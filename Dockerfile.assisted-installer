@@ -1,0 +1,3 @@
+FROM bash
+copy install_node.sh /
+ENTRYPOINT ["/install_node.sh"]
