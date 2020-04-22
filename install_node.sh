@@ -1,6 +1,7 @@
 #!/usr/local/bin/bash
 set -euo pipefail
 
+# Change this to the MCD image from the relevant openshift release image (will require pull secret)
 MACHINE_CONFIG_IMAGE=docker.io/eranco/mcd:latest
 INSTALL_DIR=/opt/insall-dir
 podman_run() {
@@ -20,6 +21,7 @@ bootstrap() {
   echo "Writing bootstrap ignition to disk"
   podman_run \
     --volume "/:/rootfs:rw" \
+    --volume "/usr/bin/rpm-ostree:/usr/bin/rpm-ostree" \
     --privileged \
     --entrypoint /machine-config-daemon \
     "${MACHINE_CONFIG_IMAGE}" \
