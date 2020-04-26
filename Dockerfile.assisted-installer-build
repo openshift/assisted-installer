@@ -1,0 +1,6 @@
+FROM golang:1.13
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.24.0
+RUN go get -u golang.org/x/tools/cmd/goimports
+RUN apt-get update && apt-get install -y docker.io libvirt-clients awscli \
+ && rm -rf /var/lib/apt/lists/*
+
