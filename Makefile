@@ -1,9 +1,23 @@
-INSTALLER := $(or ${INSTALLER},quay.io/eranco74/assisted-installer:latest)
+INSTALLER := $(or ${INSTALLER},quay.io/eranco74/assisted-installer:stable)
 
-all: push
+all: image
 
-build:
+lint:
+	golangci-lint run -v
+
+format:
+	goimports -w -l cmd/ internal/
+
+build/installer: lint
+	mkdir -p build
+	CGO_ENABLED=0 go build -o build/installer src/main/main.go
+
+image: build/installer
 	docker build -f Dockerfile.assisted-installer . -t $(INSTALLER)
 
-push: build
+push: image
 	docker push $(INSTALLER)
+
+clean:
+	rm -rf build
+
