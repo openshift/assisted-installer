@@ -8,6 +8,7 @@ import (
 	"syscall"
 )
 
+//go:generate mockgen -source=ops.go -package=ops -destination=mock_ops.go
 type Ops interface {
 	ExecPrivilegeCommand(command string, args ...string) (string, error)
 	ExecCommand(command string, args ...string) (string, error)

@@ -183,7 +183,7 @@ func (i *installer) patchEtcd(kubeconfigPath string) {
 func (i *installer) waitForBootkube() {
 	i.log.Infof("Waiting for bootkube to complete")
 	for ok := true; ok; {
-		out, _ := i.ops.ExecPrivilegeCommand("/bin/bash", "-c", "systemctl status bootkube.service | grep 'bootkube.service: Succeeded' | wc -l")
+		out, _ := i.ops.ExecPrivilegeCommand("bash", "-c", "systemctl status bootkube.service | grep 'bootkube.service: Succeeded' | wc -l")
 		if out == "1" {
 			break
 		}

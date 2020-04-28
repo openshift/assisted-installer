@@ -8,6 +8,12 @@ lint:
 format:
 	goimports -w -l cmd/ internal/
 
+generate:
+	go generate $(shell go list ./...)
+
+unit-test: generate
+	go test -v $(shell go list ./...) -cover
+
 build/installer: lint
 	mkdir -p build
 	CGO_ENABLED=0 go build -o build/installer src/main/main.go
