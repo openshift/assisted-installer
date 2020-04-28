@@ -1,4 +1,4 @@
-INSTALLER := $(or ${INSTALLER},quay.io/eranco74/assisted-installer:stable)
+INSTALLER := $(or ${INSTALLER},quay.io/ocpmetal/assisted-installer:stable)
 
 all: image
 
