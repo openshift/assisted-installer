@@ -1,7 +1,10 @@
-name: unit-test
+name: build
 
 on:
   push:
+    branches:
+      - master
+  pull_request:
     branches:
       - master
 
@@ -26,6 +29,8 @@ jobs:
       run: |
         skipper make
     - name: Publish to Registry
+      # Publish the image only in case of push to master
+      if: github.event_name != 'pull_request'
       uses: elgohr/Publish-Docker-Github-Action@2.14
       with:
         name: assisted-installer:stable
