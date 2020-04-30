@@ -169,7 +169,7 @@ func (i *installer) waitForReadyMasterNodes(kubeconfigPath string) {
 func (i *installer) patchEtcd(kubeconfigPath string) {
 	i.log.Info("Patching etcd")
 	for ok := true; ok; {
-		out, err := i.ops.ExecPrivilegeCommand("oc", "--kubeconfig", kubeconfigPath, "patch", "etcd",
+		out, err := i.ops.ExecPrivilegeCommand("until", "oc", "--kubeconfig", kubeconfigPath, "patch", "etcd",
 			"cluster", "-p", `{"spec": {"unsupportedConfigOverrides": {"useUnsupportedUnsafeNonHANonProductionUnstableEtcd": true}}}`, "--type", "merge")
 		if err == nil {
 			i.log.Info(out)

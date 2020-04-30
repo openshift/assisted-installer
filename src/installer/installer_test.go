@@ -87,7 +87,7 @@ var _ = Describe("installer master role", func() {
 			).Return("2", nil).Times(1)
 		}
 		patchEtcdSuccess := func() {
-			mockops.EXPECT().ExecPrivilegeCommand("oc", "--kubeconfig", filepath.Join(installDir, kubeconfig),
+			mockops.EXPECT().ExecPrivilegeCommand("until", "oc", "--kubeconfig", filepath.Join(installDir, kubeconfig),
 				"patch", "etcd", "cluster", "-p",
 				`{"spec": {"unsupportedConfigOverrides": {"useUnsupportedUnsafeNonHANonProductionUnstableEtcd": true}}}`,
 				"--type", "merge")
