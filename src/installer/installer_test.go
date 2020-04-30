@@ -65,7 +65,7 @@ var _ = Describe("installer master role", func() {
 		}
 		startServicesSuccess := func() {
 			services := []string{"bootkube.service", "progress.service", "approve-csr.service"}
-			for i, _ := range services {
+			for i := range services {
 				mockops.EXPECT().ExecPrivilegeCommand("systemctl", "start", services[i]).Return("", nil).Times(1)
 			}
 		}
