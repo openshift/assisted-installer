@@ -3,7 +3,7 @@ name: unit-test
 on:
   push:
     branches:
-      - eran/workflow
+      - master
 
 jobs:
   build:
