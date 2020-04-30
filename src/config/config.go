@@ -6,12 +6,12 @@ import (
 )
 
 type Config struct {
-	Role          string
-	ClusterID     string
-	Device        string
-	S3EndpointURL string
-	S3Bucket      string
-	Verbose       bool
+	Role      string
+	ClusterID string
+	Device    string
+	Host      string
+	Port      int
+	Verbose   bool
 }
 
 var GlobalConfig Config
@@ -26,8 +26,8 @@ func ProcessArgs() {
 	flag.StringVar(&ret.Role, "role", "master", "The node role")
 	flag.StringVar(&ret.ClusterID, "cluster-id", "", "The cluster id")
 	flag.StringVar(&ret.Device, "boot-device", "", "The boot device")
-	flag.StringVar(&ret.S3EndpointURL, "s3-endpoint", "", "The s3 endpoint url for fetching files")
-	flag.StringVar(&ret.S3Bucket, "s3-bucket", "test", "The s3 bucket for fetching files")
+	flag.StringVar(&ret.Host, "host", "", "The BM inventory host address")
+	flag.IntVar(&ret.Port, "port", 80, "The BM inventory port")
 	flag.BoolVar(&ret.Verbose, "verbose", false, "Increase verbosity, set log level to debug")
 	h := flag.Bool("help", false, "Help message")
 	flag.Parse()

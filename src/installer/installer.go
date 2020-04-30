@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/eranco74/assisted-installer/src/config"
 	"github.com/eranco74/assisted-installer/src/ops"
+	"github.com/eranco74/assisted-installer/src/inventory_client"
 	"github.com/sirupsen/logrus"
 	"path/filepath"
 	"time"
@@ -28,13 +29,15 @@ type installer struct {
 	config.Config
 	log *logrus.Logger
 	ops ops.Ops
+	ic inventory_client.InventoryClient
 }
 
-func NewAssistedInstaller(log *logrus.Logger, cfg config.Config, ops ops.Ops) *installer {
+func NewAssistedInstaller(log *logrus.Logger, cfg config.Config, ops ops.Ops, ic inventory_client.InventoryClient) *installer {
 	return &installer{
 		log:    log,
 		Config: cfg,
 		ops:    ops,
+		ic:    ic,
 	}
 }
 
@@ -108,16 +111,14 @@ func (i *installer) runBootstrap() error {
 	return nil
 }
 
-func (i *installer) getFileFromService(fileName string) (string, error) {
-	i.log.Infof("Getting %s file", fileName)
-	fileUrl := fmt.Sprintf("%s/%s/%s/%s", i.Config.S3EndpointURL, i.Config.S3Bucket, i.Config.ClusterID, fileName)
-	dest := filepath.Join(installDir, fileName)
-	out, err := i.ops.ExecPrivilegeCommand("curl", "-s", fileUrl, "-o", dest)
-	if err != nil {
-		i.log.Errorf("Failed to fetch file (%s) from server. out: %s, err: %s", fileName, out, err)
-		return "", err
+func (i *installer) getFileFromService(filename string) (string, error) {
+	i.log.Infof("Getting %s file", filename)
+	dest := filepath.Join(installDir, filename)
+	err := i.ic.DownloadFile(filename, dest)
+	if err !=  nil {
+		i.log.Errorf("Failed to fetch file (%s) from server. err: %s", filename, err)
 	}
-	return dest, nil
+	return dest, err
 }
 
 func (i *installer) waitForControlPlane() error{

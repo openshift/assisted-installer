@@ -3,6 +3,7 @@ package installer
 import (
 	"fmt"
 	"github.com/eranco74/assisted-installer/src/config"
+	"github.com/eranco74/assisted-installer/src/inventory_client"
 	"github.com/eranco74/assisted-installer/src/ops"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
@@ -23,18 +24,18 @@ var _ = Describe("installer master role", func() {
 		l            = logrus.New()
 		ctrl    *gomock.Controller
 		mockops      *ops.MockOps
+		mockbmclient      *inventory_client.MockInventoryClient
 		i            *installer
 		bootstrapIgn = "bootstrap.ign"
 		masterIgn    = "master.ign"
 	)
 	device := "/dev/vda"
-	baseUrl := "https://s3.com/test/cluster-id/"
 	l.SetOutput(ioutil.Discard)
 	mkdirSuccess := func() {
 		mockops.EXPECT().Mkdir(installDir).Return(nil).Times(1)
 	}
-	curlSuccess := func(fileName string) {
-		mockops.EXPECT().ExecPrivilegeCommand("curl", "-s", baseUrl+fileName, "-o", filepath.Join(installDir, fileName)).Return("", nil).Times(1)
+	downloadFileSuccess := func(fileName string) {
+		mockbmclient.EXPECT().DownloadFile(fileName, filepath.Join(installDir, fileName)).Return(nil).Times(1)
 	}
 	writeToDiskSuccess := func() {
 		mockops.EXPECT().WriteImageToDisk(filepath.Join(installDir, "master.ign"), device).Return(nil).Times(1)
@@ -45,12 +46,13 @@ var _ = Describe("installer master role", func() {
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockops = ops.NewMockOps(ctrl)
+		mockbmclient = inventory_client.NewMockInventoryClient(ctrl)
 	})
 
 	Context("Bootstrap role", func() {
-		conf := config.Config{Role: "bootstrap", ClusterID: "cluster-id", Device: "/dev/vda", S3EndpointURL: "https://s3.com", S3Bucket: "test"}
+		conf := config.Config{Role: "bootstrap", ClusterID: "cluster-id", Device: "/dev/vda", Host: "https://bm-inventory.com", Port: 80}
 		BeforeEach(func() {
-			i = NewAssistedInstaller(l, conf, mockops)
+			i = NewAssistedInstaller(l, conf, mockops, mockbmclient)
 		})
 		extractSuccess := func() {
 			mockops.EXPECT().ExecPrivilegeCommand(
@@ -98,13 +100,12 @@ var _ = Describe("installer master role", func() {
 		bootkubeStatusSuccess := func() {
 			mockops.EXPECT().ExecPrivilegeCommand("systemctl", "status", "bootkube.service").Return("1", nil).Times(1)
 		}
-		conf = config.Config{Role: "bootstrap", ClusterID: "cluster-id", Device: "/dev/vda", S3EndpointURL: "https://s3.com", S3Bucket: "test"}
 		It("bootstrap role happy flow", func() {
 			mkdirSuccess()
-			curlSuccess(bootstrapIgn)
+			downloadFileSuccess(bootstrapIgn)
 			extractSuccess()
 			startServicesSuccess()
-			curlSuccess(kubeconfig)
+			downloadFileSuccess(kubeconfig)
 			patchEtcdSuccess()
 			GetMasterNodesSucccess()
 			GetNodesSucccess()
@@ -112,7 +113,7 @@ var _ = Describe("installer master role", func() {
 			waitForBootkubeSuccess()
 			bootkubeStatusSuccess()
 			//master flow:
-			curlSuccess(masterIgn)
+			downloadFileSuccess(masterIgn)
 			writeToDiskSuccess()
 			rebootSuccess()
 			ret := i.InstallNode()
@@ -121,13 +122,13 @@ var _ = Describe("installer master role", func() {
 
 	})
 	Context("Master role", func() {
-		conf := config.Config{Role: "master", ClusterID: "cluster-id", Device: "/dev/vda", S3EndpointURL: "https://s3.com", S3Bucket: "test"}
+		conf := config.Config{Role: "master", ClusterID: "cluster-id", Device: "/dev/vda", Host: "https://bm-inventory.com", Port: 80}
 		BeforeEach(func() {
-			i = NewAssistedInstaller(l, conf, mockops)
+			i = NewAssistedInstaller(l, conf, mockops, mockbmclient)
 		})
 		It("master role happy flow", func() {
 			mkdirSuccess()
-			curlSuccess(masterIgn)
+			downloadFileSuccess(masterIgn)
 			writeToDiskSuccess()
 			rebootSuccess()
 			ret := i.InstallNode()
@@ -142,14 +143,13 @@ var _ = Describe("installer master role", func() {
 		It("master role failed to get ignition", func() {
 			mkdirSuccess()
 			err := fmt.Errorf("failed to fetch file")
-			mockops.EXPECT().ExecPrivilegeCommand("curl", "-s", baseUrl+masterIgn,
-				"-o", filepath.Join(installDir, masterIgn)).Return("", err).Times(1)
+			mockbmclient.EXPECT().DownloadFile(masterIgn, filepath.Join(installDir, masterIgn)).Return(err).Times(1)
 			ret := i.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
 		It("master role failed to write image to disk", func() {
 			mkdirSuccess()
-			curlSuccess(masterIgn)
+			downloadFileSuccess(masterIgn)
 			err := fmt.Errorf("failed to write image to disk")
 			mockops.EXPECT().WriteImageToDisk(filepath.Join(installDir, masterIgn), device).Return(err).Times(1)
 			ret := i.InstallNode()
@@ -157,7 +157,7 @@ var _ = Describe("installer master role", func() {
 		})
 		It("master role failed to reboot", func() {
 			mkdirSuccess()
-			curlSuccess(masterIgn)
+			downloadFileSuccess(masterIgn)
 			writeToDiskSuccess()
 			err := fmt.Errorf("failed to reboot")
 			mockops.EXPECT().Reboot().Return(err).Times(1)
