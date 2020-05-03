@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/eranco74/assisted-installer/src/k8s_client"
+
 	"github.com/eranco74/assisted-installer/src/config"
 	"github.com/eranco74/assisted-installer/src/inventory_client"
 	"github.com/eranco74/assisted-installer/src/ops"
@@ -26,20 +28,21 @@ var _ = Describe("installer master role", func() {
 		ctrl         *gomock.Controller
 		mockops      *ops.MockOps
 		mockbmclient *inventory_client.MockInventoryClient
+		mockk8sclien *k8s_client.MockK8SClient
 		i            *installer
-		bootstrapIgn = "bootstrap.ign"
+		bootstrapIgn = "Bootstrap.ign"
 		masterIgn    = "master.ign"
 	)
 	device := "/dev/vda"
 	l.SetOutput(ioutil.Discard)
 	mkdirSuccess := func() {
-		mockops.EXPECT().Mkdir(installDir).Return(nil).Times(1)
+		mockops.EXPECT().Mkdir(InstallDir).Return(nil).Times(1)
 	}
 	downloadFileSuccess := func(fileName string) {
-		mockbmclient.EXPECT().DownloadFile(fileName, filepath.Join(installDir, fileName)).Return(nil).Times(1)
+		mockbmclient.EXPECT().DownloadFile(fileName, filepath.Join(InstallDir, fileName)).Return(nil).Times(1)
 	}
 	writeToDiskSuccess := func() {
-		mockops.EXPECT().WriteImageToDisk(filepath.Join(installDir, "master.ign"), device).Return(nil).Times(1)
+		mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, "master.ign"), device).Return(nil).Times(1)
 	}
 	rebootSuccess := func() {
 		mockops.EXPECT().Reboot().Return(nil).Times(1)
@@ -48,12 +51,13 @@ var _ = Describe("installer master role", func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockops = ops.NewMockOps(ctrl)
 		mockbmclient = inventory_client.NewMockInventoryClient(ctrl)
+		mockk8sclien = k8s_client.NewMockK8SClient(ctrl)
 	})
 
 	Context("Bootstrap role", func() {
-		conf := config.Config{Role: "bootstrap", ClusterID: "cluster-id", Device: "/dev/vda", Host: "https://bm-inventory.com", Port: 80}
+		conf := config.Config{Role: "Bootstrap", ClusterID: "cluster-id", Device: "/dev/vda", Host: "https://bm-inventory.com", Port: 80}
 		BeforeEach(func() {
-			i = NewAssistedInstaller(l, conf, mockops, mockbmclient)
+			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, mockk8sclien)
 		})
 		extractSuccess := func() {
 			mockops.EXPECT().ExecPrivilegeCommand(
@@ -64,7 +68,7 @@ var _ = Describe("installer master role", func() {
 				"--entrypoint", "/machine-config-daemon",
 				"docker.io/eranco/mcd:latest",
 				"start", "--node-name", "localhost", "--root-mount", "/rootfs", "--once-from",
-				filepath.Join(installDir, "bootstrap.ign"), "--skip-reboot")
+				filepath.Join(InstallDir, "Bootstrap.ign"), "--skip-reboot")
 		}
 		startServicesSuccess := func() {
 			services := []string{"bootkube.service", "progress.service", "approve-csr.service"}
@@ -72,25 +76,11 @@ var _ = Describe("installer master role", func() {
 				mockops.EXPECT().ExecPrivilegeCommand("systemctl", "start", services[i]).Return("", nil).Times(1)
 			}
 		}
-		GetNodesSucccess := func() {
-
-			mockops.EXPECT().ExecPrivilegeCommand("kubectl",
-				"--kubeconfig", filepath.Join(installDir, kubeconfig), "get", "nodes").Return("2", nil).Times(2)
-		}
-		GetMasterNodesSucccess := func() {
-			mockops.EXPECT().ExecPrivilegeCommand("bash",
-				"-c",
-				fmt.Sprintf("/usr/bin/kubectl --kubeconfig %s get nodes | grep master | wc -l", filepath.Join(installDir, kubeconfig)),
-			).Return("2", nil).Times(1)
-		}
-		GetReadyNodesSucccess := func() {
-			mockops.EXPECT().ExecPrivilegeCommand("bash",
-				"-c",
-				fmt.Sprintf("/usr/bin/kubectl --kubeconfig %s get nodes | grep master | grep -v NotReady | grep Ready | wc -l", filepath.Join(installDir, kubeconfig)),
-			).Return("2", nil).Times(1)
+		WaitMasterNodesSucccess := func() {
+			mockk8sclien.EXPECT().WaitForMasterNodes(2).Return(nil).Times(1)
 		}
 		patchEtcdSuccess := func() {
-			mockops.EXPECT().ExecPrivilegeCommand("until", "oc", "--kubeconfig", filepath.Join(installDir, kubeconfig),
+			mockops.EXPECT().ExecPrivilegeCommand("until", "oc", "--Kubeconfig", filepath.Join(InstallDir, Kubeconfig),
 				"patch", "etcd", "cluster", "-p",
 				`{"spec": {"unsupportedConfigOverrides": {"useUnsupportedUnsafeNonHANonProductionUnstableEtcd": true}}}`,
 				"--type", "merge")
@@ -101,16 +91,13 @@ var _ = Describe("installer master role", func() {
 		bootkubeStatusSuccess := func() {
 			mockops.EXPECT().ExecPrivilegeCommand("systemctl", "status", "bootkube.service").Return("1", nil).Times(1)
 		}
-		It("bootstrap role happy flow", func() {
+		It("Bootstrap role happy flow", func() {
 			mkdirSuccess()
 			downloadFileSuccess(bootstrapIgn)
 			extractSuccess()
 			startServicesSuccess()
-			downloadFileSuccess(kubeconfig)
 			patchEtcdSuccess()
-			GetMasterNodesSucccess()
-			GetNodesSucccess()
-			GetReadyNodesSucccess()
+			WaitMasterNodesSucccess()
 			waitForBootkubeSuccess()
 			bootkubeStatusSuccess()
 			//master flow:
@@ -125,7 +112,7 @@ var _ = Describe("installer master role", func() {
 	Context("Master role", func() {
 		conf := config.Config{Role: "master", ClusterID: "cluster-id", Device: "/dev/vda", Host: "https://bm-inventory.com", Port: 80}
 		BeforeEach(func() {
-			i = NewAssistedInstaller(l, conf, mockops, mockbmclient)
+			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, mockk8sclien)
 		})
 		It("master role happy flow", func() {
 			mkdirSuccess()
@@ -137,14 +124,14 @@ var _ = Describe("installer master role", func() {
 		})
 		It("master role failed to create dir", func() {
 			err := fmt.Errorf("failed to create dir")
-			mockops.EXPECT().Mkdir(installDir).Return(err).Times(1)
+			mockops.EXPECT().Mkdir(InstallDir).Return(err).Times(1)
 			ret := i.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
 		It("master role failed to get ignition", func() {
 			mkdirSuccess()
 			err := fmt.Errorf("failed to fetch file")
-			mockbmclient.EXPECT().DownloadFile(masterIgn, filepath.Join(installDir, masterIgn)).Return(err).Times(1)
+			mockbmclient.EXPECT().DownloadFile(masterIgn, filepath.Join(InstallDir, masterIgn)).Return(err).Times(1)
 			ret := i.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
@@ -152,7 +139,7 @@ var _ = Describe("installer master role", func() {
 			mkdirSuccess()
 			downloadFileSuccess(masterIgn)
 			err := fmt.Errorf("failed to write image to disk")
-			mockops.EXPECT().WriteImageToDisk(filepath.Join(installDir, masterIgn), device).Return(err).Times(1)
+			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, masterIgn), device).Return(err).Times(1)
 			ret := i.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})

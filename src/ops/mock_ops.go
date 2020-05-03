@@ -5,8 +5,9 @@
 package ops
 
 import (
-	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
+
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockOps is a mock of Ops interface.

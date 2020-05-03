@@ -5,8 +5,9 @@
 package inventory_client
 
 import (
-	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
+
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockInventoryClient is a mock of InventoryClient interface.
