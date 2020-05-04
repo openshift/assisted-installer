@@ -1,15 +1,14 @@
 package main
 
 import (
+	"os"
+
 	"github.com/eranco74/assisted-installer/src/config"
 	"github.com/eranco74/assisted-installer/src/installer"
+	"github.com/eranco74/assisted-installer/src/inventory_client"
 	"github.com/eranco74/assisted-installer/src/ops"
 	"github.com/eranco74/assisted-installer/src/utils"
-	"github.com/eranco74/assisted-installer/src/inventory_client"
-	"os"
 )
-
-
 
 func main() {
 	config.ProcessArgs()

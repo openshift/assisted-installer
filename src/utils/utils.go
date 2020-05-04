@@ -1,9 +1,10 @@
 package utils
 
 import (
-	"github.com/sirupsen/logrus"
 	"io"
 	"os"
+
+	"github.com/sirupsen/logrus"
 )
 
 func InitLogger(verbose bool) *logrus.Logger {

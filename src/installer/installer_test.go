@@ -2,6 +2,10 @@ package installer
 
 import (
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
+	"testing"
+
 	"github.com/eranco74/assisted-installer/src/config"
 	"github.com/eranco74/assisted-installer/src/inventory_client"
 	"github.com/eranco74/assisted-installer/src/ops"
@@ -9,9 +13,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
-	"path/filepath"
-	"testing"
 )
 
 func TestValidator(t *testing.T) {
@@ -22,9 +23,9 @@ func TestValidator(t *testing.T) {
 var _ = Describe("installer master role", func() {
 	var (
 		l            = logrus.New()
-		ctrl    *gomock.Controller
+		ctrl         *gomock.Controller
 		mockops      *ops.MockOps
-		mockbmclient      *inventory_client.MockInventoryClient
+		mockbmclient *inventory_client.MockInventoryClient
 		i            *installer
 		bootstrapIgn = "bootstrap.ign"
 		masterIgn    = "master.ign"

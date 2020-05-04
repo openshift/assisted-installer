@@ -6,7 +6,7 @@ lint:
 	golangci-lint run -v
 
 format:
-	goimports -w -l cmd/ internal/
+	goimports -w -l src/
 
 generate:
 	go generate $(shell go list ./...)
@@ -14,7 +14,7 @@ generate:
 unit-test: generate
 	go test -v $(shell go list ./...) -cover
 
-build/installer: lint
+build/installer: lint format
 	mkdir -p build
 	CGO_ENABLED=0 go build -o build/installer src/main/main.go
 

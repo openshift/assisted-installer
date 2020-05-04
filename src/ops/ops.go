@@ -2,10 +2,11 @@ package ops
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"os/exec"
 	"strings"
 	"syscall"
+
+	"github.com/sirupsen/logrus"
 )
 
 //go:generate mockgen -source=ops.go -package=ops -destination=mock_ops.go
@@ -60,7 +61,7 @@ func (o *ops) Mkdir(dirName string) error {
 
 func (o *ops) WriteImageToDisk(ignitionPath string, device string) error {
 	o.log.Info("Writing image and ignition to disk")
-	out,  err := o.ExecPrivilegeCommand("coreos-installer", "install", "--image-url",
+	out, err := o.ExecPrivilegeCommand("coreos-installer", "install", "--image-url",
 		"https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.4/latest/rhcos-4.4.0-rc.1-x86_64-metal.x86_64.raw.gz",
 		"--insecure", "-i", ignitionPath, device)
 	o.log.Info(out)

@@ -3,14 +3,15 @@ package inventory_client
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/url"
+	"os"
+
 	"github.com/eranco74/assisted-installer/src/config"
 	"github.com/filanov/bm-inventory/client"
 	"github.com/filanov/bm-inventory/client/inventory"
 	"github.com/filanov/bm-inventory/pkg/requestid"
 	"github.com/go-openapi/strfmt"
-	"net/http"
-	"net/url"
-	"os"
 )
 
 //go:generate mockgen -source=inventory_client.go -package=inventory_client -destination=mock_inventory_client.go

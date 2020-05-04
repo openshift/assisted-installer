@@ -2,19 +2,20 @@ package installer
 
 import (
 	"fmt"
-	"github.com/eranco74/assisted-installer/src/config"
-	"github.com/eranco74/assisted-installer/src/ops"
-	"github.com/eranco74/assisted-installer/src/inventory_client"
-	"github.com/sirupsen/logrus"
 	"path/filepath"
 	"time"
+
+	"github.com/eranco74/assisted-installer/src/config"
+	"github.com/eranco74/assisted-installer/src/inventory_client"
+	"github.com/eranco74/assisted-installer/src/ops"
+	"github.com/sirupsen/logrus"
 )
 
 //const baseHref = "/api/bm-inventory/v1"
 const (
-	master          = "master"
-	bootstrap       = "bootstrap"
-	installDir     = "/opt/install-dir"
+	master     = "master"
+	bootstrap  = "bootstrap"
+	installDir = "/opt/install-dir"
 	kubeconfig = "kubeconfig"
 	// Change this to the MCD image from the relevant openshift release image
 	machineConfigImage = "docker.io/eranco/mcd:latest"
@@ -29,7 +30,7 @@ type installer struct {
 	config.Config
 	log *logrus.Logger
 	ops ops.Ops
-	ic inventory_client.InventoryClient
+	ic  inventory_client.InventoryClient
 }
 
 func NewAssistedInstaller(log *logrus.Logger, cfg config.Config, ops ops.Ops, ic inventory_client.InventoryClient) *installer {
@@ -37,7 +38,7 @@ func NewAssistedInstaller(log *logrus.Logger, cfg config.Config, ops ops.Ops, ic
 		log:    log,
 		Config: cfg,
 		ops:    ops,
-		ic:    ic,
+		ic:     ic,
 	}
 }
 
@@ -69,7 +70,7 @@ func (i *installer) InstallNode() error {
 		i.log.Errorf("Failed to write image to disk %s", err)
 		return err
 	}
-	if err = i.ops.Reboot(); err != nil{
+	if err = i.ops.Reboot(); err != nil {
 		return err
 	}
 	i.updateNodeStatus("Installed", "")
@@ -115,13 +116,13 @@ func (i *installer) getFileFromService(filename string) (string, error) {
 	i.log.Infof("Getting %s file", filename)
 	dest := filepath.Join(installDir, filename)
 	err := i.ic.DownloadFile(filename, dest)
-	if err !=  nil {
+	if err != nil {
 		i.log.Errorf("Failed to fetch file (%s) from server. err: %s", filename, err)
 	}
 	return dest, err
 }
 
-func (i *installer) waitForControlPlane() error{
+func (i *installer) waitForControlPlane() error {
 	kubeconfigPath, err := i.getFileFromService(kubeconfig)
 	if err != nil {
 		return err
