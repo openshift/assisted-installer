@@ -14,6 +14,9 @@ generate:
 unit-test: generate
 	go test -v $(shell go list ./...) -cover
 
+ut: generate
+	go test -v -coverprofile=coverage.out ./... && go tool cover -html=coverage.out && rm coverage.out
+
 build/installer: lint format
 	mkdir -p build
 	CGO_ENABLED=0 go build -o build/installer src/main/main.go
