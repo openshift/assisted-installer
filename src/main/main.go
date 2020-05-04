@@ -32,7 +32,7 @@ func main() {
 func getKubeClient(logger *logrus.Logger) k8s_client.K8SClient {
 	var kc k8s_client.K8SClient
 	// in case of bootstap download the kubeconfig and create the k8s client
-	if config.GlobalConfig.Role == installer.Bootstrap {
+	if config.GlobalConfig.Role == installer.HostRoleBootstrap {
 		kubeconfigPath, err := getKubeconfig(logger)
 		if err != nil {
 			logrus.Fatal(err)

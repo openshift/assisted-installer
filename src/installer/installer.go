@@ -13,10 +13,10 @@ import (
 
 //const baseHref = "/api/bm-inventory/v1"
 const (
-	master     = "master"
-	Bootstrap  = "Bootstrap"
-	InstallDir = "/opt/install-dir"
-	Kubeconfig = "Kubeconfig"
+	HostRoleMaster    = "master"
+	HostRoleBootstrap = "bootstrap"
+	InstallDir        = "/opt/install-dir"
+	Kubeconfig        = "kubeconfig"
 	// Change this to the MCD image from the relevant openshift release image
 	machineConfigImage = "docker.io/eranco/mcd:latest"
 	minMasterNodes     = 2
@@ -50,7 +50,7 @@ func (i *installer) InstallNode() error {
 		i.log.Errorf("Failed to create install dir: %s", err)
 		return err
 	}
-	if i.Config.Role == Bootstrap {
+	if i.Config.Role == HostRoleBootstrap {
 		err := i.runBootstrap()
 		if err != nil {
 			i.log.Errorf("Bootstrap failed %s", err)
@@ -59,8 +59,8 @@ func (i *installer) InstallNode() error {
 		if err = i.waitForControlPlane(); err != nil {
 			return err
 		}
-		i.log.Info("Setting Bootstrap node new role to master")
-		i.Config.Role = master
+		i.log.Info("Setting bootstrap node new role to master")
+		i.Config.Role = HostRoleMaster
 	}
 
 	ignitionFileName := i.Config.Role + ".ign"
@@ -111,7 +111,7 @@ func (i *installer) runBootstrap() error {
 		}
 
 	}
-	i.log.Info("Done setting up Bootstrap")
+	i.log.Info("Done setting up bootstrap")
 	return nil
 }
 
