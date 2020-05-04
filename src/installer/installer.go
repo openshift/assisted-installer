@@ -154,9 +154,7 @@ func (i *installer) waitForControlPlane() error {
 		i.log.Errorf("Timeout waiting for master nodes, %s", err)
 		return err
 	}
-
-	kubeconfigPath := filepath.Join(InstallDir, Kubeconfig)
-	i.patchEtcd(kubeconfigPath)
+	i.patchEtcd()
 	i.waitForBootkube()
 	return nil
 }
@@ -170,18 +168,13 @@ func (i *installer) UpdateHostStatus(newStatus string) {
 	}
 }
 
-func (i *installer) patchEtcd(kubeconfigPath string) {
+func (i *installer) patchEtcd() {
 	//TODO: Change this method to use k8s client
 	i.log.Info("Patching etcd")
-	for {
-		out, err := i.ops.ExecPrivilegeCommand("oc", "--kubeconfig", kubeconfigPath, "patch", "etcd",
-			"cluster", "-p", `{"spec": {"unsupportedConfigOverrides": {"useUnsupportedUnsafeNonHANonProductionUnstableEtcd": true}}}`, "--type", "merge")
-		if err == nil {
-			i.log.Info(out)
-			break
-		} else {
-			i.log.Infof("Failed to patch etcd: %s", out)
-		}
+	if err := i.kc.PatchEtcd(); err == nil {
+		i.log.Info("etcd patched")
+	} else {
+		i.log.Error(err)
 	}
 }
 

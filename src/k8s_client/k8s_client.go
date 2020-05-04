@@ -4,8 +4,11 @@ import (
 	"context"
 	"time"
 
+	"k8s.io/apimachinery/pkg/types"
+
 	"k8s.io/client-go/tools/clientcmd"
 
+	operatorv1 "github.com/openshift/client-go/operator/clientset/versioned"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -18,11 +21,13 @@ import (
 type K8SClient interface {
 	ListMasterNodes() (*v1.NodeList, error)
 	WaitForMasterNodes(minMasterNodes int) error
+	PatchEtcd() error
 }
 
 type k8sClient struct {
-	log    *logrus.Logger
-	client *kubernetes.Clientset
+	log      *logrus.Logger
+	client   *kubernetes.Clientset
+	ocClient *operatorv1.Clientset
 }
 
 func NewK8SClient(configPath string, logger *logrus.Logger) (K8SClient, error) {
@@ -34,7 +39,11 @@ func NewK8SClient(configPath string, logger *logrus.Logger) (K8SClient, error) {
 	if err != nil {
 		return &k8sClient{}, errors.Wrap(err, "creating a Kubernetes client")
 	}
-	return &k8sClient{logger, client}, nil
+	ocClient, err := operatorv1.NewForConfig(config)
+	if err != nil {
+		return &k8sClient{}, errors.Wrap(err, "creating a Kubernetes client")
+	}
+	return &k8sClient{logger, client, ocClient}, nil
 }
 
 func (c *k8sClient) ListMasterNodes() (*v1.NodeList, error) {
@@ -66,5 +75,16 @@ func (c *k8sClient) WaitForMasterNodes(minMasterNodes int) error {
 	if err != nil && err != context.Canceled {
 		return errors.Wrap(err, "waiting for master nodes")
 	}
+	return nil
+}
+
+func (c *k8sClient) PatchEtcd() error {
+	c.log.Info("Patching etcd")
+	data := []byte(`{"spec": {"unsupportedConfigOverrides": {"useUnsupportedUnsafeNonHANonProductionUnstableEtcd": true}}}`)
+	result, err := c.ocClient.OperatorV1().Etcds().Patch(context.Background(), "cluster", types.MergePatchType, data, metav1.PatchOptions{})
+	if err != nil {
+		return errors.Wrap(err, "Failed to patch etcd")
+	}
+	c.log.Info(result)
 	return nil
 }

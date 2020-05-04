@@ -94,10 +94,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclien.EXPECT().WaitForMasterNodes(2).Return(nil).Times(1)
 		}
 		patchEtcdSuccess := func() {
-			mockops.EXPECT().ExecPrivilegeCommand("oc", "--kubeconfig", filepath.Join(InstallDir, Kubeconfig),
-				"patch", "etcd", "cluster", "-p",
-				`{"spec": {"unsupportedConfigOverrides": {"useUnsupportedUnsafeNonHANonProductionUnstableEtcd": true}}}`,
-				"--type", "merge")
+			mockk8sclien.EXPECT().PatchEtcd().Return(nil).Times(1)
 		}
 		waitForBootkubeSuccess := func() {
 			mockops.EXPECT().ExecPrivilegeCommand("bash", "-c", "systemctl status bootkube.service | grep 'bootkube.service: Succeeded' | wc -l").Return("1", nil).Times(1)

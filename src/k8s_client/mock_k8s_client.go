@@ -62,3 +62,17 @@ func (mr *MockK8SClientMockRecorder) WaitForMasterNodes(minMasterNodes interface
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForMasterNodes", reflect.TypeOf((*MockK8SClient)(nil).WaitForMasterNodes), minMasterNodes)
 }
+
+// PatchEtcd mocks base method.
+func (m *MockK8SClient) PatchEtcd() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PatchEtcd")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PatchEtcd indicates an expected call of PatchEtcd.
+func (mr *MockK8SClientMockRecorder) PatchEtcd() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchEtcd", reflect.TypeOf((*MockK8SClient)(nil).PatchEtcd))
+}

@@ -10,6 +10,7 @@ import (
 	"github.com/eranco74/assisted-installer/src/k8s_client"
 	"github.com/eranco74/assisted-installer/src/ops"
 	"github.com/eranco74/assisted-installer/src/utils"
+
 	"github.com/sirupsen/logrus"
 )
 

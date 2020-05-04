@@ -10,13 +10,13 @@ require (
 	github.com/golang/mock v1.4.0
 	github.com/onsi/ginkgo v1.12.0
 	github.com/onsi/gomega v1.9.0
+	github.com/openshift/client-go v0.0.0-20200422192633-6f6c07fc2a70
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.6.0
 	github.com/vincent-petithory/dataurl v0.0.0-20191104211930-d1553a71de50
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
-	google.golang.org/appengine v1.6.5
-	k8s.io/api v0.17.3
-	k8s.io/apimachinery v0.17.3
+	k8s.io/api v0.18.2
+	k8s.io/apimachinery v0.18.2
 	k8s.io/client-go v11.0.0+incompatible
 )
 
