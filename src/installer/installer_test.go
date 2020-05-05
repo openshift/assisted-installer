@@ -80,7 +80,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclien.EXPECT().WaitForMasterNodes(2).Return(nil).Times(1)
 		}
 		patchEtcdSuccess := func() {
-			mockops.EXPECT().ExecPrivilegeCommand("until", "oc", "--kubeconfig", filepath.Join(InstallDir, Kubeconfig),
+			mockops.EXPECT().ExecPrivilegeCommand("oc", "--kubeconfig", filepath.Join(InstallDir, Kubeconfig),
 				"patch", "etcd", "cluster", "-p",
 				`{"spec": {"unsupportedConfigOverrides": {"useUnsupportedUnsafeNonHANonProductionUnstableEtcd": true}}}`,
 				"--type", "merge")

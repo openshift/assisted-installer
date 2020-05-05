@@ -146,7 +146,7 @@ func (i *installer) patchEtcd(kubeconfigPath string) {
 	//TODO: Change this method to use k8s client
 	i.log.Info("Patching etcd")
 	for {
-		out, err := i.ops.ExecPrivilegeCommand("until", "oc", "--Kubeconfig", kubeconfigPath, "patch", "etcd",
+		out, err := i.ops.ExecPrivilegeCommand("oc", "--kubeconfig", kubeconfigPath, "patch", "etcd",
 			"cluster", "-p", `{"spec": {"unsupportedConfigOverrides": {"useUnsupportedUnsafeNonHANonProductionUnstableEtcd": true}}}`, "--type", "merge")
 		if err == nil {
 			i.log.Info(out)
