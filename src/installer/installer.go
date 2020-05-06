@@ -1,6 +1,7 @@
 package installer
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/eranco74/assisted-installer/src/k8s_client"
@@ -23,9 +24,18 @@ const (
 	dockerConfigFile   = "/root/.docker/config.json"
 )
 
+const (
+	StartingInstallation = "Starting Installation"
+	RunningBootstrap     = "Running bootstrap"
+	WaitForControlPlane  = "Waiting for control plane"
+	WritingImageToDisk   = "Writing image to disk"
+	Reboot               = "Reboot"
+)
+
 // Installer will run the install operations on the node
 type Installer interface {
 	InstallNode() error
+	UpdateHostStatus(newStatus string)
 }
 
 type installer struct {
@@ -47,16 +57,19 @@ func NewAssistedInstaller(log *logrus.Logger, cfg config.Config, ops ops.Ops, ic
 }
 
 func (i *installer) InstallNode() error {
+	i.UpdateHostStatus(StartingInstallation)
 	if err := i.ops.Mkdir(InstallDir); err != nil {
 		i.log.Errorf("Failed to create install dir: %s", err)
 		return err
 	}
 	if i.Config.Role == HostRoleBootstrap {
+		i.UpdateHostStatus(RunningBootstrap)
 		err := i.runBootstrap()
 		if err != nil {
 			i.log.Errorf("Bootstrap failed %s", err)
 			return err
 		}
+		i.UpdateHostStatus(WaitForControlPlane)
 		if err = i.waitForControlPlane(); err != nil {
 			return err
 		}
@@ -64,20 +77,23 @@ func (i *installer) InstallNode() error {
 		i.Config.Role = HostRoleMaster
 	}
 
+	i.UpdateHostStatus(fmt.Sprintf("Runing %s installation", i.Config.Role))
 	ignitionFileName := i.Config.Role + ".ign"
 	ignitionPath, err := i.getFileFromService(ignitionFileName)
 	if err != nil {
 		return err
 	}
+	i.UpdateHostStatus(WritingImageToDisk)
+	// TODO report image to disk progress
 	err = i.ops.WriteImageToDisk(ignitionPath, i.Device)
 	if err != nil {
 		i.log.Errorf("Failed to write image to disk %s", err)
 		return err
 	}
+	i.UpdateHostStatus(Reboot)
 	if err = i.ops.Reboot(); err != nil {
 		return err
 	}
-	i.updateNodeStatus("Installed", "")
 	return nil
 }
 
@@ -145,9 +161,13 @@ func (i *installer) waitForControlPlane() error {
 	return nil
 }
 
-func (i *installer) updateNodeStatus(newStatus string, reason string) {
-	i.log.Infof("Updating node installation status, status: %s, reason: %s", newStatus, reason)
-	//TODO: add the API call
+func (i *installer) UpdateHostStatus(newStatus string) {
+	i.log.Infof("Updating node installation status: %s", newStatus)
+	if i.HostID != "" {
+		if err := i.ic.UpdateHostStatus(newStatus); err != nil {
+			i.log.Errorf("Failed to update node installation status, %s", err)
+		}
+	}
 }
 
 func (i *installer) patchEtcd(kubeconfigPath string) {

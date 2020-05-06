@@ -8,6 +8,7 @@ import (
 type Config struct {
 	Role      string
 	ClusterID string
+	HostID    string
 	Device    string
 	Host      string
 	Port      int
@@ -25,6 +26,7 @@ func ProcessArgs() {
 	ret := &GlobalConfig
 	flag.StringVar(&ret.Role, "role", "master", "The node role")
 	flag.StringVar(&ret.ClusterID, "cluster-id", "", "The cluster id")
+	flag.StringVar(&ret.HostID, "host-id", "", "This host id")
 	flag.StringVar(&ret.Device, "boot-device", "", "The boot device")
 	flag.StringVar(&ret.Host, "host", "", "The BM inventory host address")
 	flag.IntVar(&ret.Port, "port", 80, "The BM inventory port")

@@ -46,3 +46,17 @@ func (mr *MockInventoryClientMockRecorder) DownloadFile(filename, dest interface
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DownloadFile", reflect.TypeOf((*MockInventoryClient)(nil).DownloadFile), filename, dest)
 }
+
+// UpdateHostStatus mocks base method.
+func (m *MockInventoryClient) UpdateHostStatus(newStatus string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateHostStatus", newStatus)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateHostStatus indicates an expected call of UpdateHostStatus.
+func (mr *MockInventoryClientMockRecorder) UpdateHostStatus(newStatus interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHostStatus", reflect.TypeOf((*MockInventoryClient)(nil).UpdateHostStatus), newStatus)
+}

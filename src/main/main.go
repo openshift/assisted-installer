@@ -13,11 +13,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	Failed = "Installation failed"
+	Done   = "Done"
+)
+
 func main() {
 	config.ProcessArgs()
 	logger := utils.InitLogger(config.GlobalConfig.Verbose)
 	logger.Infof("Assisted installer started. Configuration is:\n %+v", config.GlobalConfig)
-
 	installer := installer.NewAssistedInstaller(logger,
 		config.GlobalConfig,
 		ops.NewOps(logger),
@@ -25,8 +29,10 @@ func main() {
 		getKubeClient(logger),
 	)
 	if err := installer.InstallNode(); err != nil {
+		installer.UpdateHostStatus(Failed)
 		os.Exit(1)
 	}
+	installer.UpdateHostStatus(Done)
 }
 
 func getKubeClient(logger *logrus.Logger) k8s_client.K8SClient {

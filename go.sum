@@ -93,6 +93,8 @@ github.com/evanphx/json-patch v4.5.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLi
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
 github.com/filanov/bm-inventory v0.0.0-20200503085645-1f0552ea36c3 h1:nd6zFBuxHq0Y5iKXhtAvdCIaa0hycXk4KYhCk1qXtgQ=
 github.com/filanov/bm-inventory v0.0.0-20200503085645-1f0552ea36c3/go.mod h1:uqEsTWF6L3Yr28GkgJTPdyEuUxmkOXUxl022bWlIIzU=
+github.com/filanov/bm-inventory v0.0.0-20200506054351-1b3483457026 h1:M13/TMsBaig7t5LiYcYPe/h7yvh7EeJmaQzy2YcXaUU=
+github.com/filanov/bm-inventory v0.0.0-20200506054351-1b3483457026/go.mod h1:uqEsTWF6L3Yr28GkgJTPdyEuUxmkOXUxl022bWlIIzU=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/ghodss/yaml v0.0.0-20150909031657-73d445a93680/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
