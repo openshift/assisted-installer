@@ -65,8 +65,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				"--volume", "/:/rootfs:rw",
 				"--volume", "/usr/bin/rpm-ostree:/usr/bin/rpm-ostree",
 				"--privileged",
-				"--entrypoint", "/machine-config-daemon",
-				"docker.io/eranco/mcd:latest",
+				"--entrypoint", "/usr/bin/machine-config-daemon",
+				machineConfigImage,
 				"start", "--node-name", "localhost", "--root-mount", "/rootfs", "--once-from",
 				filepath.Join(InstallDir, bootstrapIgn), "--skip-reboot")
 		}
@@ -91,6 +91,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		bootkubeStatusSuccess := func() {
 			mockops.EXPECT().ExecPrivilegeCommand("systemctl", "status", "bootkube.service").Return("1", nil).Times(1)
 		}
+		extractFromIgnition := func() {
+			mockops.EXPECT().ExtractFromIgnition(filepath.Join(InstallDir, bootstrapIgn), dockerConfigFile).Return(nil).Times(1)
+		}
 		It("HostRoleBootstrap role happy flow", func() {
 			mkdirSuccess()
 			downloadFileSuccess(bootstrapIgn)
@@ -104,6 +107,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			downloadFileSuccess(masterIgn)
 			writeToDiskSuccess()
 			rebootSuccess()
+			extractFromIgnition()
 			ret := i.InstallNode()
 			Expect(ret).Should(BeNil())
 		})

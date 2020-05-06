@@ -114,3 +114,17 @@ func (mr *MockOpsMockRecorder) Reboot() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reboot", reflect.TypeOf((*MockOps)(nil).Reboot))
 }
+
+// ExtractFromIgnition mocks base method.
+func (m *MockOps) ExtractFromIgnition(ignitionPath, fileToExtract string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ExtractFromIgnition", ignitionPath, fileToExtract)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ExtractFromIgnition indicates an expected call of ExtractFromIgnition.
+func (mr *MockOpsMockRecorder) ExtractFromIgnition(ignitionPath, fileToExtract interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExtractFromIgnition", reflect.TypeOf((*MockOps)(nil).ExtractFromIgnition), ignitionPath, fileToExtract)
+}

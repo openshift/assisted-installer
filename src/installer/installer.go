@@ -18,8 +18,9 @@ const (
 	InstallDir        = "/opt/install-dir"
 	Kubeconfig        = "kubeconfig"
 	// Change this to the MCD image from the relevant openshift release image
-	machineConfigImage = "docker.io/eranco/mcd:latest"
+	machineConfigImage = "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:301586e92bbd07ead7c5d3f342899e5923d4ef2e0f1c0cf08ecaae96568d16ed"
 	minMasterNodes     = 2
+	dockerConfigFile   = "/root/.docker/config.json"
 )
 
 // Installer will run the install operations on the node
@@ -87,12 +88,19 @@ func (i *installer) runBootstrap() error {
 	if err != nil {
 		return err
 	}
+
+	// We need to extract pull secret from ignition and save it in docker config
+	// to be able to pull MCO official image
+	if err = i.ops.ExtractFromIgnition(ignitionPath, dockerConfigFile); err != nil {
+		return err
+	}
+
 	i.log.Infof("Extracting ignition to disk")
 	out, err := i.ops.ExecPrivilegeCommand("podman", "run", "--net", "host",
 		"--volume", "/:/rootfs:rw",
 		"--volume", "/usr/bin/rpm-ostree:/usr/bin/rpm-ostree",
 		"--privileged",
-		"--entrypoint", "/machine-config-daemon",
+		"--entrypoint", "/usr/bin/machine-config-daemon",
 		machineConfigImage,
 		"start", "--node-name", "localhost", "--root-mount", "/rootfs", "--once-from", ignitionPath, "--skip-reboot")
 	if err != nil {
