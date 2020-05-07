@@ -1,10 +1,13 @@
 package installer
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
+	"time"
 
 	"github.com/eranco74/assisted-installer/src/k8s_client"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/eranco74/assisted-installer/src/config"
 	"github.com/eranco74/assisted-installer/src/inventory_client"
@@ -57,23 +60,20 @@ func NewAssistedInstaller(log *logrus.Logger, cfg config.Config, ops ops.Ops, ic
 }
 
 func (i *installer) InstallNode() error {
+	i.log.Infof("Installing node with role: %s", i.Config.Role)
 	i.UpdateHostStatus(StartingInstallation)
 	if err := i.ops.Mkdir(InstallDir); err != nil {
 		i.log.Errorf("Failed to create install dir: %s", err)
 		return err
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	errs, _ := errgroup.WithContext(ctx)
+	//cancel the context in case this method ends
+	defer cancel()
 	if i.Config.Role == HostRoleBootstrap {
-		i.UpdateHostStatus(RunningBootstrap)
-		err := i.runBootstrap()
-		if err != nil {
-			i.log.Errorf("Bootstrap failed %s", err)
-			return err
-		}
-		i.UpdateHostStatus(WaitForControlPlane)
-		if err = i.waitForControlPlane(); err != nil {
-			return err
-		}
-		i.log.Info("Setting bootstrap node new role to master")
+		errs.Go(func() error {
+			return i.runBootstrap(ctx)
+		})
 		i.Config.Role = HostRoleMaster
 	}
 
@@ -90,6 +90,10 @@ func (i *installer) InstallNode() error {
 		i.log.Errorf("Failed to write image to disk %s", err)
 		return err
 	}
+	if err = errs.Wait(); err != nil {
+		i.log.Error(err)
+		return err
+	}
 	i.UpdateHostStatus(Reboot)
 	if err = i.ops.Reboot(); err != nil {
 		return err
@@ -97,9 +101,24 @@ func (i *installer) InstallNode() error {
 	return nil
 }
 
-func (i *installer) runBootstrap() error {
-	i.log.Infof("Installing node with role: %s", i.Config.Role)
-	ignitionFileName := i.Config.Role + ".ign"
+func (i *installer) runBootstrap(ctx context.Context) error {
+	i.UpdateHostStatus(RunningBootstrap)
+	err := i.startBootstrap()
+	if err != nil {
+		i.log.Errorf("Bootstrap failed %s", err)
+		return err
+	}
+	i.UpdateHostStatus(WaitForControlPlane)
+	if err = i.waitForControlPlane(ctx); err != nil {
+		return err
+	}
+	i.log.Info("Setting bootstrap node new role to master")
+	return nil
+}
+
+func (i *installer) startBootstrap() error {
+	i.log.Infof("Running bootstrap")
+	ignitionFileName := "bootstrap.ign"
 	ignitionPath, err := i.getFileFromService(ignitionFileName)
 	if err != nil {
 		return err
@@ -149,13 +168,16 @@ func (i *installer) getFileFromService(filename string) (string, error) {
 	return dest, err
 }
 
-func (i *installer) waitForControlPlane() error {
-	if err := i.kc.WaitForMasterNodes(minMasterNodes); err != nil {
+func (i *installer) waitForControlPlane(ctx context.Context) error {
+	if err := i.kc.WaitForMasterNodes(ctx, minMasterNodes); err != nil {
 		i.log.Errorf("Timeout waiting for master nodes, %s", err)
 		return err
 	}
-	i.patchEtcd()
-	i.waitForBootkube()
+	if err := i.kc.PatchEtcd(); err != nil {
+		i.log.Error(err)
+		return err
+	}
+	i.waitForBootkube(ctx)
 	return nil
 }
 
@@ -168,26 +190,23 @@ func (i *installer) UpdateHostStatus(newStatus string) {
 	}
 }
 
-func (i *installer) patchEtcd() {
-	//TODO: Change this method to use k8s client
-	i.log.Info("Patching etcd")
-	if err := i.kc.PatchEtcd(); err == nil {
-		i.log.Info("etcd patched")
-	} else {
-		i.log.Error(err)
-	}
-}
-
-func (i *installer) waitForBootkube() {
-	//TODO: Change this method to use k8s client
+func (i *installer) waitForBootkube(ctx context.Context) {
 	i.log.Infof("Waiting for bootkube to complete")
 	for {
-		out, _ := i.ops.ExecPrivilegeCommand("bash", "-c", "systemctl status bootkube.service | grep 'bootkube.service: Succeeded' | wc -l")
-		if out == "1" {
-			break
+		select {
+		case <-ctx.Done():
+			fmt.Printf("Context cancelled, terminting wait for bootkube\n")
+			return
+		case <-time.After(time.Second * time.Duration(5)):
+			// check if bootkube is done every 5 seconds
+			out, _ := i.ops.ExecPrivilegeCommand("bash", "-c", "systemctl status bootkube.service | grep 'bootkube.service: Succeeded' | wc -l")
+			if out == "1" {
+				// in case bootkube is done log the status and return
+				i.log.Info("bootkube service completed")
+				out, _ := i.ops.ExecPrivilegeCommand("systemctl", "status", "bootkube.service")
+				i.log.Info(out)
+				return
+			}
 		}
 	}
-	i.log.Info("bootkube service completed")
-	out, _ := i.ops.ExecPrivilegeCommand("systemctl", "status", "bootkube.service")
-	i.log.Info(out)
 }

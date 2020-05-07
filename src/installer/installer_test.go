@@ -62,7 +62,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockk8sclien = k8s_client.NewMockK8SClient(ctrl)
 	})
 
-	Context("HostRoleBootstrap role", func() {
+	Context("Bootstrap role", func() {
 		conf := config.Config{Role: HostRoleBootstrap,
 			ClusterID: "cluster-id",
 			HostID:    "host-id",
@@ -91,7 +91,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			}
 		}
 		WaitMasterNodesSucccess := func() {
-			mockk8sclien.EXPECT().WaitForMasterNodes(2).Return(nil).Times(1)
+			mockk8sclien.EXPECT().WaitForMasterNodes(gomock.Any(), 2).Return(nil).Times(1)
 		}
 		patchEtcdSuccess := func() {
 			mockk8sclien.EXPECT().PatchEtcd().Return(nil).Times(1)
@@ -102,7 +102,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		bootkubeStatusSuccess := func() {
 			mockops.EXPECT().ExecPrivilegeCommand("systemctl", "status", "bootkube.service").Return("1", nil).Times(1)
 		}
-		extractFromIgnition := func() {
+		extractSecretFromIgnitionSuccess := func() {
 			mockops.EXPECT().ExtractFromIgnition(filepath.Join(InstallDir, bootstrapIgn), dockerConfigFile).Return(nil).Times(1)
 		}
 		It("bootstrap role happy flow", func() {
@@ -115,6 +115,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			})
 			mkdirSuccess()
 			downloadFileSuccess(bootstrapIgn)
+			extractSecretFromIgnitionSuccess()
 			extractSuccess()
 			startServicesSuccess()
 			patchEtcdSuccess()
@@ -125,11 +126,31 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			downloadFileSuccess(masterIgn)
 			writeToDiskSuccess()
 			rebootSuccess()
-			extractFromIgnition()
 			ret := i.InstallNode()
 			Expect(ret).Should(BeNil())
 		})
-
+		It("bootstrap role fail", func() {
+			udpateStatusSuccess([]string{StartingInstallation,
+				RunningBootstrap,
+				WaitForControlPlane,
+				fmt.Sprintf("Runing %s installation", HostRoleMaster),
+				WritingImageToDisk,
+				Reboot,
+			})
+			mkdirSuccess()
+			downloadFileSuccess(bootstrapIgn)
+			extractSecretFromIgnitionSuccess()
+			extractSuccess()
+			startServicesSuccess()
+			WaitMasterNodesSucccess()
+			err := fmt.Errorf("Etcd patch failed")
+			mockk8sclien.EXPECT().PatchEtcd().Return(err).Times(1)
+			//HostRoleMaster flow:
+			downloadFileSuccess(masterIgn)
+			writeToDiskSuccess()
+			ret := i.InstallNode()
+			Expect(ret).Should(Equal(err))
+		})
 	})
 	Context("Master role", func() {
 		conf := config.Config{Role: HostRoleMaster,
