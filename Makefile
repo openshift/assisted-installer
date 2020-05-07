@@ -2,7 +2,7 @@ INSTALLER := $(or ${INSTALLER},quay.io/ocpmetal/assisted-installer:stable)
 
 all: image unit-test
 
-lint:
+lint: generate
 	golangci-lint run -v
 
 format:
