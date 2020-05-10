@@ -135,7 +135,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				WaitForControlPlane,
 				fmt.Sprintf("Runing %s installation", HostRoleMaster),
 				WritingImageToDisk,
-				Reboot,
 			})
 			mkdirSuccess()
 			downloadFileSuccess(bootstrapIgn)
