@@ -88,17 +88,17 @@ func (mr *MockOpsMockRecorder) Mkdir(dirName interface{}) *gomock.Call {
 }
 
 // WriteImageToDisk mocks base method.
-func (m *MockOps) WriteImageToDisk(ignitionPath, device string) error {
+func (m *MockOps) WriteImageToDisk(ignitionPath, device, image string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WriteImageToDisk", ignitionPath, device)
+	ret := m.ctrl.Call(m, "WriteImageToDisk", ignitionPath, device, image)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // WriteImageToDisk indicates an expected call of WriteImageToDisk.
-func (mr *MockOpsMockRecorder) WriteImageToDisk(ignitionPath, device interface{}) *gomock.Call {
+func (mr *MockOpsMockRecorder) WriteImageToDisk(ignitionPath, device, image interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteImageToDisk", reflect.TypeOf((*MockOps)(nil).WriteImageToDisk), ignitionPath, device)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteImageToDisk", reflect.TypeOf((*MockOps)(nil).WriteImageToDisk), ignitionPath, device, image)
 }
 
 // Reboot mocks base method.

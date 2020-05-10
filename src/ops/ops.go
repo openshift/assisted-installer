@@ -18,7 +18,7 @@ type Ops interface {
 	ExecPrivilegeCommand(command string, args ...string) (string, error)
 	ExecCommand(command string, args ...string) (string, error)
 	Mkdir(dirName string) error
-	WriteImageToDisk(ignitionPath string, device string) error
+	WriteImageToDisk(ignitionPath string, device string, image string) error
 	Reboot() error
 	ExtractFromIgnition(ignitionPath string, fileToExtract string) error
 }
@@ -64,10 +64,10 @@ func (o *ops) Mkdir(dirName string) error {
 	return err
 }
 
-func (o *ops) WriteImageToDisk(ignitionPath string, device string) error {
+func (o *ops) WriteImageToDisk(ignitionPath string, device string, image string) error {
 	o.log.Info("Writing image and ignition to disk")
 	out, err := o.ExecPrivilegeCommand("coreos-installer", "install", "--image-url",
-		"https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.4/latest/rhcos-4.4.3-x86_64-metal.x86_64.raw.gz",
+		image,
 		"--insecure", "-i", ignitionPath, device)
 	o.log.Info(out)
 

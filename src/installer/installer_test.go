@@ -11,6 +11,7 @@ import (
 	"github.com/eranco74/assisted-installer/src/config"
 	"github.com/eranco74/assisted-installer/src/inventory_client"
 	"github.com/eranco74/assisted-installer/src/ops"
+	"github.com/eranco74/assisted-installer/src/utils"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -24,15 +25,17 @@ func TestValidator(t *testing.T) {
 
 var _ = Describe("installer HostRoleMaster role", func() {
 	var (
-		l            = logrus.New()
-		ctrl         *gomock.Controller
-		mockops      *ops.MockOps
-		mockbmclient *inventory_client.MockInventoryClient
-		mockk8sclien *k8s_client.MockK8SClient
-		i            *installer
-		bootstrapIgn = "bootstrap.ign"
-		masterIgn    = "master.ign"
-		workerIgn    = "worker.ign"
+		l                = logrus.New()
+		ctrl             *gomock.Controller
+		mockops          *ops.MockOps
+		mockbmclient     *inventory_client.MockInventoryClient
+		mockk8sclien     *k8s_client.MockK8SClient
+		i                *installer
+		bootstrapIgn     = "bootstrap.ign"
+		masterIgn        = "master.ign"
+		workerIgn        = "worker.ign"
+		openShiftVersion = "4.4"
+		image, _         = utils.GetRhcosImageByOpenshiftVersion(openShiftVersion)
 	)
 	device := "/dev/vda"
 	l.SetOutput(ioutil.Discard)
@@ -50,7 +53,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	}
 
 	writeToDiskSuccess := func() {
-		mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, masterIgn), device).Return(nil).Times(1)
+		mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, masterIgn), device, image).Return(nil).Times(1)
 	}
 	rebootSuccess := func() {
 		mockops.EXPECT().Reboot().Return(nil).Times(1)
@@ -64,15 +67,17 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	Context("Bootstrap role", func() {
 		conf := config.Config{Role: HostRoleBootstrap,
-			ClusterID: "cluster-id",
-			HostID:    "host-id",
-			Device:    "/dev/vda",
-			Host:      "https://bm-inventory.com",
-			Port:      80,
+			ClusterID:        "cluster-id",
+			HostID:           "host-id",
+			Device:           "/dev/vda",
+			Host:             "https://bm-inventory.com",
+			Port:             80,
+			OpenshiftVersion: openShiftVersion,
 		}
 		BeforeEach(func() {
 			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, mockk8sclien)
 		})
+		mcoImage, _ := utils.GetMCOByOpenshiftVersion(conf.OpenshiftVersion)
 		extractSuccess := func() {
 			mockops.EXPECT().ExecPrivilegeCommand(
 				"podman", "run", "--net", "host",
@@ -80,7 +85,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				"--volume", "/usr/bin/rpm-ostree:/usr/bin/rpm-ostree",
 				"--privileged",
 				"--entrypoint", "/usr/bin/machine-config-daemon",
-				machineConfigImage,
+				mcoImage,
 				"start", "--node-name", "localhost", "--root-mount", "/rootfs", "--once-from",
 				filepath.Join(InstallDir, bootstrapIgn), "--skip-reboot")
 		}
@@ -153,11 +158,12 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	})
 	Context("Master role", func() {
 		conf := config.Config{Role: HostRoleMaster,
-			ClusterID: "cluster-id",
-			HostID:    "host-id",
-			Device:    "/dev/vda",
-			Host:      "https://bm-inventory.com",
-			Port:      80,
+			ClusterID:        "cluster-id",
+			HostID:           "host-id",
+			Device:           "/dev/vda",
+			Host:             "https://bm-inventory.com",
+			Port:             80,
+			OpenshiftVersion: openShiftVersion,
 		}
 		BeforeEach(func() {
 			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, mockk8sclien)
@@ -200,7 +206,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mkdirSuccess()
 			downloadFileSuccess(masterIgn)
 			err := fmt.Errorf("failed to write image to disk")
-			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, masterIgn), device).Return(err).Times(1)
+			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, masterIgn), device, image).Return(err).Times(1)
 			ret := i.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
@@ -221,11 +227,12 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	})
 	Context("Worker role", func() {
 		conf := config.Config{Role: "worker",
-			ClusterID: "cluster-id",
-			HostID:    "host-id",
-			Device:    "/dev/vda",
-			Host:      "https://bm-inventory.com",
-			Port:      80,
+			ClusterID:        "cluster-id",
+			HostID:           "host-id",
+			Device:           "/dev/vda",
+			Host:             "https://bm-inventory.com",
+			Port:             80,
+			OpenshiftVersion: openShiftVersion,
 		}
 		BeforeEach(func() {
 			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, mockk8sclien)
@@ -238,10 +245,27 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			})
 			mkdirSuccess()
 			downloadFileSuccess(workerIgn)
-			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, workerIgn), device).Return(nil).Times(1)
+			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, workerIgn), device, image).Return(nil).Times(1)
 			rebootSuccess()
 			ret := i.InstallNode()
 			Expect(ret).Should(BeNil())
+		})
+	})
+	Context("Bad openshift version", func() {
+		conf := config.Config{Role: HostRoleMaster,
+			ClusterID:        "cluster-id",
+			HostID:           "host-id",
+			Device:           "/dev/vda",
+			Host:             "https://bm-inventory.com",
+			Port:             80,
+			OpenshiftVersion: "Bad version",
+		}
+		BeforeEach(func() {
+			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, mockk8sclien)
+		})
+		It("Bad openshift version", func() {
+			err := i.InstallNode()
+			Expect(err).To(HaveOccurred())
 		})
 	})
 	AfterEach(func() {

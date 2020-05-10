@@ -12,6 +12,7 @@ import (
 	"github.com/eranco74/assisted-installer/src/config"
 	"github.com/eranco74/assisted-installer/src/inventory_client"
 	"github.com/eranco74/assisted-installer/src/ops"
+	"github.com/eranco74/assisted-installer/src/utils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -22,9 +23,8 @@ const (
 	InstallDir        = "/opt/install-dir"
 	Kubeconfig        = "kubeconfig"
 	// Change this to the MCD image from the relevant openshift release image
-	machineConfigImage = "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:301586e92bbd07ead7c5d3f342899e5923d4ef2e0f1c0cf08ecaae96568d16ed"
-	minMasterNodes     = 2
-	dockerConfigFile   = "/root/.docker/config.json"
+	minMasterNodes   = 2
+	dockerConfigFile = "/root/.docker/config.json"
 )
 
 const (
@@ -61,6 +61,13 @@ func NewAssistedInstaller(log *logrus.Logger, cfg config.Config, ops ops.Ops, ic
 
 func (i *installer) InstallNode() error {
 	i.log.Infof("Installing node with role: %s", i.Config.Role)
+
+	if !utils.IsOpenshiftVersionIsSupported(i.OpenshiftVersion) {
+		err := fmt.Errorf("openshift version %s is not supported", i.OpenshiftVersion)
+		i.log.Error(err)
+		return err
+	}
+
 	i.UpdateHostStatus(StartingInstallation)
 	if err := i.ops.Mkdir(InstallDir); err != nil {
 		i.log.Errorf("Failed to create install dir: %s", err)
@@ -83,9 +90,14 @@ func (i *installer) InstallNode() error {
 	if err != nil {
 		return err
 	}
+
 	i.UpdateHostStatus(WritingImageToDisk)
+
+	image, _ := utils.GetRhcosImageByOpenshiftVersion(i.OpenshiftVersion)
+	i.log.Infof("Going to use image: %s", image)
 	// TODO report image to disk progress
-	err = i.ops.WriteImageToDisk(ignitionPath, i.Device)
+
+	err = i.ops.WriteImageToDisk(ignitionPath, i.Device, image)
 	if err != nil {
 		i.log.Errorf("Failed to write image to disk %s", err)
 		return err
@@ -130,13 +142,15 @@ func (i *installer) startBootstrap() error {
 		return err
 	}
 
-	i.log.Infof("Extracting ignition to disk")
+	mcoImage, _ := utils.GetMCOByOpenshiftVersion(i.OpenshiftVersion)
+	i.log.Infof("Extracting ignition to disk using %s mcoImage", mcoImage)
+
 	out, err := i.ops.ExecPrivilegeCommand("podman", "run", "--net", "host",
 		"--volume", "/:/rootfs:rw",
 		"--volume", "/usr/bin/rpm-ostree:/usr/bin/rpm-ostree",
 		"--privileged",
 		"--entrypoint", "/usr/bin/machine-config-daemon",
-		machineConfigImage,
+		mcoImage,
 		"start", "--node-name", "localhost", "--root-mount", "/rootfs", "--once-from", ignitionPath, "--skip-reboot")
 	if err != nil {
 		i.log.Errorf("Failed to extract ignition to disk")
