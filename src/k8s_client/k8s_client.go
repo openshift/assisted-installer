@@ -20,7 +20,7 @@ import (
 //go:generate mockgen -source=k8s_client.go -package=k8s_client -destination=mock_k8s_client.go
 type K8SClient interface {
 	ListMasterNodes() (*v1.NodeList, error)
-	WaitForMasterNodes(minMasterNodes int) error
+	WaitForMasterNodes(context context.Context, minMasterNodes int) error
 	PatchEtcd() error
 }
 
@@ -54,17 +54,21 @@ func (c *k8sClient) ListMasterNodes() (*v1.NodeList, error) {
 	return nodes, nil
 }
 
-func (c *k8sClient) WaitForMasterNodes(minMasterNodes int) error {
+func (c *k8sClient) WaitForMasterNodes(ctx context.Context, minMasterNodes int) error {
 	nodesTimeout := 60 * time.Minute
 	logrus.Infof("Waiting up to %v for %d master nodes", nodesTimeout, minMasterNodes)
-	apiContext, cancel := context.WithTimeout(context.Background(), nodesTimeout)
+	apiContext, cancel := context.WithTimeout(ctx, nodesTimeout)
 	defer cancel()
 	wait.Until(func() {
 		nodes, err := c.ListMasterNodes()
 		if err != nil {
 			logrus.Warnf("Still waiting for master nodes: %v", err)
 		} else {
-			logrus.Infof("Found %d master nodes: %v", len(nodes.Items), nodes.Items)
+			nodeNameAndCondition := map[string][]v1.NodeCondition{}
+			for _, node := range nodes.Items {
+				nodeNameAndCondition[node.Name] = node.Status.Conditions
+			}
+			logrus.Infof("Found %d master nodes: %+v", len(nodes.Items), nodeNameAndCondition)
 			if len(nodes.Items) >= minMasterNodes {
 				logrus.Infof("WaitForMasterNodes - Done")
 				cancel()
@@ -73,7 +77,7 @@ func (c *k8sClient) WaitForMasterNodes(minMasterNodes int) error {
 	}, 5*time.Second, apiContext.Done())
 	err := apiContext.Err()
 	if err != nil && err != context.Canceled {
-		return errors.Wrap(err, "waiting for master nodes")
+		return errors.Wrap(err, "Waiting for master nodes")
 	}
 	return nil
 }
