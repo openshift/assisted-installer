@@ -11,7 +11,7 @@ import (
 
 	"github.com/eranco74/assisted-installer/src/config"
 	"github.com/filanov/bm-inventory/client"
-	"github.com/filanov/bm-inventory/client/inventory"
+	"github.com/filanov/bm-inventory/client/installer"
 	"github.com/filanov/bm-inventory/pkg/requestid"
 	"github.com/go-openapi/strfmt"
 )
@@ -23,15 +23,15 @@ type InventoryClient interface {
 }
 
 type inventoryClient struct {
-	bmInventory *client.BMInventory
+	ai *client.AssistedInstall
 }
 
-func CreateBmInventoryClient() *inventoryClient {
+func CreateInventoryClient() *inventoryClient {
 	clientConfig := client.Config{}
 	clientConfig.URL, _ = url.Parse(createUrl())
 	clientConfig.Transport = requestid.Transport(http.DefaultTransport)
-	bmInventory := client.New(clientConfig)
-	return &inventoryClient{bmInventory}
+	assistedInstallClient := client.New(clientConfig)
+	return &inventoryClient{assistedInstallClient}
 }
 
 func (c *inventoryClient) DownloadFile(filename string, dest string) error {
@@ -44,12 +44,12 @@ func (c *inventoryClient) DownloadFile(filename string, dest string) error {
 	defer func() {
 		fo.Close()
 	}()
-	_, err = c.bmInventory.Inventory.DownloadClusterFiles(context.Background(), createDownloadParams(filename), fo)
+	_, err = c.ai.Installer.DownloadClusterFiles(context.Background(), createDownloadParams(filename), fo)
 	return err
 }
 
 func (c *inventoryClient) UpdateHostStatus(newStatus string) error {
-	_, err := c.bmInventory.Inventory.UpdateHostInstallProgress(context.Background(), createUpdateHostStatusParams(newStatus))
+	_, err := c.ai.Installer.UpdateHostInstallProgress(context.Background(), createUpdateHostStatusParams(newStatus))
 	return err
 }
 
@@ -61,15 +61,15 @@ func createUrl() string {
 	)
 }
 
-func createDownloadParams(filename string) *inventory.DownloadClusterFilesParams {
-	return &inventory.DownloadClusterFilesParams{
+func createDownloadParams(filename string) *installer.DownloadClusterFilesParams {
+	return &installer.DownloadClusterFilesParams{
 		ClusterID: strfmt.UUID(config.GlobalConfig.ClusterID),
 		FileName:  filename,
 	}
 }
 
-func createUpdateHostStatusParams(newStatus string) *inventory.UpdateHostInstallProgressParams {
-	return &inventory.UpdateHostInstallProgressParams{
+func createUpdateHostStatusParams(newStatus string) *installer.UpdateHostInstallProgressParams {
+	return &installer.UpdateHostInstallProgressParams{
 		ClusterID:                 strfmt.UUID(config.GlobalConfig.ClusterID),
 		HostID:                    strfmt.UUID(config.GlobalConfig.HostID),
 		HostInstallProgressParams: models.HostInstallProgressParams(newStatus),
