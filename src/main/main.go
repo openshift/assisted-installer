@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	Failed = "Installation failed"
-	Done   = "Done"
+	Failed = "failed"
+	Done   = "done"
 )
 
 func main() {
