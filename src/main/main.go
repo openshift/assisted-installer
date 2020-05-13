@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -14,8 +15,8 @@ import (
 )
 
 const (
-	Failed = "failed"
-	Done   = "done"
+	Failed = "Failed"
+	Done   = "Done"
 )
 
 func main() {
@@ -29,7 +30,7 @@ func main() {
 		getKubeClient(logger),
 	)
 	if err := installer.InstallNode(); err != nil {
-		installer.UpdateHostStatus(Failed)
+		installer.UpdateHostStatus(fmt.Sprintf("%s %s", Failed, err))
 		os.Exit(1)
 	}
 	installer.UpdateHostStatus(Done)
