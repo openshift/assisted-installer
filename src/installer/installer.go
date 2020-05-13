@@ -28,11 +28,12 @@ const (
 )
 
 const (
-	StartingInstallation = "Starting Installation"
-	RunningBootstrap     = "Running bootstrap"
+	StartingInstallation = "Starting installation"
+	InstallingAs         = "Installing as %s"
+	RunningBootstrap     = "Bootstrapping installation"
 	WaitForControlPlane  = "Waiting for control plane"
 	WritingImageToDisk   = "Writing image to disk"
-	Reboot               = "Reboot"
+	Reboot               = "Rebooting"
 )
 
 // Installer will run the install operations on the node
@@ -84,7 +85,7 @@ func (i *installer) InstallNode() error {
 		i.Config.Role = HostRoleMaster
 	}
 
-	i.UpdateHostStatus(fmt.Sprintf("Runing %s installation", i.Config.Role))
+	i.UpdateHostStatus(fmt.Sprintf(InstallingAs, i.Config.Role))
 	ignitionFileName := i.Config.Role + ".ign"
 	ignitionPath, err := i.getFileFromService(ignitionFileName)
 	if err != nil {

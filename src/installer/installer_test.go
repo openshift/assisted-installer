@@ -114,7 +114,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			udpateStatusSuccess([]string{StartingInstallation,
 				RunningBootstrap,
 				WaitForControlPlane,
-				fmt.Sprintf("Runing %s installation", HostRoleMaster),
+				fmt.Sprintf(InstallingAs, HostRoleMaster),
 				WritingImageToDisk,
 				Reboot,
 			})
@@ -138,7 +138,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			udpateStatusSuccess([]string{StartingInstallation,
 				RunningBootstrap,
 				WaitForControlPlane,
-				fmt.Sprintf("Runing %s installation", HostRoleMaster),
+				fmt.Sprintf(InstallingAs, HostRoleMaster),
 				WritingImageToDisk,
 			})
 			mkdirSuccess()
@@ -170,7 +170,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 		It("master role happy flow", func() {
 			udpateStatusSuccess([]string{StartingInstallation,
-				fmt.Sprintf("Runing %s installation", conf.Role),
+				fmt.Sprintf(InstallingAs, conf.Role),
 				WritingImageToDisk,
 				Reboot,
 			})
@@ -190,7 +190,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 		It("HostRoleMaster role failed to get ignition", func() {
 			udpateStatusSuccess([]string{StartingInstallation,
-				fmt.Sprintf("Runing %s installation", conf.Role),
+				fmt.Sprintf(InstallingAs, conf.Role),
 			})
 			mkdirSuccess()
 			err := fmt.Errorf("failed to fetch file")
@@ -200,7 +200,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 		It("HostRoleMaster role failed to write image to disk", func() {
 			udpateStatusSuccess([]string{StartingInstallation,
-				fmt.Sprintf("Runing %s installation", conf.Role),
+				fmt.Sprintf(InstallingAs, conf.Role),
 				WritingImageToDisk,
 			})
 			mkdirSuccess()
@@ -212,7 +212,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 		It("HostRoleMaster role failed to reboot", func() {
 			udpateStatusSuccess([]string{StartingInstallation,
-				fmt.Sprintf("Runing %s installation", conf.Role),
+				fmt.Sprintf(InstallingAs, conf.Role),
 				WritingImageToDisk,
 				Reboot,
 			})
@@ -239,7 +239,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 		It("worker role happy flow", func() {
 			udpateStatusSuccess([]string{StartingInstallation,
-				fmt.Sprintf("Runing %s installation", conf.Role),
+				fmt.Sprintf(InstallingAs, conf.Role),
 				WritingImageToDisk,
 				Reboot,
 			})
