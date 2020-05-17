@@ -5,7 +5,7 @@ go 1.14
 require (
 	github.com/ajeddeloh/go-json v0.0.0-20200220154158-5ae607161559 // indirect
 	github.com/coreos/ignition v0.35.0
-	github.com/filanov/bm-inventory v0.0.0-20200514142008-e7c4f0afc20e
+	github.com/filanov/bm-inventory v0.0.0-20200506054351-1b3483457026
 	github.com/go-openapi/strfmt v0.19.5
 	github.com/golang/mock v1.4.0
 	github.com/onsi/ginkgo v1.12.0
@@ -13,6 +13,7 @@ require (
 	github.com/openshift/client-go v0.0.0-20200422192633-6f6c07fc2a70
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.6.0
+	github.com/stretchr/testify v1.4.0
 	github.com/vincent-petithory/dataurl v0.0.0-20191104211930-d1553a71de50
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e

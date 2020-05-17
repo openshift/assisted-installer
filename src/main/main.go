@@ -23,26 +23,24 @@ func main() {
 	config.ProcessArgs()
 	logger := utils.InitLogger(config.GlobalConfig.Verbose)
 	logger.Infof("Assisted installer started. Configuration is:\n %+v", config.GlobalConfig)
-	inventoryClient := inventory_client.CreateInventoryClient()
-	kubeClient := getKubeClient(logger, inventoryClient)
-	ai := installer.NewAssistedInstaller(logger,
+	installer := installer.NewAssistedInstaller(logger,
 		config.GlobalConfig,
 		ops.NewOps(logger),
-		inventoryClient,
-		kubeClient,
+		inventory_client.CreateBmInventoryClient(),
+		getKubeClient(logger),
 	)
-	if err := ai.InstallNode(); err != nil {
-		ai.UpdateHostStatus(fmt.Sprintf("%s %s", Failed, err))
+	if err := installer.InstallNode(); err != nil {
+		installer.UpdateHostStatus(fmt.Sprintf("%s %s", Failed, err))
 		os.Exit(1)
 	}
-	ai.UpdateHostStatus(Done)
+	installer.UpdateHostStatus(Done)
 }
 
-func getKubeClient(logger *logrus.Logger, ic inventory_client.InventoryClient) k8s_client.K8SClient {
+func getKubeClient(logger *logrus.Logger) k8s_client.K8SClient {
 	var kc k8s_client.K8SClient
 	// in case of bootstap download the kubeconfig and create the k8s client
 	if config.GlobalConfig.Role == installer.HostRoleBootstrap {
-		kubeconfigPath, err := getKubeconfig(logger, ic)
+		kubeconfigPath, err := getKubeconfig(logger)
 		if err != nil {
 			logrus.Fatal(err)
 		}
@@ -54,16 +52,18 @@ func getKubeClient(logger *logrus.Logger, ic inventory_client.InventoryClient) k
 	return kc
 }
 
-func getKubeconfig(logger *logrus.Logger, ic inventory_client.InventoryClient) (string, error) {
+func getKubeconfig(logger *logrus.Logger) (string, error) {
 	o := ops.NewOps(logger)
+	ic := inventory_client.CreateBmInventoryClient()
 	if err := o.Mkdir(installer.InstallDir); err != nil {
 		logger.Errorf("Failed to create install dir: %s", err)
 		return "", err
 	}
-	dest := filepath.Join(installer.InstallDir, installer.Kubeconfig)
-	err := ic.DownloadFile(installer.Kubeconfig, dest)
+	filename := "kubeconfig"
+	dest := filepath.Join(installer.InstallDir, filename)
+	err := ic.DownloadFile(filename, dest)
 	if err != nil {
-		logger.Errorf("Failed to fetch file (%s) from server. err: %s", installer.Kubeconfig, err)
+		logger.Errorf("Failed to fetch file (%s) from server. err: %s", filename, err)
 		return "", err
 	}
 	return dest, nil
