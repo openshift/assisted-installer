@@ -91,8 +91,10 @@ github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5/go.mod h1:a
 github.com/evanphx/json-patch v4.2.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/evanphx/json-patch v4.5.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
-github.com/filanov/bm-inventory v0.0.0-20200506054351-1b3483457026 h1:M13/TMsBaig7t5LiYcYPe/h7yvh7EeJmaQzy2YcXaUU=
-github.com/filanov/bm-inventory v0.0.0-20200506054351-1b3483457026/go.mod h1:uqEsTWF6L3Yr28GkgJTPdyEuUxmkOXUxl022bWlIIzU=
+github.com/filanov/bm-inventory v0.0.0-20200514130022-571fb20e421c h1:YKjfkVCu7UNPOFxEehGs2DyvRM5LRDPc05sryhwfN0w=
+github.com/filanov/bm-inventory v0.0.0-20200514130022-571fb20e421c/go.mod h1:PcPtcLXEN8uckhqmzxgSgZwmJr7K8IvgFLmCBXYo98o=
+github.com/filanov/bm-inventory v0.0.0-20200514142008-e7c4f0afc20e h1:5dQyoGDe9wb6W77mthZNKuoksUv65iI3CvNNGsDfEMo=
+github.com/filanov/bm-inventory v0.0.0-20200514142008-e7c4f0afc20e/go.mod h1:PcPtcLXEN8uckhqmzxgSgZwmJr7K8IvgFLmCBXYo98o=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/ghodss/yaml v0.0.0-20150909031657-73d445a93680/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
@@ -359,6 +361,7 @@ github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXf
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/stretchr/testify v1.4.0 h1:2E4SXV/wtOkTonXsotYi4li6zVWxYlZuYNCXe9XRJyk=
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
+github.com/thoas/go-funk v0.6.0/go.mod h1:+IWnUfUmFO1+WVYQWQtIJHeRRdaIyyYglZN7xzUPe4Q=
 github.com/tidwall/pretty v1.0.0 h1:HsD+QiTn7sK6flMKIvNmpqz1qrpP3Ps6jOKIKMooyg4=
 github.com/tidwall/pretty v1.0.0/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
