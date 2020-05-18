@@ -31,6 +31,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockbmclient     *inventory_client.MockInventoryClient
 		mockk8sclient    *k8s_client.MockK8SClient
 		i                *installer
+		hostId           = "host-id"
 		bootstrapIgn     = "bootstrap.ign"
 		masterIgn        = "master.ign"
 		workerIgn        = "worker.ign"
@@ -47,7 +48,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	}
 	udpateStatusSuccess := func(statuses []string) {
 		for _, status := range statuses {
-			mockbmclient.EXPECT().UpdateHostStatus(status).Return(nil).Times(1)
+			mockbmclient.EXPECT().UpdateHostStatus(status, hostId).Return(nil).Times(1)
 
 		}
 	}
@@ -110,12 +111,21 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		patchEtcdSuccess := func() {
 			mockk8sclient.EXPECT().PatchEtcd().Return(nil).Times(1)
 		}
+		prepareControllerSuccess := func() {
+			mockops.EXPECT().PrepareController().Return(nil).Times(1)
+		}
 		waitForBootkubeSuccess := func() {
 			mockops.EXPECT().ExecPrivilegeCommand("bash", "-c", "systemctl status bootkube.service | grep 'bootkube.service: Succeeded' | wc -l").Return("1", nil).Times(1)
 		}
 		bootkubeStatusSuccess := func() {
 			mockops.EXPECT().ExecPrivilegeCommand("systemctl", "status", "bootkube.service").Return("1", nil).Times(1)
 		}
+
+		addPolicyForController := func() {
+			mockk8sclient.EXPECT().RunOCctlCommand([]string{"adm", "policy", "add-scc-to-user", "privileged", "-z", "default", "-n", "assisted-deployment"},
+				KubeconfigPath, mockops).Return("", nil).Times(1)
+		}
+
 		extractSecretFromIgnitionSuccess := func() {
 			mockops.EXPECT().ExtractFromIgnition(filepath.Join(InstallDir, bootstrapIgn), dockerConfigFile).Return(nil).Times(1)
 		}
@@ -133,9 +143,11 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			extractSuccess()
 			daemonReload(nil)
 			restartNetworkManager(nil)
+			prepareControllerSuccess()
 			startServicesSuccess()
 			patchEtcdSuccess()
 			WaitMasterNodesSucccess()
+			addPolicyForController()
 			waitForBootkubeSuccess()
 			bootkubeStatusSuccess()
 			//HostRoleMaster flow:
@@ -158,6 +170,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			extractSuccess()
 			daemonReload(nil)
 			restartNetworkManager(nil)
+			prepareControllerSuccess()
 			startServicesSuccess()
 			WaitMasterNodesSucccess()
 			err := fmt.Errorf("Etcd patch failed")

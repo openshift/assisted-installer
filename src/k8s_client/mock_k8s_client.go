@@ -8,6 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	ops "github.com/eranco74/assisted-installer/src/ops"
 	gomock "github.com/golang/mock/gomock"
 	v1 "k8s.io/api/core/v1"
 )
@@ -76,4 +77,34 @@ func (m *MockK8SClient) PatchEtcd() error {
 func (mr *MockK8SClientMockRecorder) PatchEtcd() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchEtcd", reflect.TypeOf((*MockK8SClient)(nil).PatchEtcd))
+}
+
+// ListNodes mocks base method.
+func (m *MockK8SClient) ListNodes() (*v1.NodeList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListNodes")
+	ret0, _ := ret[0].(*v1.NodeList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListNodes indicates an expected call of ListNodes.
+func (mr *MockK8SClientMockRecorder) ListNodes() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListNodes", reflect.TypeOf((*MockK8SClient)(nil).ListNodes))
+}
+
+// RunOCctlCommand mocks base method.
+func (m *MockK8SClient) RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RunOCctlCommand", args, kubeconfigPath, o)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RunOCctlCommand indicates an expected call of RunOCctlCommand.
+func (mr *MockK8SClientMockRecorder) RunOCctlCommand(args, kubeconfigPath, o interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunOCctlCommand", reflect.TypeOf((*MockK8SClient)(nil).RunOCctlCommand), args, kubeconfigPath, o)
 }

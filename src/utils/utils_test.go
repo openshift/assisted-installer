@@ -2,6 +2,7 @@ package utils
 
 import (
 	"io/ioutil"
+	"path/filepath"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -63,6 +64,32 @@ var _ = Describe("Verify_utils", func() {
 			supported := IsOpenshiftVersionIsSupported(openshiftVersion)
 			Expect(supported).Should(Equal(false))
 
+		})
+	})
+	Context("Find files", func() {
+		It("Read directory and return found files", func() {
+			found, err := GetListOfFilesFromFolder("../../test_files", "*.json")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(found)).Should(Equal(1))
+			Expect(filepath.Base(found[0])).Should(Equal("node.json"))
+
+			found, err = GetListOfFilesFromFolder("../../test_files", "*.not_exists")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(found)).Should(Equal(0))
+
+			_, err = GetListOfFilesFromFolder("../../test_files_not_exists", "*.json")
+			Expect(err).Should(HaveOccurred())
+		})
+	})
+
+	Context("remove from string list", func() {
+		It("Remove element from string list", func() {
+			list := []string{"aaa", "bbb"}
+			list2 := FindAndRemoveElementFromStringList(list, "aaa")
+			Expect(len(list2)).Should(Equal(1))
+
+			list2 = FindAndRemoveElementFromStringList(list, "no-exists")
+			Expect(len(list2)).Should(Equal(2))
 		})
 	})
 })
