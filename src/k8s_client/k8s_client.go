@@ -24,6 +24,8 @@ type K8SClient interface {
 	PatchEtcd() error
 }
 
+type K8SClientBuilder func(configPath string, logger *logrus.Logger) (K8SClient, error)
+
 type k8sClient struct {
 	log      *logrus.Logger
 	client   *kubernetes.Clientset

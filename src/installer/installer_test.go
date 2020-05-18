@@ -29,7 +29,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		ctrl             *gomock.Controller
 		mockops          *ops.MockOps
 		mockbmclient     *inventory_client.MockInventoryClient
-		mockk8sclien     *k8s_client.MockK8SClient
+		mockk8sclient    *k8s_client.MockK8SClient
 		i                *installer
 		bootstrapIgn     = "bootstrap.ign"
 		masterIgn        = "master.ign"
@@ -62,8 +62,11 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockops = ops.NewMockOps(ctrl)
 		mockbmclient = inventory_client.NewMockInventoryClient(ctrl)
-		mockk8sclien = k8s_client.NewMockK8SClient(ctrl)
+		mockk8sclient = k8s_client.NewMockK8SClient(ctrl)
 	})
+	k8sBuilder := func(configPath string, logger *logrus.Logger) (k8s_client.K8SClient, error) {
+		return mockk8sclient, nil
+	}
 
 	Context("Bootstrap role", func() {
 		conf := config.Config{Role: HostRoleBootstrap,
@@ -75,7 +78,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			OpenshiftVersion: openShiftVersion,
 		}
 		BeforeEach(func() {
-			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, mockk8sclien)
+			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
 		})
 		mcoImage, _ := utils.GetMCOByOpenshiftVersion(conf.OpenshiftVersion)
 		extractSuccess := func() {
@@ -96,10 +99,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			}
 		}
 		WaitMasterNodesSucccess := func() {
-			mockk8sclien.EXPECT().WaitForMasterNodes(gomock.Any(), 2).Return(nil).Times(1)
+			mockk8sclient.EXPECT().WaitForMasterNodes(gomock.Any(), 2).Return(nil).Times(1)
 		}
 		patchEtcdSuccess := func() {
-			mockk8sclien.EXPECT().PatchEtcd().Return(nil).Times(1)
+			mockk8sclient.EXPECT().PatchEtcd().Return(nil).Times(1)
 		}
 		waitForBootkubeSuccess := func() {
 			mockops.EXPECT().ExecPrivilegeCommand("bash", "-c", "systemctl status bootkube.service | grep 'bootkube.service: Succeeded' | wc -l").Return("1", nil).Times(1)
@@ -148,7 +151,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			startServicesSuccess()
 			WaitMasterNodesSucccess()
 			err := fmt.Errorf("Etcd patch failed")
-			mockk8sclien.EXPECT().PatchEtcd().Return(err).Times(1)
+			mockk8sclient.EXPECT().PatchEtcd().Return(err).Times(1)
 			//HostRoleMaster flow:
 			downloadFileSuccess(masterIgn)
 			writeToDiskSuccess()
@@ -166,7 +169,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			OpenshiftVersion: openShiftVersion,
 		}
 		BeforeEach(func() {
-			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, mockk8sclien)
+			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
 		})
 		It("master role happy flow", func() {
 			udpateStatusSuccess([]string{StartingInstallation,
@@ -235,7 +238,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			OpenshiftVersion: openShiftVersion,
 		}
 		BeforeEach(func() {
-			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, mockk8sclien)
+			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
 		})
 		It("worker role happy flow", func() {
 			udpateStatusSuccess([]string{StartingInstallation,
@@ -261,7 +264,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			OpenshiftVersion: "Bad version",
 		}
 		BeforeEach(func() {
-			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, mockk8sclien)
+			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
 		})
 		It("Bad openshift version", func() {
 			err := i.InstallNode()

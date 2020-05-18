@@ -21,7 +21,7 @@ const (
 	HostRoleMaster    = "master"
 	HostRoleBootstrap = "bootstrap"
 	InstallDir        = "/opt/install-dir"
-	Kubeconfig        = "kubeconfig"
+	KubeconfigPath    = "/opt/openshift/auth/kubeconfig-loopback"
 	// Change this to the MCD image from the relevant openshift release image
 	minMasterNodes   = 2
 	dockerConfigFile = "/root/.docker/config.json"
@@ -44,19 +44,19 @@ type Installer interface {
 
 type installer struct {
 	config.Config
-	log *logrus.Logger
-	ops ops.Ops
-	ic  inventory_client.InventoryClient
-	kc  k8s_client.K8SClient
+	log       *logrus.Logger
+	ops       ops.Ops
+	ic        inventory_client.InventoryClient
+	kcBuilder k8s_client.K8SClientBuilder
 }
 
-func NewAssistedInstaller(log *logrus.Logger, cfg config.Config, ops ops.Ops, ic inventory_client.InventoryClient, kc k8s_client.K8SClient) *installer {
+func NewAssistedInstaller(log *logrus.Logger, cfg config.Config, ops ops.Ops, ic inventory_client.InventoryClient, kcb k8s_client.K8SClientBuilder) *installer {
 	return &installer{
-		log:    log,
-		Config: cfg,
-		ops:    ops,
-		ic:     ic,
-		kc:     kc,
+		log:       log,
+		Config:    cfg,
+		ops:       ops,
+		ic:        ic,
+		kcBuilder: kcb,
 	}
 }
 
@@ -121,8 +121,13 @@ func (i *installer) runBootstrap(ctx context.Context) error {
 		i.log.Errorf("Bootstrap failed %s", err)
 		return err
 	}
+	kc, err := i.kcBuilder(KubeconfigPath, i.log)
+	if err != nil {
+		i.log.Error(err)
+		return err
+	}
 	i.UpdateHostStatus(WaitForControlPlane)
-	if err = i.waitForControlPlane(ctx); err != nil {
+	if err = i.waitForControlPlane(ctx, kc); err != nil {
 		return err
 	}
 	i.log.Info("Setting bootstrap node new role to master")
@@ -183,12 +188,12 @@ func (i *installer) getFileFromService(filename string) (string, error) {
 	return dest, err
 }
 
-func (i *installer) waitForControlPlane(ctx context.Context) error {
-	if err := i.kc.WaitForMasterNodes(ctx, minMasterNodes); err != nil {
+func (i *installer) waitForControlPlane(ctx context.Context, kc k8s_client.K8SClient) error {
+	if err := kc.WaitForMasterNodes(ctx, minMasterNodes); err != nil {
 		i.log.Errorf("Timeout waiting for master nodes, %s", err)
 		return err
 	}
-	if err := i.kc.PatchEtcd(); err != nil {
+	if err := kc.PatchEtcd(); err != nil {
 		i.log.Error(err)
 		return err
 	}
