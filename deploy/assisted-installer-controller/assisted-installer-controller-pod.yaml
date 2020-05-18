@@ -1,0 +1,49 @@
+apiVersion: batch/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Job
+metadata:
+  name: assisted-installer-controller
+  namespace: assisted-deployment
+spec:
+  template:
+    metadata:
+      labels:
+        app: assisted-installer-controller
+    spec:
+      containers:
+        - name: assisted-installer-controller
+          image: quay.io/itsoiref/assisted-installer-controller:latest
+          imagePullPolicy: Always
+          command:
+            - /assisted-installer-controller
+          env:
+            # Define the environment variable
+            - name: CLUSTER_ID
+              valueFrom:
+                configMapKeyRef:
+                  # The ConfigMap containing the value you want to assign to SPECIAL_LEVEL_KEY
+                  name: assisted-installer-controller-config
+                  key: cluster-id
+            - name: INVENTORY_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: assisted-installer-controller-config
+                  key: inventory-host
+            - name: INVENTORY_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: assisted-installer-controller-config
+                  key: inventory-port
+
+          envFrom:
+            - configMapRef:
+                name: assisted-installer-controller-config
+#          securityContext:
+#            privileged: true
+      restartPolicy: OnFailure
+
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      serviceAccountName: assisted-installer-controller
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
