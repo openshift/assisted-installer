@@ -147,3 +147,17 @@ func (mr *MockOpsMockRecorder) SystemctlAction(action interface{}, args ...inter
 	varargs := append([]interface{}{action}, args...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SystemctlAction", reflect.TypeOf((*MockOps)(nil).SystemctlAction), varargs...)
 }
+
+// PrepareController mocks base method.
+func (m *MockOps) PrepareController() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PrepareController")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PrepareController indicates an expected call of PrepareController.
+func (mr *MockOpsMockRecorder) PrepareController() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrepareController", reflect.TypeOf((*MockOps)(nil).PrepareController))
+}

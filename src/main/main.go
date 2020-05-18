@@ -14,7 +14,6 @@ import (
 
 const (
 	Failed = "Failed"
-	Done   = "Done"
 )
 
 func main() {
@@ -24,12 +23,11 @@ func main() {
 	ai := installer.NewAssistedInstaller(logger,
 		config.GlobalConfig,
 		ops.NewOps(logger),
-		inventory_client.CreateInventoryClient(),
+		inventory_client.CreateInventoryClient(config.GlobalConfig.ClusterID, config.GlobalConfig.Host, config.GlobalConfig.Port),
 		k8s_client.NewK8SClient,
 	)
 	if err := ai.InstallNode(); err != nil {
 		ai.UpdateHostStatus(fmt.Sprintf("%s %s", Failed, err))
 		os.Exit(1)
 	}
-	ai.UpdateHostStatus(Done)
 }

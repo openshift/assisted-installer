@@ -1,0 +1,3 @@
+FROM bash
+copy build/assisted-installer-controller /
+ENTRYPOINT ["/assisted-installer-controller"]

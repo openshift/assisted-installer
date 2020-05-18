@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"text/template"
+
+	"github.com/eranco74/assisted-installer/src/config"
+
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -24,7 +28,15 @@ type Ops interface {
 	Reboot() error
 	ExtractFromIgnition(ignitionPath string, fileToExtract string) error
 	SystemctlAction(action string, args ...string) error
+	PrepareController() error
 }
+
+const (
+	renderedControllerCm       = "assisted-installer-controller.yaml"
+	controllerDeployFolder     = "/assisted-installer-controller/deploy"
+	manifestsFolder            = "/opt/openshift/manifests"
+	controllerDeployCmTemplate = "assisted-installer-controller-cm.yaml.template"
+)
 
 type ops struct {
 	log *logrus.Logger
@@ -133,6 +145,64 @@ func (o *ops) ExtractFromIgnition(ignitionPath string, fileToExtract string) err
 	_, err = o.ExecPrivilegeCommand("mv", tmpFile, fileToExtract)
 	if err != nil {
 		o.log.Errorf("Error occurred while moving %s to %s", tmpFile, fileToExtract)
+		return err
+	}
+	return nil
+}
+
+func (o *ops) PrepareController() error {
+
+	if err := o.renderControllerCm(); err != nil {
+		return err
+	}
+
+	// Copy deploy files to manifestsFolder
+	files, err := utils.GetListOfFilesFromFolder(controllerDeployFolder, "*.yaml")
+	if err != nil {
+		o.log.Errorf("Error occurred while trying to get list of files from %s : %e", controllerDeployFolder, err)
+		return err
+	}
+	for _, file := range files {
+		err := utils.CopyFile(file, filepath.Join(manifestsFolder, filepath.Base(file)))
+		if err != nil {
+			o.log.Errorf("Failed to copy %s to %s. error :%e", file, manifestsFolder, err)
+			return err
+		}
+	}
+	return nil
+}
+
+func (o *ops) renderControllerCm() error {
+
+	controllerDeployTemplate := filepath.Join(controllerDeployFolder, controllerDeployCmTemplate)
+	templateData, err := ioutil.ReadFile(controllerDeployTemplate)
+	if err != nil {
+		o.log.Errorf("Error occurred while trying to read %s : %e", controllerDeployTemplate, err)
+		return err
+	}
+	var assistedControllerParams = map[string]string{
+		"InventoryHost": config.GlobalConfig.Host,
+		"InventoryPort": fmt.Sprintf("\"%d\"", config.GlobalConfig.Port),
+		"ClusterId":     config.GlobalConfig.ClusterID,
+	}
+	o.log.Infof("Filling template file %s", controllerDeployTemplate)
+	tmpl := template.Must(template.New("assisted-controller").Parse(string(templateData)))
+	var buf bytes.Buffer
+	if err = tmpl.Execute(&buf, assistedControllerParams); err != nil {
+		o.log.Errorf("Failed to render controller template: %e", err)
+		return err
+	}
+
+	if err = o.Mkdir(manifestsFolder); err != nil {
+		o.log.Errorf("Failed to create manifests dir: %e", err)
+		return err
+	}
+
+	renderedControllerYaml := filepath.Join(manifestsFolder, renderedControllerCm)
+	o.log.Infof("Writing rendered data to %s", renderedControllerYaml)
+	err = ioutil.WriteFile(renderedControllerYaml, buf.Bytes(), 0644)
+	if err != nil {
+		o.log.Errorf("Error occurred while trying to write rendered data to %s : %e", renderedControllerYaml, err)
 		return err
 	}
 	return nil

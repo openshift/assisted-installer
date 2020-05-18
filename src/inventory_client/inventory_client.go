@@ -9,7 +9,6 @@ import (
 
 	"github.com/filanov/bm-inventory/models"
 
-	"github.com/eranco74/assisted-installer/src/config"
 	"github.com/filanov/bm-inventory/client"
 	"github.com/filanov/bm-inventory/client/installer"
 	"github.com/filanov/bm-inventory/pkg/requestid"
@@ -19,19 +18,21 @@ import (
 //go:generate mockgen -source=inventory_client.go -package=inventory_client -destination=mock_inventory_client.go
 type InventoryClient interface {
 	DownloadFile(filename string, dest string) error
-	UpdateHostStatus(newStatus string) error
+	UpdateHostStatus(newStatus string, hostId string) error
+	GetHostsIds() ([]string, error)
 }
 
 type inventoryClient struct {
-	ai *client.AssistedInstall
+	ai        *client.AssistedInstall
+	clusterId strfmt.UUID
 }
 
-func CreateInventoryClient() *inventoryClient {
+func CreateInventoryClient(clusterId string, host string, port int) *inventoryClient {
 	clientConfig := client.Config{}
-	clientConfig.URL, _ = url.Parse(createUrl())
+	clientConfig.URL, _ = url.Parse(createUrl(host, port))
 	clientConfig.Transport = requestid.Transport(http.DefaultTransport)
 	assistedInstallClient := client.New(clientConfig)
-	return &inventoryClient{assistedInstallClient}
+	return &inventoryClient{assistedInstallClient, strfmt.UUID(clusterId)}
 }
 
 func (c *inventoryClient) DownloadFile(filename string, dest string) error {
@@ -44,34 +45,46 @@ func (c *inventoryClient) DownloadFile(filename string, dest string) error {
 	defer func() {
 		fo.Close()
 	}()
-	_, err = c.ai.Installer.DownloadClusterFiles(context.Background(), createDownloadParams(filename), fo)
+	_, err = c.ai.Installer.DownloadClusterFiles(context.Background(), c.createDownloadParams(filename), fo)
 	return err
 }
 
-func (c *inventoryClient) UpdateHostStatus(newStatus string) error {
-	_, err := c.ai.Installer.UpdateHostInstallProgress(context.Background(), createUpdateHostStatusParams(newStatus))
+func (c *inventoryClient) UpdateHostStatus(newStatus string, hostId string) error {
+	_, err := c.ai.Installer.UpdateHostInstallProgress(context.Background(), c.createUpdateHostStatusParams(newStatus, hostId))
 	return err
 }
 
-func createUrl() string {
+func (c *inventoryClient) GetHostsIds() ([]string, error) {
+	var hostIds []string
+	hosts, err := c.ai.Installer.ListHosts(context.Background(), &installer.ListHostsParams{ClusterID: c.clusterId})
+	if err != nil {
+		return nil, err
+	}
+	for _, host := range hosts.Payload {
+		hostIds = append(hostIds, host.ID.String())
+	}
+	return hostIds, nil
+}
+
+func createUrl(host string, port int) string {
 	return fmt.Sprintf("http://%s:%d/%s",
-		config.GlobalConfig.Host,
-		config.GlobalConfig.Port,
+		host,
+		port,
 		client.DefaultBasePath,
 	)
 }
 
-func createDownloadParams(filename string) *installer.DownloadClusterFilesParams {
+func (c *inventoryClient) createDownloadParams(filename string) *installer.DownloadClusterFilesParams {
 	return &installer.DownloadClusterFilesParams{
-		ClusterID: strfmt.UUID(config.GlobalConfig.ClusterID),
+		ClusterID: c.clusterId,
 		FileName:  filename,
 	}
 }
 
-func createUpdateHostStatusParams(newStatus string) *installer.UpdateHostInstallProgressParams {
+func (c *inventoryClient) createUpdateHostStatusParams(newStatus string, hostId string) *installer.UpdateHostInstallProgressParams {
 	return &installer.UpdateHostInstallProgressParams{
-		ClusterID:                 strfmt.UUID(config.GlobalConfig.ClusterID),
-		HostID:                    strfmt.UUID(config.GlobalConfig.HostID),
+		ClusterID:                 c.clusterId,
+		HostID:                    strfmt.UUID(hostId),
 		HostInstallProgressParams: models.HostInstallProgressParams(newStatus),
 	}
 }

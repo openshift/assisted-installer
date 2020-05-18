@@ -2,10 +2,12 @@ package k8s_client
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
+	"github.com/eranco74/assisted-installer/src/ops"
 	"k8s.io/apimachinery/pkg/types"
-
 	"k8s.io/client-go/tools/clientcmd"
 
 	operatorv1 "github.com/openshift/client-go/operator/clientset/versioned"
@@ -22,6 +24,8 @@ type K8SClient interface {
 	ListMasterNodes() (*v1.NodeList, error)
 	WaitForMasterNodes(context context.Context, minMasterNodes int) error
 	PatchEtcd() error
+	ListNodes() (*v1.NodeList, error)
+	RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error)
 }
 
 type K8SClientBuilder func(configPath string, logger *logrus.Logger) (K8SClient, error)
@@ -50,6 +54,14 @@ func NewK8SClient(configPath string, logger *logrus.Logger) (K8SClient, error) {
 
 func (c *k8sClient) ListMasterNodes() (*v1.NodeList, error) {
 	nodes, err := c.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: "node-role.kubernetes.io/master"})
+	if err != nil {
+		return &v1.NodeList{}, err
+	}
+	return nodes, nil
+}
+
+func (c *k8sClient) ListNodes() (*v1.NodeList, error) {
+	nodes, err := c.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return &v1.NodeList{}, err
 	}
@@ -93,4 +105,14 @@ func (c *k8sClient) PatchEtcd() error {
 	}
 	c.log.Info(result)
 	return nil
+}
+
+func (c *k8sClient) RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error) {
+	c.log.Infof("Running oc command with args %v", args)
+	outPut, err := o.ExecPrivilegeCommand("oc", fmt.Sprintf("--kubeconfig=%s", kubeconfigPath),
+		strings.Join(args, " "))
+	if err != nil {
+		return "", err
+	}
+	return outPut, nil
 }
