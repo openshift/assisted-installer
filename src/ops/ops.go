@@ -1,9 +1,11 @@
 package ops
 
 import (
+	"bytes"
 	"fmt"
-
+	"io"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -42,8 +44,15 @@ func (o *ops) ExecPrivilegeCommand(command string, args ...string) (string, erro
 
 // ExecCommand executes command.
 func (o *ops) ExecCommand(command string, args ...string) (string, error) {
-	out, err := exec.Command(command, args...).CombinedOutput()
-	output := strings.TrimSpace(string(out))
+
+	var stdoutBuf bytes.Buffer
+
+	cmd := exec.Command(command, args...)
+	cmd.Stdout = io.MultiWriter(os.Stdout, &stdoutBuf)
+	cmd.Stderr = io.MultiWriter(os.Stderr, &stdoutBuf)
+
+	err := cmd.Run()
+	output := strings.TrimSpace(stdoutBuf.String())
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {

@@ -151,7 +151,7 @@ func (i *installer) startBootstrap() error {
 	mcoImage, _ := utils.GetMCOByOpenshiftVersion(i.OpenshiftVersion)
 	i.log.Infof("Extracting ignition to disk using %s mcoImage", mcoImage)
 
-	out, err := i.ops.ExecPrivilegeCommand("podman", "run", "--net", "host",
+	_, err = i.ops.ExecPrivilegeCommand("podman", "run", "--net", "host",
 		"--volume", "/:/rootfs:rw",
 		"--volume", "/usr/bin/rpm-ostree:/usr/bin/rpm-ostree",
 		"--privileged",
@@ -162,7 +162,7 @@ func (i *installer) startBootstrap() error {
 		i.log.Errorf("Failed to extract ignition to disk")
 		return err
 	}
-	i.log.Info(out)
+	i.log.Info("Done extracting ignition to filesystem")
 
 	servicesToStart := []string{"bootkube.service", "approve-csr.service", "progress.service"}
 	for _, service := range servicesToStart {
