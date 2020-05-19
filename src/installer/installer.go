@@ -164,15 +164,24 @@ func (i *installer) startBootstrap() error {
 	}
 	i.log.Info("Done extracting ignition to filesystem")
 
+	// reload systemd configurations from filesystem and regenerate dependency trees
+	err = i.ops.SystemctlAction("daemon-reload")
+	if err != nil {
+		return err
+	}
+
+	// restart NetworkManager to trigger NetworkManager/dispatcher.d/30-local-dns-prepender
+	err = i.ops.SystemctlAction("restart", "NetworkManager.service")
+	if err != nil {
+		return err
+	}
+
 	servicesToStart := []string{"bootkube.service", "approve-csr.service", "progress.service"}
 	for _, service := range servicesToStart {
-		i.log.Infof("Starting %s", service)
-		_, err = i.ops.ExecPrivilegeCommand("systemctl", "start", service)
+		err = i.ops.SystemctlAction("start", service)
 		if err != nil {
-			i.log.Errorf("Failed to start service %s", service)
 			return err
 		}
-
 	}
 	i.log.Info("Done setting up bootstrap")
 	return nil

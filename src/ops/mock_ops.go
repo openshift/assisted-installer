@@ -128,3 +128,22 @@ func (mr *MockOpsMockRecorder) ExtractFromIgnition(ignitionPath, fileToExtract i
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExtractFromIgnition", reflect.TypeOf((*MockOps)(nil).ExtractFromIgnition), ignitionPath, fileToExtract)
 }
+
+// SystemctlAction mocks base method.
+func (m *MockOps) SystemctlAction(action string, args ...string) error {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{action}
+	for _, a := range args {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "SystemctlAction", varargs...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SystemctlAction indicates an expected call of SystemctlAction.
+func (mr *MockOpsMockRecorder) SystemctlAction(action interface{}, args ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{action}, args...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SystemctlAction", reflect.TypeOf((*MockOps)(nil).SystemctlAction), varargs...)
+}

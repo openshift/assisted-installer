@@ -92,10 +92,16 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				"start", "--node-name", "localhost", "--root-mount", "/rootfs", "--once-from",
 				filepath.Join(InstallDir, bootstrapIgn), "--skip-reboot")
 		}
+		daemonReload := func(err error) {
+			mockops.EXPECT().SystemctlAction("daemon-reload").Return(err).Times(1)
+		}
+		restartNetworkManager := func(err error) {
+			mockops.EXPECT().SystemctlAction("restart", "NetworkManager.service").Return(err).Times(1)
+		}
 		startServicesSuccess := func() {
 			services := []string{"bootkube.service", "progress.service", "approve-csr.service"}
 			for i := range services {
-				mockops.EXPECT().ExecPrivilegeCommand("systemctl", "start", services[i]).Return("", nil).Times(1)
+				mockops.EXPECT().SystemctlAction("start", services[i]).Return(nil).Times(1)
 			}
 		}
 		WaitMasterNodesSucccess := func() {
@@ -125,6 +131,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			downloadFileSuccess(bootstrapIgn)
 			extractSecretFromIgnitionSuccess()
 			extractSuccess()
+			daemonReload(nil)
+			restartNetworkManager(nil)
 			startServicesSuccess()
 			patchEtcdSuccess()
 			WaitMasterNodesSucccess()
@@ -148,10 +156,31 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			downloadFileSuccess(bootstrapIgn)
 			extractSecretFromIgnitionSuccess()
 			extractSuccess()
+			daemonReload(nil)
+			restartNetworkManager(nil)
 			startServicesSuccess()
 			WaitMasterNodesSucccess()
 			err := fmt.Errorf("Etcd patch failed")
 			mockk8sclient.EXPECT().PatchEtcd().Return(err).Times(1)
+			//HostRoleMaster flow:
+			downloadFileSuccess(masterIgn)
+			writeToDiskSuccess()
+			ret := i.InstallNode()
+			Expect(ret).Should(Equal(err))
+		})
+		It("bootstrap fail to restart NetworkManager", func() {
+			udpateStatusSuccess([]string{StartingInstallation,
+				RunningBootstrap,
+				fmt.Sprintf(InstallingAs, HostRoleMaster),
+				WritingImageToDisk,
+			})
+			mkdirSuccess()
+			downloadFileSuccess(bootstrapIgn)
+			extractSecretFromIgnitionSuccess()
+			extractSuccess()
+			daemonReload(nil)
+			err := fmt.Errorf("Failed to restart NetworkManager")
+			restartNetworkManager(err)
 			//HostRoleMaster flow:
 			downloadFileSuccess(masterIgn)
 			writeToDiskSuccess()

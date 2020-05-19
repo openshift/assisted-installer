@@ -23,6 +23,7 @@ type Ops interface {
 	WriteImageToDisk(ignitionPath string, device string, image string) error
 	Reboot() error
 	ExtractFromIgnition(ignitionPath string, fileToExtract string) error
+	SystemctlAction(action string, args ...string) error
 }
 
 type ops struct {
@@ -70,6 +71,15 @@ func (o *ops) ExecCommand(command string, args ...string) (string, error) {
 func (o *ops) Mkdir(dirName string) error {
 	o.log.Infof("Creating directory: %s", dirName)
 	_, err := o.ExecPrivilegeCommand("mkdir", "-p", dirName)
+	return err
+}
+
+func (o *ops) SystemctlAction(action string, args ...string) error {
+	o.log.Infof("Running systemctl %s %s", action, args)
+	_, err := o.ExecPrivilegeCommand("systemctl", append([]string{action}, args...)...)
+	if err != nil {
+		o.log.Errorf("Failed to executing systemctl %s %s", action, args)
+	}
 	return err
 }
 
