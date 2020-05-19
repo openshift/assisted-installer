@@ -3,7 +3,6 @@ package k8s_client
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/eranco74/assisted-installer/src/ops"
@@ -109,8 +108,8 @@ func (c *k8sClient) PatchEtcd() error {
 
 func (c *k8sClient) RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error) {
 	c.log.Infof("Running oc command with args %v", args)
-	outPut, err := o.ExecPrivilegeCommand("oc", fmt.Sprintf("--kubeconfig=%s", kubeconfigPath),
-		strings.Join(args, " "))
+	args = append([]string{fmt.Sprintf("--kubeconfig=%s", kubeconfigPath)}, args...)
+	outPut, err := o.ExecPrivilegeCommand("oc", args...)
 	if err != nil {
 		return "", err
 	}
