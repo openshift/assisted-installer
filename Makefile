@@ -1,4 +1,5 @@
 INSTALLER := $(or ${INSTALLER},quay.io/ocpmetal/assisted-installer:stable)
+GIT_REVISION := $(shell git rev-parse HEAD)
 
 all: image unit-test
 
@@ -23,7 +24,7 @@ build/installer: lint format
 	CGO_ENABLED=0 go build -o build/installer src/main/main.go
 
 image: build/installer
-	docker build -f Dockerfile.assisted-installer . -t $(INSTALLER)
+	GIT_REVISION=${GIT_REVISION} docker build --build-arg GIT_REVISION -f Dockerfile.assisted-installer . -t $(INSTALLER)
 
 push: image
 	docker push $(INSTALLER)

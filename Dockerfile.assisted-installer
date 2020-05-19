@@ -1,3 +1,5 @@
 FROM bash
 copy build/installer /
+ARG GIT_REVISION
+LABEL "git_revision"=${GIT_REVISION}
 ENTRYPOINT ["/installer"]
