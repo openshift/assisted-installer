@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/api/certificates/v1beta1"
+
 	"github.com/eranco74/assisted-installer/src/ops"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd"
@@ -12,10 +14,12 @@ import (
 	operatorv1 "github.com/openshift/client-go/operator/clientset/versioned"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	certificatesv1beta1client "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 )
 
 //go:generate mockgen -source=k8s_client.go -package=k8s_client -destination=mock_k8s_client.go
@@ -25,6 +29,8 @@ type K8SClient interface {
 	PatchEtcd() error
 	ListNodes() (*v1.NodeList, error)
 	RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error)
+	ApproveCsr(csr *v1beta1.CertificateSigningRequest) error
+	ListCsrs() (*v1beta1.CertificateSigningRequestList, error)
 }
 
 type K8SClientBuilder func(configPath string, logger *logrus.Logger) (K8SClient, error)
@@ -33,6 +39,8 @@ type k8sClient struct {
 	log      *logrus.Logger
 	client   *kubernetes.Clientset
 	ocClient *operatorv1.Clientset
+	// CertificateSigningRequestInterface is interface
+	csrClient certificatesv1beta1client.CertificateSigningRequestInterface
 }
 
 func NewK8SClient(configPath string, logger *logrus.Logger) (K8SClient, error) {
@@ -48,7 +56,9 @@ func NewK8SClient(configPath string, logger *logrus.Logger) (K8SClient, error) {
 	if err != nil {
 		return &k8sClient{}, errors.Wrap(err, "creating a Kubernetes client")
 	}
-	return &k8sClient{logger, client, ocClient}, nil
+	csrClient := client.CertificatesV1beta1().CertificateSigningRequests()
+
+	return &k8sClient{logger, client, ocClient, csrClient}, nil
 }
 
 func (c *k8sClient) ListMasterNodes() (*v1.NodeList, error) {
@@ -122,4 +132,28 @@ func (c *k8sClient) RunOCctlCommand(args []string, kubeconfigPath string, o ops.
 		return "", err
 	}
 	return outPut, nil
+}
+
+func (c k8sClient) ListCsrs() (*v1beta1.CertificateSigningRequestList, error) {
+	csrs, err := c.csrClient.List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		c.log.Errorf("Failed to get list of csrs. err : %e", err)
+		return nil, err
+	}
+	return csrs, nil
+}
+
+func (c k8sClient) ApproveCsr(csr *v1beta1.CertificateSigningRequest) error {
+
+	csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
+		Type:           certificatesv1beta1.CertificateApproved,
+		Reason:         "NodeCSRApprove",
+		Message:        "This CSR was approved by the assisted-installer-controller",
+		LastUpdateTime: metav1.Now(),
+	})
+	if _, err := c.csrClient.UpdateApproval(csr); err != nil {
+		c.log.Errorf("Failed to approve csr %v, err %e", csr, err)
+		return err
+	}
+	return nil
 }

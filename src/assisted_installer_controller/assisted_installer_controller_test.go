@@ -172,7 +172,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
-			getInventoryNodesTimeout = 1 * time.Second
+			GeneralWaitTimeout = 1 * time.Second
 		})
 		It("inventory client fails and return result only on second run", func() {
 			mockbmclient.EXPECT().GetHostsIds().Return(nil, fmt.Errorf("dummy")).Times(1)

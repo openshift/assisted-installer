@@ -8,13 +8,15 @@ import (
 	"github.com/eranco74/assisted-installer/src/ops"
 	"github.com/eranco74/assisted-installer/src/utils"
 	"github.com/sirupsen/logrus"
+	"k8s.io/api/certificates/v1beta1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 )
 
 const (
 	done = "Done"
 )
 
-var getInventoryNodesTimeout = 30 * time.Second
+var GeneralWaitTimeout = 30 * time.Second
 
 // assisted installer controller is added to control installation process after  bootstrap pivot
 // assisted installer will deploy it on installation process
@@ -89,11 +91,47 @@ func (c *controller) getInventoryNodes() []string {
 		assistedInstallerNodes, err = c.ic.GetHostsIds()
 		if err != nil {
 			c.log.Infof("Failed to get node list from inventory, will retry in 30 seconds, %e", err)
-			time.Sleep(getInventoryNodesTimeout)
+			time.Sleep(GeneralWaitTimeout)
 			continue
 		}
 		break
 	}
 	c.log.Infof("Got list of host from inventory %s", assistedInstallerNodes)
 	return assistedInstallerNodes
+}
+
+func (c *controller) ApproveCsrs(done <-chan bool) {
+	c.log.Infof("Start approving csrs")
+	ticker := time.NewTicker(GeneralWaitTimeout)
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			csrs, err := c.kc.ListCsrs()
+			if err != nil {
+				continue
+			}
+			c.approveCsrs(csrs)
+		}
+	}
+}
+
+func (c controller) approveCsrs(csrs *v1beta1.CertificateSigningRequestList) {
+	for _, csr := range csrs.Items {
+		if !isCsrApproved(&csr) {
+			c.log.Infof("Approving csr %s", csr.Name)
+			// We can fail and it is ok, we will retry on the next time
+			_ = c.kc.ApproveCsr(&csr)
+		}
+	}
+}
+
+func isCsrApproved(csr *certificatesv1beta1.CertificateSigningRequest) bool {
+	for _, condition := range csr.Status.Conditions {
+		if condition.Type == certificatesv1beta1.CertificateApproved {
+			return true
+		}
+	}
+	return false
 }

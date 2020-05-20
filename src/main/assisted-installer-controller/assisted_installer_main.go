@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"time"
 
 	"github.com/eranco74/assisted-installer/src/k8s_client"
 
@@ -38,5 +39,12 @@ func main() {
 		inventory_client.CreateInventoryClient(Options.ControllerConfig.ClusterID, Options.ControllerConfig.Host, Options.ControllerConfig.Port),
 		kc,
 	)
+
+	done := make(chan bool)
+	go assistedController.ApproveCsrs(done)
 	assistedController.WaitAndUpdateNodesStatus()
+	logger.Infof("Sleeping for 10 minutes to give a chance to approve all crs")
+	time.Sleep(10 * time.Minute)
+
+	done <- true
 }
