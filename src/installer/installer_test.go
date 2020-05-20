@@ -121,11 +121,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockops.EXPECT().ExecPrivilegeCommand("systemctl", "status", "bootkube.service").Return("1", nil).Times(1)
 		}
 
-		addPolicyForController := func() {
-			mockk8sclient.EXPECT().RunOCctlCommand([]string{"adm", "policy", "add-scc-to-user", "privileged", "-z", "default", "-n", "assisted-deployment"},
-				KubeconfigPath, mockops).Return("", nil).Times(1)
-		}
-
 		extractSecretFromIgnitionSuccess := func() {
 			mockops.EXPECT().ExtractFromIgnition(filepath.Join(InstallDir, bootstrapIgn), dockerConfigFile).Return(nil).Times(1)
 		}
@@ -147,7 +142,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			startServicesSuccess()
 			patchEtcdSuccess()
 			WaitMasterNodesSucccess()
-			addPolicyForController()
 			waitForBootkubeSuccess()
 			bootkubeStatusSuccess()
 			//HostRoleMaster flow:

@@ -6,8 +6,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/avast/retry-go"
-
 	"github.com/eranco74/assisted-installer/src/k8s_client"
 	"golang.org/x/sync/errgroup"
 
@@ -216,12 +214,6 @@ func (i *installer) waitForControlPlane(ctx context.Context, kc k8s_client.K8SCl
 		return err
 	}
 
-	err := i.addPolicyForController(kc)
-	if err != nil {
-		i.log.Error(err)
-		return err
-	}
-
 	i.waitForBootkube(ctx)
 
 	return nil
@@ -234,18 +226,6 @@ func (i *installer) UpdateHostStatus(newStatus string) {
 			i.log.Errorf("Failed to update node installation status, %s", err)
 		}
 	}
-}
-
-func (i *installer) addPolicyForController(kc k8s_client.K8SClient) error {
-	i.log.Infof("Adding policy for assisted-deployment namespace")
-	err := retry.Do(
-		func() error {
-			commandArgs := []string{"adm", "policy", "add-scc-to-user", "privileged", "-z", "default", "-n", "assisted-deployment"}
-			_, err := kc.RunOCctlCommand(commandArgs, KubeconfigPath, i.ops)
-			return err
-		}, retry.Delay(10*time.Second), retry.Attempts(100),
-	)
-	return err
 }
 
 func (i *installer) waitForBootkube(ctx context.Context) {
