@@ -1,3 +1,5 @@
 FROM bash
 copy build/assisted-installer-controller /
+ARG GIT_REVISION
+LABEL "git_revision"=${GIT_REVISION}
 ENTRYPOINT ["/assisted-installer-controller"]

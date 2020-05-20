@@ -1,6 +1,6 @@
 INSTALLER := $(or ${INSTALLER},quay.io/ocpmetal/assisted-installer:stable)
 GIT_REVISION := $(shell git rev-parse HEAD)
-CONTROLLER :=  $(or ${CONTROLLER},quay.io/itsoiref/assisted-installer-controller:latest)
+CONTROLLER :=  $(or ${CONTROLLER}, quay.io/ocpmetal/assisted-installer-controller:stable)
 all: image unit-test
 
 lint:
@@ -34,7 +34,7 @@ push: image
 	docker push $(INSTALLER)
 
 image_controller: build/controller
-	docker build -f Dockerfile.assisted-installer-controller . -t $(CONTROLLER)
+	GIT_REVISION=${GIT_REVISION} docker build --build-arg GIT_REVISION -f Dockerfile.assisted-installer-controller . -t $(CONTROLLER)
 
 push_controller: image_controller
 	docker push $(CONTROLLER)
