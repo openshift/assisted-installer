@@ -12,6 +12,19 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type LogWriter struct {
+	log *logrus.Logger
+}
+
+func (l *LogWriter) Write(p []byte) (n int, err error) {
+	l.log.Info(string(p))
+	return len(p), nil
+}
+
+func NewLogWriter(logger *logrus.Logger) *LogWriter {
+	return &LogWriter{logger}
+}
+
 func InitLogger(verbose bool) *logrus.Logger {
 	var log = logrus.New()
 	// log to console and file

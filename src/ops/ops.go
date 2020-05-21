@@ -9,7 +9,6 @@ import (
 	"github.com/eranco74/assisted-installer/src/config"
 
 	"io/ioutil"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -39,12 +38,13 @@ const (
 )
 
 type ops struct {
-	log *logrus.Logger
+	log       *logrus.Logger
+	logWriter *utils.LogWriter
 }
 
 // NewOps return a new ops interface
 func NewOps(logger *logrus.Logger) Ops {
-	return &ops{logger}
+	return &ops{logger, utils.NewLogWriter(logger)}
 }
 
 // ExecPrivilegeCommand execute a command in the host environment via nsenter
@@ -61,8 +61,8 @@ func (o *ops) ExecCommand(command string, args ...string) (string, error) {
 	var stdoutBuf bytes.Buffer
 
 	cmd := exec.Command(command, args...)
-	cmd.Stdout = io.MultiWriter(os.Stdout, &stdoutBuf)
-	cmd.Stderr = io.MultiWriter(os.Stderr, &stdoutBuf)
+	cmd.Stdout = io.MultiWriter(o.logWriter, &stdoutBuf)
+	cmd.Stderr = io.MultiWriter(o.logWriter, &stdoutBuf)
 
 	err := cmd.Run()
 	output := strings.TrimSpace(stdoutBuf.String())
