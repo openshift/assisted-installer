@@ -79,19 +79,19 @@ func (c *k8sClient) WaitForMasterNodes(ctx context.Context, minMasterNodes int) 
 			c.log.Warnf("Still waiting for master nodes: %v", err)
 		} else {
 			nodeNameAndCondition := map[string][]v1.NodeCondition{}
-			readyNodes := 0
+			readyMasterNodes := 0
 			for _, node := range nodes.Items {
 				nodeNameAndCondition[node.Name] = node.Status.Conditions
 				for _, cond := range node.Status.Conditions {
 					if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue {
-						readyNodes++
+						readyMasterNodes++
 					}
 				}
 			}
 			c.log.Infof("Found %d master nodes: %+v", len(nodes.Items), nodeNameAndCondition)
-			c.log.Infof("Found %d ready master nodes", readyNodes)
-			if readyNodes >= minMasterNodes {
-				c.log.Infof("WaitForMasterNodes - Done")
+			c.log.Infof("Found %d ready master nodes", readyMasterNodes)
+			if readyMasterNodes >= minMasterNodes {
+				c.log.Infof("Waiting for master nodes - Done")
 				cancel()
 			}
 		}
