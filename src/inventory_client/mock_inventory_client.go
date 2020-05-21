@@ -10,30 +10,30 @@ import (
 	gomock "github.com/golang/mock/gomock"
 )
 
-// MockInventoryClient is a mock of InventoryClient interface.
+// MockInventoryClient is a mock of InventoryClient interface
 type MockInventoryClient struct {
 	ctrl     *gomock.Controller
 	recorder *MockInventoryClientMockRecorder
 }
 
-// MockInventoryClientMockRecorder is the mock recorder for MockInventoryClient.
+// MockInventoryClientMockRecorder is the mock recorder for MockInventoryClient
 type MockInventoryClientMockRecorder struct {
 	mock *MockInventoryClient
 }
 
-// NewMockInventoryClient creates a new mock instance.
+// NewMockInventoryClient creates a new mock instance
 func NewMockInventoryClient(ctrl *gomock.Controller) *MockInventoryClient {
 	mock := &MockInventoryClient{ctrl: ctrl}
 	mock.recorder = &MockInventoryClientMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use.
+// EXPECT returns an object that allows the caller to indicate expected use
 func (m *MockInventoryClient) EXPECT() *MockInventoryClientMockRecorder {
 	return m.recorder
 }
 
-// DownloadFile mocks base method.
+// DownloadFile mocks base method
 func (m *MockInventoryClient) DownloadFile(filename, dest string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DownloadFile", filename, dest)
@@ -41,13 +41,13 @@ func (m *MockInventoryClient) DownloadFile(filename, dest string) error {
 	return ret0
 }
 
-// DownloadFile indicates an expected call of DownloadFile.
+// DownloadFile indicates an expected call of DownloadFile
 func (mr *MockInventoryClientMockRecorder) DownloadFile(filename, dest interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DownloadFile", reflect.TypeOf((*MockInventoryClient)(nil).DownloadFile), filename, dest)
 }
 
-// UpdateHostStatus mocks base method.
+// UpdateHostStatus mocks base method
 func (m *MockInventoryClient) UpdateHostStatus(newStatus, hostId string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateHostStatus", newStatus, hostId)
@@ -55,13 +55,13 @@ func (m *MockInventoryClient) UpdateHostStatus(newStatus, hostId string) error {
 	return ret0
 }
 
-// UpdateHostStatus indicates an expected call of UpdateHostStatus.
+// UpdateHostStatus indicates an expected call of UpdateHostStatus
 func (mr *MockInventoryClientMockRecorder) UpdateHostStatus(newStatus, hostId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHostStatus", reflect.TypeOf((*MockInventoryClient)(nil).UpdateHostStatus), newStatus, hostId)
 }
 
-// GetHostsIds mocks base method.
+// GetHostsIds mocks base method
 func (m *MockInventoryClient) GetHostsIds() ([]string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetHostsIds")
@@ -70,7 +70,7 @@ func (m *MockInventoryClient) GetHostsIds() ([]string, error) {
 	return ret0, ret1
 }
 
-// GetHostsIds indicates an expected call of GetHostsIds.
+// GetHostsIds indicates an expected call of GetHostsIds
 func (mr *MockInventoryClientMockRecorder) GetHostsIds() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHostsIds", reflect.TypeOf((*MockInventoryClient)(nil).GetHostsIds))

@@ -10,30 +10,30 @@ import (
 	gomock "github.com/golang/mock/gomock"
 )
 
-// MockOps is a mock of Ops interface.
+// MockOps is a mock of Ops interface
 type MockOps struct {
 	ctrl     *gomock.Controller
 	recorder *MockOpsMockRecorder
 }
 
-// MockOpsMockRecorder is the mock recorder for MockOps.
+// MockOpsMockRecorder is the mock recorder for MockOps
 type MockOpsMockRecorder struct {
 	mock *MockOps
 }
 
-// NewMockOps creates a new mock instance.
+// NewMockOps creates a new mock instance
 func NewMockOps(ctrl *gomock.Controller) *MockOps {
 	mock := &MockOps{ctrl: ctrl}
 	mock.recorder = &MockOpsMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use.
+// EXPECT returns an object that allows the caller to indicate expected use
 func (m *MockOps) EXPECT() *MockOpsMockRecorder {
 	return m.recorder
 }
 
-// ExecPrivilegeCommand mocks base method.
+// ExecPrivilegeCommand mocks base method
 func (m *MockOps) ExecPrivilegeCommand(command string, args ...string) (string, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{command}
@@ -46,14 +46,14 @@ func (m *MockOps) ExecPrivilegeCommand(command string, args ...string) (string, 
 	return ret0, ret1
 }
 
-// ExecPrivilegeCommand indicates an expected call of ExecPrivilegeCommand.
+// ExecPrivilegeCommand indicates an expected call of ExecPrivilegeCommand
 func (mr *MockOpsMockRecorder) ExecPrivilegeCommand(command interface{}, args ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{command}, args...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecPrivilegeCommand", reflect.TypeOf((*MockOps)(nil).ExecPrivilegeCommand), varargs...)
 }
 
-// ExecCommand mocks base method.
+// ExecCommand mocks base method
 func (m *MockOps) ExecCommand(command string, args ...string) (string, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{command}
@@ -66,14 +66,14 @@ func (m *MockOps) ExecCommand(command string, args ...string) (string, error) {
 	return ret0, ret1
 }
 
-// ExecCommand indicates an expected call of ExecCommand.
+// ExecCommand indicates an expected call of ExecCommand
 func (mr *MockOpsMockRecorder) ExecCommand(command interface{}, args ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{command}, args...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecCommand", reflect.TypeOf((*MockOps)(nil).ExecCommand), varargs...)
 }
 
-// Mkdir mocks base method.
+// Mkdir mocks base method
 func (m *MockOps) Mkdir(dirName string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Mkdir", dirName)
@@ -81,13 +81,13 @@ func (m *MockOps) Mkdir(dirName string) error {
 	return ret0
 }
 
-// Mkdir indicates an expected call of Mkdir.
+// Mkdir indicates an expected call of Mkdir
 func (mr *MockOpsMockRecorder) Mkdir(dirName interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Mkdir", reflect.TypeOf((*MockOps)(nil).Mkdir), dirName)
 }
 
-// WriteImageToDisk mocks base method.
+// WriteImageToDisk mocks base method
 func (m *MockOps) WriteImageToDisk(ignitionPath, device, image string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WriteImageToDisk", ignitionPath, device, image)
@@ -95,13 +95,13 @@ func (m *MockOps) WriteImageToDisk(ignitionPath, device, image string) error {
 	return ret0
 }
 
-// WriteImageToDisk indicates an expected call of WriteImageToDisk.
+// WriteImageToDisk indicates an expected call of WriteImageToDisk
 func (mr *MockOpsMockRecorder) WriteImageToDisk(ignitionPath, device, image interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteImageToDisk", reflect.TypeOf((*MockOps)(nil).WriteImageToDisk), ignitionPath, device, image)
 }
 
-// Reboot mocks base method.
+// Reboot mocks base method
 func (m *MockOps) Reboot() error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Reboot")
@@ -109,13 +109,13 @@ func (m *MockOps) Reboot() error {
 	return ret0
 }
 
-// Reboot indicates an expected call of Reboot.
+// Reboot indicates an expected call of Reboot
 func (mr *MockOpsMockRecorder) Reboot() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reboot", reflect.TypeOf((*MockOps)(nil).Reboot))
 }
 
-// ExtractFromIgnition mocks base method.
+// ExtractFromIgnition mocks base method
 func (m *MockOps) ExtractFromIgnition(ignitionPath, fileToExtract string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ExtractFromIgnition", ignitionPath, fileToExtract)
@@ -123,13 +123,13 @@ func (m *MockOps) ExtractFromIgnition(ignitionPath, fileToExtract string) error 
 	return ret0
 }
 
-// ExtractFromIgnition indicates an expected call of ExtractFromIgnition.
+// ExtractFromIgnition indicates an expected call of ExtractFromIgnition
 func (mr *MockOpsMockRecorder) ExtractFromIgnition(ignitionPath, fileToExtract interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExtractFromIgnition", reflect.TypeOf((*MockOps)(nil).ExtractFromIgnition), ignitionPath, fileToExtract)
 }
 
-// SystemctlAction mocks base method.
+// SystemctlAction mocks base method
 func (m *MockOps) SystemctlAction(action string, args ...string) error {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{action}
@@ -141,14 +141,14 @@ func (m *MockOps) SystemctlAction(action string, args ...string) error {
 	return ret0
 }
 
-// SystemctlAction indicates an expected call of SystemctlAction.
+// SystemctlAction indicates an expected call of SystemctlAction
 func (mr *MockOpsMockRecorder) SystemctlAction(action interface{}, args ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{action}, args...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SystemctlAction", reflect.TypeOf((*MockOps)(nil).SystemctlAction), varargs...)
 }
 
-// PrepareController mocks base method.
+// PrepareController mocks base method
 func (m *MockOps) PrepareController() error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PrepareController")
@@ -156,7 +156,7 @@ func (m *MockOps) PrepareController() error {
 	return ret0
 }
 
-// PrepareController indicates an expected call of PrepareController.
+// PrepareController indicates an expected call of PrepareController
 func (mr *MockOpsMockRecorder) PrepareController() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrepareController", reflect.TypeOf((*MockOps)(nil).PrepareController))
