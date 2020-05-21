@@ -67,6 +67,7 @@ func (c *k8sClient) ListNodes() (*v1.NodeList, error) {
 	return nodes, nil
 }
 
+// wait for minimum master nodes to be in ready status
 func (c *k8sClient) WaitForMasterNodes(ctx context.Context, minMasterNodes int) error {
 	nodesTimeout := 120 * time.Minute
 	c.log.Infof("Waiting up to %v for %d master nodes", nodesTimeout, minMasterNodes)
@@ -78,11 +79,18 @@ func (c *k8sClient) WaitForMasterNodes(ctx context.Context, minMasterNodes int) 
 			c.log.Warnf("Still waiting for master nodes: %v", err)
 		} else {
 			nodeNameAndCondition := map[string][]v1.NodeCondition{}
+			readyNodes := 0
 			for _, node := range nodes.Items {
 				nodeNameAndCondition[node.Name] = node.Status.Conditions
+				for _, cond := range node.Status.Conditions {
+					if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue {
+						readyNodes++
+					}
+				}
 			}
 			c.log.Infof("Found %d master nodes: %+v", len(nodes.Items), nodeNameAndCondition)
-			if len(nodes.Items) >= minMasterNodes {
+			c.log.Infof("Found %d ready master nodes", readyNodes)
+			if readyNodes >= minMasterNodes {
 				c.log.Infof("WaitForMasterNodes - Done")
 				cancel()
 			}
