@@ -7,6 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/certificates/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	v1 "k8s.io/api/core/v1"
 
 	"github.com/eranco74/assisted-installer/src/k8s_client"
@@ -17,6 +20,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 )
 
 func TestValidator(t *testing.T) {
@@ -180,6 +184,62 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			nodesIds := c.getInventoryNodes()
 			Expect(nodesIds).Should(Equal(hostIds))
 		})
+		AfterEach(func() {
+			ctrl.Finish()
+		})
+	})
+
+	Context("validating ApproveCsrs", func() {
+		conf := ControllerConfig{
+			ClusterID: "cluster-id",
+			Host:      "https://bm-inventory.com",
+			Port:      80,
+		}
+		BeforeEach(func() {
+			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
+			GeneralWaitTimeout = 1 * time.Second
+		})
+		It("Run ApproveCsrs and validate it exists on channel set", func() {
+			testList := v1beta1.CertificateSigningRequestList{}
+			mockk8sclient.EXPECT().ListCsrs().Return(&testList, nil).MinTimes(2).MaxTimes(5)
+			done := make(chan bool)
+			go c.ApproveCsrs(done)
+			time.Sleep(3 * time.Second)
+			done <- true
+		})
+		It("Run ApproveCsrs when list returns error", func() {
+			mockk8sclient.EXPECT().ListCsrs().Return(nil, fmt.Errorf("dummy")).MinTimes(2).MaxTimes(5)
+			done := make(chan bool)
+			go c.ApproveCsrs(done)
+			time.Sleep(3 * time.Second)
+			done <- true
+		})
+		It("Run ApproveCsrs with csrs list", func() {
+			csr := v1beta1.CertificateSigningRequest{}
+			csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
+				Type:           certificatesv1beta1.CertificateDenied,
+				Reason:         "dummy",
+				Message:        "dummy",
+				LastUpdateTime: metav1.Now(),
+			})
+			csrApproved := v1beta1.CertificateSigningRequest{}
+			csrApproved.Status.Conditions = append(csrApproved.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
+				Type:           certificatesv1beta1.CertificateApproved,
+				Reason:         "dummy",
+				Message:        "dummy",
+				LastUpdateTime: metav1.Now(),
+			})
+			testList := v1beta1.CertificateSigningRequestList{}
+			testList.Items = []v1beta1.CertificateSigningRequest{csr, csrApproved}
+			mockk8sclient.EXPECT().ListCsrs().Return(&testList, nil).MinTimes(1)
+			mockk8sclient.EXPECT().ApproveCsr(&csr).Return(nil).MinTimes(1)
+			mockk8sclient.EXPECT().ApproveCsr(&csrApproved).Return(nil).Times(0)
+			done := make(chan bool)
+			go c.ApproveCsrs(done)
+			time.Sleep(2 * time.Second)
+			done <- true
+		})
+
 		AfterEach(func() {
 			ctrl.Finish()
 		})
