@@ -1,7 +1,7 @@
 INSTALLER := $(or ${INSTALLER},quay.io/ocpmetal/assisted-installer:stable)
 GIT_REVISION := $(shell git rev-parse HEAD)
 CONTROLLER :=  $(or ${CONTROLLER}, quay.io/ocpmetal/assisted-installer-controller:stable)
-all: image unit-test
+all: image image_controller unit-test
 
 lint:
 	golangci-lint run -v
