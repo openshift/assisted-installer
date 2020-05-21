@@ -68,7 +68,7 @@ func (c *k8sClient) ListNodes() (*v1.NodeList, error) {
 }
 
 func (c *k8sClient) WaitForMasterNodes(ctx context.Context, minMasterNodes int) error {
-	nodesTimeout := 60 * time.Minute
+	nodesTimeout := 120 * time.Minute
 	logrus.Infof("Waiting up to %v for %d master nodes", nodesTimeout, minMasterNodes)
 	apiContext, cancel := context.WithTimeout(ctx, nodesTimeout)
 	defer cancel()
