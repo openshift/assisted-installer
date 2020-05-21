@@ -69,21 +69,21 @@ func (c *k8sClient) ListNodes() (*v1.NodeList, error) {
 
 func (c *k8sClient) WaitForMasterNodes(ctx context.Context, minMasterNodes int) error {
 	nodesTimeout := 120 * time.Minute
-	logrus.Infof("Waiting up to %v for %d master nodes", nodesTimeout, minMasterNodes)
+	c.log.Infof("Waiting up to %v for %d master nodes", nodesTimeout, minMasterNodes)
 	apiContext, cancel := context.WithTimeout(ctx, nodesTimeout)
 	defer cancel()
 	wait.Until(func() {
 		nodes, err := c.ListMasterNodes()
 		if err != nil {
-			logrus.Warnf("Still waiting for master nodes: %v", err)
+			c.log.Warnf("Still waiting for master nodes: %v", err)
 		} else {
 			nodeNameAndCondition := map[string][]v1.NodeCondition{}
 			for _, node := range nodes.Items {
 				nodeNameAndCondition[node.Name] = node.Status.Conditions
 			}
-			logrus.Infof("Found %d master nodes: %+v", len(nodes.Items), nodeNameAndCondition)
+			c.log.Infof("Found %d master nodes: %+v", len(nodes.Items), nodeNameAndCondition)
 			if len(nodes.Items) >= minMasterNodes {
-				logrus.Infof("WaitForMasterNodes - Done")
+				c.log.Infof("WaitForMasterNodes - Done")
 				cancel()
 			}
 		}
