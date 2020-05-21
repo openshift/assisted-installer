@@ -80,6 +80,7 @@ out:
 			break
 		}
 		c.log.Infof("Still waiting for %d nodes %v", len(assistedInstallerNodes), assistedInstallerNodes)
+		time.Sleep(GeneralWaitTimeout)
 	}
 }
 
