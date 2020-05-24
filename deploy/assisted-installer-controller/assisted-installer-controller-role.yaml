@@ -5,12 +5,63 @@ metadata:
   namespace: assisted-deployment
 rules:
   # "" indicates the core API group
-  - apiGroups: [""]
-    resources: ["nodes","pods"]
-    verbs: ["get","list","watch"]
-  - apiGroups: ["certificates.k8s.io"]
-    resources: ["certificatesigningrequests"]
-    verbs: ["get","list","watch"]
-  - apiGroups: ["certificates.k8s.io"]
-    resources: ["certificatesigningrequests/approval"]
-    verbs: ["update"]
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - certificates.k8s.io
+    resources:
+      - certificatesigningrequests
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - certificates.k8s.io
+    resources:
+      - certificatesigningrequests/approval
+    verbs:
+      - update
+  - apiGroups:
+      - authentication.k8s.io
+    resources:
+      - tokenreviews
+    verbs:
+      - create
+  - apiGroups:
+      - authorization.k8s.io
+    resources:
+      - subjectaccessreviews
+    verbs:
+      - create
+  - apiGroups:
+      - config.openshift.io
+    resources:
+      - clusteroperators
+    verbs:
+      - get
+      - create
+      - list
+      - watch
+  - apiGroups:
+      - config.openshift.io
+    resources:
+      - clusteroperators/status
+    resourceNames:
+      - machine-approver
+    verbs:
+      - update
+  - apiGroups:
+      - certificates.k8s.io
+    resourceNames:
+      - kubernetes.io/kube-apiserver-client-kubelet
+      - kubernetes.io/kubelet-serving
+    resources:
+      - signers
+    verbs:
+      - approve
