@@ -84,7 +84,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mcoImage, _ := utils.GetMCOByOpenshiftVersion(conf.OpenshiftVersion)
 		extractSuccess := func() {
 			mockops.EXPECT().ExecPrivilegeCommand(
-				"podman", "run", "--net", "host",
+				true, "podman", "run", "--net", "host",
 				"--volume", "/:/rootfs:rw",
 				"--volume", "/usr/bin/rpm-ostree:/usr/bin/rpm-ostree",
 				"--privileged",
@@ -115,10 +115,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockops.EXPECT().PrepareController().Return(nil).Times(1)
 		}
 		waitForBootkubeSuccess := func() {
-			mockops.EXPECT().ExecPrivilegeCommand("bash", "-c", "systemctl status bootkube.service | grep 'bootkube.service: Succeeded' | wc -l").Return("1", nil).Times(1)
+			mockops.EXPECT().ExecPrivilegeCommand(false, "bash", "-c", "systemctl status bootkube.service | grep 'bootkube.service: Succeeded' | wc -l").Return("1", nil).Times(1)
 		}
 		bootkubeStatusSuccess := func() {
-			mockops.EXPECT().ExecPrivilegeCommand("systemctl", "status", "bootkube.service").Return("1", nil).Times(1)
+			mockops.EXPECT().ExecPrivilegeCommand(true, "systemctl", "status", "bootkube.service").Return("1", nil).Times(1)
 		}
 
 		extractSecretFromIgnitionSuccess := func() {

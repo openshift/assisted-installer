@@ -127,7 +127,7 @@ func (c *k8sClient) PatchEtcd() error {
 func (c *k8sClient) RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error) {
 	c.log.Infof("Running oc command with args %v", args)
 	args = append([]string{fmt.Sprintf("--kubeconfig=%s", kubeconfigPath)}, args...)
-	outPut, err := o.ExecPrivilegeCommand("oc", args...)
+	outPut, err := o.ExecPrivilegeCommand(true, "oc", args...)
 	if err != nil {
 		return "", err
 	}

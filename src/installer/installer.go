@@ -151,7 +151,7 @@ func (i *installer) startBootstrap() error {
 	mcoImage, _ := utils.GetMCOByOpenshiftVersion(i.OpenshiftVersion)
 	i.log.Infof("Extracting ignition to disk using %s mcoImage", mcoImage)
 
-	_, err = i.ops.ExecPrivilegeCommand("podman", "run", "--net", "host",
+	_, err = i.ops.ExecPrivilegeCommand(true, "podman", "run", "--net", "host",
 		"--volume", "/:/rootfs:rw",
 		"--volume", "/usr/bin/rpm-ostree:/usr/bin/rpm-ostree",
 		"--privileged",
@@ -237,11 +237,11 @@ func (i *installer) waitForBootkube(ctx context.Context) {
 			return
 		case <-time.After(time.Second * time.Duration(5)):
 			// check if bootkube is done every 5 seconds
-			out, _ := i.ops.ExecPrivilegeCommand("bash", "-c", "systemctl status bootkube.service | grep 'bootkube.service: Succeeded' | wc -l")
+			out, _ := i.ops.ExecPrivilegeCommand(false, "bash", "-c", "systemctl status bootkube.service | grep 'bootkube.service: Succeeded' | wc -l")
 			if out == "1" {
 				// in case bootkube is done log the status and return
 				i.log.Info("bootkube service completed")
-				out, _ := i.ops.ExecPrivilegeCommand("systemctl", "status", "bootkube.service")
+				out, _ := i.ops.ExecPrivilegeCommand(true, "systemctl", "status", "bootkube.service")
 				i.log.Info(out)
 				return
 			}

@@ -34,9 +34,9 @@ func (m *MockOps) EXPECT() *MockOpsMockRecorder {
 }
 
 // ExecPrivilegeCommand mocks base method
-func (m *MockOps) ExecPrivilegeCommand(command string, args ...string) (string, error) {
+func (m *MockOps) ExecPrivilegeCommand(verbose bool, command string, args ...string) (string, error) {
 	m.ctrl.T.Helper()
-	varargs := []interface{}{command}
+	varargs := []interface{}{verbose, command}
 	for _, a := range args {
 		varargs = append(varargs, a)
 	}
@@ -47,16 +47,16 @@ func (m *MockOps) ExecPrivilegeCommand(command string, args ...string) (string, 
 }
 
 // ExecPrivilegeCommand indicates an expected call of ExecPrivilegeCommand
-func (mr *MockOpsMockRecorder) ExecPrivilegeCommand(command interface{}, args ...interface{}) *gomock.Call {
+func (mr *MockOpsMockRecorder) ExecPrivilegeCommand(verbose, command interface{}, args ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{command}, args...)
+	varargs := append([]interface{}{verbose, command}, args...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecPrivilegeCommand", reflect.TypeOf((*MockOps)(nil).ExecPrivilegeCommand), varargs...)
 }
 
 // ExecCommand mocks base method
-func (m *MockOps) ExecCommand(command string, args ...string) (string, error) {
+func (m *MockOps) ExecCommand(verbose bool, command string, args ...string) (string, error) {
 	m.ctrl.T.Helper()
-	varargs := []interface{}{command}
+	varargs := []interface{}{verbose, command}
 	for _, a := range args {
 		varargs = append(varargs, a)
 	}
@@ -67,9 +67,9 @@ func (m *MockOps) ExecCommand(command string, args ...string) (string, error) {
 }
 
 // ExecCommand indicates an expected call of ExecCommand
-func (mr *MockOpsMockRecorder) ExecCommand(command interface{}, args ...interface{}) *gomock.Call {
+func (mr *MockOpsMockRecorder) ExecCommand(verbose, command interface{}, args ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{command}, args...)
+	varargs := append([]interface{}{verbose, command}, args...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecCommand", reflect.TypeOf((*MockOps)(nil).ExecCommand), varargs...)
 }
 

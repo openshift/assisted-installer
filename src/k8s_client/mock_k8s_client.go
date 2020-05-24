@@ -110,7 +110,7 @@ func (mr *MockK8SClientMockRecorder) RunOCctlCommand(args, kubeconfigPath, o int
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunOCctlCommand", reflect.TypeOf((*MockK8SClient)(nil).RunOCctlCommand), args, kubeconfigPath, o)
 }
 
-// ApproveCsr mocks base method.
+// ApproveCsr mocks base method
 func (m *MockK8SClient) ApproveCsr(csr *v1beta1.CertificateSigningRequest) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ApproveCsr", csr)
@@ -118,13 +118,13 @@ func (m *MockK8SClient) ApproveCsr(csr *v1beta1.CertificateSigningRequest) error
 	return ret0
 }
 
-// ApproveCsr indicates an expected call of ApproveCsr.
+// ApproveCsr indicates an expected call of ApproveCsr
 func (mr *MockK8SClientMockRecorder) ApproveCsr(csr interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApproveCsr", reflect.TypeOf((*MockK8SClient)(nil).ApproveCsr), csr)
 }
 
-// ListCsrs mocks base method.
+// ListCsrs mocks base method
 func (m *MockK8SClient) ListCsrs() (*v1beta1.CertificateSigningRequestList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListCsrs")
@@ -133,7 +133,7 @@ func (m *MockK8SClient) ListCsrs() (*v1beta1.CertificateSigningRequestList, erro
 	return ret0, ret1
 }
 
-// ListCsrs indicates an expected call of ListCsrs.
+// ListCsrs indicates an expected call of ListCsrs
 func (mr *MockK8SClientMockRecorder) ListCsrs() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCsrs", reflect.TypeOf((*MockK8SClient)(nil).ListCsrs))
