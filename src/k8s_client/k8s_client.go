@@ -31,6 +31,7 @@ type K8SClient interface {
 	RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error)
 	ApproveCsr(csr *v1beta1.CertificateSigningRequest) error
 	ListCsrs() (*v1beta1.CertificateSigningRequestList, error)
+	GetConfigMap(namespace string, name string) (*v1.ConfigMap, error)
 }
 
 type K8SClientBuilder func(configPath string, logger *logrus.Logger) (K8SClient, error)
@@ -156,4 +157,12 @@ func (c k8sClient) ApproveCsr(csr *v1beta1.CertificateSigningRequest) error {
 		return err
 	}
 	return nil
+}
+
+func (c *k8sClient) GetConfigMap(namespace string, name string) (*v1.ConfigMap, error) {
+	cm, err := c.client.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return cm, nil
 }

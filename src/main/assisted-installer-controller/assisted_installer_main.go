@@ -43,6 +43,7 @@ func main() {
 	done := make(chan bool)
 	go assistedController.ApproveCsrs(done)
 	assistedController.WaitAndUpdateNodesStatus()
+	assistedController.AddRouterCAToClusterCA()
 	logger.Infof("Sleeping for 10 minutes to give a chance to approve all crs")
 	time.Sleep(10 * time.Minute)
 

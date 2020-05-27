@@ -20,6 +20,7 @@ type InventoryClient interface {
 	DownloadFile(filename string, dest string) error
 	UpdateHostStatus(newStatus string, hostId string) error
 	GetHostsIds() ([]string, error)
+	UploadIngressCa(ingressCA string, clusterId string) error
 }
 
 type inventoryClient struct {
@@ -51,6 +52,12 @@ func (c *inventoryClient) DownloadFile(filename string, dest string) error {
 
 func (c *inventoryClient) UpdateHostStatus(newStatus string, hostId string) error {
 	_, err := c.ai.Installer.UpdateHostInstallProgress(context.Background(), c.createUpdateHostStatusParams(newStatus, hostId))
+	return err
+}
+
+func (c *inventoryClient) UploadIngressCa(ingressCA string, clusterId string) error {
+	_, err := c.ai.Installer.UploadClusterIngressCert(context.Background(),
+		&installer.UploadClusterIngressCertParams{ClusterID: strfmt.UUID(clusterId), IngressCertParams: models.IngressCertParams(ingressCA)})
 	return err
 }
 

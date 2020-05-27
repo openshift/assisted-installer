@@ -91,7 +91,7 @@ func (c *controller) getInventoryNodes() []string {
 	for {
 		assistedInstallerNodes, err = c.ic.GetHostsIds()
 		if err != nil {
-			c.log.Infof("Failed to get node list from inventory, will retry in 30 seconds, %e", err)
+			c.log.Errorf("Failed to get node list from inventory, will retry in 30 seconds, %s", err)
 			time.Sleep(GeneralWaitTimeout)
 			continue
 		}
@@ -135,4 +135,28 @@ func isCsrApproved(csr *certificatesv1beta1.CertificateSigningRequest) bool {
 		}
 	}
 	return false
+}
+
+// AddRouterCAToClusterCA adds router CA to cluster CA in kubeconfig
+func (c controller) AddRouterCAToClusterCA() {
+	cmName := "default-ingress-cert"
+	cmNamespace := "openshift-config-managed"
+	c.log.Infof("Start adding ingress ca to cluster")
+	for {
+		time.Sleep(GeneralWaitTimeout)
+		caConfigMap, err := c.kc.GetConfigMap(cmNamespace, cmName)
+		if err != nil {
+			c.log.WithError(err).Errorf("fetching %s configmap from %s namespace", cmName, cmNamespace)
+			continue
+		}
+
+		c.log.Infof("Sending ingress certificate to inventory service. Certificate data %s", caConfigMap.Data["ca-bundle.crt"])
+		err = c.ic.UploadIngressCa(caConfigMap.Data["ca-bundle.crt"], c.ClusterID)
+		if err != nil {
+			c.log.WithError(err).Errorf("Failed to upload ingress ca to bm-inventory")
+			continue
+		}
+		c.log.Infof("Ingress ca successfully sent to inventory")
+		break
+	}
 }
