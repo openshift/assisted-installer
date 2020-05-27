@@ -9,6 +9,7 @@ rules:
       - ""
     resources:
       - nodes
+      - configmaps
     verbs:
       - get
       - list
