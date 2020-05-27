@@ -75,3 +75,17 @@ func (mr *MockInventoryClientMockRecorder) GetHostsIds() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHostsIds", reflect.TypeOf((*MockInventoryClient)(nil).GetHostsIds))
 }
+
+// UploadIngressCa mocks base method.
+func (m *MockInventoryClient) UploadIngressCa(ingressCA, clusterId string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UploadIngressCa", ingressCA, clusterId)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UploadIngressCa indicates an expected call of UploadIngressCa.
+func (mr *MockInventoryClientMockRecorder) UploadIngressCa(ingressCA, clusterId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadIngressCa", reflect.TypeOf((*MockInventoryClient)(nil).UploadIngressCa), ingressCA, clusterId)
+}
