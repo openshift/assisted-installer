@@ -245,6 +245,34 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ctrl.Finish()
 		})
 	})
+
+	Context("validating AddRouterCAToClusterCA", func() {
+		conf := ControllerConfig{
+			ClusterID: "cluster-id",
+			Host:      "https://bm-inventory.com",
+			Port:      80,
+		}
+		BeforeEach(func() {
+			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
+			GeneralWaitTimeout = 1 * time.Second
+		})
+		It("Run AddRouterCAToClusterCA", func() {
+			cmName := "default-ingress-cert"
+			cmNamespace := "openshift-config-managed"
+			data := make(map[string]string)
+			data["ca-bundle.crt"] = "CA"
+			cm := v1.ConfigMap{Data: data}
+			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(nil, fmt.Errorf("dummy")).Times(1)
+			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(&cm, nil).Times(2)
+			mockbmclient.EXPECT().UploadIngressCa(data["ca-bundle.crt"], c.ClusterID).Return(fmt.Errorf("dummy")).Times(1)
+			mockbmclient.EXPECT().UploadIngressCa(data["ca-bundle.crt"], c.ClusterID).Return(nil).Times(1)
+			c.AddRouterCAToClusterCA()
+		})
+
+		AfterEach(func() {
+			ctrl.Finish()
+		})
+	})
 })
 
 func GetKubeNodes(hostIds []string) *v1.NodeList {
