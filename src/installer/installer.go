@@ -98,7 +98,9 @@ func (i *installer) InstallNode() error {
 	i.log.Infof("Going to use image: %s", image)
 	// TODO report image to disk progress
 
-	err = i.ops.WriteImageToDisk(ignitionPath, i.Device, image)
+	err = utils.Retry(3, time.Second, i.log, func() error {
+		return i.ops.WriteImageToDisk(ignitionPath, i.Device, image)
+	})
 	if err != nil {
 		i.log.Errorf("Failed to write image to disk %s", err)
 		return err

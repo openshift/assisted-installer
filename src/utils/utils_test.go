@@ -1,9 +1,11 @@
 package utils
 
 import (
+	"fmt"
 	"io/ioutil"
 	"path/filepath"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -90,6 +92,42 @@ var _ = Describe("Verify_utils", func() {
 
 			list2 = FindAndRemoveElementFromStringList(list, "no-exists")
 			Expect(len(list2)).Should(Equal(2))
+		})
+	})
+	Context("test retry", func() {
+		It("test once", func() {
+			callCount := 0
+			err := Retry(3, time.Millisecond, l, func() error {
+				callCount++
+				return nil
+			})
+			Expect(err).Should(BeNil())
+			Expect(callCount).Should(Equal(1))
+
+		})
+		It("test multiple", func() {
+			callCount := 0
+			err := Retry(3, time.Millisecond, l, func() error {
+				callCount++
+				if callCount < 2 {
+					return fmt.Errorf("Failed")
+				}
+				return nil
+			})
+			Expect(err).Should(BeNil())
+			Expect(callCount).Should(Equal(2))
+
+		})
+		It("test Failure", func() {
+			callCount := 0
+			tries := 4
+			err := Retry(tries, time.Millisecond, l, func() error {
+				callCount++
+				return fmt.Errorf("failed again")
+			})
+			Expect(err).Should(Equal(fmt.Errorf("failed after 4 attempts, last error: failed again")))
+			Expect(callCount).Should(Equal(tries))
+
 		})
 	})
 })

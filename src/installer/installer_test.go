@@ -245,9 +245,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mkdirSuccess()
 			downloadFileSuccess(masterIgn)
 			err := fmt.Errorf("failed to write image to disk")
-			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, masterIgn), device, image).Return(err).Times(1)
+			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, masterIgn), device, image).Return(err).Times(3)
 			ret := i.InstallNode()
-			Expect(ret).Should(Equal(err))
+			Expect(ret).Should(Equal(fmt.Errorf("failed after 3 attempts, last error: failed to write image to disk")))
 		})
 		It("HostRoleMaster role failed to reboot", func() {
 			udpateStatusSuccess([]string{StartingInstallation,

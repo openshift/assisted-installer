@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	ignition "github.com/coreos/ignition/config/v2_2"
 	"github.com/vincent-petithory/dataurl"
@@ -106,4 +107,16 @@ func FindAndRemoveElementFromStringList(s []string, r string) []string {
 		}
 	}
 	return s
+}
+
+func Retry(attempts int, sleep time.Duration, log *logrus.Logger, f func() error) (err error) {
+	for i := 0; i < attempts; i++ {
+		err = f()
+		if err == nil {
+			return
+		}
+		time.Sleep(sleep)
+		log.Warnf("Retrying after error: %s", err)
+	}
+	return fmt.Errorf("failed after %d attempts, last error: %s", attempts, err)
 }
