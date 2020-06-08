@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/filanov/bm-inventory/models"
 
 	"k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,6 +40,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockk8sclient *k8s_client.MockK8SClient
 		c             *controller
 		hostIds       []string
+		wg            sync.WaitGroup
 	)
 	hostIds = []string{"7916fa89-ea7a-443e-a862-b3e930309f65", "eb82821f-bf21-4614-9a3b-ecb07929f238", "b898d516-3e16-49d0-86a5-0ad5bd04e3ed"}
 	l.SetOutput(ioutil.Discard)
@@ -204,16 +208,20 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			testList := v1beta1.CertificateSigningRequestList{}
 			mockk8sclient.EXPECT().ListCsrs().Return(&testList, nil).MinTimes(2).MaxTimes(5)
 			done := make(chan bool)
-			go c.ApproveCsrs(done)
+			wg.Add(1)
+			go c.ApproveCsrs(done, &wg)
 			time.Sleep(3 * time.Second)
 			done <- true
+			wg.Wait()
 		})
 		It("Run ApproveCsrs when list returns error", func() {
 			mockk8sclient.EXPECT().ListCsrs().Return(nil, fmt.Errorf("dummy")).MinTimes(2).MaxTimes(5)
 			done := make(chan bool)
-			go c.ApproveCsrs(done)
+			wg.Add(1)
+			go c.ApproveCsrs(done, &wg)
 			time.Sleep(3 * time.Second)
 			done <- true
+			wg.Wait()
 		})
 		It("Run ApproveCsrs with csrs list", func() {
 			csr := v1beta1.CertificateSigningRequest{}
@@ -236,7 +244,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().ApproveCsr(&csr).Return(nil).MinTimes(1)
 			mockk8sclient.EXPECT().ApproveCsr(&csrApproved).Return(nil).Times(0)
 			done := make(chan bool)
-			go c.ApproveCsrs(done)
+			wg.Add(1)
+			go c.ApproveCsrs(done, &wg)
 			time.Sleep(2 * time.Second)
 			done <- true
 		})
@@ -262,11 +271,17 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			data := make(map[string]string)
 			data["ca-bundle.crt"] = "CA"
 			cm := v1.ConfigMap{Data: data}
+			installed := "installed"
+			cluster := models.Cluster{Status: &installed}
+			mockbmclient.EXPECT().GetCluster().Return(nil, fmt.Errorf("dummy")).Times(1)
+			mockbmclient.EXPECT().GetCluster().Return(&cluster, nil).AnyTimes()
 			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(nil, fmt.Errorf("dummy")).Times(1)
 			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(&cm, nil).Times(2)
 			mockbmclient.EXPECT().UploadIngressCa(data["ca-bundle.crt"], c.ClusterID).Return(fmt.Errorf("dummy")).Times(1)
 			mockbmclient.EXPECT().UploadIngressCa(data["ca-bundle.crt"], c.ClusterID).Return(nil).Times(1)
-			c.AddRouterCAToClusterCA()
+			wg.Add(1)
+			go c.AddRouterCAToClusterCA(&wg)
+			wg.Wait()
 		})
 
 		AfterEach(func() {

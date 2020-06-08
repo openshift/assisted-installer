@@ -1,6 +1,7 @@
 package assisted_installer_controller
 
 import (
+	"sync"
 	"time"
 
 	"github.com/eranco74/assisted-installer/src/inventory_client"
@@ -52,7 +53,6 @@ func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inv
 
 func (c *controller) WaitAndUpdateNodesStatus() {
 	c.log.Infof("Waiting till all nodes will join and update status to assisted installer")
-
 	assistedInstallerNodes := c.getInventoryNodes()
 	numberOfNodesToWaitFor := len(assistedInstallerNodes)
 	nodeUUIDAndName := make(map[string]string)
@@ -101,7 +101,8 @@ func (c *controller) getInventoryNodes() []string {
 	return assistedInstallerNodes
 }
 
-func (c *controller) ApproveCsrs(done <-chan bool) {
+func (c *controller) ApproveCsrs(done <-chan bool, wg *sync.WaitGroup) {
+	defer wg.Done()
 	c.log.Infof("Start approving csrs")
 	ticker := time.NewTicker(GeneralWaitTimeout)
 	for {
@@ -138,12 +139,22 @@ func isCsrApproved(csr *certificatesv1beta1.CertificateSigningRequest) bool {
 }
 
 // AddRouterCAToClusterCA adds router CA to cluster CA in kubeconfig
-func (c controller) AddRouterCAToClusterCA() {
+func (c controller) AddRouterCAToClusterCA(wg *sync.WaitGroup) {
+	defer wg.Done()
 	cmName := "default-ingress-cert"
 	cmNamespace := "openshift-config-managed"
 	c.log.Infof("Start adding ingress ca to cluster")
 	for {
 		time.Sleep(GeneralWaitTimeout)
+		cluster, err := c.ic.GetCluster()
+		if err != nil {
+			c.log.WithError(err).Errorf("Failed to get cluster %s from bm-inventory", c.ClusterID)
+			continue
+		}
+		// waiting till cluster will be installed(3 masters must be installed)
+		if *cluster.Status != "installed" {
+			continue
+		}
 		caConfigMap, err := c.kc.GetConfigMap(cmNamespace, cmName)
 		if err != nil {
 			c.log.WithError(err).Errorf("fetching %s configmap from %s namespace", cmName, cmNamespace)

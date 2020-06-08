@@ -21,6 +21,7 @@ type InventoryClient interface {
 	UpdateHostStatus(newStatus string, hostId string) error
 	GetHostsIds() ([]string, error)
 	UploadIngressCa(ingressCA string, clusterId string) error
+	GetCluster() (*models.Cluster, error)
 }
 
 type inventoryClient struct {
@@ -59,6 +60,15 @@ func (c *inventoryClient) UploadIngressCa(ingressCA string, clusterId string) er
 	_, err := c.ai.Installer.UploadClusterIngressCert(context.Background(),
 		&installer.UploadClusterIngressCertParams{ClusterID: strfmt.UUID(clusterId), IngressCertParams: models.IngressCertParams(ingressCA)})
 	return err
+}
+
+func (c *inventoryClient) GetCluster() (*models.Cluster, error) {
+	cluster, err := c.ai.Installer.GetCluster(context.Background(), &installer.GetClusterParams{ClusterID: c.clusterId})
+	if err != nil {
+		return nil, err
+	}
+
+	return cluster.Payload, nil
 }
 
 func (c *inventoryClient) GetHostsIds() ([]string, error) {

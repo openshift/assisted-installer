@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"sync"
 	"time"
 
 	"github.com/eranco74/assisted-installer/src/k8s_client"
@@ -39,13 +40,15 @@ func main() {
 		inventory_client.CreateInventoryClient(Options.ControllerConfig.ClusterID, Options.ControllerConfig.Host, Options.ControllerConfig.Port),
 		kc,
 	)
-
+	var wg sync.WaitGroup
 	done := make(chan bool)
-	go assistedController.ApproveCsrs(done)
+	wg.Add(2)
+	go assistedController.ApproveCsrs(done, &wg)
+	go assistedController.AddRouterCAToClusterCA(&wg)
 	assistedController.WaitAndUpdateNodesStatus()
-	assistedController.AddRouterCAToClusterCA()
 	logger.Infof("Sleeping for 10 minutes to give a chance to approve all crs")
 	time.Sleep(10 * time.Minute)
-
 	done <- true
+	logger.Infof("Waiting fo all go routines to finish")
+	wg.Wait()
 }
