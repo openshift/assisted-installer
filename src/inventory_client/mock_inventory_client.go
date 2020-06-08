@@ -7,6 +7,7 @@ package inventory_client
 import (
 	reflect "reflect"
 
+	models "github.com/filanov/bm-inventory/models"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -76,7 +77,7 @@ func (mr *MockInventoryClientMockRecorder) GetHostsIds() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHostsIds", reflect.TypeOf((*MockInventoryClient)(nil).GetHostsIds))
 }
 
-// UploadIngressCa mocks base method.
+// UploadIngressCa mocks base method
 func (m *MockInventoryClient) UploadIngressCa(ingressCA, clusterId string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UploadIngressCa", ingressCA, clusterId)
@@ -84,8 +85,23 @@ func (m *MockInventoryClient) UploadIngressCa(ingressCA, clusterId string) error
 	return ret0
 }
 
-// UploadIngressCa indicates an expected call of UploadIngressCa.
+// UploadIngressCa indicates an expected call of UploadIngressCa
 func (mr *MockInventoryClientMockRecorder) UploadIngressCa(ingressCA, clusterId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadIngressCa", reflect.TypeOf((*MockInventoryClient)(nil).UploadIngressCa), ingressCA, clusterId)
+}
+
+// GetCluster mocks base method
+func (m *MockInventoryClient) GetCluster() (*models.Cluster, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCluster")
+	ret0, _ := ret[0].(*models.Cluster)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCluster indicates an expected call of GetCluster
+func (mr *MockInventoryClientMockRecorder) GetCluster() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCluster", reflect.TypeOf((*MockInventoryClient)(nil).GetCluster))
 }

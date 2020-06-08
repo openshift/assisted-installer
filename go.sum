@@ -102,6 +102,7 @@ github.com/filanov/bm-inventory v0.0.0-20200526122322-f11aebeae19d h1:zBUpzjk3tq
 github.com/filanov/bm-inventory v0.0.0-20200526122322-f11aebeae19d/go.mod h1:U2Ju0BoQd5mg8nE2EDQDuE4kJf00vU6OiblUYJonw78=
 github.com/filanov/bm-inventory v0.0.0-20200527181715-eee180e28961 h1:JQpRU/vysI+n1ARA61JU8bzOIdX54jxECSin8gdXCrw=
 github.com/filanov/bm-inventory v0.0.0-20200527181715-eee180e28961/go.mod h1:SnGwgZqpHzRwFrnhwWzMvXwaE/amj0YByVHyxBFCOrY=
+github.com/filanov/bm-inventory v0.0.0-20200608112038-43f0481079d0 h1:CwN2Hf56mt/1PKpW0cwP+0lENDSMJyuH7k20b57PN6o=
 github.com/filanov/stateswitch v0.0.0-20200513095115-051501b05b45/go.mod h1:sk33Oz1ABVidMrVdJfd6tj7n9exK/PZarClHJNnFIQ8=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
