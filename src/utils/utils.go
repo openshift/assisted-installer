@@ -29,7 +29,7 @@ func NewLogWriter(logger *logrus.Logger) *LogWriter {
 func InitLogger(verbose bool) *logrus.Logger {
 	var log = logrus.New()
 	// log to console and file
-	f, err := os.OpenFile("crawler.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	f, err := os.OpenFile("/var/log/assisted-installer.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("error opening file: %v", err)
 	}
