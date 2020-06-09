@@ -3,7 +3,6 @@ package k8s_client
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"k8s.io/api/certificates/v1beta1"
 
@@ -17,7 +16,6 @@ import (
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	certificatesv1beta1client "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 )
@@ -25,7 +23,6 @@ import (
 //go:generate mockgen -source=k8s_client.go -package=k8s_client -destination=mock_k8s_client.go
 type K8SClient interface {
 	ListMasterNodes() (*v1.NodeList, error)
-	WaitForMasterNodes(context context.Context, minMasterNodes int) error
 	PatchEtcd() error
 	ListNodes() (*v1.NodeList, error)
 	RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error)
@@ -76,42 +73,6 @@ func (c *k8sClient) ListNodes() (*v1.NodeList, error) {
 		return &v1.NodeList{}, err
 	}
 	return nodes, nil
-}
-
-// wait for minimum master nodes to be in ready status
-func (c *k8sClient) WaitForMasterNodes(ctx context.Context, minMasterNodes int) error {
-	nodesTimeout := 120 * time.Minute
-	c.log.Infof("Waiting up to %v for %d master nodes", nodesTimeout, minMasterNodes)
-	apiContext, cancel := context.WithTimeout(ctx, nodesTimeout)
-	defer cancel()
-	wait.Until(func() {
-		nodes, err := c.ListMasterNodes()
-		if err != nil {
-			c.log.Warnf("Still waiting for master nodes: %v", err)
-		} else {
-			nodeNameAndCondition := map[string][]v1.NodeCondition{}
-			readyMasterNodes := 0
-			for _, node := range nodes.Items {
-				nodeNameAndCondition[node.Name] = node.Status.Conditions
-				for _, cond := range node.Status.Conditions {
-					if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue {
-						readyMasterNodes++
-					}
-				}
-			}
-			c.log.Infof("Found %d master nodes: %+v", len(nodes.Items), nodeNameAndCondition)
-			c.log.Infof("Found %d ready master nodes", readyMasterNodes)
-			if readyMasterNodes >= minMasterNodes {
-				c.log.Infof("Waiting for master nodes - Done")
-				cancel()
-			}
-		}
-	}, 5*time.Second, apiContext.Done())
-	err := apiContext.Err()
-	if err != nil && err != context.Canceled {
-		return errors.Wrap(err, "Waiting for master nodes")
-	}
-	return nil
 }
 
 func (c *k8sClient) PatchEtcd() error {

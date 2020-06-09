@@ -6,6 +6,12 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/thoas/go-funk"
+
+	"github.com/pkg/errors"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+
 	"github.com/eranco74/assisted-installer/src/k8s_client"
 	"golang.org/x/sync/errgroup"
 
@@ -34,6 +40,7 @@ const (
 	WaitForControlPlane  = "Waiting for control plane"
 	WritingImageToDisk   = "Writing image to disk"
 	Reboot               = "Rebooting"
+	Joined               = "Joined"
 )
 
 // Installer will run the install operations on the node
@@ -206,7 +213,7 @@ func (i *installer) getFileFromService(filename string) (string, error) {
 }
 
 func (i *installer) waitForControlPlane(ctx context.Context, kc k8s_client.K8SClient) error {
-	if err := kc.WaitForMasterNodes(ctx, minMasterNodes); err != nil {
+	if err := i.waitForMasterNodes(ctx, minMasterNodes, kc); err != nil {
 		i.log.Errorf("Timeout waiting for master nodes, %s", err)
 		return err
 	}
@@ -235,7 +242,7 @@ func (i *installer) waitForBootkube(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Printf("Context cancelled, terminting wait for bootkube\n")
+			i.log.Info("Context cancelled, terminating wait for bootkube\n")
 			return
 		case <-time.After(time.Second * time.Duration(5)):
 			// check if bootkube is done every 5 seconds
@@ -249,4 +256,51 @@ func (i *installer) waitForBootkube(ctx context.Context) {
 			}
 		}
 	}
+}
+
+// wait for minimum master nodes to be in ready status
+func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, kc k8s_client.K8SClient) error {
+	nodesTimeout := 120 * time.Minute
+	var readyMasters []string
+	i.log.Infof("Waiting up to %v for %d master nodes", nodesTimeout, minMasterNodes)
+	apiContext, cancel := context.WithTimeout(ctx, nodesTimeout)
+	defer cancel()
+
+	wait.Until(func() {
+		nodes, err := kc.ListMasterNodes()
+		if err != nil {
+			i.log.Warnf("Still waiting for master nodes: %v", err)
+		} else {
+			i.updateReadyMasters(nodes, &readyMasters)
+			i.log.Infof("Found %d ready master nodes", len(readyMasters))
+			if len(readyMasters) >= minMasterNodes {
+				i.log.Infof("Waiting for master nodes - Done")
+				cancel()
+			}
+		}
+	}, 5*time.Second, apiContext.Done())
+	err := apiContext.Err()
+	if err != nil && err != context.Canceled {
+		return errors.Wrap(err, "Waiting for master nodes")
+	}
+	return nil
+}
+
+func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]string) {
+	nodeNameAndCondition := map[string][]v1.NodeCondition{}
+	for _, node := range nodes.Items {
+		nodeNameAndCondition[node.Name] = node.Status.Conditions
+		for _, cond := range node.Status.Conditions {
+			if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue &&
+				!funk.ContainsString(*readyMasters, node.Status.NodeInfo.SystemUUID) {
+
+				i.log.Infof("Found a new ready master node %s with id %s", node.Name, node.Status.NodeInfo.SystemUUID)
+				*readyMasters = append(*readyMasters, node.Status.NodeInfo.SystemUUID)
+				if err := i.ic.UpdateHostStatus(Joined, node.Status.NodeInfo.SystemUUID); err != nil {
+					i.log.Errorf("Failed to update node installation status, %s", err)
+				}
+			}
+		}
+	}
+	i.log.Infof("Found %d master nodes: %+v", len(nodes.Items), nodeNameAndCondition)
 }

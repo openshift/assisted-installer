@@ -1,10 +1,13 @@
 package installer
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
 	"testing"
+
+	v1 "k8s.io/api/core/v1"
 
 	"github.com/eranco74/assisted-installer/src/k8s_client"
 
@@ -106,7 +109,13 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			}
 		}
 		WaitMasterNodesSucccess := func() {
-			mockk8sclient.EXPECT().WaitForMasterNodes(gomock.Any(), 2).Return(nil).Times(1)
+			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes([]string{}), nil).Times(1)
+			hostIds := []string{"7916fa89-ea7a-443e-a862-b3e930309f65"}
+			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(hostIds), nil).Times(1)
+			mockbmclient.EXPECT().UpdateHostStatus(Joined, hostIds[0]).Times(1)
+			hostIds = []string{"7916fa89-ea7a-443e-a862-b3e930309f65", "eb82821f-bf21-4614-9a3b-ecb07929f238"}
+			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(hostIds), nil).Times(1)
+			mockbmclient.EXPECT().UpdateHostStatus(Joined, hostIds[1]).Times(1)
 		}
 		patchEtcdSuccess := func() {
 			mockk8sclient.EXPECT().PatchEtcd().Return(nil).Times(1)
@@ -312,3 +321,16 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	})
 
 })
+
+func GetKubeNodes(hostIds []string) *v1.NodeList {
+	file, _ := ioutil.ReadFile("../../test_files/node.json")
+	var node v1.Node
+	_ = json.Unmarshal(file, &node)
+	nodeList := &v1.NodeList{}
+	for _, id := range hostIds {
+		node.Status.Conditions = []v1.NodeCondition{{Status: v1.ConditionTrue, Type: v1.NodeReady}}
+		node.Status.NodeInfo.SystemUUID = id
+		nodeList.Items = append(nodeList.Items, node)
+	}
+	return nodeList
+}
