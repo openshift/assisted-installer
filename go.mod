@@ -15,7 +15,7 @@ require (
 	github.com/openshift/client-go v0.0.0-20200422192633-6f6c07fc2a70
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.6.0
-	github.com/thoas/go-funk v0.6.0 // indirect
+	github.com/thoas/go-funk v0.6.0
 	github.com/vincent-petithory/dataurl v0.0.0-20191104211930-d1553a71de50
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e

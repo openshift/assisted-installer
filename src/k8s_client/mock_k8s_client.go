@@ -5,7 +5,6 @@
 package k8s_client
 
 import (
-	context "context"
 	reflect "reflect"
 
 	ops "github.com/eranco74/assisted-installer/src/ops"
@@ -50,20 +49,6 @@ func (m *MockK8SClient) ListMasterNodes() (*v1.NodeList, error) {
 func (mr *MockK8SClientMockRecorder) ListMasterNodes() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListMasterNodes", reflect.TypeOf((*MockK8SClient)(nil).ListMasterNodes))
-}
-
-// WaitForMasterNodes mocks base method
-func (m *MockK8SClient) WaitForMasterNodes(context context.Context, minMasterNodes int) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WaitForMasterNodes", context, minMasterNodes)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// WaitForMasterNodes indicates an expected call of WaitForMasterNodes
-func (mr *MockK8SClientMockRecorder) WaitForMasterNodes(context, minMasterNodes interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForMasterNodes", reflect.TypeOf((*MockK8SClient)(nil).WaitForMasterNodes), context, minMasterNodes)
 }
 
 // PatchEtcd mocks base method
