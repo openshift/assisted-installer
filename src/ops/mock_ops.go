@@ -5,6 +5,7 @@
 package ops
 
 import (
+	io "io"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -34,9 +35,9 @@ func (m *MockOps) EXPECT() *MockOpsMockRecorder {
 }
 
 // ExecPrivilegeCommand mocks base method
-func (m *MockOps) ExecPrivilegeCommand(verbose bool, command string, args ...string) (string, error) {
+func (m *MockOps) ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
 	m.ctrl.T.Helper()
-	varargs := []interface{}{verbose, command}
+	varargs := []interface{}{liveLogger, command}
 	for _, a := range args {
 		varargs = append(varargs, a)
 	}
@@ -47,16 +48,16 @@ func (m *MockOps) ExecPrivilegeCommand(verbose bool, command string, args ...str
 }
 
 // ExecPrivilegeCommand indicates an expected call of ExecPrivilegeCommand
-func (mr *MockOpsMockRecorder) ExecPrivilegeCommand(verbose, command interface{}, args ...interface{}) *gomock.Call {
+func (mr *MockOpsMockRecorder) ExecPrivilegeCommand(liveLogger, command interface{}, args ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{verbose, command}, args...)
+	varargs := append([]interface{}{liveLogger, command}, args...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecPrivilegeCommand", reflect.TypeOf((*MockOps)(nil).ExecPrivilegeCommand), varargs...)
 }
 
 // ExecCommand mocks base method
-func (m *MockOps) ExecCommand(verbose bool, command string, args ...string) (string, error) {
+func (m *MockOps) ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
 	m.ctrl.T.Helper()
-	varargs := []interface{}{verbose, command}
+	varargs := []interface{}{liveLogger, command}
 	for _, a := range args {
 		varargs = append(varargs, a)
 	}
@@ -67,9 +68,9 @@ func (m *MockOps) ExecCommand(verbose bool, command string, args ...string) (str
 }
 
 // ExecCommand indicates an expected call of ExecCommand
-func (mr *MockOpsMockRecorder) ExecCommand(verbose, command interface{}, args ...interface{}) *gomock.Call {
+func (mr *MockOpsMockRecorder) ExecCommand(liveLogger, command interface{}, args ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{verbose, command}, args...)
+	varargs := append([]interface{}{liveLogger, command}, args...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecCommand", reflect.TypeOf((*MockOps)(nil).ExecCommand), varargs...)
 }
 
