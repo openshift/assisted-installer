@@ -20,8 +20,8 @@ import (
 
 //go:generate mockgen -source=ops.go -package=ops -destination=mock_ops.go
 type Ops interface {
-	ExecPrivilegeCommand(verbose bool, command string, args ...string) (string, error)
-	ExecCommand(verbose bool, command string, args ...string) (string, error)
+	ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error)
+	ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error)
 	Mkdir(dirName string) error
 	WriteImageToDisk(ignitionPath string, device string, image string) error
 	Reboot() error
@@ -48,22 +48,22 @@ func NewOps(logger *logrus.Logger) Ops {
 }
 
 // ExecPrivilegeCommand execute a command in the host environment via nsenter
-func (o *ops) ExecPrivilegeCommand(verbose bool, command string, args ...string) (string, error) {
+func (o *ops) ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
 	commandBase := "nsenter"
 	arguments := []string{"-t", "1", "-m", "--", command}
 	arguments = append(arguments, args...)
-	return o.ExecCommand(verbose, commandBase, arguments...)
+	return o.ExecCommand(liveLogger, commandBase, arguments...)
 }
 
 // ExecCommand executes command.
-func (o *ops) ExecCommand(verbose bool, command string, args ...string) (string, error) {
+func (o *ops) ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
 
 	var stdoutBuf bytes.Buffer
 
 	cmd := exec.Command(command, args...)
-	if verbose {
-		cmd.Stdout = io.MultiWriter(o.logWriter, &stdoutBuf)
-		cmd.Stderr = io.MultiWriter(o.logWriter, &stdoutBuf)
+	if liveLogger != nil {
+		cmd.Stdout = io.MultiWriter(liveLogger, &stdoutBuf)
+		cmd.Stderr = io.MultiWriter(liveLogger, &stdoutBuf)
 	} else {
 		cmd.Stdout = &stdoutBuf
 		cmd.Stderr = &stdoutBuf
@@ -86,13 +86,13 @@ func (o *ops) ExecCommand(verbose bool, command string, args ...string) (string,
 
 func (o *ops) Mkdir(dirName string) error {
 	o.log.Infof("Creating directory: %s", dirName)
-	_, err := o.ExecPrivilegeCommand(true, "mkdir", "-p", dirName)
+	_, err := o.ExecPrivilegeCommand(o.logWriter, "mkdir", "-p", dirName)
 	return err
 }
 
 func (o *ops) SystemctlAction(action string, args ...string) error {
 	o.log.Infof("Running systemctl %s %s", action, args)
-	_, err := o.ExecPrivilegeCommand(true, "systemctl", append([]string{action}, args...)...)
+	_, err := o.ExecPrivilegeCommand(o.logWriter, "systemctl", append([]string{action}, args...)...)
 	if err != nil {
 		o.log.Errorf("Failed to executing systemctl %s %s", action, args)
 	}
@@ -101,12 +101,12 @@ func (o *ops) SystemctlAction(action string, args ...string) error {
 
 func (o *ops) WriteImageToDisk(ignitionPath string, device string, image string) error {
 	o.log.Info("Writing image and ignition to disk")
-	_, err := o.ExecPrivilegeCommand(true, "coreos-installer", "install", "--image-url", image, "--insecure", "-i", ignitionPath, device)
+	_, err := o.ExecPrivilegeCommand(utils.NewCoreosInstallerLogWriter(o.log), "coreos-installer", "install", "--image-url", image, "--insecure", "-i", ignitionPath, device)
 	return err
 }
 func (o *ops) Reboot() error {
 	o.log.Info("Rebooting node")
-	_, err := o.ExecPrivilegeCommand(true, "shutdown", "-r", "+1", "'Installation completed, server is going to reboot.'")
+	_, err := o.ExecPrivilegeCommand(o.logWriter, "shutdown", "-r", "+1", "'Installation completed, server is going to reboot.'")
 	if err != nil {
 		o.log.Errorf("Failed to reboot node, err: %s", err)
 		return err
@@ -137,12 +137,12 @@ func (o *ops) ExtractFromIgnition(ignitionPath string, fileToExtract string) err
 
 	o.log.Infof("Moving %s to %s", tmpFile, fileToExtract)
 	dir := filepath.Dir(fileToExtract)
-	_, err = o.ExecPrivilegeCommand(true, "mkdir", "-p", filepath.Dir(fileToExtract))
+	_, err = o.ExecPrivilegeCommand(o.logWriter, "mkdir", "-p", filepath.Dir(fileToExtract))
 	if err != nil {
 		o.log.Errorf("Failed to create directory %s ", dir)
 		return err
 	}
-	_, err = o.ExecPrivilegeCommand(true, "mv", tmpFile, fileToExtract)
+	_, err = o.ExecPrivilegeCommand(o.logWriter, "mv", tmpFile, fileToExtract)
 	if err != nil {
 		o.log.Errorf("Error occurred while moving %s to %s", tmpFile, fileToExtract)
 		return err

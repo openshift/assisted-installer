@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -39,6 +40,33 @@ func InitLogger(verbose bool) *logrus.Logger {
 		log.SetLevel(logrus.DebugLevel)
 	}
 	return log
+}
+
+type CoreosInstallerLogWriter struct {
+	log         *logrus.Logger
+	lastLogLine []byte
+}
+
+func NewCoreosInstallerLogWriter(logger *logrus.Logger) *CoreosInstallerLogWriter {
+	return &CoreosInstallerLogWriter{logger, []byte{}}
+}
+
+func (l *CoreosInstallerLogWriter) Write(p []byte) (n int, err error) {
+	if bytes.Contains(p, []byte{'\n'}) {
+		// If log has a new line - log it
+		fmt.Printf("Eran 1  logging %s", p)
+		l.log.Info(string(p))
+	} else {
+		// Append bytes to last log line slice
+		l.lastLogLine = append(l.lastLogLine, p...)
+		if bytes.Contains(l.lastLogLine, []byte{'\r'}) {
+			// If log contains carriage return - log it and set to empty slice
+			fmt.Printf("Eran logging %s", l.lastLogLine)
+			l.log.Info(string(l.lastLogLine))
+			l.lastLogLine = []byte{}
+		}
+	}
+	return len(p), nil
 }
 
 func GetFileContentFromIgnition(ignitionData []byte, fileName string) ([]byte, error) {
