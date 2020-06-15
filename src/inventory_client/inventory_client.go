@@ -2,6 +2,7 @@ package inventory_client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -13,28 +14,30 @@ import (
 	"github.com/filanov/bm-inventory/client/installer"
 	"github.com/filanov/bm-inventory/pkg/requestid"
 	"github.com/go-openapi/strfmt"
+	"github.com/sirupsen/logrus"
 )
 
 //go:generate mockgen -source=inventory_client.go -package=inventory_client -destination=mock_inventory_client.go
 type InventoryClient interface {
 	DownloadFile(filename string, dest string) error
 	UpdateHostStatus(newStatus string, hostId string) error
-	GetHostsIds() ([]string, error)
+	GetEnabledHostsNamesIds() (map[string]string, error)
 	UploadIngressCa(ingressCA string, clusterId string) error
 	GetCluster() (*models.Cluster, error)
 }
 
 type inventoryClient struct {
+	log       *logrus.Logger
 	ai        *client.AssistedInstall
 	clusterId strfmt.UUID
 }
 
-func CreateInventoryClient(clusterId string, host string, port int) *inventoryClient {
+func CreateInventoryClient(clusterId string, host string, port int, logger *logrus.Logger) *inventoryClient {
 	clientConfig := client.Config{}
 	clientConfig.URL, _ = url.Parse(createUrl(host, port))
 	clientConfig.Transport = requestid.Transport(http.DefaultTransport)
 	assistedInstallClient := client.New(clientConfig)
-	return &inventoryClient{assistedInstallClient, strfmt.UUID(clusterId)}
+	return &inventoryClient{logger, assistedInstallClient, strfmt.UUID(clusterId)}
 }
 
 func (c *inventoryClient) DownloadFile(filename string, dest string) error {
@@ -71,16 +74,25 @@ func (c *inventoryClient) GetCluster() (*models.Cluster, error) {
 	return cluster.Payload, nil
 }
 
-func (c *inventoryClient) GetHostsIds() ([]string, error) {
-	var hostIds []string
+func (c *inventoryClient) GetEnabledHostsNamesIds() (map[string]string, error) {
+	namesIdsMap := make(map[string]string)
+	var hwInfo models.Inventory
 	hosts, err := c.ai.Installer.ListHosts(context.Background(), &installer.ListHostsParams{ClusterID: c.clusterId})
 	if err != nil {
 		return nil, err
 	}
 	for _, host := range hosts.Payload {
-		hostIds = append(hostIds, host.ID.String())
+		err = json.Unmarshal([]byte(host.Inventory), &hwInfo)
+		if err != nil {
+			c.log.Warnf("Failed to parse host %s inventory %s", host.ID.String(), host.Inventory)
+			return nil, err
+		}
+		if *host.Status == models.HostStatusDisabled {
+			continue
+		}
+		namesIdsMap[hwInfo.Hostname] = host.ID.String()
 	}
-	return hostIds, nil
+	return namesIdsMap, nil
 }
 
 func createUrl(host string, port int) string {

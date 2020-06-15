@@ -33,16 +33,23 @@ func TestValidator(t *testing.T) {
 
 var _ = Describe("installer HostRoleMaster role", func() {
 	var (
-		l             = logrus.New()
-		ctrl          *gomock.Controller
-		mockops       *ops.MockOps
-		mockbmclient  *inventory_client.MockInventoryClient
-		mockk8sclient *k8s_client.MockK8SClient
-		c             *controller
-		hostIds       []string
-		wg            sync.WaitGroup
+		l                 = logrus.New()
+		ctrl              *gomock.Controller
+		mockops           *ops.MockOps
+		mockbmclient      *inventory_client.MockInventoryClient
+		mockk8sclient     *k8s_client.MockK8SClient
+		c                 *controller
+		inventoryNamesIds map[string]string
+		kubeNamesIds      map[string]string
+		wg                sync.WaitGroup
 	)
-	hostIds = []string{"7916fa89-ea7a-443e-a862-b3e930309f65", "eb82821f-bf21-4614-9a3b-ecb07929f238", "b898d516-3e16-49d0-86a5-0ad5bd04e3ed"}
+	inventoryNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65",
+		"node1": "eb82821f-bf21-4614-9a3b-ecb07929f238",
+		"node2": "b898d516-3e16-49d0-86a5-0ad5bd04e3ed"}
+	kubeNamesIds = map[string]string{"node0": "6d6f00e8-70dd-48a5-859a-0f1459485ad9",
+		"node1": "2834ff2e-8965-48a5-859a-0f1459485a77",
+		"node2": "57df89ee-3546-48a5-859a-0f1459485a66"}
+	//hostIds = []string{"7916fa89-ea7a-443e-a862-b3e930309f65", "eb82821f-bf21-4614-9a3b-ecb07929f238", "b898d516-3e16-49d0-86a5-0ad5bd04e3ed"}
 	l.SetOutput(ioutil.Discard)
 
 	BeforeEach(func() {
@@ -50,23 +57,34 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockops = ops.NewMockOps(ctrl)
 		mockbmclient = inventory_client.NewMockInventoryClient(ctrl)
 		mockk8sclient = k8s_client.NewMockK8SClient(ctrl)
-		hostIds = []string{"7916fa89-ea7a-443e-a862-b3e930309f65", "eb82821f-bf21-4614-9a3b-ecb07929f238", "b898d516-3e16-49d0-86a5-0ad5bd04e3ed"}
+		inventoryNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65",
+			"node1": "eb82821f-bf21-4614-9a3b-ecb07929f238",
+			"node2": "b898d516-3e16-49d0-86a5-0ad5bd04e3ed"}
+		kubeNamesIds = map[string]string{"node0": "6d6f00e8-70dd-48a5-859a-0f1459485ad9",
+			"node1": "2834ff2e-8965-48a5-859a-0f1459485a77",
+			"node2": "57df89ee-3546-48a5-859a-0f1459485a66"}
+		//hostIds = []string{"7916fa89-ea7a-443e-a862-b3e930309f65", "eb82821f-bf21-4614-9a3b-ecb07929f238", "b898d516-3e16-49d0-86a5-0ad5bd04e3ed"}
 		GeneralWaitTimeout = 100 * time.Millisecond
 	})
 
-	getInventoryNodes := func() []string {
-		mockbmclient.EXPECT().GetHostsIds().Return(hostIds, nil).Times(1)
-		return hostIds
+	getInventoryNodes := func() map[string]string {
+		mockbmclient.EXPECT().GetEnabledHostsNamesIds().Return(inventoryNamesIds, nil).Times(1)
+		return inventoryNamesIds
 	}
 
-	udpateStatusSuccess := func(statuses []string, hostIds []string) {
+	updateStatusSuccess := func(statuses []string, inventoryNamesIds map[string]string) {
+		var hostIds []string
+		for _, id := range inventoryNamesIds {
+			hostIds = append(hostIds, id)
+		}
+
 		for i, status := range statuses {
 			mockbmclient.EXPECT().UpdateHostStatus(status, hostIds[i]).Return(nil).Times(1)
 		}
 	}
 
 	listNodes := func() {
-		mockk8sclient.EXPECT().ListNodes().Return(GetKubeNodes(hostIds), nil).Times(1)
+		mockk8sclient.EXPECT().ListNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
 	}
 
 	Context("Waiting for 3 nodes", func() {
@@ -79,7 +97,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
 		})
 		It("WaitAndUpdateNodesStatus happy flow", func() {
-			udpateStatusSuccess([]string{done, done, done}, hostIds)
+			updateStatusSuccess([]string{done, done, done}, inventoryNamesIds)
 			getInventoryNodes()
 			listNodes()
 			c.WaitAndUpdateNodesStatus()
@@ -97,23 +115,32 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
-			udpateStatusSuccess = func(statuses []string, hostIds []string) {
+			updateStatusSuccess = func(statuses []string, inventoryNamesIds map[string]string) {
+				var hostIds []string
+				for _, id := range inventoryNamesIds {
+					hostIds = append(hostIds, id)
+				}
 				for i, status := range statuses {
 					mockbmclient.EXPECT().UpdateHostStatus(status, hostIds[i]).Return(nil).Times(1)
 				}
 			}
-			hostIds = []string{"7916fa89-ea7a-443e-a862-b3e930309f65", "eb82821f-bf21-4614-9a3b-ecb07929f238", "b898d516-3e16-49d0-86a5-0ad5bd04e3ed"}
+			inventoryNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65",
+				"node1": "eb82821f-bf21-4614-9a3b-ecb07929f238",
+				"node2": "b898d516-3e16-49d0-86a5-0ad5bd04e3ed"}
+			kubeNamesIds = map[string]string{"node0": "6d6f00e8-70dd-48a5-859a-0f1459485ad9",
+				"node1": "2834ff2e-8965-48a5-859a-0f1459485a77",
+				"node2": "57df89ee-3546-48a5-859a-0f1459485a66"}
 		})
 		It("WaitAndUpdateNodesStatus one by one", func() {
 			listNodes := func() {
-				var hostIdsToReturn []string
-				for _, host := range hostIds {
-					hostIdsToReturn = append(hostIdsToReturn, host)
-					mockk8sclient.EXPECT().ListNodes().Return(GetKubeNodes(hostIdsToReturn), nil).Times(1)
+				kubeNameIdsToReturn := make(map[string]string)
+				for name, id := range kubeNamesIds {
+					kubeNameIdsToReturn[name] = id
+					mockk8sclient.EXPECT().ListNodes().Return(GetKubeNodes(kubeNameIdsToReturn), nil).Times(1)
 				}
 			}
 
-			udpateStatusSuccess([]string{done, done, done}, hostIds)
+			updateStatusSuccess([]string{done, done, done}, inventoryNamesIds)
 			getInventoryNodes()
 			listNodes()
 			c.WaitAndUpdateNodesStatus()
@@ -133,14 +160,18 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
 		})
 		It("UpdateStatus fails and then succeeds", func() {
-			udpateStatusSuccessFailureTest := func(statuses []string, hostIds []string) {
+			updateStatusSuccessFailureTest := func(statuses []string, inventoryNamesIds map[string]string) {
+				var hostIds []string
+				for _, id := range inventoryNamesIds {
+					hostIds = append(hostIds, id)
+				}
 				for i, status := range statuses {
 					mockbmclient.EXPECT().UpdateHostStatus(status, hostIds[i]).Return(fmt.Errorf("dummy")).Times(1)
 					mockbmclient.EXPECT().UpdateHostStatus(status, hostIds[i]).Return(nil).Times(1)
 				}
 			}
-			mockk8sclient.EXPECT().ListNodes().Return(GetKubeNodes(hostIds), nil).Times(4)
-			udpateStatusSuccessFailureTest([]string{done, done, done}, hostIds)
+			mockk8sclient.EXPECT().ListNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(2)
+			updateStatusSuccessFailureTest([]string{done, done, done}, inventoryNamesIds)
 			getInventoryNodes()
 			c.WaitAndUpdateNodesStatus()
 
@@ -161,9 +192,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("ListNodes fails and then succeeds", func() {
 			listNodes := func() {
 				mockk8sclient.EXPECT().ListNodes().Return(nil, fmt.Errorf("dummy")).Times(1)
-				mockk8sclient.EXPECT().ListNodes().Return(GetKubeNodes(hostIds), nil).Times(1)
+				mockk8sclient.EXPECT().ListNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
 			}
-			udpateStatusSuccess([]string{done, done, done}, hostIds)
+			updateStatusSuccess([]string{done, done, done}, inventoryNamesIds)
 			getInventoryNodes()
 			listNodes()
 			c.WaitAndUpdateNodesStatus()
@@ -184,10 +215,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			GeneralWaitTimeout = 1 * time.Second
 		})
 		It("inventory client fails and return result only on second run", func() {
-			mockbmclient.EXPECT().GetHostsIds().Return(nil, fmt.Errorf("dummy")).Times(1)
-			mockbmclient.EXPECT().GetHostsIds().Return(hostIds, nil).Times(1)
-			nodesIds := c.getInventoryNodes()
-			Expect(nodesIds).Should(Equal(hostIds))
+			mockbmclient.EXPECT().GetEnabledHostsNamesIds().Return(nil, fmt.Errorf("dummy")).Times(1)
+			mockbmclient.EXPECT().GetEnabledHostsNamesIds().Return(inventoryNamesIds, nil).Times(1)
+			nodesNamesIds := c.getInventoryNodesMap()
+			Expect(nodesNamesIds).Should(Equal(inventoryNamesIds))
 		})
 		AfterEach(func() {
 			ctrl.Finish()
@@ -290,13 +321,14 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	})
 })
 
-func GetKubeNodes(hostIds []string) *v1.NodeList {
+func GetKubeNodes(kubeNamesIds map[string]string) *v1.NodeList {
 	file, _ := ioutil.ReadFile("../../test_files/node.json")
 	var node v1.Node
 	_ = json.Unmarshal(file, &node)
 	nodeList := &v1.NodeList{}
-	for _, id := range hostIds {
+	for name, id := range kubeNamesIds {
 		node.Status.NodeInfo.SystemUUID = id
+		node.Name = name
 		nodeList.Items = append(nodeList.Items, node)
 	}
 	return nodeList

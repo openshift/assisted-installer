@@ -37,7 +37,7 @@ func main() {
 	assistedController := assistedinstallercontroller.NewController(logger,
 		Options.ControllerConfig,
 		ops.NewOps(logger),
-		inventory_client.CreateInventoryClient(Options.ControllerConfig.ClusterID, Options.ControllerConfig.Host, Options.ControllerConfig.Port),
+		inventory_client.CreateInventoryClient(Options.ControllerConfig.ClusterID, Options.ControllerConfig.Host, Options.ControllerConfig.Port, logger),
 		kc,
 	)
 	var wg sync.WaitGroup

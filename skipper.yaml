@@ -6,3 +6,4 @@ volumes:
     - $HOME/.docker/config.json:$HOME/.docker/config.json
 env:
    INSTALLER: $INSTALLER
+   CONTROLLER: $CONTROLLER

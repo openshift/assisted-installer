@@ -7,7 +7,7 @@ import (
 	"github.com/eranco74/assisted-installer/src/inventory_client"
 	"github.com/eranco74/assisted-installer/src/k8s_client"
 	"github.com/eranco74/assisted-installer/src/ops"
-	"github.com/eranco74/assisted-installer/src/utils"
+
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/certificates/v1beta1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
@@ -53,52 +53,44 @@ func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inv
 
 func (c *controller) WaitAndUpdateNodesStatus() {
 	c.log.Infof("Waiting till all nodes will join and update status to assisted installer")
-	assistedInstallerNodes := c.getInventoryNodes()
-	numberOfNodesToWaitFor := len(assistedInstallerNodes)
-	nodeUUIDAndName := make(map[string]string)
-out:
-	for {
+	assistedInstallerNodesMap := c.getInventoryNodesMap()
+	for len(assistedInstallerNodesMap) > 0 {
+		time.Sleep(GeneralWaitTimeout)
 		nodes, err := c.kc.ListNodes()
 		if err != nil {
 			continue
 		}
 		for _, node := range nodes.Items {
-			if _, ok := nodeUUIDAndName[node.Status.NodeInfo.SystemUUID]; ok {
+			hostId, ok := assistedInstallerNodesMap[node.Name]
+			if !ok {
 				continue
 			}
-			c.log.Infof("Found new joined node %s with id %s, updating its status to %s", node.Name, node.Status.NodeInfo.SystemUUID, done)
-			if err := c.ic.UpdateHostStatus(done, node.Status.NodeInfo.SystemUUID); err != nil {
-				c.log.Errorf("Failed to update node installation status, %s", err)
-				continue out
+			c.log.Infof("Found new joined node %s with inventory id %s, kuberentes id %s, updating its status to %s", node.Name, hostId, node.Status.NodeInfo.SystemUUID, done)
+			if err := c.ic.UpdateHostStatus(done, hostId); err != nil {
+				c.log.Errorf("Failed to update node %s installation status, %s", node.Name, err)
+				continue
 			}
-			nodeUUIDAndName[node.Status.NodeInfo.SystemUUID] = node.Name
-			assistedInstallerNodes = utils.FindAndRemoveElementFromStringList(assistedInstallerNodes, node.Status.NodeInfo.SystemUUID)
+			delete(assistedInstallerNodesMap, node.Name)
 		}
-		c.log.Infof("Found %d nodes: %+v", len(nodes.Items), nodeUUIDAndName)
-		if len(nodeUUIDAndName) >= numberOfNodesToWaitFor {
-			c.log.Infof("All nodes were found. WaitAndUpdateNodesStatus - Done")
-			break
-		}
-		c.log.Infof("Still waiting for %d nodes %v", len(assistedInstallerNodes), assistedInstallerNodes)
-		time.Sleep(GeneralWaitTimeout)
 	}
+	c.log.Infof("All nodes were found. WaitAndUpdateNodesStatus - Done")
 }
 
-func (c *controller) getInventoryNodes() []string {
-	c.log.Infof("Getting list of inventory nodes")
-	var assistedInstallerNodes []string
+func (c *controller) getInventoryNodesMap() map[string]string {
+	c.log.Infof("Getting amp of inventory nodes")
+	var assistedInstallerNodesMap map[string]string
 	var err error
 	for {
-		assistedInstallerNodes, err = c.ic.GetHostsIds()
+		assistedInstallerNodesMap, err = c.ic.GetEnabledHostsNamesIds()
 		if err != nil {
-			c.log.Errorf("Failed to get node list from inventory, will retry in 30 seconds, %s", err)
+			c.log.Errorf("Failed to get node map from inventory, will retry in 30 seconds, %s", err)
 			time.Sleep(GeneralWaitTimeout)
 			continue
 		}
 		break
 	}
-	c.log.Infof("Got list of host from inventory %s", assistedInstallerNodes)
-	return assistedInstallerNodes
+	c.log.Infof("Got map of host from inventory, number of nodes %d", len(assistedInstallerNodesMap))
+	return assistedInstallerNodesMap
 }
 
 func (c *controller) ApproveCsrs(done <-chan bool, wg *sync.WaitGroup) {

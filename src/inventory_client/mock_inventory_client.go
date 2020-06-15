@@ -62,19 +62,19 @@ func (mr *MockInventoryClientMockRecorder) UpdateHostStatus(newStatus, hostId in
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHostStatus", reflect.TypeOf((*MockInventoryClient)(nil).UpdateHostStatus), newStatus, hostId)
 }
 
-// GetHostsIds mocks base method
-func (m *MockInventoryClient) GetHostsIds() ([]string, error) {
+// GetEnabledHostsNamesIds mocks base method
+func (m *MockInventoryClient) GetEnabledHostsNamesIds() (map[string]string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetHostsIds")
-	ret0, _ := ret[0].([]string)
+	ret := m.ctrl.Call(m, "GetEnabledHostsNamesIds")
+	ret0, _ := ret[0].(map[string]string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetHostsIds indicates an expected call of GetHostsIds
-func (mr *MockInventoryClientMockRecorder) GetHostsIds() *gomock.Call {
+// GetEnabledHostsNamesIds indicates an expected call of GetEnabledHostsNamesIds
+func (mr *MockInventoryClientMockRecorder) GetEnabledHostsNamesIds() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHostsIds", reflect.TypeOf((*MockInventoryClient)(nil).GetHostsIds))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEnabledHostsNamesIds", reflect.TypeOf((*MockInventoryClient)(nil).GetEnabledHostsNamesIds))
 }
 
 // UploadIngressCa mocks base method

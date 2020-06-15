@@ -23,7 +23,7 @@ func main() {
 	ai := installer.NewAssistedInstaller(logger,
 		config.GlobalConfig,
 		ops.NewOps(logger),
-		inventory_client.CreateInventoryClient(config.GlobalConfig.ClusterID, config.GlobalConfig.Host, config.GlobalConfig.Port),
+		inventory_client.CreateInventoryClient(config.GlobalConfig.ClusterID, config.GlobalConfig.Host, config.GlobalConfig.Port, logger),
 		k8s_client.NewK8SClient,
 	)
 	if err := ai.InstallNode(); err != nil {
