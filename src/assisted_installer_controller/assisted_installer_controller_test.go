@@ -49,7 +49,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	kubeNamesIds = map[string]string{"node0": "6d6f00e8-70dd-48a5-859a-0f1459485ad9",
 		"node1": "2834ff2e-8965-48a5-859a-0f1459485a77",
 		"node2": "57df89ee-3546-48a5-859a-0f1459485a66"}
-	//hostIds = []string{"7916fa89-ea7a-443e-a862-b3e930309f65", "eb82821f-bf21-4614-9a3b-ecb07929f238", "b898d516-3e16-49d0-86a5-0ad5bd04e3ed"}
 	l.SetOutput(ioutil.Discard)
 
 	BeforeEach(func() {
@@ -63,7 +62,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		kubeNamesIds = map[string]string{"node0": "6d6f00e8-70dd-48a5-859a-0f1459485ad9",
 			"node1": "2834ff2e-8965-48a5-859a-0f1459485a77",
 			"node2": "57df89ee-3546-48a5-859a-0f1459485a66"}
-		//hostIds = []string{"7916fa89-ea7a-443e-a862-b3e930309f65", "eb82821f-bf21-4614-9a3b-ecb07929f238", "b898d516-3e16-49d0-86a5-0ad5bd04e3ed"}
 		GeneralWaitTimeout = 100 * time.Millisecond
 	})
 

@@ -262,21 +262,26 @@ func (i *installer) waitForBootkube(ctx context.Context) {
 func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, kc k8s_client.K8SClient) error {
 	nodesTimeout := 120 * time.Minute
 	var readyMasters []string
+	var inventoryHostsMap map[string]string
 	i.log.Infof("Waiting up to %v for %d master nodes", nodesTimeout, minMasterNodes)
 	apiContext, cancel := context.WithTimeout(ctx, nodesTimeout)
 	defer cancel()
 
 	wait.Until(func() {
+		inventoryHostsMap = i.getInventoryHostsMap(inventoryHostsMap)
+		if inventoryHostsMap == nil {
+			return
+		}
 		nodes, err := kc.ListMasterNodes()
 		if err != nil {
 			i.log.Warnf("Still waiting for master nodes: %v", err)
-		} else {
-			i.updateReadyMasters(nodes, &readyMasters)
-			i.log.Infof("Found %d ready master nodes", len(readyMasters))
-			if len(readyMasters) >= minMasterNodes {
-				i.log.Infof("Waiting for master nodes - Done")
-				cancel()
-			}
+			return
+		}
+		i.updateReadyMasters(nodes, &readyMasters, inventoryHostsMap)
+		i.log.Infof("Found %d ready master nodes", len(readyMasters))
+		if len(readyMasters) >= minMasterNodes {
+			i.log.Infof("Waiting for master nodes - Done")
+			cancel()
 		}
 	}, 5*time.Second, apiContext.Done())
 	err := apiContext.Err()
@@ -286,7 +291,19 @@ func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, 
 	return nil
 }
 
-func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]string) {
+func (i *installer) getInventoryHostsMap(hostsMap map[string]string) map[string]string {
+	var err error
+	if hostsMap == nil {
+		hostsMap, err = i.ic.GetEnabledHostsNamesIds()
+		if err != nil {
+			i.log.Warnf("Failed to get hosts info from inventory, err %s", err)
+			return nil
+		}
+	}
+	return hostsMap
+}
+
+func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]string, inventoryHostsMap map[string]string) {
 	nodeNameAndCondition := map[string][]v1.NodeCondition{}
 	for _, node := range nodes.Items {
 		nodeNameAndCondition[node.Name] = node.Status.Conditions
@@ -296,7 +313,12 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 
 				i.log.Infof("Found a new ready master node %s with id %s", node.Name, node.Status.NodeInfo.SystemUUID)
 				*readyMasters = append(*readyMasters, node.Status.NodeInfo.SystemUUID)
-				if err := i.ic.UpdateHostStatus(Joined, node.Status.NodeInfo.SystemUUID); err != nil {
+				hostId, ok := inventoryHostsMap[node.Name]
+				if !ok {
+					i.log.Warnf("Node %s is not in inventory hosts", node.Name)
+					break
+				}
+				if err := i.ic.UpdateHostStatus(Joined, hostId); err != nil {
 					i.log.Errorf("Failed to update node installation status, %s", err)
 				}
 			}

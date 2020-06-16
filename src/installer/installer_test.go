@@ -28,19 +28,24 @@ func TestValidator(t *testing.T) {
 
 var _ = Describe("installer HostRoleMaster role", func() {
 	var (
-		l                = logrus.New()
-		ctrl             *gomock.Controller
-		mockops          *ops.MockOps
-		mockbmclient     *inventory_client.MockInventoryClient
-		mockk8sclient    *k8s_client.MockK8SClient
-		i                *installer
-		hostId           = "host-id"
-		bootstrapIgn     = "bootstrap.ign"
-		masterIgn        = "master.ign"
-		workerIgn        = "worker.ign"
-		openShiftVersion = "4.4"
-		image, _         = utils.GetRhcosImageByOpenshiftVersion(openShiftVersion)
+		l                 = logrus.New()
+		ctrl              *gomock.Controller
+		mockops           *ops.MockOps
+		mockbmclient      *inventory_client.MockInventoryClient
+		mockk8sclient     *k8s_client.MockK8SClient
+		i                 *installer
+		hostId            = "host-id"
+		bootstrapIgn      = "bootstrap.ign"
+		masterIgn         = "master.ign"
+		workerIgn         = "worker.ign"
+		openShiftVersion  = "4.4"
+		image, _          = utils.GetRhcosImageByOpenshiftVersion(openShiftVersion)
+		inventoryNamesIds map[string]string
+		kubeNamesIds      map[string]string
 	)
+	inventoryNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65",
+		"node1": "eb82821f-bf21-4614-9a3b-ecb07929f238",
+		"node2": "b898d516-3e16-49d0-86a5-0ad5bd04e3ed"}
 	device := "/dev/vda"
 	l.SetOutput(ioutil.Discard)
 	mkdirSuccess := func() {
@@ -49,6 +54,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	downloadFileSuccess := func(fileName string) {
 		mockbmclient.EXPECT().DownloadFile(fileName, filepath.Join(InstallDir, fileName)).Return(nil).Times(1)
 	}
+
 	udpateStatusSuccess := func(statuses []string) {
 		for _, status := range statuses {
 			mockbmclient.EXPECT().UpdateHostStatus(status, hostId).Return(nil).Times(1)
@@ -109,13 +115,15 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			}
 		}
 		WaitMasterNodesSucccess := func() {
-			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes([]string{}), nil).Times(1)
-			hostIds := []string{"7916fa89-ea7a-443e-a862-b3e930309f65"}
-			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(hostIds), nil).Times(1)
-			mockbmclient.EXPECT().UpdateHostStatus(Joined, hostIds[0]).Times(1)
-			hostIds = []string{"7916fa89-ea7a-443e-a862-b3e930309f65", "eb82821f-bf21-4614-9a3b-ecb07929f238"}
-			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(hostIds), nil).Times(1)
-			mockbmclient.EXPECT().UpdateHostStatus(Joined, hostIds[1]).Times(1)
+			mockbmclient.EXPECT().GetEnabledHostsNamesIds().Return(inventoryNamesIds, nil).Times(1)
+			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(map[string]string{}), nil).Times(1)
+			kubeNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65"}
+			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
+			mockbmclient.EXPECT().UpdateHostStatus(Joined, inventoryNamesIds["node0"]).Times(1)
+			kubeNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65",
+				"node1": "eb82821f-bf21-4614-9a3b-ecb07929f238"}
+			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
+			mockbmclient.EXPECT().UpdateHostStatus(Joined, inventoryNamesIds["node1"]).Times(1)
 		}
 		patchEtcdSuccess := func() {
 			mockk8sclient.EXPECT().PatchEtcd().Return(nil).Times(1)
@@ -322,14 +330,15 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 })
 
-func GetKubeNodes(hostIds []string) *v1.NodeList {
+func GetKubeNodes(kubeNamesIds map[string]string) *v1.NodeList {
 	file, _ := ioutil.ReadFile("../../test_files/node.json")
 	var node v1.Node
 	_ = json.Unmarshal(file, &node)
 	nodeList := &v1.NodeList{}
-	for _, id := range hostIds {
+	for name, id := range kubeNamesIds {
 		node.Status.Conditions = []v1.NodeCondition{{Status: v1.ConditionTrue, Type: v1.NodeReady}}
 		node.Status.NodeInfo.SystemUUID = id
+		node.Name = name
 		nodeList.Items = append(nodeList.Items, node)
 	}
 	return nodeList
