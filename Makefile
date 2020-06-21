@@ -14,7 +14,7 @@ generate:
 	$(MAKE) format
 
 unit-test:
-	go test -v $(shell go list ./...) -cover
+	go test -v $(shell go list ./...) -cover -ginkgo.focus=${FOCUS} -ginkgo.v
 
 ut:
 	go test -v -coverprofile=coverage.out ./... && go tool cover -html=coverage.out && rm coverage.out
