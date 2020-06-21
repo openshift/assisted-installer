@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus/hooks/test"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
@@ -127,6 +129,93 @@ var _ = Describe("Verify_utils", func() {
 			})
 			Expect(err).Should(Equal(fmt.Errorf("failed after 4 attempts, last error: failed again")))
 			Expect(callCount).Should(Equal(tries))
+
+		})
+	})
+	Context("test coreosInstlalerLogger", func() {
+		var (
+			cilogger *CoreosInstallerLogWriter
+			hook     *test.Hook
+			logger   *logrus.Logger
+		)
+		BeforeEach(func() {
+			logger, hook = test.NewNullLogger()
+			cilogger = NewCoreosInstallerLogWriter(logger)
+		})
+		It("test log with new line", func() {
+			_, err := cilogger.Write([]byte("some log with a new line \n"))
+			Expect(err).Should(BeNil())
+			Expect(len(hook.Entries)).Should(Equal(1))
+
+		})
+		It("test full progress line", func() {
+			_, err := cilogger.Write([]byte("> Read disk 473.8 MiB/844.7 MiB (56%)   \r"))
+			Expect(err).Should(BeNil())
+			Expect(len(hook.Entries)).Should(Equal(1))
+		})
+		It("test partial line", func() {
+			_, err := cilogger.Write([]byte("844.7 MiB"))
+			Expect(err).Should(BeNil())
+			Expect(len(hook.Entries)).Should(Equal(0))
+
+		})
+		It("test partial line", func() {
+			testLogs := []string{"> Read ",
+				"disk",
+				" ",
+				"473.6 MiB",
+				"/",
+				"844.7 MiB",
+				" (",
+				"56",
+				"%)   \r",
+			}
+			for i := range testLogs {
+				_, err := cilogger.Write([]byte(testLogs[i]))
+				Expect(err).Should(BeNil())
+			}
+			Expect(len(hook.Entries)).Should(Equal(1))
+		})
+		It("test multiple lines", func() {
+			testLogs := []string{"> Read disk 471.2 MiB/844.7 MiB (55%)   \r",
+				"> Read ",
+				"disk",
+				" ",
+				"471.6 MiB",
+				"/",
+				"844.7 MiB",
+				" (",
+				"55",
+				"%)   \r",
+				"> Read ",
+				"disk",
+				" ",
+				"472.1 MiB",
+				"/",
+				"844.7 MiB",
+				" (",
+				"55",
+				"%)   \r",
+				"> Read disk 472.6 MiB/844.7 MiB (55%)   \r",
+				"> Read disk 472.8 MiB/844.7 MiB (55%)   \r",
+				"> Read disk 472.9 MiB/844.7 MiB (55%)   \r",
+				"> Read disk 473.0 MiB/844.7 MiB (56%)   \r",
+				"> Read disk 473.3 MiB/844.7 MiB (56%)   \r",
+				"> Read ",
+				"disk",
+				" ",
+				"473.6 MiB",
+				"/",
+				"844.7 MiB",
+				" (",
+				"56",
+				"%)   \r",
+				"> Read disk 473.8 MiB/844.7 MiB (56%)   \r"}
+			for i := range testLogs {
+				_, err := cilogger.Write([]byte(testLogs[i]))
+				Expect(err).Should(BeNil())
+			}
+			Expect(len(hook.Entries)).Should(Equal(10))
 
 		})
 	})
