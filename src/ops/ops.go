@@ -102,7 +102,6 @@ func (o *ops) SystemctlAction(action string, args ...string) error {
 func (o *ops) WriteImageToDisk(ignitionPath string, device string, image string) error {
 	o.log.Info("Writing image and ignition to disk")
 	_, err := o.ExecPrivilegeCommand(true, "coreos-installer", "install", "--image-url", image, "--insecure", "-i", ignitionPath, device)
-	o.log.Info("Done writing image to disk")
 	return err
 }
 func (o *ops) Reboot() error {

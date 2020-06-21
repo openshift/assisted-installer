@@ -111,6 +111,8 @@ func (i *installer) InstallNode() error {
 	if err != nil {
 		i.log.Errorf("Failed to write image to disk %s", err)
 		return err
+	} else {
+		i.log.Info("Done writing image to disk")
 	}
 	if err = errs.Wait(); err != nil {
 		i.log.Error(err)
