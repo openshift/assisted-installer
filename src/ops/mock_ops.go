@@ -8,6 +8,7 @@ import (
 	io "io"
 	reflect "reflect"
 
+	inventory_client "github.com/eranco74/assisted-installer/src/inventory_client"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -89,17 +90,17 @@ func (mr *MockOpsMockRecorder) Mkdir(dirName interface{}) *gomock.Call {
 }
 
 // WriteImageToDisk mocks base method
-func (m *MockOps) WriteImageToDisk(ignitionPath, device, image string) error {
+func (m *MockOps) WriteImageToDisk(ignitionPath, device, image string, progressReporter inventory_client.InventoryClient) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WriteImageToDisk", ignitionPath, device, image)
+	ret := m.ctrl.Call(m, "WriteImageToDisk", ignitionPath, device, image, progressReporter)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // WriteImageToDisk indicates an expected call of WriteImageToDisk
-func (mr *MockOpsMockRecorder) WriteImageToDisk(ignitionPath, device, image interface{}) *gomock.Call {
+func (mr *MockOpsMockRecorder) WriteImageToDisk(ignitionPath, device, image, progressReporter interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteImageToDisk", reflect.TypeOf((*MockOps)(nil).WriteImageToDisk), ignitionPath, device, image)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteImageToDisk", reflect.TypeOf((*MockOps)(nil).WriteImageToDisk), ignitionPath, device, image, progressReporter)
 }
 
 // Reboot mocks base method
