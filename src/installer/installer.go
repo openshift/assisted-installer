@@ -248,8 +248,7 @@ func (i *installer) waitForBootkube(ctx context.Context) {
 			return
 		case <-time.After(time.Second * time.Duration(5)):
 			// check if bootkube is done every 5 seconds
-			out, _ := i.ops.ExecPrivilegeCommand(nil, "bash", "-c", "systemctl status bootkube.service | grep 'bootkube.service: Succeeded' | wc -l")
-			if out == "1" {
+			if _, err := i.ops.ExecPrivilegeCommand(nil, "stat", "/opt/openshift/.bootkube.done"); err == nil {
 				// in case bootkube is done log the status and return
 				i.log.Info("bootkube service completed")
 				out, _ := i.ops.ExecPrivilegeCommand(utils.NewLogWriter(i.log), "systemctl", "status", "bootkube.service")
