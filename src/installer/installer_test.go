@@ -67,7 +67,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	}
 
 	writeToDiskSuccess := func() {
-		mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, masterIgn), device, image).Return(nil).Times(1)
+		mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, masterIgn), device, image, mockbmclient).Return(nil).Times(1)
 	}
 	rebootSuccess := func() {
 		mockops.EXPECT().Reboot().Return(nil).Times(1)
@@ -297,7 +297,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mkdirSuccess()
 			downloadFileSuccess(masterIgn)
 			err := fmt.Errorf("failed to write image to disk")
-			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, masterIgn), device, image).Return(err).Times(3)
+			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, masterIgn), device, image, mockbmclient).Return(err).Times(3)
 			ret := i.InstallNode()
 			Expect(ret).Should(Equal(fmt.Errorf("failed after 3 attempts, last error: failed to write image to disk")))
 		})
@@ -338,7 +338,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			cleanInstallDevice()
 			mkdirSuccess()
 			downloadFileSuccess(workerIgn)
-			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, workerIgn), device, image).Return(nil).Times(1)
+			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, workerIgn), device, image, mockbmclient).Return(nil).Times(1)
 			rebootSuccess()
 			ret := i.InstallNode()
 			Expect(ret).Should(BeNil())
