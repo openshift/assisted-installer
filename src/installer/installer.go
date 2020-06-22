@@ -51,19 +51,19 @@ type Installer interface {
 
 type installer struct {
 	config.Config
-	log       *logrus.Logger
-	ops       ops.Ops
-	ic        inventory_client.InventoryClient
-	kcBuilder k8s_client.K8SClientBuilder
+	log             *logrus.Logger
+	ops             ops.Ops
+	inventoryClient inventory_client.InventoryClient
+	kcBuilder       k8s_client.K8SClientBuilder
 }
 
 func NewAssistedInstaller(log *logrus.Logger, cfg config.Config, ops ops.Ops, ic inventory_client.InventoryClient, kcb k8s_client.K8SClientBuilder) *installer {
 	return &installer{
-		log:       log,
-		Config:    cfg,
-		ops:       ops,
-		ic:        ic,
-		kcBuilder: kcb,
+		log:             log,
+		Config:          cfg,
+		ops:             ops,
+		inventoryClient: ic,
+		kcBuilder:       kcb,
 	}
 }
 
@@ -115,7 +115,7 @@ func (i *installer) InstallNode() error {
 	// TODO report image to disk progress
 
 	err = utils.Retry(3, time.Second, i.log, func() error {
-		return i.ops.WriteImageToDisk(ignitionPath, i.Device, image)
+		return i.ops.WriteImageToDisk(ignitionPath, i.Device, image, i.inventoryClient)
 	})
 	if err != nil {
 		i.log.Errorf("Failed to write image to disk %s", err)
@@ -216,7 +216,7 @@ func (i *installer) startBootstrap() error {
 func (i *installer) getFileFromService(filename string) (string, error) {
 	i.log.Infof("Getting %s file", filename)
 	dest := filepath.Join(InstallDir, filename)
-	err := i.ic.DownloadFile(filename, dest)
+	err := i.inventoryClient.DownloadFile(filename, dest)
 	if err != nil {
 		i.log.Errorf("Failed to fetch file (%s) from server. err: %s", filename, err)
 	}
@@ -242,7 +242,7 @@ func (i *installer) waitForControlPlane(ctx context.Context, kc k8s_client.K8SCl
 func (i *installer) UpdateHostStatus(newStatus string) {
 	i.log.Infof("Updating node installation status: %s", newStatus)
 	if i.HostID != "" {
-		if err := i.ic.UpdateHostStatus(newStatus, i.HostID); err != nil {
+		if err := i.inventoryClient.UpdateHostStatus(newStatus, i.HostID); err != nil {
 			i.log.Errorf("Failed to update node installation status, %s", err)
 		}
 	}
@@ -304,7 +304,7 @@ func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, 
 func (i *installer) getInventoryHostsMap(hostsMap map[string]string) map[string]string {
 	var err error
 	if hostsMap == nil {
-		hostsMap, err = i.ic.GetEnabledHostsNamesIds()
+		hostsMap, err = i.inventoryClient.GetEnabledHostsNamesIds()
 		if err != nil {
 			i.log.Warnf("Failed to get hosts info from inventory, err %s", err)
 			return nil
@@ -328,7 +328,7 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 					i.log.Warnf("Node %s is not in inventory hosts", node.Name)
 					break
 				}
-				if err := i.ic.UpdateHostStatus(Joined, hostId); err != nil {
+				if err := i.inventoryClient.UpdateHostStatus(Joined, hostId); err != nil {
 					i.log.Errorf("Failed to update node installation status, %s", err)
 				}
 			}

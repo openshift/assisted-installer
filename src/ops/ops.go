@@ -6,6 +6,8 @@ import (
 	"io"
 	"text/template"
 
+	"github.com/eranco74/assisted-installer/src/inventory_client"
+
 	"github.com/eranco74/assisted-installer/src/config"
 
 	"io/ioutil"
@@ -23,7 +25,7 @@ type Ops interface {
 	ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error)
 	ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error)
 	Mkdir(dirName string) error
-	WriteImageToDisk(ignitionPath string, device string, image string) error
+	WriteImageToDisk(ignitionPath string, device string, image string, progressReporter inventory_client.InventoryClient) error
 	Reboot() error
 	ExtractFromIgnition(ignitionPath string, fileToExtract string) error
 	SystemctlAction(action string, args ...string) error
@@ -103,9 +105,10 @@ func (o *ops) SystemctlAction(action string, args ...string) error {
 	return err
 }
 
-func (o *ops) WriteImageToDisk(ignitionPath string, device string, image string) error {
+func (o *ops) WriteImageToDisk(ignitionPath string, device string, image string, progressReporter inventory_client.InventoryClient) error {
 	o.log.Info("Writing image and ignition to disk")
-	_, err := o.ExecPrivilegeCommand(utils.NewCoreosInstallerLogWriter(o.log), "coreos-installer", "install", "--image-url", image, "--insecure", "-i", ignitionPath, device)
+	_, err := o.ExecPrivilegeCommand(utils.NewCoreosInstallerLogWriter(o.log, progressReporter, config.GlobalConfig.HostID),
+		"coreos-installer", "install", "--image-url", image, "--insecure", "-i", ignitionPath, device)
 	return err
 }
 func (o *ops) Reboot() error {
