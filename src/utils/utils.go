@@ -88,6 +88,9 @@ func (l *CoreosInstallerLogWriter) Write(p []byte) (n int, err error) {
 
 func (l *CoreosInstallerLogWriter) reportProgress() {
 	match := l.progressRegex.FindStringSubmatch(string(l.lastLogLine))
+	if len(match) < 3 {
+		return
+	}
 	currentPercent, err := strconv.Atoi(strings.TrimRight(match[2], "%"))
 	// in case we fail to parse the log line we do nothing
 	if err != nil {
