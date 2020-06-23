@@ -28,6 +28,10 @@ type Ops interface {
 	ExtractFromIgnition(ignitionPath string, fileToExtract string) error
 	SystemctlAction(action string, args ...string) error
 	PrepareController() error
+	GetVGByPV(pvName string) (string, error)
+	RemoveVG(vgName string) error
+	RemoveLV(lvName, vgName string) error
+	RemovePV(pvName string) error
 }
 
 const (
@@ -50,7 +54,7 @@ func NewOps(logger *logrus.Logger) Ops {
 // ExecPrivilegeCommand execute a command in the host environment via nsenter
 func (o *ops) ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
 	commandBase := "nsenter"
-	arguments := []string{"-t", "1", "-m", "--", command}
+	arguments := []string{"-t", "1", "-m", "-i", "--", command}
 	arguments = append(arguments, args...)
 	return o.ExecCommand(liveLogger, commandBase, arguments...)
 }
@@ -206,4 +210,49 @@ func (o *ops) renderControllerCm() error {
 		return err
 	}
 	return nil
+}
+
+func (o *ops) GetVGByPV(pvName string) (string, error) {
+	output, err := o.ExecPrivilegeCommand(o.logWriter, "vgs", "--noheadings", "-o", "vg_name,pv_name")
+	if err != nil {
+		o.log.Errorf("Failed to list VGs in the system")
+		return "", err
+	}
+
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		res := strings.Fields(line)
+		if len(res) < 2 {
+			continue
+		}
+
+		if strings.Contains(res[1], pvName) {
+			return res[0], nil
+		}
+	}
+	return "", nil
+}
+
+func (o *ops) RemoveVG(vgName string) error {
+	output, err := o.ExecPrivilegeCommand(o.logWriter, "vgremove", vgName, "-y")
+	if err != nil {
+		o.log.Errorf("Failed to remove VG %s, output %s, error %s", vgName, output, err)
+	}
+	return err
+}
+
+func (o *ops) RemoveLV(lvName, vgName string) error {
+	output, err := o.ExecPrivilegeCommand(o.logWriter, "lvremove", fmt.Sprintf("/dev/%s/%s", vgName, lvName), "-y")
+	if err != nil {
+		o.log.Errorf("Failed to remove LVM %s, output %s, error %s", fmt.Sprintf("/dev/%s/%s", vgName, lvName), output, err)
+	}
+	return err
+}
+
+func (o *ops) RemovePV(pvName string) error {
+	output, err := o.ExecPrivilegeCommand(o.logWriter, "pvremove", pvName, "-y")
+	if err != nil {
+		o.log.Errorf("Failed to remove PV %s, output %s, error %s", pvName, output, err)
+	}
+	return err
 }

@@ -162,3 +162,60 @@ func (mr *MockOpsMockRecorder) PrepareController() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrepareController", reflect.TypeOf((*MockOps)(nil).PrepareController))
 }
+
+// GetVGByPV mocks base method
+func (m *MockOps) GetVGByPV(pvName string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetVGByPV", pvName)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetVGByPV indicates an expected call of GetVGByPV
+func (mr *MockOpsMockRecorder) GetVGByPV(pvName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVGByPV", reflect.TypeOf((*MockOps)(nil).GetVGByPV), pvName)
+}
+
+// RemoveVG mocks base method
+func (m *MockOps) RemoveVG(vgName string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveVG", vgName)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveVG indicates an expected call of RemoveVG
+func (mr *MockOpsMockRecorder) RemoveVG(vgName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveVG", reflect.TypeOf((*MockOps)(nil).RemoveVG), vgName)
+}
+
+// RemoveLV mocks base method
+func (m *MockOps) RemoveLV(lvName, vgName string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveLV", lvName, vgName)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveLV indicates an expected call of RemoveLV
+func (mr *MockOpsMockRecorder) RemoveLV(lvName, vgName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveLV", reflect.TypeOf((*MockOps)(nil).RemoveLV), lvName, vgName)
+}
+
+// RemovePV mocks base method
+func (m *MockOps) RemovePV(pvName string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemovePV", pvName)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemovePV indicates an expected call of RemovePV
+func (mr *MockOpsMockRecorder) RemovePV(pvName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemovePV", reflect.TypeOf((*MockOps)(nil).RemovePV), pvName)
+}

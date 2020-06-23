@@ -55,6 +55,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockbmclient.EXPECT().DownloadFile(fileName, filepath.Join(InstallDir, fileName)).Return(nil).Times(1)
 	}
 
+	cleanInstallDevice := func() {
+		mockops.EXPECT().GetVGByPV(device).Return("", nil).Times(1)
+	}
+
 	udpateStatusSuccess := func(statuses []string) {
 		for _, status := range statuses {
 			mockbmclient.EXPECT().UpdateHostStatus(status, hostId).Return(nil).Times(1)
@@ -149,6 +153,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				WritingImageToDisk,
 				Reboot,
 			})
+			cleanInstallDevice()
 			mkdirSuccess()
 			downloadFileSuccess(bootstrapIgn)
 			extractSecretFromIgnitionSuccess()
@@ -175,6 +180,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				fmt.Sprintf(InstallingAs, HostRoleMaster),
 				WritingImageToDisk,
 			})
+			cleanInstallDevice()
 			mkdirSuccess()
 			downloadFileSuccess(bootstrapIgn)
 			extractSecretFromIgnitionSuccess()
@@ -198,6 +204,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				fmt.Sprintf(InstallingAs, HostRoleMaster),
 				WritingImageToDisk,
 			})
+			cleanInstallDevice()
 			mkdirSuccess()
 			downloadFileSuccess(bootstrapIgn)
 			extractSecretFromIgnitionSuccess()
@@ -230,6 +237,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				WritingImageToDisk,
 				Reboot,
 			})
+			cleanInstallDevice()
 			mkdirSuccess()
 			downloadFileSuccess(masterIgn)
 			writeToDiskSuccess()
@@ -237,8 +245,33 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ret := i.InstallNode()
 			Expect(ret).Should(BeNil())
 		})
+		It("HostRoleMaster role happy flow with disk cleanup", func() {
+			cleanInstallDeviceClean := func() {
+				mockops.EXPECT().GetVGByPV(device).Return("vg1", nil).Times(1)
+				mockops.EXPECT().RemoveVG("vg1").Return(nil).Times(1)
+				mockops.EXPECT().RemovePV(device).Return(nil).Times(1)
+			}
+			udpateStatusSuccess([]string{StartingInstallation})
+			cleanInstallDeviceClean()
+			err := fmt.Errorf("failed to create dir")
+			mockops.EXPECT().Mkdir(InstallDir).Return(err).Times(1)
+			ret := i.InstallNode()
+			Expect(ret).Should(Equal(err))
+		})
+		It("HostRoleMaster role failed to cleanup disk", func() {
+			err := fmt.Errorf("Failed to remove vg")
+			cleanInstallDeviceError := func() {
+				mockops.EXPECT().GetVGByPV(device).Return("vg1", nil).Times(1)
+				mockops.EXPECT().RemoveVG("vg1").Return(err).Times(1)
+			}
+			udpateStatusSuccess([]string{StartingInstallation})
+			cleanInstallDeviceError()
+			ret := i.InstallNode()
+			Expect(ret).Should(Equal(err))
+		})
 		It("HostRoleMaster role failed to create dir", func() {
 			udpateStatusSuccess([]string{StartingInstallation})
+			cleanInstallDevice()
 			err := fmt.Errorf("failed to create dir")
 			mockops.EXPECT().Mkdir(InstallDir).Return(err).Times(1)
 			ret := i.InstallNode()
@@ -248,6 +281,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			udpateStatusSuccess([]string{StartingInstallation,
 				fmt.Sprintf(InstallingAs, conf.Role),
 			})
+			cleanInstallDevice()
 			mkdirSuccess()
 			err := fmt.Errorf("failed to fetch file")
 			mockbmclient.EXPECT().DownloadFile(masterIgn, filepath.Join(InstallDir, masterIgn)).Return(err).Times(1)
@@ -259,6 +293,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				fmt.Sprintf(InstallingAs, conf.Role),
 				WritingImageToDisk,
 			})
+			cleanInstallDevice()
 			mkdirSuccess()
 			downloadFileSuccess(masterIgn)
 			err := fmt.Errorf("failed to write image to disk")
@@ -272,6 +307,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				WritingImageToDisk,
 				Reboot,
 			})
+			cleanInstallDevice()
 			mkdirSuccess()
 			downloadFileSuccess(masterIgn)
 			writeToDiskSuccess()
@@ -299,6 +335,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				WritingImageToDisk,
 				Reboot,
 			})
+			cleanInstallDevice()
 			mkdirSuccess()
 			downloadFileSuccess(workerIgn)
 			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, workerIgn), device, image).Return(nil).Times(1)

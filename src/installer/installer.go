@@ -77,7 +77,16 @@ func (i *installer) InstallNode() error {
 	}
 
 	i.UpdateHostStatus(StartingInstallation)
-	if err := i.ops.Mkdir(InstallDir); err != nil {
+
+	i.log.Infof("Start cleaning up device %s", i.Device)
+	err := i.cleanupInstallDevice()
+	if err != nil {
+		i.log.Errorf("failed to prepare install device %s, err %s", i.Device, err)
+		return err
+	}
+	i.log.Infof("Fnished cleaning up device %s", i.Device)
+
+	if err = i.ops.Mkdir(InstallDir); err != nil {
 		i.log.Errorf("Failed to create install dir: %s", err)
 		return err
 	}
@@ -326,4 +335,23 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 		}
 	}
 	i.log.Infof("Found %d master nodes: %+v", len(nodes.Items), nodeNameAndCondition)
+}
+
+func (i *installer) cleanupInstallDevice() error {
+	vgName, err := i.ops.GetVGByPV(i.Device)
+	if err != nil {
+		return err
+	}
+
+	if vgName == "" {
+		i.log.Infof("No VG/LVM was found on device %s, no need to clean", i.Device)
+		return nil
+	}
+
+	err = i.ops.RemoveVG(vgName)
+	if err != nil {
+		return err
+	}
+
+	return i.ops.RemovePV(i.Device)
 }
