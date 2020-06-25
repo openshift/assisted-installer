@@ -130,12 +130,8 @@ func isCsrApproved(csr *certificatesv1beta1.CertificateSigningRequest) bool {
 	return false
 }
 
-// AddRouterCAToClusterCA adds router CA to cluster CA in kubeconfig
-func (c controller) AddRouterCAToClusterCA(wg *sync.WaitGroup) {
+func (c controller) PostInstallConfigs(wg *sync.WaitGroup) {
 	defer wg.Done()
-	cmName := "default-ingress-cert"
-	cmNamespace := "openshift-config-managed"
-	c.log.Infof("Start adding ingress ca to cluster")
 	for {
 		time.Sleep(GeneralWaitTimeout)
 		cluster, err := c.ic.GetCluster()
@@ -147,7 +143,32 @@ func (c controller) AddRouterCAToClusterCA(wg *sync.WaitGroup) {
 		if *cluster.Status != "installed" {
 			continue
 		}
+		break
+	}
+	c.addRouterCAToClusterCA()
+	c.unpatchEtcd()
+}
+
+func (c controller) unpatchEtcd() {
+	c.log.Infof("Unpatching etcd")
+	for {
+		if err := c.kc.UnPatchEtcd(); err != nil {
+			c.log.Error(err)
+			continue
+		}
+		break
+	}
+
+}
+
+// AddRouterCAToClusterCA adds router CA to cluster CA in kubeconfig
+func (c controller) addRouterCAToClusterCA() {
+	cmName := "default-ingress-cert"
+	cmNamespace := "openshift-config-managed"
+	c.log.Infof("Start adding ingress ca to cluster")
+	for {
 		caConfigMap, err := c.kc.GetConfigMap(cmNamespace, cmName)
+
 		if err != nil {
 			c.log.WithError(err).Errorf("fetching %s configmap from %s namespace", cmName, cmNamespace)
 			continue
@@ -160,6 +181,6 @@ func (c controller) AddRouterCAToClusterCA(wg *sync.WaitGroup) {
 			continue
 		}
 		c.log.Infof("Ingress ca successfully sent to inventory")
-		break
+		return
 	}
 }
