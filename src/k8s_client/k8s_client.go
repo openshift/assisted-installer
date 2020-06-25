@@ -26,6 +26,7 @@ import (
 type K8SClient interface {
 	ListMasterNodes() (*v1.NodeList, error)
 	PatchEtcd() error
+	UnPatchEtcd() error
 	ListNodes() (*v1.NodeList, error)
 	RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error)
 	ApproveCsr(csr *v1beta1.CertificateSigningRequest) error
@@ -83,6 +84,17 @@ func (c *k8sClient) PatchEtcd() error {
 	result, err := c.ocClient.OperatorV1().Etcds().Patch(context.Background(), "cluster", types.MergePatchType, data, metav1.PatchOptions{})
 	if err != nil {
 		return errors.Wrap(err, "Failed to patch etcd")
+	}
+	c.log.Info(result)
+	return nil
+}
+
+func (c *k8sClient) UnPatchEtcd() error {
+	c.log.Info("UnPatching etcd")
+	data := []byte(`{"spec": {"unsupportedConfigOverrides": null}}`)
+	result, err := c.ocClient.OperatorV1().Etcds().Patch(context.Background(), "cluster", types.MergePatchType, data, metav1.PatchOptions{})
+	if err != nil {
+		return errors.Wrap(err, "Failed to unpatch etcd")
 	}
 	c.log.Info(result)
 	return nil

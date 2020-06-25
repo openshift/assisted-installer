@@ -65,6 +65,20 @@ func (mr *MockK8SClientMockRecorder) PatchEtcd() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchEtcd", reflect.TypeOf((*MockK8SClient)(nil).PatchEtcd))
 }
 
+// UnPatchEtcd mocks base method
+func (m *MockK8SClient) UnPatchEtcd() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UnPatchEtcd")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UnPatchEtcd indicates an expected call of UnPatchEtcd
+func (mr *MockK8SClientMockRecorder) UnPatchEtcd() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnPatchEtcd", reflect.TypeOf((*MockK8SClient)(nil).UnPatchEtcd))
+}
+
 // ListNodes mocks base method
 func (m *MockK8SClient) ListNodes() (*v1.NodeList, error) {
 	m.ctrl.T.Helper()
