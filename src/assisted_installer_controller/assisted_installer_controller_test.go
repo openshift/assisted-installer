@@ -294,7 +294,19 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
 			GeneralWaitTimeout = 1 * time.Second
 		})
-		It("Run AddRouterCAToClusterCA", func() {
+		It("Run addRouterCAToClusterCA", func() {
+			cmName := "default-ingress-cert"
+			cmNamespace := "openshift-config-managed"
+			data := make(map[string]string)
+			data["ca-bundle.crt"] = "CA"
+			cm := v1.ConfigMap{Data: data}
+			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(nil, fmt.Errorf("dummy")).Times(1)
+			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(&cm, nil).Times(2)
+			mockbmclient.EXPECT().UploadIngressCa(data["ca-bundle.crt"], c.ClusterID).Return(fmt.Errorf("dummy")).Times(1)
+			mockbmclient.EXPECT().UploadIngressCa(data["ca-bundle.crt"], c.ClusterID).Return(nil).Times(1)
+			c.addRouterCAToClusterCA()
+		})
+		It("Run PostInstallConfigs", func() {
 			cmName := "default-ingress-cert"
 			cmNamespace := "openshift-config-managed"
 			data := make(map[string]string)
@@ -303,13 +315,13 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			installed := "installed"
 			cluster := models.Cluster{Status: &installed}
 			mockbmclient.EXPECT().GetCluster().Return(nil, fmt.Errorf("dummy")).Times(1)
-			mockbmclient.EXPECT().GetCluster().Return(&cluster, nil).AnyTimes()
-			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(nil, fmt.Errorf("dummy")).Times(1)
-			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(&cm, nil).Times(2)
-			mockbmclient.EXPECT().UploadIngressCa(data["ca-bundle.crt"], c.ClusterID).Return(fmt.Errorf("dummy")).Times(1)
+			mockbmclient.EXPECT().GetCluster().Return(&cluster, nil).Times(1)
+			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(&cm, nil).Times(1)
 			mockbmclient.EXPECT().UploadIngressCa(data["ca-bundle.crt"], c.ClusterID).Return(nil).Times(1)
+			mockk8sclient.EXPECT().UnPatchEtcd().Return(fmt.Errorf("dummy")).Times(1)
+			mockk8sclient.EXPECT().UnPatchEtcd().Return(nil).Times(1)
 			wg.Add(1)
-			go c.AddRouterCAToClusterCA(&wg)
+			go c.PostInstallConfigs(&wg)
 			wg.Wait()
 		})
 
