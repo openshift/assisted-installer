@@ -34,6 +34,7 @@ type Ops interface {
 	RemoveVG(vgName string) error
 	RemoveLV(lvName, vgName string) error
 	RemovePV(pvName string) error
+	GetMCSLogs() (string, error)
 }
 
 const (
@@ -258,4 +259,26 @@ func (o *ops) RemovePV(pvName string) error {
 		o.log.Errorf("Failed to remove PV %s, output %s, error %s", pvName, output, err)
 	}
 	return err
+}
+
+func (o *ops) GetMCSLogs() (string, error) {
+
+	files, err := utils.GetListOfFilesFromFolder("/var/log/containers/", "*machine-config-server*.log")
+	if err != nil {
+		o.log.WithError(err).Errorf("Error occurred while trying to get list of files from %s", "/var/log/containers/")
+		return "", err
+	}
+	if len(files) < 1 {
+		o.log.Warnf("MCS log file not found")
+		return "", err
+	}
+	// There is theoretical option in case of static pod restart that there can be more than one file
+	// we never saw it and it was decided not to handle it here
+	logs, err := ioutil.ReadFile(files[0])
+	if err != nil {
+		o.log.Errorf("Error occurred while trying to read %s : %e", files[0], err)
+		return "", err
+	}
+
+	return string(logs), nil
 }

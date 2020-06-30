@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -24,6 +25,7 @@ type InventoryClient interface {
 	GetEnabledHostsNamesIds() (map[string]string, error)
 	UploadIngressCa(ingressCA string, clusterId string) error
 	GetCluster() (*models.Cluster, error)
+	GetEnabledIdsIps() (map[string][]string, error)
 }
 
 type inventoryClient struct {
@@ -76,23 +78,35 @@ func (c *inventoryClient) GetCluster() (*models.Cluster, error) {
 
 func (c *inventoryClient) GetEnabledHostsNamesIds() (map[string]string, error) {
 	namesIdsMap := make(map[string]string)
-	var hwInfo models.Inventory
-	hosts, err := c.ai.Installer.ListHosts(context.Background(), &installer.ListHostsParams{ClusterID: c.clusterId})
+	hosts, err := c.getEnabledHostsWithInventoryInfo()
 	if err != nil {
 		return nil, err
 	}
-	for _, host := range hosts.Payload {
-		err = json.Unmarshal([]byte(host.Inventory), &hwInfo)
-		if err != nil {
-			c.log.Warnf("Failed to parse host %s inventory %s", host.ID.String(), host.Inventory)
-			return nil, err
-		}
-		if *host.Status == models.HostStatusDisabled {
-			continue
-		}
-		namesIdsMap[hwInfo.Hostname] = host.ID.String()
+	for hostId, hwInfo := range hosts {
+		namesIdsMap[hwInfo.Hostname] = hostId
 	}
 	return namesIdsMap, nil
+}
+
+func (c *inventoryClient) GetEnabledIdsIps() (map[string][]string, error) {
+	idIpsMap := make(map[string][]string)
+	hosts, err := c.getEnabledHostsWithInventoryInfo()
+	if err != nil {
+		return nil, err
+	}
+	for hostId, hwInfo := range hosts {
+		for _, netInt := range hwInfo.Interfaces {
+			for _, ip := range append(netInt.IPV4Addresses, netInt.IPV6Addresses...) {
+				parsedIp, _, err := net.ParseCIDR(ip)
+				if err != nil {
+					c.log.Warnf("Failed to parse ip %s for host %s", ip, hostId)
+					continue
+				}
+				idIpsMap[hostId] = append(idIpsMap[hostId], parsedIp.String())
+			}
+		}
+	}
+	return idIpsMap, nil
 }
 
 func createUrl(host string, port int) string {
@@ -116,4 +130,25 @@ func (c *inventoryClient) createUpdateHostStatusParams(newStatus string, hostId 
 		HostID:                    strfmt.UUID(hostId),
 		HostInstallProgressParams: models.HostInstallProgressParams(newStatus),
 	}
+}
+
+func (c *inventoryClient) getEnabledHostsWithInventoryInfo() (map[string]models.Inventory, error) {
+	hostsWithHwInfo := make(map[string]models.Inventory)
+	hosts, err := c.ai.Installer.ListHosts(context.Background(), &installer.ListHostsParams{ClusterID: c.clusterId})
+	if err != nil {
+		return nil, err
+	}
+	for _, host := range hosts.Payload {
+		hwInfo := models.Inventory{}
+		err = json.Unmarshal([]byte(host.Inventory), &hwInfo)
+		if err != nil {
+			c.log.Warnf("Failed to parse host %s inventory %s", host.ID.String(), host.Inventory)
+			return nil, err
+		}
+		if *host.Status == models.HostStatusDisabled {
+			continue
+		}
+		hostsWithHwInfo[host.ID.String()] = hwInfo
+	}
+	return hostsWithHwInfo, nil
 }

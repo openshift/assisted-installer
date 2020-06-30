@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/thoas/go-funk"
@@ -41,7 +43,10 @@ const (
 	WritingImageToDisk   = "Writing image to disk"
 	Reboot               = "Rebooting"
 	Joined               = "Joined"
+	Configuring          = "Configuring"
 )
+
+var generalWaitTimeout = 30 * time.Second
 
 // Installer will run the install operations on the node
 type Installer interface {
@@ -136,6 +141,11 @@ func (i *installer) InstallNode() error {
 
 func (i *installer) runBootstrap(ctx context.Context) error {
 	i.UpdateHostStatus(RunningBootstrap)
+	done := make(chan bool)
+	defer func() {
+		done <- true
+	}()
+	go i.updateConfiguringStatus(done)
 	err := i.startBootstrap()
 	if err != nil {
 		i.log.Errorf("Bootstrap failed %s", err)
@@ -146,6 +156,7 @@ func (i *installer) runBootstrap(ctx context.Context) error {
 		i.log.Error(err)
 		return err
 	}
+
 	i.UpdateHostStatus(WaitForControlPlane)
 	if err = i.waitForControlPlane(ctx, kc); err != nil {
 		return err
@@ -354,4 +365,56 @@ func (i *installer) cleanupInstallDevice() error {
 	}
 
 	return i.ops.RemovePV(i.Device)
+}
+
+func (i *installer) verifyHostCanMoveToConfigurationStatus(inventoryHostsMapWithIp map[string][]string) {
+	logs, err := i.ops.GetMCSLogs()
+	if err != nil {
+		i.log.Infof("Failed to get MCS logs, will retry")
+		return
+	}
+	for hostId, ips := range inventoryHostsMapWithIp {
+		pat := fmt.Sprintf("(%s)", strings.Join(ips, "|"))
+		pattern, err := regexp.Compile(pat)
+		if err != nil {
+			i.log.WithError(err).Errorf("Failed to compile regex from host %s ips list", hostId)
+			return
+		}
+
+		if pattern.MatchString(logs) {
+			i.log.Infof("Host %s found in mcs logs, moving it to %s state", hostId, Configuring)
+			if err := i.inventoryClient.UpdateHostStatus(Configuring, hostId); err != nil {
+				i.log.Errorf("Failed to update node installation status, %s", err)
+				continue
+			}
+			delete(inventoryHostsMapWithIp, hostId)
+		}
+	}
+}
+
+// will run as go routine and tries to find nodes that pulled ignition from mcs
+// it will get mcs logs of static pod that runs on bootstrap and will search for matched ip
+// when match is found it will update inventory service with new host status
+func (i *installer) updateConfiguringStatus(done <-chan bool) {
+	i.log.Infof("Start waiting for configuring state")
+	ticker := time.NewTicker(generalWaitTimeout)
+	var inventoryHostsMapWithIp map[string][]string
+	var err error
+	for {
+		select {
+		case <-done:
+			i.log.Infof("Exiting updateConfiguringStatus go routine")
+			return
+		case <-ticker.C:
+			i.log.Infof("searching for hosts that had pulled ignition already")
+			if inventoryHostsMapWithIp == nil {
+				inventoryHostsMapWithIp, err = i.inventoryClient.GetEnabledIdsIps()
+				if err != nil {
+					i.log.Warnf("Failed to get hosts info from inventory, err %s", err)
+					continue
+				}
+			}
+			i.verifyHostCanMoveToConfigurationStatus(inventoryHostsMapWithIp)
+		}
+	}
 }
