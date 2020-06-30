@@ -1,0 +1,9 @@
+2020-07-01T16:56:38.177165860+00:00 stderr F I0701 16:56:38.177018       1 bootstrap.go:37] Version: v4.5.0-202005201657-dirty (50bc7b453a3fd66a511a69822ccb5fd00a9a5d93)
+2020-07-01T16:56:38.177165860+00:00 stderr F I0701 16:56:38.177133       1 api.go:56] Launching server on :22624
+2020-07-01T16:56:38.177245330+00:00 stderr F I0701 16:56:38.177214       1 api.go:56] Launching server on :22623
+2020-07-01T16:57:08.449846700+00:00 stderr F I0701 16:57:08.449808       1 api.go:102] Pool master requested by 192.168.126.12:32780
+2020-07-01T16:57:08.449904020+00:00 stderr F I0701 16:57:08.449893       1 bootstrap_server.go:64] reading file "/etc/mcs/bootstrap/machine-pools/master.yaml"
+2020-07-01T16:57:08.451073060+00:00 stderr F I0701 16:57:08.451054       1 bootstrap_server.go:84] reading file "/etc/mcs/bootstrap/machine-configs/rendered-master-39287e7d053e8395ab3c1ecd762dd578.yaml"
+2020-07-01T16:57:22.319520480+00:00 stderr F I0701 16:57:22.319461       1 api.go:102] Pool master requested by 192.168.126.11:40548
+2020-07-01T16:57:22.319520480+00:00 stderr F I0701 16:57:22.319485       1 bootstrap_server.go:64] reading file "/etc/mcs/bootstrap/machine-pools/master.yaml"
+2020-07-01T16:57:22.320165920+00:00 stderr F I0701 16:57:22.320128       1 bootstrap_server.go:84] reading file "/etc/mcs/bootstrap/machine-configs/rendered-master-39287e7d053e8395ab3c1ecd762dd578.yaml"
