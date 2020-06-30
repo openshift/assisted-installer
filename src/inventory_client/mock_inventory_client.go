@@ -105,3 +105,18 @@ func (mr *MockInventoryClientMockRecorder) GetCluster() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCluster", reflect.TypeOf((*MockInventoryClient)(nil).GetCluster))
 }
+
+// GetEnabledIdsIps mocks base method
+func (m *MockInventoryClient) GetEnabledIdsIps() (map[string][]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEnabledIdsIps")
+	ret0, _ := ret[0].(map[string][]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetEnabledIdsIps indicates an expected call of GetEnabledIdsIps
+func (mr *MockInventoryClientMockRecorder) GetEnabledIdsIps() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEnabledIdsIps", reflect.TypeOf((*MockInventoryClient)(nil).GetEnabledIdsIps))
+}

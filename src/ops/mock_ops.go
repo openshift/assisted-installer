@@ -220,3 +220,18 @@ func (mr *MockOpsMockRecorder) RemovePV(pvName interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemovePV", reflect.TypeOf((*MockOps)(nil).RemovePV), pvName)
 }
+
+// GetMCSLogs mocks base method
+func (m *MockOps) GetMCSLogs() (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMCSLogs")
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMCSLogs indicates an expected call of GetMCSLogs
+func (mr *MockOpsMockRecorder) GetMCSLogs() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMCSLogs", reflect.TypeOf((*MockOps)(nil).GetMCSLogs))
+}
