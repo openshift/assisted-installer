@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"text/template"
 
 	"github.com/eranco74/assisted-installer/src/inventory_client"
@@ -28,6 +29,7 @@ type Ops interface {
 	WriteImageToDisk(ignitionPath string, device string, image string, progressReporter inventory_client.InventoryClient) error
 	Reboot() error
 	ExtractFromIgnition(ignitionPath string, fileToExtract string) error
+	SetFileInIgnition(ignitionPath, filePath, contents string, mode int) error
 	SystemctlAction(action string, args ...string) error
 	PrepareController() error
 	GetVGByPV(pvName string) (string, error)
@@ -155,6 +157,29 @@ func (o *ops) ExtractFromIgnition(ignitionPath string, fileToExtract string) err
 		o.log.Errorf("Error occurred while moving %s to %s", tmpFile, fileToExtract)
 		return err
 	}
+	return nil
+}
+
+func (o *ops) SetFileInIgnition(ignitionPath, filePath, contents string, mode int) error {
+	o.log.Infof("Setting  file %s, mode %d in ignition %s", filePath, mode, ignitionPath)
+	ignitionData, err := ioutil.ReadFile(ignitionPath)
+	if err != nil {
+		o.log.Errorf("Error occurred while trying to read %s : %e", ignitionPath, err)
+		return err
+	}
+
+	newIgnitionData, err := utils.SetFileInIgnition(ignitionData, filePath, contents, mode)
+	if err != nil {
+		o.log.Errorf("Failed to set new file data %s into ignition data", filePath)
+		return err
+	}
+
+	err = ioutil.WriteFile(ignitionPath, newIgnitionData, os.ModePerm)
+	if err != nil {
+		o.log.Errorf("Failed to write new ignition to %s", ignitionPath)
+		return err
+	}
+
 	return nil
 }
 

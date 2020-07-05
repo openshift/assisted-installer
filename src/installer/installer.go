@@ -3,6 +3,7 @@ package installer
 import (
 	"context"
 	"fmt"
+
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -110,6 +111,12 @@ func (i *installer) InstallNode() error {
 	ignitionFileName := i.Config.Role + ".ign"
 	ignitionPath, err := i.getFileFromService(ignitionFileName)
 	if err != nil {
+		return err
+	}
+
+	err = i.setHostnameInIgnition(ignitionPath)
+	if err != nil {
+		i.log.Errorf("Failed to set hostname %s in ignition %s", i.Hostname, ignitionPath)
 		return err
 	}
 
@@ -417,4 +424,12 @@ func (i *installer) updateConfiguringStatus(done <-chan bool) {
 			i.verifyHostCanMoveToConfigurationStatus(inventoryHostsMapWithIp)
 		}
 	}
+}
+
+func (i *installer) setHostnameInIgnition(ignitionPath string) error {
+	if i.Hostname == "" {
+		i.log.Infof("No hostname to set, continuing")
+		return nil
+	}
+	return i.ops.SetFileInIgnition(ignitionPath, "/etc/hostname", fmt.Sprintf("data:,%s", i.Hostname), 420)
 }

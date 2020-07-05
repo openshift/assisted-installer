@@ -131,6 +131,20 @@ func (mr *MockOpsMockRecorder) ExtractFromIgnition(ignitionPath, fileToExtract i
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExtractFromIgnition", reflect.TypeOf((*MockOps)(nil).ExtractFromIgnition), ignitionPath, fileToExtract)
 }
 
+// SetFileInIgnition mocks base method
+func (m *MockOps) SetFileInIgnition(ignitionPath, filePath, contents string, mode int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetFileInIgnition", ignitionPath, filePath, contents, mode)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetFileInIgnition indicates an expected call of SetFileInIgnition
+func (mr *MockOpsMockRecorder) SetFileInIgnition(ignitionPath, filePath, contents, mode interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFileInIgnition", reflect.TypeOf((*MockOps)(nil).SetFileInIgnition), ignitionPath, filePath, contents, mode)
+}
+
 // SystemctlAction mocks base method
 func (m *MockOps) SystemctlAction(action string, args ...string) error {
 	m.ctrl.T.Helper()

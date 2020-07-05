@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/eranco74/assisted-installer/src/inventory_client"
 
 	ignition "github.com/coreos/ignition/config/v2_2"
+	"github.com/coreos/ignition/config/v2_2/types"
 	"github.com/vincent-petithory/dataurl"
 
 	"github.com/sirupsen/logrus"
@@ -119,6 +121,32 @@ func GetFileContentFromIgnition(ignitionData []byte, fileName string) ([]byte, e
 		}
 	}
 	return nil, fmt.Errorf("path %s found in ignition", fileName)
+}
+
+func SetFileInIgnition(ignitionData []byte, filePath, fileContents string, mode int) ([]byte, error) {
+	bm, _, err := ignition.Parse(ignitionData)
+	if err != nil {
+		return nil, err
+	}
+
+	file := types.File{
+		Node: types.Node{
+			Filesystem: "root",
+			Path:       filePath,
+			Overwrite:  nil,
+			Group:      nil,
+			User:       nil,
+		},
+		FileEmbedded1: types.FileEmbedded1{
+			Append: false,
+			Contents: types.FileContents{
+				Source: fileContents,
+			},
+			Mode: &mode,
+		},
+	}
+	bm.Storage.Files = append(bm.Storage.Files, file)
+	return json.Marshal(bm)
 }
 
 func GetListOfFilesFromFolder(root, pattern string) ([]string, error) {

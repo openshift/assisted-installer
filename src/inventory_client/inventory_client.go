@@ -34,6 +34,11 @@ type inventoryClient struct {
 	clusterId strfmt.UUID
 }
 
+type enabledHostData struct {
+	inventory *models.Inventory
+	host      *models.Host
+}
+
 func CreateInventoryClient(clusterId string, host string, port int, logger *logrus.Logger) *inventoryClient {
 	clientConfig := client.Config{}
 	clientConfig.URL, _ = url.Parse(createUrl(host, port))
@@ -82,8 +87,12 @@ func (c *inventoryClient) GetEnabledHostsNamesIds() (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	for hostId, hwInfo := range hosts {
-		namesIdsMap[hwInfo.Hostname] = hostId
+	for hostId, hostData := range hosts {
+		hostname := hostData.host.RequestedHostname
+		if hostname == "" {
+			hostname = hostData.inventory.Hostname
+		}
+		namesIdsMap[hostname] = hostId
 	}
 	return namesIdsMap, nil
 }
@@ -94,8 +103,8 @@ func (c *inventoryClient) GetEnabledIdsIps() (map[string][]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	for hostId, hwInfo := range hosts {
-		for _, netInt := range hwInfo.Interfaces {
+	for hostId, hostData := range hosts {
+		for _, netInt := range hostData.inventory.Interfaces {
 			for _, ip := range append(netInt.IPV4Addresses, netInt.IPV6Addresses...) {
 				parsedIp, _, err := net.ParseCIDR(ip)
 				if err != nil {
@@ -132,23 +141,23 @@ func (c *inventoryClient) createUpdateHostStatusParams(newStatus string, hostId 
 	}
 }
 
-func (c *inventoryClient) getEnabledHostsWithInventoryInfo() (map[string]models.Inventory, error) {
-	hostsWithHwInfo := make(map[string]models.Inventory)
+func (c *inventoryClient) getEnabledHostsWithInventoryInfo() (map[string]enabledHostData, error) {
+	hostsWithHwInfo := make(map[string]enabledHostData)
 	hosts, err := c.ai.Installer.ListHosts(context.Background(), &installer.ListHostsParams{ClusterID: c.clusterId})
 	if err != nil {
 		return nil, err
 	}
 	for _, host := range hosts.Payload {
+		if *host.Status == models.HostStatusDisabled {
+			continue
+		}
 		hwInfo := models.Inventory{}
 		err = json.Unmarshal([]byte(host.Inventory), &hwInfo)
 		if err != nil {
 			c.log.Warnf("Failed to parse host %s inventory %s", host.ID.String(), host.Inventory)
 			return nil, err
 		}
-		if *host.Status == models.HostStatusDisabled {
-			continue
-		}
-		hostsWithHwInfo[host.ID.String()] = hwInfo
+		hostsWithHwInfo[host.ID.String()] = enabledHostData{inventory: &hwInfo, host: host}
 	}
 	return hostsWithHwInfo, nil
 }

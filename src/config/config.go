@@ -14,6 +14,7 @@ type Config struct {
 	Port             int
 	Verbose          bool
 	OpenshiftVersion string
+	Hostname         string
 }
 
 var GlobalConfig Config
@@ -32,6 +33,7 @@ func ProcessArgs() {
 	flag.StringVar(&ret.Host, "host", "", "The BM inventory host address")
 	flag.IntVar(&ret.Port, "port", 80, "The BM inventory port")
 	flag.StringVar(&ret.OpenshiftVersion, "openshift-version", "4.4", "Openshift version to install")
+	flag.StringVar(&ret.Hostname, "host-name", "", "hostname to be set for this node")
 	flag.BoolVar(&ret.Verbose, "verbose", false, "Increase verbosity, set log level to debug")
 	h := flag.Bool("help", false, "Help message")
 	flag.Parse()
