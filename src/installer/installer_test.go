@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/filanov/bm-inventory/models"
+	"github.com/go-openapi/strfmt"
+
 	v1 "k8s.io/api/core/v1"
 
 	"github.com/eranco74/assisted-installer/src/k8s_client"
@@ -29,25 +32,22 @@ func TestValidator(t *testing.T) {
 
 var _ = Describe("installer HostRoleMaster role", func() {
 	var (
-		l                 = logrus.New()
-		ctrl              *gomock.Controller
-		mockops           *ops.MockOps
-		mockbmclient      *inventory_client.MockInventoryClient
-		mockk8sclient     *k8s_client.MockK8SClient
-		i                 *installer
-		hostId            = "host-id"
-		bootstrapIgn      = "bootstrap.ign"
-		masterIgn         = "master.ign"
-		workerIgn         = "worker.ign"
-		openShiftVersion  = "4.4"
-		image, _          = utils.GetRhcosImageByOpenshiftVersion(openShiftVersion)
-		inventoryNamesIds map[string]string
-		kubeNamesIds      map[string]string
+		l                  = logrus.New()
+		ctrl               *gomock.Controller
+		mockops            *ops.MockOps
+		mockbmclient       *inventory_client.MockInventoryClient
+		mockk8sclient      *k8s_client.MockK8SClient
+		i                  *installer
+		hostId             = "host-id"
+		bootstrapIgn       = "bootstrap.ign"
+		masterIgn          = "master.ign"
+		workerIgn          = "worker.ign"
+		openShiftVersion   = "4.4"
+		image, _           = utils.GetRhcosImageByOpenshiftVersion(openShiftVersion)
+		inventoryNamesHost map[string]inventory_client.EnabledHostData
+		kubeNamesIds       map[string]string
 	)
-	generalWaitTimeout = 100 * time.Millisecond
-	inventoryNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65",
-		"node1": "eb82821f-bf21-4614-9a3b-ecb07929f238",
-		"node2": "b898d516-3e16-49d0-86a5-0ad5bd04e3ed"}
+	generalWaitTimeout = 100 * time.Minute
 	device := "/dev/vda"
 	l.SetOutput(ioutil.Discard)
 	mkdirSuccess := func() {
@@ -57,12 +57,12 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockbmclient.EXPECT().DownloadFile(fileName, filepath.Join(InstallDir, fileName)).Return(nil).Times(1)
 	}
 
-	updateStatusConfiguringSuccess := func() {
-		inventoryIdsIps := map[string][]string{"eb82821f-bf21-4614-9a3b-ecb07929f238": {"192.168.126.10"}}
-		mockbmclient.EXPECT().GetEnabledIdsIps().Return(inventoryIdsIps, nil).AnyTimes()
-		mockops.EXPECT().GetMCSLogs().Return("dummy logs", nil).AnyTimes()
-
-	}
+	//updateStatusConfiguringSuccess := func() {
+	//	mockbmclient.EXPECT().GetEnabledHostsNamesHosts().Return(inventoryNamesHost, nil).AnyTimes()
+	//	mockops.EXPECT().GetMCSLogs().Return("dummy logs", nil).AnyTimes()
+	//	mockbmclient.EXPECT().SetConfiguringStatusForHosts(inventoryNamesHost, "dummy logs").Return().AnyTimes()
+	//
+	//}
 
 	cleanInstallDevice := func() {
 		mockops.EXPECT().GetVGByPV(device).Return("", nil).Times(1)
@@ -86,6 +86,12 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockops = ops.NewMockOps(ctrl)
 		mockbmclient = inventory_client.NewMockInventoryClient(ctrl)
 		mockk8sclient = k8s_client.NewMockK8SClient(ctrl)
+		node0Id := strfmt.UUID("7916fa89-ea7a-443e-a862-b3e930309f65")
+		node1Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f238")
+		node2Id := strfmt.UUID("b898d516-3e16-49d0-86a5-0ad5bd04e3ed")
+		inventoryNamesHost = map[string]inventory_client.EnabledHostData{"node0": {Host: &models.Host{ID: &node0Id}, IPs: []string{"192.168.126.10"}},
+			"node1": {Host: &models.Host{ID: &node1Id}, IPs: []string{"192.168.126.11"}},
+			"node2": {Host: &models.Host{ID: &node2Id}, IPs: []string{"192.168.126.12"}}}
 	})
 	k8sBuilder := func(configPath string, logger *logrus.Logger) (k8s_client.K8SClient, error) {
 		return mockk8sclient, nil
@@ -128,15 +134,15 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			}
 		}
 		WaitMasterNodesSucccess := func() {
-			mockbmclient.EXPECT().GetEnabledHostsNamesIds().Return(inventoryNamesIds, nil).Times(1)
+			mockbmclient.EXPECT().GetEnabledHostsNamesHosts().Return(inventoryNamesHost, nil).AnyTimes()
 			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(map[string]string{}), nil).Times(1)
 			kubeNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65"}
 			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
-			mockbmclient.EXPECT().UpdateHostStatus(Joined, inventoryNamesIds["node0"]).Times(1)
+			mockbmclient.EXPECT().UpdateHostStatus(Joined, inventoryNamesHost["node0"].Host.ID.String()).Times(1)
 			kubeNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65",
 				"node1": "eb82821f-bf21-4614-9a3b-ecb07929f238"}
 			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
-			mockbmclient.EXPECT().UpdateHostStatus(Joined, inventoryNamesIds["node1"]).Times(1)
+			mockbmclient.EXPECT().UpdateHostStatus(Joined, inventoryNamesHost["node1"].Host.ID.String()).Times(1)
 		}
 		patchEtcdSuccess := func() {
 			mockk8sclient.EXPECT().PatchEtcd().Return(nil).Times(1)
@@ -170,7 +176,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			daemonReload(nil)
 			restartNetworkManager(nil)
 			prepareControllerSuccess()
-			updateStatusConfiguringSuccess()
+			// updateStatusConfiguringSuccess()
 			startServicesSuccess()
 			patchEtcdSuccess()
 			WaitMasterNodesSucccess()
@@ -197,7 +203,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			extractSuccess()
 			daemonReload(nil)
 			restartNetworkManager(nil)
-			updateStatusConfiguringSuccess()
+			// updateStatusConfiguringSuccess()
 			prepareControllerSuccess()
 			startServicesSuccess()
 			WaitMasterNodesSucccess()
@@ -220,7 +226,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			downloadFileSuccess(bootstrapIgn)
 			extractSecretFromIgnitionSuccess()
 			extractSuccess()
-			updateStatusConfiguringSuccess()
+			// updateStatusConfiguringSuccess()
 			daemonReload(nil)
 			err := fmt.Errorf("Failed to restart NetworkManager")
 			restartNetworkManager(err)
@@ -229,6 +235,33 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			writeToDiskSuccess()
 			ret := i.InstallNode()
 			Expect(ret).Should(Equal(err))
+		})
+		It("Configuring state", func() {
+			var logs string
+			generalWaitTimeout = 100 * time.Millisecond
+			logsInBytes, _ := ioutil.ReadFile("../../test_files/mcs_logs.txt")
+			logs = string(logsInBytes)
+			node0Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f238")
+			node1Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f239")
+			node2Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f240")
+			testInventoryIdsIps := map[string]inventory_client.EnabledHostData{"node0": {Host: &models.Host{ID: &node0Id},
+				IPs: []string{"192.168.126.10", "192.168.11.122", "fe80::5054:ff:fe9a:4738"}},
+				"node1": {Host: &models.Host{ID: &node1Id}, IPs: []string{"192.168.126.11", "192.168.11.123", "fe80::5054:ff:fe9a:4739"}},
+				"node2": {Host: &models.Host{ID: &node2Id}, IPs: []string{"192.168.126.12", "192.168.11.124", "fe80::5054:ff:fe9a:4740"}}}
+			mockbmclient.EXPECT().GetEnabledHostsNamesHosts().Return(nil, fmt.Errorf("dummy")).Times(1)
+			mockbmclient.EXPECT().GetEnabledHostsNamesHosts().Return(testInventoryIdsIps, nil).Times(1)
+			mockops.EXPECT().GetMCSLogs().Return("", fmt.Errorf("dummy")).Times(1)
+			mockops.EXPECT().GetMCSLogs().Return("dummy logs", nil).Times(1)
+			mockops.EXPECT().GetMCSLogs().Return("dummy logs", nil).Times(1)
+			mockops.EXPECT().GetMCSLogs().Return(logs, nil).AnyTimes()
+			mockbmclient.EXPECT().SetConfiguringStatusForHosts(testInventoryIdsIps, "dummy logs").Return().Times(1)
+			mockbmclient.EXPECT().SetConfiguringStatusForHosts(testInventoryIdsIps, "dummy logs").Return().Times(1)
+			mockbmclient.EXPECT().SetConfiguringStatusForHosts(testInventoryIdsIps, logs).Return().AnyTimes()
+
+			done := make(chan bool)
+			go i.updateConfiguringStatus(done)
+			time.Sleep(3 * time.Second)
+			done <- true
 		})
 	})
 	Context("Master role", func() {
@@ -376,46 +409,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	AfterEach(func() {
 		ctrl.Finish()
 	})
-	Context("Configuring state", func() {
-		var testInventoryIdsIps map[string][]string
-		var logs string
-		conf := config.Config{Role: HostRoleBootstrap,
-			ClusterID:        "cluster-id",
-			HostID:           "host-id",
-			Device:           "/dev/vda",
-			Host:             "https://bm-inventory.com",
-			Port:             80,
-			OpenshiftVersion: "Bad version",
-		}
-		BeforeEach(func() {
-			logsInBytes, _ := ioutil.ReadFile("../../test_files/mcs_logs.txt")
-			logs = string(logsInBytes)
-			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
-			testInventoryIdsIps = map[string][]string{"eb82821f-bf21-4614-9a3b-ecb07929f238": {"192.168.126.10", "192.168.11.122", "fe80::5054:ff:fe9a:4738"},
-				"eb82821f-bf21-4614-9a3b-ecb07929f239": {"192.168.126.11", "192.168.11.123", "fe80::5054:ff:fe9a:4739"},
-				"eb82821f-bf21-4614-9a3b-ecb07929f240": {"192.168.126.12", "192.168.11.124", "fe80::5054:ff:fe9a:4740"}}
-		})
-		It("Configuring state flow", func() {
-			mockbmclient.EXPECT().GetEnabledIdsIps().Return(nil, fmt.Errorf("dummy")).Times(1)
-			mockbmclient.EXPECT().GetEnabledIdsIps().Return(testInventoryIdsIps, nil).Times(1)
-			mockops.EXPECT().GetMCSLogs().Return("", fmt.Errorf("dummy")).Times(1)
-			mockops.EXPECT().GetMCSLogs().Return("dummy logs", nil).Times(1)
-			mockops.EXPECT().GetMCSLogs().Return("dummy logs", nil).Times(1)
-			mockops.EXPECT().GetMCSLogs().Return(logs, nil).AnyTimes()
-			mockbmclient.EXPECT().UpdateHostStatus(Configuring, gomock.Any()).Return(fmt.Errorf("dummy")).Times(1)
-			mockbmclient.EXPECT().UpdateHostStatus(Configuring, "eb82821f-bf21-4614-9a3b-ecb07929f240").Return(nil).Times(1)
-			mockbmclient.EXPECT().UpdateHostStatus(Configuring, "eb82821f-bf21-4614-9a3b-ecb07929f239").Return(nil).Times(1)
-
-			done := make(chan bool)
-			go i.updateConfiguringStatus(done)
-			time.Sleep(3 * time.Second)
-			done <- true
-		})
-	})
-	//AfterEach(func() {
-	//	ctrl.Finish()
-	//})
-
 })
 
 func GetKubeNodes(kubeNamesIds map[string]string) *v1.NodeList {
