@@ -152,3 +152,33 @@ func (mr *MockK8SClientMockRecorder) GetConfigMap(namespace, name interface{}) *
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConfigMap", reflect.TypeOf((*MockK8SClient)(nil).GetConfigMap), namespace, name)
 }
+
+// GetPodLogs mocks base method
+func (m *MockK8SClient) GetPodLogs(namespace, podName string, sinceSeconds int64) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPodLogs", namespace, podName, sinceSeconds)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPodLogs indicates an expected call of GetPodLogs
+func (mr *MockK8SClientMockRecorder) GetPodLogs(namespace, podName, sinceSeconds interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPodLogs", reflect.TypeOf((*MockK8SClient)(nil).GetPodLogs), namespace, podName, sinceSeconds)
+}
+
+// GetPods mocks base method
+func (m *MockK8SClient) GetPods(namespace string, labelMatch map[string]string) ([]v1.Pod, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPods", namespace, labelMatch)
+	ret0, _ := ret[0].([]v1.Pod)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPods indicates an expected call of GetPods
+func (mr *MockK8SClientMockRecorder) GetPods(namespace, labelMatch interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPods", reflect.TypeOf((*MockK8SClient)(nil).GetPods), namespace, labelMatch)
+}

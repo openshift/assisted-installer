@@ -62,19 +62,19 @@ func (mr *MockInventoryClientMockRecorder) UpdateHostStatus(newStatus, hostId in
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHostStatus", reflect.TypeOf((*MockInventoryClient)(nil).UpdateHostStatus), newStatus, hostId)
 }
 
-// GetEnabledHostsNamesIds mocks base method
-func (m *MockInventoryClient) GetEnabledHostsNamesIds() (map[string]string, error) {
+// GetEnabledHostsNamesHosts mocks base method
+func (m *MockInventoryClient) GetEnabledHostsNamesHosts() (map[string]EnabledHostData, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetEnabledHostsNamesIds")
-	ret0, _ := ret[0].(map[string]string)
+	ret := m.ctrl.Call(m, "GetEnabledHostsNamesHosts")
+	ret0, _ := ret[0].(map[string]EnabledHostData)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetEnabledHostsNamesIds indicates an expected call of GetEnabledHostsNamesIds
-func (mr *MockInventoryClientMockRecorder) GetEnabledHostsNamesIds() *gomock.Call {
+// GetEnabledHostsNamesHosts indicates an expected call of GetEnabledHostsNamesHosts
+func (mr *MockInventoryClientMockRecorder) GetEnabledHostsNamesHosts() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEnabledHostsNamesIds", reflect.TypeOf((*MockInventoryClient)(nil).GetEnabledHostsNamesIds))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEnabledHostsNamesHosts", reflect.TypeOf((*MockInventoryClient)(nil).GetEnabledHostsNamesHosts))
 }
 
 // UploadIngressCa mocks base method
@@ -106,17 +106,14 @@ func (mr *MockInventoryClientMockRecorder) GetCluster() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCluster", reflect.TypeOf((*MockInventoryClient)(nil).GetCluster))
 }
 
-// GetEnabledIdsIps mocks base method
-func (m *MockInventoryClient) GetEnabledIdsIps() (map[string][]string, error) {
+// SetConfiguringStatusForHosts mocks base method
+func (m *MockInventoryClient) SetConfiguringStatusForHosts(inventoryHostsMapWithIp map[string]EnabledHostData, mcsLogs string) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetEnabledIdsIps")
-	ret0, _ := ret[0].(map[string][]string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	m.ctrl.Call(m, "SetConfiguringStatusForHosts", inventoryHostsMapWithIp, mcsLogs)
 }
 
-// GetEnabledIdsIps indicates an expected call of GetEnabledIdsIps
-func (mr *MockInventoryClientMockRecorder) GetEnabledIdsIps() *gomock.Call {
+// SetConfiguringStatusForHosts indicates an expected call of SetConfiguringStatusForHosts
+func (mr *MockInventoryClientMockRecorder) SetConfiguringStatusForHosts(inventoryHostsMapWithIp, mcsLogs interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEnabledIdsIps", reflect.TypeOf((*MockInventoryClient)(nil).GetEnabledIdsIps))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConfiguringStatusForHosts", reflect.TypeOf((*MockInventoryClient)(nil).SetConfiguringStatusForHosts), inventoryHostsMapWithIp, mcsLogs)
 }

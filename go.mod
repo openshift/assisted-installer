@@ -4,12 +4,10 @@ go 1.14
 
 require (
 	github.com/ajeddeloh/go-json v0.0.0-20200220154158-5ae607161559 // indirect
-	github.com/avast/retry-go v2.6.0+incompatible // indirect
 	github.com/coreos/ignition v0.35.0
 	github.com/filanov/bm-inventory v1.0.5-0.20200705123845-90cad02ceedb
 	github.com/go-openapi/strfmt v0.19.5
 	github.com/golang/mock v1.4.0
-	github.com/hashicorp/go-multierror v1.1.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo v1.12.2
 	github.com/onsi/gomega v1.10.1
