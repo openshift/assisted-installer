@@ -110,7 +110,7 @@ func (o *ops) SystemctlAction(action string, args ...string) error {
 
 func (o *ops) WriteImageToDisk(ignitionPath string, device string, image string, progressReporter inventory_client.InventoryClient) error {
 	o.log.Info("Writing image and ignition to disk")
-	_, err := o.ExecPrivilegeCommand(utils.NewCoreosInstallerLogWriter(o.log, progressReporter, config.GlobalConfig.HostID),
+	_, err := o.ExecPrivilegeCommand(NewCoreosInstallerLogWriter(o.log, progressReporter, config.GlobalConfig.HostID),
 		"coreos-installer", "install", "--image-url", image, "--insecure", "-i", ignitionPath, device)
 	return err
 }

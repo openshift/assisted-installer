@@ -1,18 +1,16 @@
 package utils
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/filanov/bm-inventory/models"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
 	"time"
 
-	"github.com/eranco74/assisted-installer/src/inventory_client"
+	"github.com/filanov/bm-inventory/models"
 
 	ignition "github.com/coreos/ignition/config/v2_2"
 	"github.com/coreos/ignition/config/v2_2/types"
@@ -20,8 +18,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 )
-
-const MinProgressDelta = 5
 
 type LogWriter struct {
 	log *logrus.Logger
@@ -49,61 +45,6 @@ func InitLogger(verbose bool) *logrus.Logger {
 		log.SetLevel(logrus.DebugLevel)
 	}
 	return log
-}
-
-type CoreosInstallerLogWriter struct {
-	log              *logrus.Logger
-	lastLogLine      []byte
-	progressReporter inventory_client.InventoryClient
-	progressRegex    *regexp.Regexp
-	hostID           string
-	lastProgress     int
-}
-
-func NewCoreosInstallerLogWriter(logger *logrus.Logger, progressReporter inventory_client.InventoryClient, hostID string) *CoreosInstallerLogWriter {
-	return &CoreosInstallerLogWriter{log: logger,
-		lastLogLine:      []byte{},
-		progressReporter: progressReporter,
-		progressRegex:    regexp.MustCompile(`^>(.*?)\((.*?)\)\s*\r`),
-		hostID:           hostID,
-		lastProgress:     0,
-	}
-}
-
-func (l *CoreosInstallerLogWriter) Write(p []byte) (n int, err error) {
-	if bytes.Contains(p, []byte{'\n'}) {
-		// If log has a new line - log it
-		l.log.Info(string(p))
-	} else {
-		// Append bytes to last log line slice
-		l.lastLogLine = append(l.lastLogLine, p...)
-		if bytes.Contains(l.lastLogLine, []byte{'\r'}) {
-			// If log contains carriage return - log it and set to empty slice
-			l.log.Info(string(l.lastLogLine))
-			l.reportProgress()
-			l.lastLogLine = []byte{}
-
-		}
-	}
-	return len(p), nil
-}
-
-func (l *CoreosInstallerLogWriter) reportProgress() {
-	match := l.progressRegex.FindStringSubmatch(string(l.lastLogLine))
-	if len(match) < 3 {
-		return
-	}
-	currentPercent, err := strconv.Atoi(strings.TrimRight(match[2], "%"))
-	// in case we fail to parse the log line we do nothing
-	if err != nil {
-		return
-	}
-	if currentPercent >= l.lastProgress+MinProgressDelta {
-		// If the progress is more than 5% report it
-		if err := l.progressReporter.UpdateHostStatus(fmt.Sprintf("Writing image to disk - %s", match[2]), l.hostID); err == nil {
-			l.lastProgress = currentPercent
-		}
-	}
 }
 
 func GetFileContentFromIgnition(ignitionData []byte, fileName string) ([]byte, error) {
@@ -210,4 +151,18 @@ func Retry(attempts int, sleep time.Duration, log *logrus.Logger, f func() error
 		log.Warnf("Retrying after error: %s", err)
 	}
 	return fmt.Errorf("failed after %d attempts, last error: %s", attempts, err)
+}
+
+func GetHostIpsFromInventory(inventory *models.Inventory) ([]string, error) {
+	var ips []string
+	for _, netInt := range inventory.Interfaces {
+		for _, ip := range append(netInt.IPV4Addresses, netInt.IPV6Addresses...) {
+			parsedIp, _, err := net.ParseCIDR(ip)
+			if err != nil {
+				return nil, err
+			}
+			ips = append(ips, parsedIp.String())
+		}
+	}
+	return ips, nil
 }
