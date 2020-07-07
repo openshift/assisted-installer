@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
+	"strings"
+
+	"github.com/eranco74/assisted-installer/src/utils"
 
 	"github.com/filanov/bm-inventory/models"
 
@@ -18,14 +21,16 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const configuring = "Configuring"
+
 //go:generate mockgen -source=inventory_client.go -package=inventory_client -destination=mock_inventory_client.go
 type InventoryClient interface {
 	DownloadFile(filename string, dest string) error
 	UpdateHostStatus(newStatus string, hostId string) error
-	GetEnabledHostsNamesIds() (map[string]string, error)
+	GetEnabledHostsNamesHosts() (map[string]EnabledHostData, error)
 	UploadIngressCa(ingressCA string, clusterId string) error
 	GetCluster() (*models.Cluster, error)
-	GetEnabledIdsIps() (map[string][]string, error)
+	SetConfiguringStatusForHosts(inventoryHostsMapWithIp map[string]EnabledHostData, mcsLogs string)
 }
 
 type inventoryClient struct {
@@ -34,9 +39,10 @@ type inventoryClient struct {
 	clusterId strfmt.UUID
 }
 
-type enabledHostData struct {
-	inventory *models.Inventory
-	host      *models.Host
+type EnabledHostData struct {
+	IPs       []string
+	Inventory *models.Inventory
+	Host      *models.Host
 }
 
 func CreateInventoryClient(clusterId string, host string, port int, logger *logrus.Logger) *inventoryClient {
@@ -81,41 +87,25 @@ func (c *inventoryClient) GetCluster() (*models.Cluster, error) {
 	return cluster.Payload, nil
 }
 
-func (c *inventoryClient) GetEnabledHostsNamesIds() (map[string]string, error) {
-	namesIdsMap := make(map[string]string)
+func (c *inventoryClient) GetEnabledHostsNamesHosts() (map[string]EnabledHostData, error) {
+	namesIdsMap := make(map[string]EnabledHostData)
 	hosts, err := c.getEnabledHostsWithInventoryInfo()
 	if err != nil {
 		return nil, err
 	}
-	for hostId, hostData := range hosts {
-		hostname := hostData.host.RequestedHostname
+	for _, hostData := range hosts {
+		hostname := hostData.Host.RequestedHostname
 		if hostname == "" {
-			hostname = hostData.inventory.Hostname
+			hostname = hostData.Inventory.Hostname
 		}
-		namesIdsMap[hostname] = hostId
+		ips, err := utils.GetHostIpsFromInventory(hostData.Inventory)
+		if err != nil {
+			c.log.WithError(err).Errorf("failed to get ips of node %s", hostname)
+		}
+		hostData.IPs = ips
+		namesIdsMap[hostname] = hostData
 	}
 	return namesIdsMap, nil
-}
-
-func (c *inventoryClient) GetEnabledIdsIps() (map[string][]string, error) {
-	idIpsMap := make(map[string][]string)
-	hosts, err := c.getEnabledHostsWithInventoryInfo()
-	if err != nil {
-		return nil, err
-	}
-	for hostId, hostData := range hosts {
-		for _, netInt := range hostData.inventory.Interfaces {
-			for _, ip := range append(netInt.IPV4Addresses, netInt.IPV6Addresses...) {
-				parsedIp, _, err := net.ParseCIDR(ip)
-				if err != nil {
-					c.log.Warnf("Failed to parse ip %s for host %s", ip, hostId)
-					continue
-				}
-				idIpsMap[hostId] = append(idIpsMap[hostId], parsedIp.String())
-			}
-		}
-	}
-	return idIpsMap, nil
 }
 
 func createUrl(host string, port int) string {
@@ -141,8 +131,8 @@ func (c *inventoryClient) createUpdateHostStatusParams(newStatus string, hostId 
 	}
 }
 
-func (c *inventoryClient) getEnabledHostsWithInventoryInfo() (map[string]enabledHostData, error) {
-	hostsWithHwInfo := make(map[string]enabledHostData)
+func (c *inventoryClient) getEnabledHostsWithInventoryInfo() (map[string]EnabledHostData, error) {
+	hostsWithHwInfo := make(map[string]EnabledHostData)
 	hosts, err := c.ai.Installer.ListHosts(context.Background(), &installer.ListHostsParams{ClusterID: c.clusterId})
 	if err != nil {
 		return nil, err
@@ -157,7 +147,33 @@ func (c *inventoryClient) getEnabledHostsWithInventoryInfo() (map[string]enabled
 			c.log.Warnf("Failed to parse host %s inventory %s", host.ID.String(), host.Inventory)
 			return nil, err
 		}
-		hostsWithHwInfo[host.ID.String()] = enabledHostData{inventory: &hwInfo, host: host}
+		hostsWithHwInfo[host.ID.String()] = EnabledHostData{Inventory: &hwInfo, Host: host}
 	}
 	return hostsWithHwInfo, nil
+}
+
+// TODO move states to enums after bm-inventory changes
+func (c *inventoryClient) SetConfiguringStatusForHosts(inventoryHostsMapWithIp map[string]EnabledHostData, mcsLogs string) {
+	notValidStates := map[string]string{configuring: "", "Joined": "", "Done": ""}
+	for key, host := range inventoryHostsMapWithIp {
+		_, ok := notValidStates[*host.Host.Status]
+		if ok {
+			continue
+		}
+		c.log.Infof("Verifying if host %s pulled ignition", key)
+		pat := fmt.Sprintf("(%s)", strings.Join(host.IPs, "|"))
+		pattern, err := regexp.Compile(pat)
+		if err != nil {
+			c.log.WithError(err).Errorf("Failed to compile regex from host %s ips list", host.Host.ID.String())
+			return
+		}
+		if pattern.MatchString(mcsLogs) {
+			c.log.Infof("Host %s found in mcs logs, moving it to %s state", host.Host.ID.String(), configuring)
+			if err := c.UpdateHostStatus(configuring, host.Host.ID.String()); err != nil {
+				c.log.Errorf("Failed to update node installation status, %s", err)
+				continue
+			}
+			*inventoryHostsMapWithIp[key].Host.Status = configuring
+		}
+	}
 }

@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	"path/filepath"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/thoas/go-funk"
@@ -290,7 +288,7 @@ func (i *installer) waitForBootkube(ctx context.Context) {
 func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, kc k8s_client.K8SClient) error {
 	nodesTimeout := 120 * time.Minute
 	var readyMasters []string
-	var inventoryHostsMap map[string]string
+	var inventoryHostsMap map[string]inventory_client.EnabledHostData
 	i.log.Infof("Waiting up to %v for %d master nodes", nodesTimeout, minMasterNodes)
 	apiContext, cancel := context.WithTimeout(ctx, nodesTimeout)
 	defer cancel()
@@ -319,10 +317,10 @@ func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, 
 	return nil
 }
 
-func (i *installer) getInventoryHostsMap(hostsMap map[string]string) map[string]string {
+func (i *installer) getInventoryHostsMap(hostsMap map[string]inventory_client.EnabledHostData) map[string]inventory_client.EnabledHostData {
 	var err error
 	if hostsMap == nil {
-		hostsMap, err = i.inventoryClient.GetEnabledHostsNamesIds()
+		hostsMap, err = i.inventoryClient.GetEnabledHostsNamesHosts()
 		if err != nil {
 			i.log.Warnf("Failed to get hosts info from inventory, err %s", err)
 			return nil
@@ -331,7 +329,7 @@ func (i *installer) getInventoryHostsMap(hostsMap map[string]string) map[string]
 	return hostsMap
 }
 
-func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]string, inventoryHostsMap map[string]string) {
+func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]string, inventoryHostsMap map[string]inventory_client.EnabledHostData) {
 	nodeNameAndCondition := map[string][]v1.NodeCondition{}
 	for _, node := range nodes.Items {
 		nodeNameAndCondition[node.Name] = node.Status.Conditions
@@ -341,12 +339,12 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 
 				i.log.Infof("Found a new ready master node %s with id %s", node.Name, node.Status.NodeInfo.SystemUUID)
 				*readyMasters = append(*readyMasters, node.Status.NodeInfo.SystemUUID)
-				hostId, ok := inventoryHostsMap[node.Name]
+				host, ok := inventoryHostsMap[node.Name]
 				if !ok {
 					i.log.Warnf("Node %s is not in inventory hosts", node.Name)
 					break
 				}
-				if err := i.inventoryClient.UpdateHostStatus(Joined, hostId); err != nil {
+				if err := i.inventoryClient.UpdateHostStatus(Joined, host.Host.ID.String()); err != nil {
 					i.log.Errorf("Failed to update node installation status, %s", err)
 				}
 			}
@@ -374,29 +372,13 @@ func (i *installer) cleanupInstallDevice() error {
 	return i.ops.RemovePV(i.Device)
 }
 
-func (i *installer) verifyHostCanMoveToConfigurationStatus(inventoryHostsMapWithIp map[string][]string) {
+func (i *installer) verifyHostCanMoveToConfigurationStatus(inventoryHostsMapWithIp map[string]inventory_client.EnabledHostData) {
 	logs, err := i.ops.GetMCSLogs()
 	if err != nil {
 		i.log.Infof("Failed to get MCS logs, will retry")
 		return
 	}
-	for hostId, ips := range inventoryHostsMapWithIp {
-		pat := fmt.Sprintf("(%s)", strings.Join(ips, "|"))
-		pattern, err := regexp.Compile(pat)
-		if err != nil {
-			i.log.WithError(err).Errorf("Failed to compile regex from host %s ips list", hostId)
-			return
-		}
-
-		if pattern.MatchString(logs) {
-			i.log.Infof("Host %s found in mcs logs, moving it to %s state", hostId, Configuring)
-			if err := i.inventoryClient.UpdateHostStatus(Configuring, hostId); err != nil {
-				i.log.Errorf("Failed to update node installation status, %s", err)
-				continue
-			}
-			delete(inventoryHostsMapWithIp, hostId)
-		}
-	}
+	i.inventoryClient.SetConfiguringStatusForHosts(inventoryHostsMapWithIp, logs)
 }
 
 // will run as go routine and tries to find nodes that pulled ignition from mcs
@@ -405,21 +387,17 @@ func (i *installer) verifyHostCanMoveToConfigurationStatus(inventoryHostsMapWith
 func (i *installer) updateConfiguringStatus(done <-chan bool) {
 	i.log.Infof("Start waiting for configuring state")
 	ticker := time.NewTicker(generalWaitTimeout)
-	var inventoryHostsMapWithIp map[string][]string
-	var err error
+	var inventoryHostsMapWithIp map[string]inventory_client.EnabledHostData
 	for {
 		select {
 		case <-done:
 			i.log.Infof("Exiting updateConfiguringStatus go routine")
 			return
 		case <-ticker.C:
-			i.log.Infof("searching for hosts that had pulled ignition already")
+			i.log.Infof("searching for hosts that pulled ignition already")
+			inventoryHostsMapWithIp = i.getInventoryHostsMap(inventoryHostsMapWithIp)
 			if inventoryHostsMapWithIp == nil {
-				inventoryHostsMapWithIp, err = i.inventoryClient.GetEnabledIdsIps()
-				if err != nil {
-					i.log.Warnf("Failed to get hosts info from inventory, err %s", err)
-					continue
-				}
+				continue
 			}
 			i.verifyHostCanMoveToConfigurationStatus(inventoryHostsMapWithIp)
 		}

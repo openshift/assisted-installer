@@ -1,10 +1,13 @@
 package k8s_client
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/eranco74/assisted-installer/src/utils"
+	"k8s.io/apimachinery/pkg/labels"
 
 	"k8s.io/api/certificates/v1beta1"
 
@@ -32,6 +35,8 @@ type K8SClient interface {
 	ApproveCsr(csr *v1beta1.CertificateSigningRequest) error
 	ListCsrs() (*v1beta1.CertificateSigningRequestList, error)
 	GetConfigMap(namespace string, name string) (*v1.ConfigMap, error)
+	GetPodLogs(namespace string, podName string, sinceSeconds int64) (string, error)
+	GetPods(namespace string, labelMatch map[string]string) ([]v1.Pod, error)
 }
 
 type K8SClientBuilder func(configPath string, logger *logrus.Logger) (K8SClient, error)
@@ -140,4 +145,40 @@ func (c *k8sClient) GetConfigMap(namespace string, name string) (*v1.ConfigMap, 
 		return nil, err
 	}
 	return cm, nil
+}
+
+func (c *k8sClient) GetPods(namespace string, labelMatch map[string]string) ([]v1.Pod, error) {
+	listOptions := metav1.ListOptions{}
+	if labelMatch != nil {
+		labelSelector := metav1.LabelSelector{MatchLabels: labelMatch}
+		listOptions.LabelSelector = labels.Set(labelSelector.MatchLabels).String()
+	}
+
+	pod, err := c.client.CoreV1().Pods(namespace).List(context.TODO(), listOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	return pod.Items, nil
+}
+
+func (c *k8sClient) GetPodLogs(namespace string, podName string, sinceSeconds int64) (string, error) {
+	podLogOpts := v1.PodLogOptions{}
+	if sinceSeconds > 0 {
+		podLogOpts.SinceSeconds = &sinceSeconds
+	}
+	req := c.client.CoreV1().Pods(namespace).GetLogs(podName, &podLogOpts)
+	podLogs, err := req.Stream(context.TODO())
+	if err != nil {
+		return "", err
+	}
+	defer podLogs.Close()
+
+	buf := new(bytes.Buffer)
+	_, err = io.Copy(buf, podLogs)
+	if err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
 }

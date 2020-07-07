@@ -14,10 +14,11 @@ import (
 )
 
 const (
-	done = "Done"
+	done                  = "Done"
+	generalWaitTimeoutInt = 30
 )
 
-var GeneralWaitTimeout = 30 * time.Second
+var GeneralWaitTimeout = generalWaitTimeoutInt * time.Second
 
 // assisted installer controller is added to control installation process after  bootstrap pivot
 // assisted installer will deploy it on installation process
@@ -61,27 +62,58 @@ func (c *controller) WaitAndUpdateNodesStatus() {
 			continue
 		}
 		for _, node := range nodes.Items {
-			hostId, ok := assistedInstallerNodesMap[node.Name]
+			host, ok := assistedInstallerNodesMap[node.Name]
 			if !ok {
 				continue
 			}
-			c.log.Infof("Found new joined node %s with inventory id %s, kuberentes id %s, updating its status to %s", node.Name, hostId, node.Status.NodeInfo.SystemUUID, done)
-			if err := c.ic.UpdateHostStatus(done, hostId); err != nil {
+			c.log.Infof("Found new joined node %s with inventory id %s, kubernetes id %s, updating its status to %s",
+				node.Name, host.Host.ID.String(), node.Status.NodeInfo.SystemUUID, done)
+
+			if err := c.ic.UpdateHostStatus(done, host.Host.ID.String()); err != nil {
 				c.log.Errorf("Failed to update node %s installation status, %s", node.Name, err)
 				continue
 			}
 			delete(assistedInstallerNodesMap, node.Name)
 		}
+		c.updateConfiguringStatusIfNeeded(assistedInstallerNodesMap)
+
 	}
 	c.log.Infof("All nodes were found. WaitAndUpdateNodesStatus - Done")
 }
 
-func (c *controller) getInventoryNodesMap() map[string]string {
-	c.log.Infof("Getting amp of inventory nodes")
-	var assistedInstallerNodesMap map[string]string
+func (c *controller) getMCSLogs() (string, error) {
+	logs := ""
+	namespace := "openshift-machine-config-operator"
+	pods, err := c.kc.GetPods(namespace, map[string]string{"k8s-app": "machine-config-server"})
+	if err != nil {
+		c.log.WithError(err).Warnf("Failed to get mcs pods")
+		return "", nil
+	}
+	for _, pod := range pods {
+		podLogs, err := c.kc.GetPodLogs(namespace, pod.Name, generalWaitTimeoutInt+10)
+		if err != nil {
+			c.log.WithError(err).Warnf("Failed to get logs of pod %s", pod.Name)
+			return "", nil
+		}
+		logs += podLogs
+	}
+	return logs, nil
+}
+
+func (c *controller) updateConfiguringStatusIfNeeded(hosts map[string]inventory_client.EnabledHostData) {
+	logs, err := c.getMCSLogs()
+	if err != nil {
+		return
+	}
+	c.ic.SetConfiguringStatusForHosts(hosts, logs)
+}
+
+func (c *controller) getInventoryNodesMap() map[string]inventory_client.EnabledHostData {
+	c.log.Infof("Getting map of inventory nodes")
+	var assistedInstallerNodesMap map[string]inventory_client.EnabledHostData
 	var err error
 	for {
-		assistedInstallerNodesMap, err = c.ic.GetEnabledHostsNamesIds()
+		assistedInstallerNodesMap, err = c.ic.GetEnabledHostsNamesHosts()
 		if err != nil {
 			c.log.Errorf("Failed to get node map from inventory, will retry in 30 seconds, %s", err)
 			time.Sleep(GeneralWaitTimeout)

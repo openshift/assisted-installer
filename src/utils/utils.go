@@ -3,7 +3,6 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/filanov/bm-inventory/models"
 	"io"
 	"net"
 	"os"
