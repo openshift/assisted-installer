@@ -13,8 +13,8 @@ var getOpenshiftMapping = func(openshiftVersion string) map[string]string {
 			rhcos: "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.4/latest/rhcos-4.4.3-x86_64-metal.x86_64.raw.gz",
 			mco:   "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:301586e92bbd07ead7c5d3f342899e5923d4ef2e0f1c0cf08ecaae96568d16ed"},
 		"4.5": {
-			rhcos: "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.5/latest/rhcos-4.5.0-0.nightly-2020-03-18-115438-x86_64-metal.x86_64.raw.gz", // latest image in the 4.5 mirror
-			mco:   "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:58bed0f5c4fbe453b994f6b606fefe3e2aaf1d10dcbdf5debb73b93007c7bee5"},                        // MCO from latest 4.5 nightly https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.5.0-0.nightly-2020-05-14-021132/
+			rhcos: "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.5/latest/rhcos-4.5.0-rc.7-x86_64-metal.x86_64.raw.gz", // latest image in the 4.5 mirror
+			mco:   "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:58bed0f5c4fbe453b994f6b606fefe3e2aaf1d10dcbdf5debb73b93007c7bee5"}, // MCO from latest 4.5 nightly https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.5.0-0.nightly-2020-05-14-021132/
 	}
 
 	return openshiftVersionMap[openshiftVersion]
