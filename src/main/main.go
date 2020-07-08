@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/eranco74/assisted-installer/src/config"
@@ -10,10 +9,7 @@ import (
 	"github.com/eranco74/assisted-installer/src/k8s_client"
 	"github.com/eranco74/assisted-installer/src/ops"
 	"github.com/eranco74/assisted-installer/src/utils"
-)
-
-const (
-	Failed = "Failed"
+	"github.com/filanov/bm-inventory/models"
 )
 
 func main() {
@@ -27,7 +23,7 @@ func main() {
 		k8s_client.NewK8SClient,
 	)
 	if err := ai.InstallNode(); err != nil {
-		ai.UpdateHostStatus(fmt.Sprintf("%s %s", Failed, err))
+		ai.UpdateHostInstallProgress(models.HostStageFailed, err.Error())
 		os.Exit(1)
 	}
 }

@@ -48,18 +48,18 @@ func (mr *MockInventoryClientMockRecorder) DownloadFile(filename, dest interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DownloadFile", reflect.TypeOf((*MockInventoryClient)(nil).DownloadFile), filename, dest)
 }
 
-// UpdateHostStatus mocks base method
-func (m *MockInventoryClient) UpdateHostStatus(newStatus, hostId string) error {
+// UpdateHostInstallProgress mocks base method
+func (m *MockInventoryClient) UpdateHostInstallProgress(hostId string, newStage models.HostStage, info string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateHostStatus", newStatus, hostId)
+	ret := m.ctrl.Call(m, "UpdateHostInstallProgress", hostId, newStage, info)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// UpdateHostStatus indicates an expected call of UpdateHostStatus
-func (mr *MockInventoryClientMockRecorder) UpdateHostStatus(newStatus, hostId interface{}) *gomock.Call {
+// UpdateHostInstallProgress indicates an expected call of UpdateHostInstallProgress
+func (mr *MockInventoryClientMockRecorder) UpdateHostInstallProgress(hostId, newStage, info interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHostStatus", reflect.TypeOf((*MockInventoryClient)(nil).UpdateHostStatus), newStatus, hostId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHostInstallProgress", reflect.TypeOf((*MockInventoryClient)(nil).UpdateHostInstallProgress), hostId, newStage, info)
 }
 
 // GetEnabledHostsNamesHosts mocks base method

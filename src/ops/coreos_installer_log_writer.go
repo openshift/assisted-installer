@@ -2,12 +2,12 @@ package ops
 
 import (
 	"bytes"
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/eranco74/assisted-installer/src/inventory_client"
+	"github.com/filanov/bm-inventory/models"
 	"github.com/sirupsen/logrus"
 )
 
@@ -62,7 +62,7 @@ func (l *CoreosInstallerLogWriter) reportProgress() {
 	}
 	if currentPercent >= l.lastProgress+MinProgressDelta {
 		// If the progress is more than 5% report it
-		if err := l.progressReporter.UpdateHostStatus(fmt.Sprintf("Writing image to disk - %s", match[2]), l.hostID); err == nil {
+		if err := l.progressReporter.UpdateHostInstallProgress(l.hostID, models.HostStageWritingImageToDisk, match[2]); err == nil {
 			l.lastProgress = currentPercent
 		}
 	}

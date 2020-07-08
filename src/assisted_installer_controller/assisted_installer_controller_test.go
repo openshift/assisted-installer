@@ -44,6 +44,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		inventoryNamesIds map[string]inventory_client.EnabledHostData
 		kubeNamesIds      map[string]string
 		wg                sync.WaitGroup
+		defaultStages     []models.HostStage
 	)
 	kubeNamesIds = map[string]string{"node0": "6d6f00e8-70dd-48a5-859a-0f1459485ad9",
 		"node1": "2834ff2e-8965-48a5-859a-0f1459485a77",
@@ -65,6 +66,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			"node1": "2834ff2e-8965-48a5-859a-0f1459485a77",
 			"node2": "57df89ee-3546-48a5-859a-0f1459485a66"}
 		GeneralWaitTimeout = 100 * time.Millisecond
+
+		defaultStages = []models.HostStage{models.HostStageDone,
+			models.HostStageDone,
+			models.HostStageDone}
 	})
 
 	getInventoryNodes := func() map[string]inventory_client.EnabledHostData {
@@ -76,14 +81,14 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockbmclient.EXPECT().SetConfiguringStatusForHosts(gomock.Any(), gomock.Any()).Return().AnyTimes()
 	}
 
-	updateStatusSuccess := func(statuses []string, inventoryNamesIds map[string]inventory_client.EnabledHostData) {
+	updateProgressSuccess := func(stages []models.HostStage, inventoryNamesIds map[string]inventory_client.EnabledHostData) {
 		var hostIds []string
 		for _, host := range inventoryNamesIds {
 			hostIds = append(hostIds, host.Host.ID.String())
 		}
 
-		for i, status := range statuses {
-			mockbmclient.EXPECT().UpdateHostStatus(status, hostIds[i]).Return(nil).Times(1)
+		for i, stage := range stages {
+			mockbmclient.EXPECT().UpdateHostInstallProgress(hostIds[i], stage, "").Return(nil).Times(1)
 		}
 	}
 
@@ -101,7 +106,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
 		})
 		It("WaitAndUpdateNodesStatus happy flow", func() {
-			updateStatusSuccess([]string{done, done, done}, inventoryNamesIds)
+			updateProgressSuccess(defaultStages, inventoryNamesIds)
 			getInventoryNodes()
 			configuringSuccess()
 			listNodes()
@@ -120,13 +125,14 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
-			updateStatusSuccess = func(statuses []string, inventoryNamesIds map[string]inventory_client.EnabledHostData) {
+
+			updateProgressSuccess = func(stages []models.HostStage, inventoryNamesIds map[string]inventory_client.EnabledHostData) {
 				var hostIds []string
 				for _, host := range inventoryNamesIds {
 					hostIds = append(hostIds, host.Host.ID.String())
 				}
-				for i, status := range statuses {
-					mockbmclient.EXPECT().UpdateHostStatus(status, hostIds[i]).Return(nil).Times(1)
+				for i, stage := range stages {
+					mockbmclient.EXPECT().UpdateHostInstallProgress(hostIds[i], stage, "").Return(nil).Times(1)
 				}
 			}
 			kubeNamesIds = map[string]string{"node0": "6d6f00e8-70dd-48a5-859a-0f1459485ad9",
@@ -142,7 +148,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				}
 			}
 
-			updateStatusSuccess([]string{done, done, done}, inventoryNamesIds)
+			updateProgressSuccess(defaultStages, inventoryNamesIds)
 			getInventoryNodes()
 			listNodes()
 			configuringSuccess()
@@ -163,18 +169,18 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
 		})
 		It("UpdateStatus fails and then succeeds", func() {
-			updateStatusSuccessFailureTest := func(statuses []string, inventoryNamesIds map[string]inventory_client.EnabledHostData) {
+			updateProgressSuccessFailureTest := func(stages []models.HostStage, inventoryNamesIds map[string]inventory_client.EnabledHostData) {
 				var hostIds []string
 				for _, host := range inventoryNamesIds {
 					hostIds = append(hostIds, host.Host.ID.String())
 				}
-				for i, status := range statuses {
-					mockbmclient.EXPECT().UpdateHostStatus(status, hostIds[i]).Return(fmt.Errorf("dummy")).Times(1)
-					mockbmclient.EXPECT().UpdateHostStatus(status, hostIds[i]).Return(nil).Times(1)
+				for i, stage := range stages {
+					mockbmclient.EXPECT().UpdateHostInstallProgress(hostIds[i], stage, "").Return(fmt.Errorf("dummy")).Times(1)
+					mockbmclient.EXPECT().UpdateHostInstallProgress(hostIds[i], stage, "").Return(nil).Times(1)
 				}
 			}
 			mockk8sclient.EXPECT().ListNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(2)
-			updateStatusSuccessFailureTest([]string{done, done, done}, inventoryNamesIds)
+			updateProgressSuccessFailureTest(defaultStages, inventoryNamesIds)
 			getInventoryNodes()
 			configuringSuccess()
 			c.WaitAndUpdateNodesStatus()
@@ -198,7 +204,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockk8sclient.EXPECT().ListNodes().Return(nil, fmt.Errorf("dummy")).Times(1)
 				mockk8sclient.EXPECT().ListNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
 			}
-			updateStatusSuccess([]string{done, done, done}, inventoryNamesIds)
+			updateProgressSuccess(defaultStages, inventoryNamesIds)
 			getInventoryNodes()
 			listNodes()
 			configuringSuccess()

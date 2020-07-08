@@ -7,6 +7,7 @@ import (
 	"github.com/eranco74/assisted-installer/src/inventory_client"
 	"github.com/eranco74/assisted-installer/src/k8s_client"
 	"github.com/eranco74/assisted-installer/src/ops"
+	"github.com/filanov/bm-inventory/models"
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/certificates/v1beta1"
@@ -14,7 +15,6 @@ import (
 )
 
 const (
-	done                  = "Done"
 	generalWaitTimeoutInt = 30
 )
 
@@ -66,10 +66,10 @@ func (c *controller) WaitAndUpdateNodesStatus() {
 			if !ok {
 				continue
 			}
-			c.log.Infof("Found new joined node %s with inventory id %s, kubernetes id %s, updating its status to %s",
-				node.Name, host.Host.ID.String(), node.Status.NodeInfo.SystemUUID, done)
 
-			if err := c.ic.UpdateHostStatus(done, host.Host.ID.String()); err != nil {
+			c.log.Infof("Found new joined node %s with inventory id %s, kuberentes id %s, updating its status to %s",
+				node.Name, host.Host.ID.String(), node.Status.NodeInfo.SystemUUID, models.HostStageDone)
+			if err := c.ic.UpdateHostInstallProgress(host.Host.ID.String(), models.HostStageDone, ""); err != nil {
 				c.log.Errorf("Failed to update node %s installation status, %s", node.Name, err)
 				continue
 			}

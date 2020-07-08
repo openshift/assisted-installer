@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filanov/bm-inventory/models"
 	"github.com/go-openapi/strfmt"
 
 	v1 "k8s.io/api/core/v1"
 
 	"github.com/eranco74/assisted-installer/src/k8s_client"
+	"github.com/filanov/bm-inventory/models"
 
 	"github.com/eranco74/assisted-installer/src/config"
 	"github.com/eranco74/assisted-installer/src/inventory_client"
@@ -68,10 +68,13 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockops.EXPECT().GetVGByPV(device).Return("", nil).Times(1)
 	}
 
-	udpateStatusSuccess := func(statuses []string) {
-		for _, status := range statuses {
-			mockbmclient.EXPECT().UpdateHostStatus(status, hostId).Return(nil).Times(1)
-
+	updateProgressSuccess := func(stages [][]string) {
+		for _, stage := range stages {
+			if len(stage) == 2 {
+				mockbmclient.EXPECT().UpdateHostInstallProgress(hostId, models.HostStage(stage[0]), stage[1]).Return(nil).Times(1)
+			} else {
+				mockbmclient.EXPECT().UpdateHostInstallProgress(hostId, models.HostStage(stage[0]), "").Return(nil).Times(1)
+			}
 		}
 	}
 
@@ -138,11 +141,11 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(map[string]string{}), nil).Times(1)
 			kubeNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65"}
 			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
-			mockbmclient.EXPECT().UpdateHostStatus(Joined, inventoryNamesHost["node0"].Host.ID.String()).Times(1)
+			mockbmclient.EXPECT().UpdateHostInstallProgress(inventoryNamesHost["node0"].Host.ID.String(), models.HostStageJoined, "").Times(1)
 			kubeNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65",
 				"node1": "eb82821f-bf21-4614-9a3b-ecb07929f238"}
 			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
-			mockbmclient.EXPECT().UpdateHostStatus(Joined, inventoryNamesHost["node1"].Host.ID.String()).Times(1)
+			mockbmclient.EXPECT().UpdateHostInstallProgress(inventoryNamesHost["node1"].Host.ID.String(), models.HostStageJoined, "").Times(1)
 		}
 		patchEtcdSuccess := func() {
 			mockk8sclient.EXPECT().PatchEtcd().Return(nil).Times(1)
@@ -161,12 +164,12 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockops.EXPECT().ExtractFromIgnition(filepath.Join(InstallDir, bootstrapIgn), dockerConfigFile).Return(nil).Times(1)
 		}
 		It("bootstrap role happy flow", func() {
-			udpateStatusSuccess([]string{StartingInstallation,
-				RunningBootstrap,
-				WaitForControlPlane,
-				fmt.Sprintf(InstallingAs, models.HostRoleMaster),
-				WritingImageToDisk,
-				Reboot,
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+				{string(models.HostStageStartWaitingForControlPlane)},
+				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+				{string(models.HostStageWritingImageToDisk), "0%"},
+				{string(models.HostStageFinishWaitingForControlPlane)},
+				{string(models.HostStageRebooting)},
 			})
 			cleanInstallDevice()
 			mkdirSuccess()
@@ -190,11 +193,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			Expect(ret).Should(BeNil())
 		})
 		It("bootstrap role fail", func() {
-			udpateStatusSuccess([]string{StartingInstallation,
-				RunningBootstrap,
-				WaitForControlPlane,
-				fmt.Sprintf(InstallingAs, models.HostRoleMaster),
-				WritingImageToDisk,
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+				{string(models.HostStageStartWaitingForControlPlane)},
+				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+				{string(models.HostStageWritingImageToDisk), "0%"},
 			})
 			cleanInstallDevice()
 			mkdirSuccess()
@@ -216,10 +218,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			Expect(ret).Should(Equal(err))
 		})
 		It("bootstrap fail to restart NetworkManager", func() {
-			udpateStatusSuccess([]string{StartingInstallation,
-				RunningBootstrap,
-				fmt.Sprintf(InstallingAs, models.HostRoleMaster),
-				WritingImageToDisk,
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+				{string(models.HostStageWritingImageToDisk), "0%"},
 			})
 			cleanInstallDevice()
 			mkdirSuccess()
@@ -277,10 +278,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
 		})
 		It("master role happy flow", func() {
-			udpateStatusSuccess([]string{StartingInstallation,
-				fmt.Sprintf(InstallingAs, conf.Role),
-				WritingImageToDisk,
-				Reboot,
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+				{string(models.HostStageInstalling), conf.Role},
+				{string(models.HostStageWritingImageToDisk), "0%"},
+				{string(models.HostStageRebooting)},
 			})
 			cleanInstallDevice()
 			mkdirSuccess()
@@ -296,7 +297,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockops.EXPECT().RemoveVG("vg1").Return(nil).Times(1)
 				mockops.EXPECT().RemovePV(device).Return(nil).Times(1)
 			}
-			udpateStatusSuccess([]string{StartingInstallation})
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
 			cleanInstallDeviceClean()
 			err := fmt.Errorf("failed to create dir")
 			mockops.EXPECT().Mkdir(InstallDir).Return(err).Times(1)
@@ -309,13 +310,13 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockops.EXPECT().GetVGByPV(device).Return("vg1", nil).Times(1)
 				mockops.EXPECT().RemoveVG("vg1").Return(err).Times(1)
 			}
-			udpateStatusSuccess([]string{StartingInstallation})
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
 			cleanInstallDeviceError()
 			ret := i.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
 		It("HostRoleMaster role failed to create dir", func() {
-			udpateStatusSuccess([]string{StartingInstallation})
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
 			cleanInstallDevice()
 			err := fmt.Errorf("failed to create dir")
 			mockops.EXPECT().Mkdir(InstallDir).Return(err).Times(1)
@@ -323,8 +324,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			Expect(ret).Should(Equal(err))
 		})
 		It("HostRoleMaster role failed to get ignition", func() {
-			udpateStatusSuccess([]string{StartingInstallation,
-				fmt.Sprintf(InstallingAs, conf.Role),
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+				{string(models.HostStageInstalling), conf.Role},
 			})
 			cleanInstallDevice()
 			mkdirSuccess()
@@ -334,9 +335,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			Expect(ret).Should(Equal(err))
 		})
 		It("HostRoleMaster role failed to write image to disk", func() {
-			udpateStatusSuccess([]string{StartingInstallation,
-				fmt.Sprintf(InstallingAs, conf.Role),
-				WritingImageToDisk,
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+				{string(models.HostStageInstalling), conf.Role},
+				{string(models.HostStageWritingImageToDisk), "0%"},
 			})
 			cleanInstallDevice()
 			mkdirSuccess()
@@ -347,10 +348,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			Expect(ret).Should(Equal(fmt.Errorf("failed after 3 attempts, last error: failed to write image to disk")))
 		})
 		It("HostRoleMaster role failed to reboot", func() {
-			udpateStatusSuccess([]string{StartingInstallation,
-				fmt.Sprintf(InstallingAs, conf.Role),
-				WritingImageToDisk,
-				Reboot,
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+				{string(models.HostStageInstalling), conf.Role},
+				{string(models.HostStageWritingImageToDisk), "0%"},
+				{string(models.HostStageRebooting)},
 			})
 			cleanInstallDevice()
 			mkdirSuccess()
@@ -375,10 +376,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
 		})
 		It("worker role happy flow", func() {
-			udpateStatusSuccess([]string{StartingInstallation,
-				fmt.Sprintf(InstallingAs, conf.Role),
-				WritingImageToDisk,
-				Reboot,
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+				{string(models.HostStageInstalling), conf.Role},
+				{string(models.HostStageWritingImageToDisk), "0%"},
+				{string(models.HostStageRebooting)},
 			})
 			cleanInstallDevice()
 			mkdirSuccess()

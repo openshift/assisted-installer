@@ -26,7 +26,7 @@ const configuring = "Configuring"
 //go:generate mockgen -source=inventory_client.go -package=inventory_client -destination=mock_inventory_client.go
 type InventoryClient interface {
 	DownloadFile(filename string, dest string) error
-	UpdateHostStatus(newStatus string, hostId string) error
+	UpdateHostInstallProgress(hostId string, newStage models.HostStage, info string) error
 	GetEnabledHostsNamesHosts() (map[string]EnabledHostData, error)
 	UploadIngressCa(ingressCA string, clusterId string) error
 	GetCluster() (*models.Cluster, error)
@@ -67,8 +67,8 @@ func (c *inventoryClient) DownloadFile(filename string, dest string) error {
 	return err
 }
 
-func (c *inventoryClient) UpdateHostStatus(newStatus string, hostId string) error {
-	_, err := c.ai.Installer.UpdateHostInstallProgress(context.Background(), c.createUpdateHostStatusParams(newStatus, hostId))
+func (c *inventoryClient) UpdateHostInstallProgress(hostId string, newStage models.HostStage, info string) error {
+	_, err := c.ai.Installer.UpdateHostInstallProgress(context.Background(), c.createUpdateHostInstallProgressParams(hostId, newStage, info))
 	return err
 }
 
@@ -123,11 +123,14 @@ func (c *inventoryClient) createDownloadParams(filename string) *installer.Downl
 	}
 }
 
-func (c *inventoryClient) createUpdateHostStatusParams(newStatus string, hostId string) *installer.UpdateHostInstallProgressParams {
+func (c *inventoryClient) createUpdateHostInstallProgressParams(hostId string, newStage models.HostStage, info string) *installer.UpdateHostInstallProgressParams {
 	return &installer.UpdateHostInstallProgressParams{
-		ClusterID:                 c.clusterId,
-		HostID:                    strfmt.UUID(hostId),
-		HostInstallProgressParams: models.HostInstallProgressParams(newStatus),
+		ClusterID: c.clusterId,
+		HostID:    strfmt.UUID(hostId),
+		HostProgress: &models.HostProgress{
+			CurrentStage: newStage,
+			ProgressInfo: info,
+		},
 	}
 }
 
@@ -169,7 +172,7 @@ func (c *inventoryClient) SetConfiguringStatusForHosts(inventoryHostsMapWithIp m
 		}
 		if pattern.MatchString(mcsLogs) {
 			c.log.Infof("Host %s found in mcs logs, moving it to %s state", host.Host.ID.String(), configuring)
-			if err := c.UpdateHostStatus(configuring, host.Host.ID.String()); err != nil {
+			if err := c.UpdateHostInstallProgress(host.Host.ID.String(), configuring, ""); err != nil {
 				c.log.Errorf("Failed to update node installation status, %s", err)
 				continue
 			}

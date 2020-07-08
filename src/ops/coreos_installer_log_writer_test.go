@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/eranco74/assisted-installer/src/inventory_client"
+	"github.com/filanov/bm-inventory/models"
 	"github.com/golang/mock/gomock"
 
 	"github.com/sirupsen/logrus/hooks/test"
@@ -31,10 +32,14 @@ var _ = Describe("Verify CoreosInstallerLogger", func() {
 			logger       *logrus.Logger
 			mockbmclient *inventory_client.MockInventoryClient
 		)
-		udpateStatusSuccess := func(statuses []string) {
-			for _, status := range statuses {
-				mockbmclient.EXPECT().UpdateHostStatus(status, "hostID").Return(nil).Times(1)
 
+		updateProgressSuccess := func(stages [][]string) {
+			for _, stage := range stages {
+				if len(stage) == 2 {
+					mockbmclient.EXPECT().UpdateHostInstallProgress("hostID", models.HostStage(stage[0]), stage[1]).Return(nil).Times(1)
+				} else {
+					mockbmclient.EXPECT().UpdateHostInstallProgress("hostID", models.HostStage(stage[0]), "").Return(nil).Times(1)
+				}
 			}
 		}
 
@@ -51,7 +56,7 @@ var _ = Describe("Verify CoreosInstallerLogger", func() {
 
 		})
 		It("test full progress line", func() {
-			udpateStatusSuccess([]string{"Writing image to disk - 56%"})
+			updateProgressSuccess([][]string{{string(models.HostStageWritingImageToDisk), "56%"}})
 			_, err := cilogger.Write([]byte("> Read disk 473.8 MiB/844.7 MiB (56%)   \r"))
 			Expect(err).Should(BeNil())
 			Expect(len(hook.Entries)).Should(Equal(1))
@@ -63,7 +68,7 @@ var _ = Describe("Verify CoreosInstallerLogger", func() {
 
 		})
 		It("test partial line - should log", func() {
-			udpateStatusSuccess([]string{"Writing image to disk - 58%"})
+			updateProgressSuccess([][]string{{string(models.HostStageWritingImageToDisk), "58%"}})
 			testLogs := []string{"> Read ",
 				"disk",
 				" ",
@@ -81,9 +86,9 @@ var _ = Describe("Verify CoreosInstallerLogger", func() {
 			Expect(len(hook.Entries)).Should(Equal(1))
 		})
 		It("test multiple lines", func() {
-			udpateStatusSuccess([]string{"Writing image to disk - 55%",
-				"Writing image to disk - 60%",
-				"Writing image to disk - 66%",
+			updateProgressSuccess([][]string{{string(models.HostStageWritingImageToDisk), "55%"},
+				{string(models.HostStageWritingImageToDisk), "60%"},
+				{string(models.HostStageWritingImageToDisk), "66%"},
 			})
 			testLogs := []string{"> Read disk 471.2 MiB/844.7 MiB (55%)   \r",
 				"> Read ",

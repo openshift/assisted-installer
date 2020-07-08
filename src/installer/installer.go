@@ -33,23 +33,12 @@ const (
 	dockerConfigFile = "/root/.docker/config.json"
 )
 
-const (
-	StartingInstallation = "Starting installation"
-	InstallingAs         = "Installing as %s"
-	RunningBootstrap     = "Bootstrapping installation"
-	WaitForControlPlane  = "Waiting for control plane"
-	WritingImageToDisk   = "Writing image to disk"
-	Reboot               = "Rebooting"
-	Joined               = "Joined"
-	Configuring          = "Configuring"
-)
-
 var generalWaitTimeout = 30 * time.Second
 
 // Installer will run the install operations on the node
 type Installer interface {
 	InstallNode() error
-	UpdateHostStatus(newStatus string)
+	UpdateHostInstallProgress(newStage models.HostStage, info string)
 }
 
 type installer struct {
@@ -79,7 +68,7 @@ func (i *installer) InstallNode() error {
 		return err
 	}
 
-	i.UpdateHostStatus(StartingInstallation)
+	i.UpdateHostInstallProgress(models.HostStageStartingInstallation, i.Config.Role)
 
 	i.log.Infof("Start cleaning up device %s", i.Device)
 	err := i.cleanupInstallDevice()
@@ -104,7 +93,7 @@ func (i *installer) InstallNode() error {
 		i.Config.Role = string(models.HostRoleMaster)
 	}
 
-	i.UpdateHostStatus(fmt.Sprintf(InstallingAs, i.Config.Role))
+	i.UpdateHostInstallProgress(models.HostStageInstalling, i.Config.Role)
 	ignitionFileName := i.Config.Role + ".ign"
 	ignitionPath, err := i.getFileFromService(ignitionFileName)
 	if err != nil {
@@ -117,7 +106,7 @@ func (i *installer) InstallNode() error {
 		return err
 	}
 
-	i.UpdateHostStatus(WritingImageToDisk)
+	i.UpdateHostInstallProgress(models.HostStageWritingImageToDisk, "0%")
 
 	image, _ := utils.GetRhcosImageByOpenshiftVersion(i.OpenshiftVersion)
 	i.log.Infof("Going to use image: %s", image)
@@ -136,7 +125,7 @@ func (i *installer) InstallNode() error {
 		i.log.Error(err)
 		return err
 	}
-	i.UpdateHostStatus(Reboot)
+	i.UpdateHostInstallProgress(models.HostStageRebooting, "")
 	if err = i.ops.Reboot(); err != nil {
 		return err
 	}
@@ -144,12 +133,12 @@ func (i *installer) InstallNode() error {
 }
 
 func (i *installer) runBootstrap(ctx context.Context) error {
-	i.UpdateHostStatus(RunningBootstrap)
 	done := make(chan bool)
 	defer func() {
 		done <- true
 	}()
 	go i.updateConfiguringStatus(done)
+
 	err := i.startBootstrap()
 	if err != nil {
 		i.log.Errorf("Bootstrap failed %s", err)
@@ -161,10 +150,11 @@ func (i *installer) runBootstrap(ctx context.Context) error {
 		return err
 	}
 
-	i.UpdateHostStatus(WaitForControlPlane)
+	i.UpdateHostInstallProgress(models.HostStageStartWaitingForControlPlane, "")
 	if err = i.waitForControlPlane(ctx, kc); err != nil {
 		return err
 	}
+	i.UpdateHostInstallProgress(models.HostStageFinishWaitingForControlPlane, "")
 	i.log.Info("Setting bootstrap node new role to master")
 	return nil
 }
@@ -254,11 +244,11 @@ func (i *installer) waitForControlPlane(ctx context.Context, kc k8s_client.K8SCl
 	return nil
 }
 
-func (i *installer) UpdateHostStatus(newStatus string) {
-	i.log.Infof("Updating node installation status: %s", newStatus)
+func (i *installer) UpdateHostInstallProgress(newStage models.HostStage, info string) {
+	i.log.Infof("Updating node installation stage: %s - %s", newStage, info)
 	if i.HostID != "" {
-		if err := i.inventoryClient.UpdateHostStatus(newStatus, i.HostID); err != nil {
-			i.log.Errorf("Failed to update node installation status, %s", err)
+		if err := i.inventoryClient.UpdateHostInstallProgress(i.HostID, newStage, info); err != nil {
+			i.log.Errorf("Failed to update node installation stage, %s", err)
 		}
 	}
 }
@@ -343,7 +333,7 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 					i.log.Warnf("Node %s is not in inventory hosts", node.Name)
 					break
 				}
-				if err := i.inventoryClient.UpdateHostStatus(Joined, host.Host.ID.String()); err != nil {
+				if err := i.inventoryClient.UpdateHostInstallProgress(host.Host.ID.String(), models.HostStageJoined, ""); err != nil {
 					i.log.Errorf("Failed to update node installation status, %s", err)
 				}
 			}
