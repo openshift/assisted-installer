@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/filanov/bm-inventory/models"
 	"github.com/thoas/go-funk"
 
 	"github.com/pkg/errors"
@@ -25,10 +26,8 @@ import (
 
 //const baseHref = "/api/bm-inventory/v1"
 const (
-	HostRoleMaster    = "master"
-	HostRoleBootstrap = "bootstrap"
-	InstallDir        = "/opt/install-dir"
-	KubeconfigPath    = "/opt/openshift/auth/kubeconfig-loopback"
+	InstallDir     = "/opt/install-dir"
+	KubeconfigPath = "/opt/openshift/auth/kubeconfig-loopback"
 	// Change this to the MCD image from the relevant openshift release image
 	minMasterNodes   = 2
 	dockerConfigFile = "/root/.docker/config.json"
@@ -98,11 +97,11 @@ func (i *installer) InstallNode() error {
 	errs, _ := errgroup.WithContext(ctx)
 	//cancel the context in case this method ends
 	defer cancel()
-	if i.Config.Role == HostRoleBootstrap {
+	if i.Config.Role == string(models.HostRoleBootstrap) {
 		errs.Go(func() error {
 			return i.runBootstrap(ctx)
 		})
-		i.Config.Role = HostRoleMaster
+		i.Config.Role = string(models.HostRoleMaster)
 	}
 
 	i.UpdateHostStatus(fmt.Sprintf(InstallingAs, i.Config.Role))

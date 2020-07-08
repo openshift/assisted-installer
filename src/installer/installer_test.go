@@ -98,7 +98,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	}
 
 	Context("Bootstrap role", func() {
-		conf := config.Config{Role: HostRoleBootstrap,
+		conf := config.Config{Role: string(models.HostRoleBootstrap),
 			ClusterID:        "cluster-id",
 			HostID:           "host-id",
 			Device:           "/dev/vda",
@@ -164,7 +164,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			udpateStatusSuccess([]string{StartingInstallation,
 				RunningBootstrap,
 				WaitForControlPlane,
-				fmt.Sprintf(InstallingAs, HostRoleMaster),
+				fmt.Sprintf(InstallingAs, models.HostRoleMaster),
 				WritingImageToDisk,
 				Reboot,
 			})
@@ -193,7 +193,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			udpateStatusSuccess([]string{StartingInstallation,
 				RunningBootstrap,
 				WaitForControlPlane,
-				fmt.Sprintf(InstallingAs, HostRoleMaster),
+				fmt.Sprintf(InstallingAs, models.HostRoleMaster),
 				WritingImageToDisk,
 			})
 			cleanInstallDevice()
@@ -218,7 +218,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("bootstrap fail to restart NetworkManager", func() {
 			udpateStatusSuccess([]string{StartingInstallation,
 				RunningBootstrap,
-				fmt.Sprintf(InstallingAs, HostRoleMaster),
+				fmt.Sprintf(InstallingAs, models.HostRoleMaster),
 				WritingImageToDisk,
 			})
 			cleanInstallDevice()
@@ -265,7 +265,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 	})
 	Context("Master role", func() {
-		conf := config.Config{Role: HostRoleMaster,
+		conf := config.Config{Role: string(models.HostRoleMaster),
 			ClusterID:        "cluster-id",
 			HostID:           "host-id",
 			Device:           "/dev/vda",
@@ -363,7 +363,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 	})
 	Context("Worker role", func() {
-		conf := config.Config{Role: "worker",
+		conf := config.Config{Role: string(models.HostRoleWorker),
 			ClusterID:        "cluster-id",
 			HostID:           "host-id",
 			Device:           "/dev/vda",
@@ -390,7 +390,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 	})
 	Context("Bad openshift version", func() {
-		conf := config.Config{Role: HostRoleMaster,
+		conf := config.Config{Role: string(models.HostRoleMaster),
 			ClusterID:        "cluster-id",
 			HostID:           "host-id",
 			Device:           "/dev/vda",

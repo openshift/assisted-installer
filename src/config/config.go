@@ -3,6 +3,8 @@ package config
 import (
 	"flag"
 	"os"
+
+	"github.com/filanov/bm-inventory/models"
 )
 
 type Config struct {
@@ -26,7 +28,7 @@ func printHelpAndExit() {
 
 func ProcessArgs() {
 	ret := &GlobalConfig
-	flag.StringVar(&ret.Role, "role", "master", "The node role")
+	flag.StringVar(&ret.Role, "role", string(models.HostRoleMaster), "The node role")
 	flag.StringVar(&ret.ClusterID, "cluster-id", "", "The cluster id")
 	flag.StringVar(&ret.HostID, "host-id", "", "This host id")
 	flag.StringVar(&ret.Device, "boot-device", "", "The boot device")
