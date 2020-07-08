@@ -11,7 +11,7 @@ spec:
     spec:
       containers:
         - name: assisted-installer-controller
-          image: quay.io/ocpmetal/assisted-installer-controller:stable
+          image: quay.io/ocpmetal/assisted-installer-controller:latest
           imagePullPolicy: Always
           command:
             - /assisted-installer-controller
