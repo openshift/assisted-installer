@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"regexp"
-	"strings"
 
 	"github.com/eranco74/assisted-installer/src/utils"
 
@@ -21,8 +19,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const configuring = "Configuring"
-
 //go:generate mockgen -source=inventory_client.go -package=inventory_client -destination=mock_inventory_client.go
 type InventoryClient interface {
 	DownloadFile(filename string, dest string) error
@@ -30,7 +26,6 @@ type InventoryClient interface {
 	GetEnabledHostsNamesHosts() (map[string]EnabledHostData, error)
 	UploadIngressCa(ingressCA string, clusterId string) error
 	GetCluster() (*models.Cluster, error)
-	SetConfiguringStatusForHosts(inventoryHostsMapWithIp map[string]EnabledHostData, mcsLogs string)
 }
 
 type inventoryClient struct {
@@ -153,30 +148,4 @@ func (c *inventoryClient) getEnabledHostsWithInventoryInfo() (map[string]Enabled
 		hostsWithHwInfo[host.ID.String()] = EnabledHostData{Inventory: &hwInfo, Host: host}
 	}
 	return hostsWithHwInfo, nil
-}
-
-// TODO move states to enums after bm-inventory changes
-func (c *inventoryClient) SetConfiguringStatusForHosts(inventoryHostsMapWithIp map[string]EnabledHostData, mcsLogs string) {
-	notValidStates := map[string]string{configuring: "", "Joined": "", "Done": ""}
-	for key, host := range inventoryHostsMapWithIp {
-		_, ok := notValidStates[*host.Host.Status]
-		if ok {
-			continue
-		}
-		c.log.Infof("Verifying if host %s pulled ignition", key)
-		pat := fmt.Sprintf("(%s)", strings.Join(host.IPs, "|"))
-		pattern, err := regexp.Compile(pat)
-		if err != nil {
-			c.log.WithError(err).Errorf("Failed to compile regex from host %s ips list", host.Host.ID.String())
-			return
-		}
-		if pattern.MatchString(mcsLogs) {
-			c.log.Infof("Host %s found in mcs logs, moving it to %s state", host.Host.ID.String(), configuring)
-			if err := c.UpdateHostInstallProgress(host.Host.ID.String(), configuring, ""); err != nil {
-				c.log.Errorf("Failed to update node installation status, %s", err)
-				continue
-			}
-			*inventoryHostsMapWithIp[key].Host.Status = configuring
-		}
-	}
 }

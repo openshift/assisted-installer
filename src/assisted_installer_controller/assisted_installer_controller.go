@@ -4,6 +4,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/eranco74/assisted-installer/src/common"
+
 	"github.com/eranco74/assisted-installer/src/inventory_client"
 	"github.com/eranco74/assisted-installer/src/k8s_client"
 	"github.com/eranco74/assisted-installer/src/ops"
@@ -57,6 +59,7 @@ func (c *controller) WaitAndUpdateNodesStatus() {
 	assistedInstallerNodesMap := c.getInventoryNodesMap()
 	for len(assistedInstallerNodesMap) > 0 {
 		time.Sleep(GeneralWaitTimeout)
+		c.log.Infof("Searching for host to change status")
 		nodes, err := c.kc.ListNodes()
 		if err != nil {
 			continue
@@ -90,7 +93,7 @@ func (c *controller) getMCSLogs() (string, error) {
 		return "", nil
 	}
 	for _, pod := range pods {
-		podLogs, err := c.kc.GetPodLogs(namespace, pod.Name, generalWaitTimeoutInt+10)
+		podLogs, err := c.kc.GetPodLogs(namespace, pod.Name, generalWaitTimeoutInt*10)
 		if err != nil {
 			c.log.WithError(err).Warnf("Failed to get logs of pod %s", pod.Name)
 			return "", nil
@@ -105,7 +108,7 @@ func (c *controller) updateConfiguringStatusIfNeeded(hosts map[string]inventory_
 	if err != nil {
 		return
 	}
-	c.ic.SetConfiguringStatusForHosts(hosts, logs)
+	common.SetConfiguringStatusForHosts(c.ic, hosts, logs, true, c.log)
 }
 
 func (c *controller) getInventoryNodesMap() map[string]inventory_client.EnabledHostData {
