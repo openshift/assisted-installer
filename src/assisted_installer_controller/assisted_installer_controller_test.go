@@ -59,9 +59,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		node0Id := strfmt.UUID("7916fa89-ea7a-443e-a862-b3e930309f65")
 		node1Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f238")
 		node2Id := strfmt.UUID("b898d516-3e16-49d0-86a5-0ad5bd04e3ed")
-		inventoryNamesIds = map[string]inventory_client.EnabledHostData{"node0": {Host: &models.Host{ID: &node0Id}},
-			"node1": {Host: &models.Host{ID: &node1Id}},
-			"node2": {Host: &models.Host{ID: &node2Id}}}
+		currentState := models.HostProgress{CurrentStage: models.HostStageConfiguring}
+		inventoryNamesIds = map[string]inventory_client.EnabledHostData{"node0": {Host: &models.Host{ID: &node0Id, Progress: &currentState}},
+			"node1": {Host: &models.Host{ID: &node1Id, Progress: &currentState}},
+			"node2": {Host: &models.Host{ID: &node2Id, Progress: &currentState}}}
 		kubeNamesIds = map[string]string{"node0": "6d6f00e8-70dd-48a5-859a-0f1459485ad9",
 			"node1": "2834ff2e-8965-48a5-859a-0f1459485a77",
 			"node2": "57df89ee-3546-48a5-859a-0f1459485a66"}
@@ -78,7 +79,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	}
 	configuringSuccess := func() {
 		mockk8sclient.EXPECT().GetPods(gomock.Any(), gomock.Any()).Return([]v1.Pod{}, nil).AnyTimes()
-		mockbmclient.EXPECT().SetConfiguringStatusForHosts(gomock.Any(), gomock.Any()).Return().AnyTimes()
+		mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	}
 
 	updateProgressSuccess := func(stages []models.HostStage, inventoryNamesIds map[string]inventory_client.EnabledHostData) {

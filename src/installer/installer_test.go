@@ -57,13 +57,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockbmclient.EXPECT().DownloadFile(fileName, filepath.Join(InstallDir, fileName)).Return(nil).Times(1)
 	}
 
-	//updateStatusConfiguringSuccess := func() {
-	//	mockbmclient.EXPECT().GetEnabledHostsNamesHosts().Return(inventoryNamesHost, nil).AnyTimes()
-	//	mockops.EXPECT().GetMCSLogs().Return("dummy logs", nil).AnyTimes()
-	//	mockbmclient.EXPECT().SetConfiguringStatusForHosts(inventoryNamesHost, "dummy logs").Return().AnyTimes()
-	//
-	//}
-
 	cleanInstallDevice := func() {
 		mockops.EXPECT().GetVGByPV(device).Return("", nil).Times(1)
 	}
@@ -179,7 +172,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			daemonReload(nil)
 			restartNetworkManager(nil)
 			prepareControllerSuccess()
-			// updateStatusConfiguringSuccess()
 			startServicesSuccess()
 			patchEtcdSuccess()
 			WaitMasterNodesSucccess()
@@ -205,7 +197,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			extractSuccess()
 			daemonReload(nil)
 			restartNetworkManager(nil)
-			// updateStatusConfiguringSuccess()
 			prepareControllerSuccess()
 			startServicesSuccess()
 			WaitMasterNodesSucccess()
@@ -227,7 +218,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			downloadFileSuccess(bootstrapIgn)
 			extractSecretFromIgnitionSuccess()
 			extractSuccess()
-			// updateStatusConfiguringSuccess()
 			daemonReload(nil)
 			err := fmt.Errorf("Failed to restart NetworkManager")
 			restartNetworkManager(err)
@@ -245,19 +235,21 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			node0Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f238")
 			node1Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f239")
 			node2Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f240")
-			testInventoryIdsIps := map[string]inventory_client.EnabledHostData{"node0": {Host: &models.Host{ID: &node0Id},
+
+			testInventoryIdsIps := map[string]inventory_client.EnabledHostData{"node0": {Host: &models.Host{ID: &node0Id, Progress: &models.HostProgress{CurrentStage: models.HostStageRebooting}},
 				IPs: []string{"192.168.126.10", "192.168.11.122", "fe80::5054:ff:fe9a:4738"}},
-				"node1": {Host: &models.Host{ID: &node1Id}, IPs: []string{"192.168.126.11", "192.168.11.123", "fe80::5054:ff:fe9a:4739"}},
-				"node2": {Host: &models.Host{ID: &node2Id}, IPs: []string{"192.168.126.12", "192.168.11.124", "fe80::5054:ff:fe9a:4740"}}}
+				"node1": {Host: &models.Host{ID: &node1Id, Progress: &models.HostProgress{CurrentStage: models.HostStageRebooting}}, IPs: []string{"192.168.126.11", "192.168.11.123", "fe80::5054:ff:fe9a:4739"}},
+				"node2": {Host: &models.Host{ID: &node2Id, Progress: &models.HostProgress{CurrentStage: models.HostStageRebooting}}, IPs: []string{"192.168.126.12", "192.168.11.124", "fe80::5054:ff:fe9a:4740"}}}
 			mockbmclient.EXPECT().GetEnabledHostsNamesHosts().Return(nil, fmt.Errorf("dummy")).Times(1)
 			mockbmclient.EXPECT().GetEnabledHostsNamesHosts().Return(testInventoryIdsIps, nil).Times(1)
 			mockops.EXPECT().GetMCSLogs().Return("", fmt.Errorf("dummy")).Times(1)
 			mockops.EXPECT().GetMCSLogs().Return("dummy logs", nil).Times(1)
 			mockops.EXPECT().GetMCSLogs().Return("dummy logs", nil).Times(1)
 			mockops.EXPECT().GetMCSLogs().Return(logs, nil).AnyTimes()
-			mockbmclient.EXPECT().SetConfiguringStatusForHosts(testInventoryIdsIps, "dummy logs").Return().Times(1)
-			mockbmclient.EXPECT().SetConfiguringStatusForHosts(testInventoryIdsIps, "dummy logs").Return().Times(1)
-			mockbmclient.EXPECT().SetConfiguringStatusForHosts(testInventoryIdsIps, logs).Return().AnyTimes()
+
+			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), models.HostStageConfiguring, gomock.Any()).Return(fmt.Errorf("dummy")).Times(1)
+			mockbmclient.EXPECT().UpdateHostInstallProgress("eb82821f-bf21-4614-9a3b-ecb07929f240", models.HostStageConfiguring, gomock.Any()).Return(nil).Times(1)
+			mockbmclient.EXPECT().UpdateHostInstallProgress("eb82821f-bf21-4614-9a3b-ecb07929f239", models.HostStageConfiguring, gomock.Any()).Return(nil).Times(1)
 
 			done := make(chan bool)
 			go i.updateConfiguringStatus(done)
