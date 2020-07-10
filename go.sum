@@ -105,6 +105,10 @@ github.com/evanphx/json-patch v4.5.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLi
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
 github.com/filanov/bm-inventory v1.0.5-0.20200708111900-dd688075cf50 h1:PmPifzNjqn6Re70RqFHRiuHB+IeaIdMV9xVDL0+lU24=
 github.com/filanov/bm-inventory v1.0.5-0.20200708111900-dd688075cf50/go.mod h1:f6PxP73qFkAtN7KhXHbjo9u0ztZfLYZFugjhvLviKG4=
+github.com/filanov/bm-inventory v1.0.5-0.20200709155130-4b2c56a19f59 h1:V1J5IjXM2bMKkgI7n5Y7RGpB7wB5ResqOMUO203/KJg=
+github.com/filanov/bm-inventory v1.0.5-0.20200709155130-4b2c56a19f59/go.mod h1:f6PxP73qFkAtN7KhXHbjo9u0ztZfLYZFugjhvLviKG4=
+github.com/filanov/bm-inventory v1.0.5-0.20200712092810-1e35f50fb322 h1:KsG8OQf4gQFN3zb6eS0S4FoudB/MFW+DxLjeCBeDlqk=
+github.com/filanov/bm-inventory v1.0.5-0.20200712092810-1e35f50fb322/go.mod h1:f6PxP73qFkAtN7KhXHbjo9u0ztZfLYZFugjhvLviKG4=
 github.com/filanov/stateswitch v0.0.0-20200513095115-051501b05b45/go.mod h1:sk33Oz1ABVidMrVdJfd6tj7n9exK/PZarClHJNnFIQ8=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
