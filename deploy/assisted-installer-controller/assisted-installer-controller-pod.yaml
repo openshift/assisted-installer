@@ -37,13 +37,11 @@ spec:
           envFrom:
             - configMapRef:
                 name: assisted-installer-controller-config
-#          securityContext:
-#            privileged: true
       restartPolicy: OnFailure
-
       nodeSelector:
         node-role.kubernetes.io/master: ""
       serviceAccountName: assisted-installer-controller
       tolerations:
-        - key: node-role.kubernetes.io/master
-          effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+        operator: Exists

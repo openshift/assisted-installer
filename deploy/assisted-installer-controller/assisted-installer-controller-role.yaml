@@ -13,7 +13,6 @@ rules:
       - configmaps
       - pods/log
     verbs:
-      - logs
       - get
       - list
       - watch

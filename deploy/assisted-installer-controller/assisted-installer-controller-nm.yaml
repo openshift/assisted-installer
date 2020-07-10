@@ -3,4 +3,4 @@ kind: Namespace
 metadata:
   name: assisted-deployment
   labels:
-    name: assisted-deployment
+    openshift.io/run-level: "0"
