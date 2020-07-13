@@ -40,10 +40,12 @@ type Ops interface {
 }
 
 const (
-	renderedControllerCm       = "assisted-installer-controller.yaml"
-	controllerDeployFolder     = "/assisted-installer-controller/deploy"
-	manifestsFolder            = "/opt/openshift/manifests"
-	controllerDeployCmTemplate = "assisted-installer-controller-cm.yaml.template"
+	controllerDeployFolder      = "/assisted-installer-controller/deploy"
+	manifestsFolder             = "/opt/openshift/manifests"
+	renderedControllerCm        = "assisted-installer-controller-cm.yaml"
+	controllerDeployCmTemplate  = "assisted-installer-controller-cm.yaml.template"
+	renderedControllerPod       = "assisted-installer-controller-pod.yaml"
+	controllerDeployPodTemplate = "assisted-installer-controller-pod.yaml.template"
 )
 
 type ops struct {
@@ -189,6 +191,10 @@ func (o *ops) PrepareController() error {
 		return err
 	}
 
+	if err := o.renderControllerPod(); err != nil {
+		return err
+	}
+
 	// Copy deploy files to manifestsFolder
 	files, err := utils.GetListOfFilesFromFolder(controllerDeployFolder, "*.yaml")
 	if err != nil {
@@ -206,22 +212,35 @@ func (o *ops) PrepareController() error {
 }
 
 func (o *ops) renderControllerCm() error {
-
-	controllerDeployTemplate := filepath.Join(controllerDeployFolder, controllerDeployCmTemplate)
-	templateData, err := ioutil.ReadFile(controllerDeployTemplate)
-	if err != nil {
-		o.log.Errorf("Error occurred while trying to read %s : %e", controllerDeployTemplate, err)
-		return err
-	}
-	var assistedControllerParams = map[string]string{
+	var params = map[string]string{
 		"InventoryHost": config.GlobalConfig.Host,
 		"InventoryPort": fmt.Sprintf("\"%d\"", config.GlobalConfig.Port),
 		"ClusterId":     config.GlobalConfig.ClusterID,
 	}
-	o.log.Infof("Filling template file %s", controllerDeployTemplate)
+
+	return o.renderDeploymentFiles(filepath.Join(controllerDeployFolder, controllerDeployCmTemplate),
+		params, renderedControllerCm)
+}
+
+func (o *ops) renderControllerPod() error {
+	var params = map[string]string{
+		"ControllerImage": config.GlobalConfig.ControllerImage,
+	}
+
+	return o.renderDeploymentFiles(filepath.Join(controllerDeployFolder, controllerDeployPodTemplate),
+		params, renderedControllerPod)
+}
+
+func (o *ops) renderDeploymentFiles(srcTemplate string, params map[string]string, dest string) error {
+	templateData, err := ioutil.ReadFile(srcTemplate)
+	if err != nil {
+		o.log.Errorf("Error occurred while trying to read %s : %e", srcTemplate, err)
+		return err
+	}
+	o.log.Infof("Filling template file %s", srcTemplate)
 	tmpl := template.Must(template.New("assisted-controller").Parse(string(templateData)))
 	var buf bytes.Buffer
-	if err = tmpl.Execute(&buf, assistedControllerParams); err != nil {
+	if err = tmpl.Execute(&buf, params); err != nil {
 		o.log.Errorf("Failed to render controller template: %e", err)
 		return err
 	}
@@ -231,10 +250,9 @@ func (o *ops) renderControllerCm() error {
 		return err
 	}
 
-	renderedControllerYaml := filepath.Join(manifestsFolder, renderedControllerCm)
+	renderedControllerYaml := filepath.Join(manifestsFolder, dest)
 	o.log.Infof("Writing rendered data to %s", renderedControllerYaml)
-	err = ioutil.WriteFile(renderedControllerYaml, buf.Bytes(), 0644)
-	if err != nil {
+	if err = ioutil.WriteFile(renderedControllerYaml, buf.Bytes(), 0644); err != nil {
 		o.log.Errorf("Error occurred while trying to write rendered data to %s : %e", renderedControllerYaml, err)
 		return err
 	}

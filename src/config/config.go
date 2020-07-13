@@ -17,6 +17,7 @@ type Config struct {
 	Verbose          bool
 	OpenshiftVersion string
 	Hostname         string
+	ControllerImage  string
 }
 
 var GlobalConfig Config
@@ -37,6 +38,8 @@ func ProcessArgs() {
 	flag.StringVar(&ret.OpenshiftVersion, "openshift-version", "4.4", "Openshift version to install")
 	flag.StringVar(&ret.Hostname, "host-name", "", "hostname to be set for this node")
 	flag.BoolVar(&ret.Verbose, "verbose", false, "Increase verbosity, set log level to debug")
+	flag.StringVar(&ret.ControllerImage, "controller-image", "quay.io/ocpmetal/assisted-installer-controller:latest",
+		"Assisted Installer Controller image URL")
 	h := flag.Bool("help", false, "Help message")
 	flag.Parse()
 	if h != nil && *h {
