@@ -70,7 +70,6 @@ func (o *ops) ExecPrivilegeCommand(liveLogger io.Writer, command string, args ..
 func (o *ops) ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
 
 	var stdoutBuf bytes.Buffer
-
 	cmd := exec.Command(command, args...)
 	if liveLogger != nil {
 		cmd.Stdout = io.MultiWriter(liveLogger, &stdoutBuf)
@@ -82,14 +81,23 @@ func (o *ops) ExecCommand(liveLogger io.Writer, command string, args ...string) 
 	err := cmd.Run()
 	output := strings.TrimSpace(stdoutBuf.String())
 	if err != nil {
+
+		// Get all lines from Error message
+		errorIndex := strings.Index(output, "Error")
+		// if Error not found return all output
+		if errorIndex > -1 {
+			output = output[errorIndex:]
+		}
+
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
 				o.log.Debugf("failed executing %s %v, out: %s, with status %d",
 					command, args, output, status.ExitStatus())
-				return output, fmt.Errorf("failed executing %s %v , error %s", command, args, exitErr)
+
+				return output, fmt.Errorf("failed executing %s %v , error %s. Output %s", command, args, exitErr, output)
 			}
 		}
-		return output, fmt.Errorf("failed executing %s %v , error %s", command, args, err)
+		return output, fmt.Errorf("failed executing %s %v , error %s. Output %s", command, args, err, output)
 	}
 	o.log.Debug("Command executed:", " command", command, " arguments", args, " output", output)
 	return output, err
