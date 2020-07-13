@@ -87,7 +87,9 @@ func (i *installer) InstallNode() error {
 	errs, _ := errgroup.WithContext(ctx)
 	//cancel the context in case this method ends
 	defer cancel()
+	isBootstrap := false
 	if i.Config.Role == string(models.HostRoleBootstrap) {
+		isBootstrap = true
 		errs.Go(func() error {
 			return i.runBootstrap(ctx)
 		})
@@ -122,9 +124,12 @@ func (i *installer) InstallNode() error {
 	} else {
 		i.log.Info("Done writing image to disk")
 	}
-	if err = errs.Wait(); err != nil {
-		i.log.Error(err)
-		return err
+	if isBootstrap {
+		i.UpdateHostInstallProgress(models.HostStageStartWaitingForControlPlane, "")
+		if err = errs.Wait(); err != nil {
+			i.log.Error(err)
+			return err
+		}
 	}
 	i.UpdateHostInstallProgress(models.HostStageRebooting, "")
 	if err = i.ops.Reboot(); err != nil {
@@ -150,12 +155,9 @@ func (i *installer) runBootstrap(ctx context.Context) error {
 		i.log.Error(err)
 		return err
 	}
-
-	i.UpdateHostInstallProgress(models.HostStageStartWaitingForControlPlane, "")
 	if err = i.waitForControlPlane(ctx, kc); err != nil {
 		return err
 	}
-	i.UpdateHostInstallProgress(models.HostStageFinishWaitingForControlPlane, "")
 	i.log.Info("Setting bootstrap node new role to master")
 	return nil
 }

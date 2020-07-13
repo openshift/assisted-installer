@@ -161,7 +161,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				{string(models.HostStageStartWaitingForControlPlane)},
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
 				{string(models.HostStageWritingImageToDisk), "0%"},
-				{string(models.HostStageFinishWaitingForControlPlane)},
 				{string(models.HostStageRebooting)},
 			})
 			cleanInstallDevice()
@@ -212,6 +211,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
 				{string(models.HostStageWritingImageToDisk), "0%"},
+				{string(models.HostStageStartWaitingForControlPlane)},
 			})
 			cleanInstallDevice()
 			mkdirSuccess()
