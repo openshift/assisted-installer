@@ -105,3 +105,17 @@ func (mr *MockInventoryClientMockRecorder) GetCluster() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCluster", reflect.TypeOf((*MockInventoryClient)(nil).GetCluster))
 }
+
+// CompleteInstallation mocks base method
+func (m *MockInventoryClient) CompleteInstallation(clusterId string, isSuccess bool, errorInfo string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CompleteInstallation", clusterId, isSuccess, errorInfo)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CompleteInstallation indicates an expected call of CompleteInstallation
+func (mr *MockInventoryClientMockRecorder) CompleteInstallation(clusterId, isSuccess, errorInfo interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteInstallation", reflect.TypeOf((*MockInventoryClient)(nil).CompleteInstallation), clusterId, isSuccess, errorInfo)
+}

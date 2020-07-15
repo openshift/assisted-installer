@@ -109,6 +109,16 @@ github.com/filanov/bm-inventory v1.0.5-0.20200709155130-4b2c56a19f59 h1:V1J5IjXM
 github.com/filanov/bm-inventory v1.0.5-0.20200709155130-4b2c56a19f59/go.mod h1:f6PxP73qFkAtN7KhXHbjo9u0ztZfLYZFugjhvLviKG4=
 github.com/filanov/bm-inventory v1.0.5-0.20200712092810-1e35f50fb322 h1:KsG8OQf4gQFN3zb6eS0S4FoudB/MFW+DxLjeCBeDlqk=
 github.com/filanov/bm-inventory v1.0.5-0.20200712092810-1e35f50fb322/go.mod h1:f6PxP73qFkAtN7KhXHbjo9u0ztZfLYZFugjhvLviKG4=
+github.com/filanov/bm-inventory v1.0.5-0.20200713222914-54a07c74b20e h1:s6Itl4epMNRAJgfqd7fQC/7eXlXBZbz+2pC2LPWtcvQ=
+github.com/filanov/bm-inventory v1.0.5-0.20200713222914-54a07c74b20e/go.mod h1:qhYn8CX9D8vUGa6/g+V/6+giDj8fAeGlEZZTLZZz5sw=
+github.com/filanov/bm-inventory v1.0.5-0.20200714191425-9011eb60883c h1:YYKO24VPdj+vVnKjKKk4u3MAMlQIqkUYoAIp1GCR4Ig=
+github.com/filanov/bm-inventory v1.0.5-0.20200714191425-9011eb60883c/go.mod h1:qhYn8CX9D8vUGa6/g+V/6+giDj8fAeGlEZZTLZZz5sw=
+github.com/filanov/bm-inventory v1.0.6-0.20200715091038-5bbb10a1f1f0 h1:mmGQZUotub7YzsxXa0+f874F51BwQ5f6ygZ9Ra/Nhfo=
+github.com/filanov/bm-inventory v1.0.6-0.20200715091038-5bbb10a1f1f0/go.mod h1:qhYn8CX9D8vUGa6/g+V/6+giDj8fAeGlEZZTLZZz5sw=
+github.com/filanov/bm-inventory v1.0.6-0.20200715115300-aa7735c912d7 h1:/jexwPBpwr7axjZ0y3g/z2LqhTq66o6JUviF4+Rid3k=
+github.com/filanov/bm-inventory v1.0.6-0.20200715115300-aa7735c912d7/go.mod h1:qhYn8CX9D8vUGa6/g+V/6+giDj8fAeGlEZZTLZZz5sw=
+github.com/filanov/bm-inventory v1.0.6-0.20200715181832-13822c3e5bbb h1:SI37cmjgegYph4O399enPGzNMcnMX+1aau4Ll8805V8=
+github.com/filanov/bm-inventory v1.0.6-0.20200715181832-13822c3e5bbb/go.mod h1:qH8cptTSrjDTPThOIQJVRywKqyAAzZrMk/2/lQIPd2Q=
 github.com/filanov/stateswitch v0.0.0-20200513095115-051501b05b45/go.mod h1:sk33Oz1ABVidMrVdJfd6tj7n9exK/PZarClHJNnFIQ8=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
@@ -208,6 +218,7 @@ github.com/go-playground/assert/v2 v2.0.1/go.mod h1:VDjEfimB/XKnb+ZQfWdccd7VUvSc
 github.com/go-playground/locales v0.13.0/go.mod h1:taPMhCMXrRLJO55olJkUXHZBHCxTMfnGwq/HNwmWNS8=
 github.com/go-playground/universal-translator v0.17.0/go.mod h1:UkSxE5sNxxRwHyU+Scu5vgOQjsIJAF8j9muTVoKLVtA=
 github.com/go-playground/validator/v10 v10.2.0/go.mod h1:uOYAAleCW8F/7oMFd6aG0GOhaH6EGOAJShg8Id5JGkI=
+github.com/go-redis/redis v6.15.5+incompatible/go.mod h1:NAIEuMOZ/fxfXJIrKDQDz8wamY7mA7PouImQ2Jvg6kA=
 github.com/go-sql-driver/mysql v1.4.1/go.mod h1:zAC/RDZ24gD3HViQzih4MyKcchzm+sOG5ZlKdlhCg5w=
 github.com/go-sql-driver/mysql v1.5.0/go.mod h1:DCzpHaOWr8IXmIStZouvnhqoel9Qv2LBy8hT2VhHyBg=
 github.com/go-stack/stack v1.8.0 h1:5SgMzNM5HxrEjV0ww2lTmX6E2Izsfxas4+YHWRs3Lsk=
@@ -312,6 +323,7 @@ github.com/imdario/mergo v0.3.5/go.mod h1:2EnlNZ0deacrJVfApfmtdGgDfMuh/nq6Ok1EcJ
 github.com/imdario/mergo v0.3.6 h1:xTNEAn+kxVO7dTZGu0CegyqKZmoWFI0rF8UxjlB2d28=
 github.com/imdario/mergo v0.3.6/go.mod h1:2EnlNZ0deacrJVfApfmtdGgDfMuh/nq6Ok1EcJh5FfA=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
+github.com/jasonlvhit/gocron v0.0.0-20200423141508-ab84337f7963/go.mod h1:k9a3TV8VcU73XZxfVHCHWMWF9SOqgoku0/QlY2yvlA4=
 github.com/jinzhu/gorm v1.9.12/go.mod h1:vhTjlKSJUTWNtcbQtrMBFCxy7eXTzeCAzfL5fBZT/Qs=
 github.com/jinzhu/inflection v1.0.0/go.mod h1:h+uFLlag+Qp1Va5pdKtLDYj+kHp5pxUVkryuEj+Srlc=
 github.com/jinzhu/now v1.0.1/go.mod h1:d3SSVoowX0Lcu0IBviAWJpolVfI5UJVZZ7cO71lE/z8=
@@ -403,6 +415,7 @@ github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI
 github.com/olekukonko/tablewriter v0.0.0-20170122224234-a0225b3f23b5/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/onsi/ginkgo v0.0.0-20170829012221-11459a886d9c/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
+github.com/onsi/ginkgo v1.10.1/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.11.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.12.0 h1:Iw5WCbBcaAAd0fpRb1c9r5YCylv4XDoCSigm1zLevwU=
 github.com/onsi/ginkgo v1.12.0/go.mod h1:oUhWkIvk5aDxtKvDDuw8gItl8pKl42LzjC9KZE0HfGg=
