@@ -26,6 +26,7 @@ type InventoryClient interface {
 	GetEnabledHostsNamesHosts() (map[string]EnabledHostData, error)
 	UploadIngressCa(ingressCA string, clusterId string) error
 	GetCluster() (*models.Cluster, error)
+	CompleteInstallation(clusterId string, isSuccess bool, errorInfo string) error
 }
 
 type inventoryClient struct {
@@ -148,4 +149,11 @@ func (c *inventoryClient) getEnabledHostsWithInventoryInfo() (map[string]Enabled
 		hostsWithHwInfo[host.ID.String()] = EnabledHostData{Inventory: &hwInfo, Host: host}
 	}
 	return hostsWithHwInfo, nil
+}
+
+func (c *inventoryClient) CompleteInstallation(clusterId string, isSuccess bool, errorInfo string) error {
+	_, err := c.ai.Installer.CompleteInstallation(context.Background(),
+		&installer.CompleteInstallationParams{ClusterID: strfmt.UUID(clusterId),
+			CompletionParams: &models.CompletionParams{IsSuccess: &isSuccess, ErrorInfo: errorInfo}})
+	return err
 }

@@ -175,13 +175,15 @@ func (c controller) PostInstallConfigs(wg *sync.WaitGroup) {
 			continue
 		}
 		// waiting till cluster will be installed(3 masters must be installed)
-		if *cluster.Status != "installed" {
+		if *cluster.Status != models.ClusterStatusFinalizing {
 			continue
 		}
 		break
 	}
 	c.addRouterCAToClusterCA()
 	c.unpatchEtcd()
+	c.waitForConsole()
+	c.sendCompleteInstallation(true, "")
 }
 
 func (c controller) unpatchEtcd() {
@@ -218,4 +220,35 @@ func (c controller) addRouterCAToClusterCA() {
 		c.log.Infof("Ingress ca successfully sent to inventory")
 		return
 	}
+}
+
+func (c controller) waitForConsole() {
+	c.log.Infof("Waiting for console pod")
+
+	// TODO maybe need some timeout?
+	for {
+		pods, err := c.kc.GetPods("openshift-console", map[string]string{"app": "console", "component": "ui"})
+		if err != nil {
+			c.log.WithError(err).Warnf("Failed to get console pods")
+			continue
+		}
+		for _, pod := range pods {
+			if pod.Status.Phase == "Running" {
+				c.log.Infof("Found running console pod")
+				return
+			}
+		}
+	}
+}
+
+func (c controller) sendCompleteInstallation(isSuccess bool, errorInfo string) {
+	c.log.Infof("Start complete installation step")
+	for {
+		if err := c.ic.CompleteInstallation(c.ClusterID, isSuccess, errorInfo); err != nil {
+			c.log.Error(err)
+			continue
+		}
+		break
+	}
+	c.log.Infof("Done complete installation step")
 }
