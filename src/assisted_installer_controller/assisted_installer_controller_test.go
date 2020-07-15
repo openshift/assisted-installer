@@ -323,17 +323,26 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("Run PostInstallConfigs", func() {
 			cmName := "default-ingress-cert"
 			cmNamespace := "openshift-config-managed"
+			consoleNamespace := "openshift-console"
 			data := make(map[string]string)
 			data["ca-bundle.crt"] = "CA"
 			cm := v1.ConfigMap{Data: data}
-			installed := "installed"
-			cluster := models.Cluster{Status: &installed}
+			finalizing := models.ClusterStatusFinalizing
+			installing := models.ClusterStatusInstalling
+			cluster := models.Cluster{Status: &finalizing}
 			mockbmclient.EXPECT().GetCluster().Return(nil, fmt.Errorf("dummy")).Times(1)
+			mockbmclient.EXPECT().GetCluster().Return(&models.Cluster{Status: &installing}, nil).Times(1)
 			mockbmclient.EXPECT().GetCluster().Return(&cluster, nil).Times(1)
 			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(&cm, nil).Times(1)
 			mockbmclient.EXPECT().UploadIngressCa(data["ca-bundle.crt"], c.ClusterID).Return(nil).Times(1)
 			mockk8sclient.EXPECT().UnPatchEtcd().Return(fmt.Errorf("dummy")).Times(1)
 			mockk8sclient.EXPECT().UnPatchEtcd().Return(nil).Times(1)
+			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any()).Return(nil, fmt.Errorf("dummy")).Times(1)
+			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any()).Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Pending"}}}, nil).Times(1)
+			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any()).Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Running"}}}, nil).Times(1)
+			mockbmclient.EXPECT().CompleteInstallation("cluster-id", true, "").Return(fmt.Errorf("dummy")).Times(1)
+			mockbmclient.EXPECT().CompleteInstallation("cluster-id", true, "").Return(nil).Times(1)
+
 			wg.Add(1)
 			go c.PostInstallConfigs(&wg)
 			wg.Wait()
