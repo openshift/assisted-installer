@@ -31,7 +31,27 @@ jobs:
       id: get_version
       run: echo ::set-env name=GIT_REVISION::$(echo ${GITHUB_SHA})
     - name: Publish Installer to Registry
-      # Publish the image only in case of push to master
+      uses: elgohr/Publish-Docker-Github-Action@2.15
+      with:
+        name: assisted-installer
+        username: ${{ secrets.OCPMETAL_USERNAME }}
+        password: ${{ secrets.OCPMETAL_PASSWORD }}
+        REGISTRY: 'quay.io/ocpmetal'
+        dockerfile: Dockerfile.assisted-installer
+        buildargs: GIT_REVISION
+        tags: "${{ env.GIT_REVISION }}"
+    - name: Publish Controller to Registry
+      uses: elgohr/Publish-Docker-Github-Action@2.15
+      with:
+        name: assisted-installer-controller
+        username: ${{ secrets.OCPMETAL_USERNAME }}
+        password: ${{ secrets.OCPMETAL_PASSWORD }}
+        REGISTRY: 'quay.io/ocpmetal'
+        dockerfile: Dockerfile.assisted-installer-controller
+        buildargs: GIT_REVISION
+        tags: "${{ env.GIT_REVISION }}"
+    - name: Publish Installer to Registry with latest tag
+      # Publish the image with latest tag only in case of push to master
       if: github.event_name != 'pull_request'
       uses: elgohr/Publish-Docker-Github-Action@2.15
       with:
@@ -42,8 +62,8 @@ jobs:
         dockerfile: Dockerfile.assisted-installer
         buildargs: GIT_REVISION
         tags: "latest,${{ env.GIT_REVISION }}"
-    - name: Publish Controller to Registry
-      # Publish the image only in case of push to master
+    - name: Publish Controller to Registry with latest tag
+      # Publish the image with latest tag only in case of push to master
       if: github.event_name != 'pull_request'
       uses: elgohr/Publish-Docker-Github-Action@2.15
       with:
