@@ -91,9 +91,6 @@ func (c *inventoryClient) GetEnabledHostsNamesHosts() (map[string]EnabledHostDat
 	}
 	for _, hostData := range hosts {
 		hostname := hostData.Host.RequestedHostname
-		if hostname == "" {
-			hostname = hostData.Inventory.Hostname
-		}
 		ips, err := utils.GetHostIpsFromInventory(hostData.Inventory)
 		if err != nil {
 			c.log.WithError(err).Errorf("failed to get ips of node %s", hostname)
