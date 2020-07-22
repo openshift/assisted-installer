@@ -43,7 +43,7 @@ jobs:
         REGISTRY: 'quay.io/ocpmetal'
         dockerfile: Dockerfile.assisted-installer
         buildargs: GIT_REVISION, QUAY_TAG_EXPIRATION
-        tags: "${{ env.GIT_REVISION }}"
+        tags: "PR_${{ env.GIT_REVISION }}"
     - name: Publish Controller to Registry
       if: github.event_name == 'pull_request'
       uses: elgohr/Publish-Docker-Github-Action@2.15
@@ -54,7 +54,7 @@ jobs:
         REGISTRY: 'quay.io/ocpmetal'
         dockerfile: Dockerfile.assisted-installer-controller
         buildargs: GIT_REVISION, QUAY_TAG_EXPIRATION
-        tags: "${{ env.GIT_REVISION }}"
+        tags: "PR_${{ env.GIT_REVISION }}"
     - name: Publish Installer to Registry with latest tag
       # Publish the image with latest tag only in case of push to master
       if: github.event_name != 'pull_request'
