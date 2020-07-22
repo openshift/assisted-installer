@@ -2,5 +2,7 @@ FROM bash
 copy build/installer /
 ARG GIT_REVISION
 LABEL "git_revision"=${GIT_REVISION}
+ARG QUAY_TAG_EXPIRATION
+LABEL "quay.expires-after"=${QUAY_TAG_EXPIRATION}
 add deploy/assisted-installer-controller /assisted-installer-controller/deploy
 ENTRYPOINT ["/installer"]
