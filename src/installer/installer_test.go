@@ -158,7 +158,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		}
 		It("bootstrap role happy flow", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
-				{string(models.HostStageStartWaitingForControlPlane)},
+				{string(models.HostStageWaitingForControlPlane)},
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
 				{string(models.HostStageWritingImageToDisk), "0%"},
 				{string(models.HostStageRebooting)},
@@ -185,7 +185,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 		It("bootstrap role fail", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
-				{string(models.HostStageStartWaitingForControlPlane)},
+				{string(models.HostStageWaitingForControlPlane)},
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
 				{string(models.HostStageWritingImageToDisk), "0%"},
 			})
@@ -211,7 +211,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
 				{string(models.HostStageWritingImageToDisk), "0%"},
-				{string(models.HostStageStartWaitingForControlPlane)},
+				{string(models.HostStageWaitingForControlPlane)},
 			})
 			cleanInstallDevice()
 			mkdirSuccess()
