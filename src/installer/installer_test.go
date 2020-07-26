@@ -158,7 +158,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		}
 		It("bootstrap role happy flow", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
-				{string(models.HostStageStartWaitingForControlPlane)},
+				{string(models.HostStageWaitingForControlPlane)},
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
 				{string(models.HostStageWritingImageToDisk), "0%"},
 				{string(models.HostStageRebooting)},
@@ -185,7 +185,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 		It("bootstrap role fail", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
-				{string(models.HostStageStartWaitingForControlPlane)},
+				{string(models.HostStageWaitingForControlPlane)},
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
 				{string(models.HostStageWritingImageToDisk), "0%"},
 			})
@@ -211,7 +211,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
 				{string(models.HostStageWritingImageToDisk), "0%"},
-				{string(models.HostStageStartWaitingForControlPlane)},
+				{string(models.HostStageWaitingForControlPlane)},
 			})
 			cleanInstallDevice()
 			mkdirSuccess()
@@ -236,10 +236,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			node1Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f239")
 			node2Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f240")
 
-			testInventoryIdsIps := map[string]inventory_client.EnabledHostData{"node0": {Host: &models.Host{ID: &node0Id, Progress: &models.HostProgress{CurrentStage: models.HostStageRebooting}},
+			testInventoryIdsIps := map[string]inventory_client.EnabledHostData{"node0": {Host: &models.Host{ID: &node0Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}},
 				IPs: []string{"192.168.126.10", "192.168.11.122", "fe80::5054:ff:fe9a:4738"}},
-				"node1": {Host: &models.Host{ID: &node1Id, Progress: &models.HostProgress{CurrentStage: models.HostStageRebooting}}, IPs: []string{"192.168.126.11", "192.168.11.123", "fe80::5054:ff:fe9a:4739"}},
-				"node2": {Host: &models.Host{ID: &node2Id, Progress: &models.HostProgress{CurrentStage: models.HostStageRebooting}}, IPs: []string{"192.168.126.12", "192.168.11.124", "fe80::5054:ff:fe9a:4740"}}}
+				"node1": {Host: &models.Host{ID: &node1Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}}, IPs: []string{"192.168.126.11", "192.168.11.123", "fe80::5054:ff:fe9a:4739"}},
+				"node2": {Host: &models.Host{ID: &node2Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}}, IPs: []string{"192.168.126.12", "192.168.11.124", "fe80::5054:ff:fe9a:4740"}}}
 			mockbmclient.EXPECT().GetEnabledHostsNamesHosts().Return(nil, fmt.Errorf("dummy")).Times(1)
 			mockbmclient.EXPECT().GetEnabledHostsNamesHosts().Return(testInventoryIdsIps, nil).Times(1)
 			mockops.EXPECT().GetMCSLogs().Return("", fmt.Errorf("dummy")).Times(1)

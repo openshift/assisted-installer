@@ -125,7 +125,7 @@ func (i *installer) InstallNode() error {
 		i.log.Info("Done writing image to disk")
 	}
 	if isBootstrap {
-		i.UpdateHostInstallProgress(models.HostStageStartWaitingForControlPlane, "")
+		i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, "")
 		if err = errs.Wait(); err != nil {
 			i.log.Error(err)
 			return err
