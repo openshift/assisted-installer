@@ -14,7 +14,7 @@ import (
 
 func main() {
 	config.ProcessArgs()
-	logger := utils.InitLogger(config.GlobalConfig.Verbose)
+	logger := utils.InitLogger(config.GlobalConfig.Verbose, true)
 	logger.Infof("Assisted installer started. Configuration is:\n %+v", config.GlobalConfig)
 	ai := installer.NewAssistedInstaller(logger,
 		config.GlobalConfig,

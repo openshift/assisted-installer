@@ -9,10 +9,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/filanov/bm-inventory/models"
+	"github.com/ori-amizur/introspector/pkg/journalLogger"
 
 	ignition "github.com/coreos/ignition/config/v2_2"
 	"github.com/coreos/ignition/config/v2_2/types"
+	"github.com/filanov/bm-inventory/models"
 	"github.com/vincent-petithory/dataurl"
 
 	"github.com/sirupsen/logrus"
@@ -31,7 +32,7 @@ func NewLogWriter(logger *logrus.Logger) *LogWriter {
 	return &LogWriter{logger}
 }
 
-func InitLogger(verbose bool) *logrus.Logger {
+func InitLogger(verbose bool, enableJournal bool) *logrus.Logger {
 	var log = logrus.New()
 	// log to console and file
 	f, err := os.OpenFile("/var/log/assisted-installer.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
@@ -43,6 +44,13 @@ func InitLogger(verbose bool) *logrus.Logger {
 	if verbose {
 		log.SetLevel(logrus.DebugLevel)
 	}
+	// log to journal
+	if enableJournal {
+		journalLogger.SetJournalLogging(log, &journalLogger.JournalWriter{}, map[string]interface{}{
+			"TAG": "assisted-installer",
+		})
+	}
+
 	return log
 }
 
