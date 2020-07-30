@@ -5,13 +5,14 @@ go 1.14
 require (
 	github.com/ajeddeloh/go-json v0.0.0-20200220154158-5ae607161559 // indirect
 	github.com/coreos/ignition v0.35.0
-	github.com/filanov/bm-inventory v1.0.7-0.20200723180205-4831b2adea2f
+	github.com/filanov/bm-inventory v1.0.7-0.20200730073440-dc96569927bb
 	github.com/go-openapi/strfmt v0.19.5
 	github.com/golang/mock v1.4.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
 	github.com/openshift/client-go v0.0.0-20200422192633-6f6c07fc2a70
+	github.com/ori-amizur/introspector v1.0.7-0.20200730083031-7fbd9c25093a
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.6.0
 	github.com/thoas/go-funk v0.6.0
