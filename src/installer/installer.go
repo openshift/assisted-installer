@@ -109,7 +109,7 @@ func (i *installer) InstallNode() error {
 		return err
 	}
 
-	i.UpdateHostInstallProgress(models.HostStageWritingImageToDisk, "0%")
+	i.UpdateHostInstallProgress(models.HostStageWritingImageToDisk, "")
 
 	image, _ := utils.GetRhcosImageByOpenshiftVersion(i.OpenshiftVersion)
 	i.log.Infof("Going to use image: %s", image)

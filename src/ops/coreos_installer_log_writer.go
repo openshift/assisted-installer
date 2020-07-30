@@ -26,26 +26,20 @@ func NewCoreosInstallerLogWriter(logger *logrus.Logger, progressReporter invento
 	return &CoreosInstallerLogWriter{log: logger,
 		lastLogLine:      []byte{},
 		progressReporter: progressReporter,
-		progressRegex:    regexp.MustCompile(`^>(.*?)\((.*?)\)\s*\r`),
+		progressRegex:    regexp.MustCompile(`(.*?)\((.*?\%)\)\s*`),
 		hostID:           hostID,
 		lastProgress:     0,
 	}
 }
 
 func (l *CoreosInstallerLogWriter) Write(p []byte) (n int, err error) {
-	if bytes.Contains(p, []byte{'\n'}) {
-		// If log has a new line - log it
-		l.log.Info(string(p))
-	} else {
-		// Append bytes to last log line slice
-		l.lastLogLine = append(l.lastLogLine, p...)
-		if bytes.Contains(l.lastLogLine, []byte{'\r'}) {
-			// If log contains carriage return - log it and set to empty slice
-			l.log.Info(string(l.lastLogLine))
-			l.reportProgress()
-			l.lastLogLine = []byte{}
-
-		}
+	// Append bytes to last log line slice
+	l.lastLogLine = append(l.lastLogLine, p...)
+	if bytes.Contains(l.lastLogLine, []byte{'\r'}) || bytes.Contains(l.lastLogLine, []byte{'\n'}) {
+		// If log contains new line or carriage return - log it and set to empty slice
+		l.log.Info(string(l.lastLogLine))
+		l.reportProgress()
+		l.lastLogLine = []byte{}
 	}
 	return len(p), nil
 }

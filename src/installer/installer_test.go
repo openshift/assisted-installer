@@ -160,7 +160,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageWaitingForControlPlane)},
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
-				{string(models.HostStageWritingImageToDisk), "0%"},
+				{string(models.HostStageWritingImageToDisk)},
 				{string(models.HostStageRebooting)},
 			})
 			cleanInstallDevice()
@@ -187,7 +187,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageWaitingForControlPlane)},
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
-				{string(models.HostStageWritingImageToDisk), "0%"},
+				{string(models.HostStageWritingImageToDisk)},
 			})
 			cleanInstallDevice()
 			mkdirSuccess()
@@ -210,7 +210,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("bootstrap fail to restart NetworkManager", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
-				{string(models.HostStageWritingImageToDisk), "0%"},
+				{string(models.HostStageWritingImageToDisk)},
 				{string(models.HostStageWaitingForControlPlane)},
 			})
 			cleanInstallDevice()
@@ -272,7 +272,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("master role happy flow", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageInstalling), conf.Role},
-				{string(models.HostStageWritingImageToDisk), "0%"},
+				{string(models.HostStageWritingImageToDisk)},
 				{string(models.HostStageRebooting)},
 			})
 			cleanInstallDevice()
@@ -329,7 +329,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("HostRoleMaster role failed to write image to disk", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageInstalling), conf.Role},
-				{string(models.HostStageWritingImageToDisk), "0%"},
+				{string(models.HostStageWritingImageToDisk)},
 			})
 			cleanInstallDevice()
 			mkdirSuccess()
@@ -342,7 +342,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("HostRoleMaster role failed to reboot", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageInstalling), conf.Role},
-				{string(models.HostStageWritingImageToDisk), "0%"},
+				{string(models.HostStageWritingImageToDisk)},
 				{string(models.HostStageRebooting)},
 			})
 			cleanInstallDevice()
@@ -370,7 +370,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("worker role happy flow", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageInstalling), conf.Role},
-				{string(models.HostStageWritingImageToDisk), "0%"},
+				{string(models.HostStageWritingImageToDisk)},
 				{string(models.HostStageRebooting)},
 			})
 			cleanInstallDevice()
