@@ -95,12 +95,13 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	Context("Bootstrap role", func() {
 		conf := config.Config{Role: string(models.HostRoleBootstrap),
-			ClusterID:        "cluster-id",
-			HostID:           "host-id",
-			Device:           "/dev/vda",
-			Host:             "https://bm-inventory.com",
-			Port:             80,
-			OpenshiftVersion: openShiftVersion,
+			ClusterID:           "cluster-id",
+			HostID:              "host-id",
+			Device:              "/dev/vda",
+			Host:                "https://bm-inventory.com",
+			Port:                80,
+			OpenshiftVersion:    openShiftVersion,
+			InstallationTimeout: 120,
 		}
 		BeforeEach(func() {
 			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
