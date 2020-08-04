@@ -34,7 +34,7 @@ jobs:
       id: get_experation
       run: echo '::set-env name=QUAY_TAG_EXPIRATION::1w'
     - name: Publish Installer to Registry
-      if: github.event_name == 'pull_request'
+      if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
       uses: elgohr/Publish-Docker-Github-Action@2.15
       with:
         name: assisted-installer
@@ -57,7 +57,7 @@ jobs:
         tags: "PR_${{ env.GIT_REVISION }}"
     - name: Publish Installer to Registry with latest tag
       # Publish the image with latest tag only in case of push to master
-      if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+      if: github.event_name != 'pull_request'
       uses: elgohr/Publish-Docker-Github-Action@2.15
       with:
         name: assisted-installer
