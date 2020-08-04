@@ -9,7 +9,7 @@ import (
 	"github.com/eranco74/assisted-installer/src/k8s_client"
 	"github.com/eranco74/assisted-installer/src/ops"
 	"github.com/eranco74/assisted-installer/src/utils"
-	"github.com/filanov/bm-inventory/models"
+	"github.com/openshift/assisted-service/models"
 )
 
 func main() {

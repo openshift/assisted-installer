@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/filanov/bm-inventory/models"
+	"github.com/openshift/assisted-service/models"
 )
 
 type Config struct {

@@ -13,7 +13,8 @@ import (
 
 	ignition "github.com/coreos/ignition/config/v2_2"
 	"github.com/coreos/ignition/config/v2_2/types"
-	"github.com/filanov/bm-inventory/models"
+	"github.com/openshift/assisted-service/models"
+
 	"github.com/vincent-petithory/dataurl"
 
 	"github.com/sirupsen/logrus"

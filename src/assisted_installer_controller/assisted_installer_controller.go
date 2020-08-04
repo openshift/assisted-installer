@@ -9,7 +9,7 @@ import (
 	"github.com/eranco74/assisted-installer/src/inventory_client"
 	"github.com/eranco74/assisted-installer/src/k8s_client"
 	"github.com/eranco74/assisted-installer/src/ops"
-	"github.com/filanov/bm-inventory/models"
+	"github.com/openshift/assisted-service/models"
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/certificates/v1beta1"
@@ -170,7 +170,7 @@ func (c controller) PostInstallConfigs(wg *sync.WaitGroup) {
 		time.Sleep(GeneralWaitTimeout)
 		cluster, err := c.ic.GetCluster()
 		if err != nil {
-			c.log.WithError(err).Errorf("Failed to get cluster %s from bm-inventory", c.ClusterID)
+			c.log.WithError(err).Errorf("Failed to get cluster %s from assisted-service", c.ClusterID)
 			continue
 		}
 		// waiting till cluster will be installed(3 masters must be installed)
@@ -213,7 +213,7 @@ func (c controller) addRouterCAToClusterCA() {
 		c.log.Infof("Sending ingress certificate to inventory service. Certificate data %s", caConfigMap.Data["ca-bundle.crt"])
 		err = c.ic.UploadIngressCa(caConfigMap.Data["ca-bundle.crt"], c.ClusterID)
 		if err != nil {
-			c.log.WithError(err).Errorf("Failed to upload ingress ca to bm-inventory")
+			c.log.WithError(err).Errorf("Failed to upload ingress ca to assisted-service")
 			continue
 		}
 		c.log.Infof("Ingress ca successfully sent to inventory")

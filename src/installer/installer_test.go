@@ -13,7 +13,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 
 	"github.com/eranco74/assisted-installer/src/k8s_client"
-	"github.com/filanov/bm-inventory/models"
+	"github.com/openshift/assisted-service/models"
 
 	"github.com/eranco74/assisted-installer/src/config"
 	"github.com/eranco74/assisted-installer/src/inventory_client"
@@ -98,7 +98,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ClusterID:           "cluster-id",
 			HostID:              "host-id",
 			Device:              "/dev/vda",
-			URL:                 "https://bm-inventory.com",
+			URL:                 "https://assisted-service.com",
 			OpenshiftVersion:    openShiftVersion,
 			InstallationTimeout: 120,
 		}
@@ -262,7 +262,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ClusterID:        "cluster-id",
 			HostID:           "host-id",
 			Device:           "/dev/vda",
-			Host:             "https://bm-inventory.com",
+			Host:             "https://assisted-service.com",
 			Port:             80,
 			OpenshiftVersion: openShiftVersion,
 		}
@@ -360,7 +360,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ClusterID:        "cluster-id",
 			HostID:           "host-id",
 			Device:           "/dev/vda",
-			Host:             "https://bm-inventory.com",
+			Host:             "https://assisted-service.com",
 			Port:             80,
 			OpenshiftVersion: openShiftVersion,
 		}
@@ -387,7 +387,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ClusterID:        "cluster-id",
 			HostID:           "host-id",
 			Device:           "/dev/vda",
-			Host:             "https://bm-inventory.com",
+			Host:             "https://assisted-service.com",
 			Port:             80,
 			OpenshiftVersion: "Bad version",
 		}

@@ -163,8 +163,8 @@
       },
       {
         "names": [
-          "quay.io/ocpmetal/bm-inventory@sha256:b0fc1c6b8cddd26368cc613b5f432490f138c2628be0ad6fc675a050be7b5382",
-          "quay.io/ocpmetal/bm-inventory:stable"
+          "quay.io/ocpmetal/assisted-service@sha256:b0fc1c6b8cddd26368cc613b5f432490f138c2628be0ad6fc675a050be7b5382",
+          "quay.io/ocpmetal/assisted-service:stable"
         ],
         "sizeBytes": 43074623
       },

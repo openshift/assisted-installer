@@ -9,13 +9,11 @@ import (
 	"os"
 
 	"github.com/eranco74/assisted-installer/src/utils"
-
-	"github.com/filanov/bm-inventory/models"
-
-	"github.com/filanov/bm-inventory/client"
-	"github.com/filanov/bm-inventory/client/installer"
-	"github.com/filanov/bm-inventory/pkg/requestid"
 	"github.com/go-openapi/strfmt"
+	"github.com/openshift/assisted-service/client"
+	"github.com/openshift/assisted-service/client/installer"
+	"github.com/openshift/assisted-service/models"
+	"github.com/openshift/assisted-service/pkg/requestid"
 	"github.com/sirupsen/logrus"
 )
 

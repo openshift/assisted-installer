@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/eranco74/assisted-installer/src/inventory_client"
-	"github.com/filanov/bm-inventory/models"
 	"github.com/golang/mock/gomock"
+	"github.com/openshift/assisted-service/models"
 
 	"github.com/sirupsen/logrus/hooks/test"
 

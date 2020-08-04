@@ -7,8 +7,8 @@ package inventory_client
 import (
 	reflect "reflect"
 
-	models "github.com/filanov/bm-inventory/models"
 	gomock "github.com/golang/mock/gomock"
+	models "github.com/openshift/assisted-service/models"
 )
 
 // MockInventoryClient is a mock of InventoryClient interface

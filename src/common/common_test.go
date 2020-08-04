@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	"github.com/eranco74/assisted-installer/src/inventory_client"
-	"github.com/filanov/bm-inventory/models"
 	"github.com/go-openapi/strfmt"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/openshift/assisted-service/models"
 	"github.com/sirupsen/logrus"
 )
 
