@@ -98,8 +98,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ClusterID:           "cluster-id",
 			HostID:              "host-id",
 			Device:              "/dev/vda",
-			Host:                "https://bm-inventory.com",
-			Port:                80,
+			URL:                 "https://bm-inventory.com",
 			OpenshiftVersion:    openShiftVersion,
 			InstallationTimeout: 120,
 		}
