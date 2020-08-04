@@ -31,13 +31,18 @@ func main() {
 		log.Fatalf("Failed to create k8 client %e", err)
 	}
 
-	logger.Infof("Start running assisted-installer with cluster-id %s, host %s , port %d ",
-		Options.ControllerConfig.ClusterID, Options.ControllerConfig.Host, Options.ControllerConfig.Port)
+	logger.Infof("Start running assisted-installer with cluster-id %s, url %s",
+		Options.ControllerConfig.ClusterID, Options.ControllerConfig.URL)
+
+	client, err := inventory_client.CreateInventoryClient(Options.ControllerConfig.ClusterID, Options.ControllerConfig.URL, logger)
+	if err != nil {
+		log.Fatalf("Failed to create inventory client %e", err)
+	}
 
 	assistedController := assistedinstallercontroller.NewController(logger,
 		Options.ControllerConfig,
 		ops.NewOps(logger),
-		inventory_client.CreateInventoryClient(Options.ControllerConfig.ClusterID, Options.ControllerConfig.Host, Options.ControllerConfig.Port, logger),
+		client,
 		kc,
 	)
 	var wg sync.WaitGroup

@@ -28,8 +28,7 @@ var GeneralWaitTimeout = generalWaitTimeoutInt * time.Second
 
 type ControllerConfig struct {
 	ClusterID string `envconfig:"CLUSTER_ID" required:"true" `
-	Host      string `envconfig:"INVENTORY_HOST" required:"true"`
-	Port      int    `envconfig:"INVENTORY_PORT" required:"true"`
+	URL       string `envconfig:"INVENTORY_URL" required:"true"`
 }
 
 type Controller interface {

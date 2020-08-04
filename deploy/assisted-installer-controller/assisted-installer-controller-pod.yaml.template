@@ -23,16 +23,11 @@ spec:
                   # The ConfigMap containing the value you want to assign to SPECIAL_LEVEL_KEY
                   name: assisted-installer-controller-config
                   key: cluster-id
-            - name: INVENTORY_HOST
+            - name: INVENTORY_URL
               valueFrom:
                 configMapKeyRef:
                   name: assisted-installer-controller-config
-                  key: inventory-host
-            - name: INVENTORY_PORT
-              valueFrom:
-                configMapKeyRef:
-                  name: assisted-installer-controller-config
-                  key: inventory-port
+                  key: inventory-url
 
           envFrom:
             - configMapRef:

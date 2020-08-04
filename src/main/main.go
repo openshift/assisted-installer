@@ -16,10 +16,15 @@ func main() {
 	config.ProcessArgs()
 	logger := utils.InitLogger(config.GlobalConfig.Verbose, true)
 	logger.Infof("Assisted installer started. Configuration is:\n %+v", config.GlobalConfig)
+	client, err := inventory_client.CreateInventoryClient(config.GlobalConfig.ClusterID, config.GlobalConfig.URL, logger)
+	if err != nil {
+		logger.Fatalf("Failed to create inventory client %e", err)
+	}
+
 	ai := installer.NewAssistedInstaller(logger,
 		config.GlobalConfig,
 		ops.NewOps(logger),
-		inventory_client.CreateInventoryClient(config.GlobalConfig.ClusterID, config.GlobalConfig.Host, config.GlobalConfig.Port, logger),
+		client,
 		k8s_client.NewK8SClient,
 	)
 	if err := ai.InstallNode(); err != nil {

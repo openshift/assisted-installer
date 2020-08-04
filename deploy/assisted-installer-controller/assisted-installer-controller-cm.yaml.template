@@ -7,5 +7,4 @@ metadata:
     app: assisted-installer-controller
 data:
   cluster-id: {{.ClusterId}}
-  inventory-host: {{.InventoryHost}}
-  inventory-port: {{.InventoryPort}}
+  inventory-url: {{.InventoryUrl}}

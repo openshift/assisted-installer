@@ -100,8 +100,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	Context("Waiting for 3 nodes", func() {
 		conf := ControllerConfig{
 			ClusterID: "cluster-id",
-			Host:      "https://bm-inventory.com",
-			Port:      80,
+			URL:       "https://bm-inventory.com:80",
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
@@ -121,8 +120,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	Context("Waiting for 3 nodes, will appear one by one", func() {
 		conf := ControllerConfig{
 			ClusterID: "cluster-id",
-			Host:      "https://bm-inventory.com",
-			Port:      80,
+			URL:       "https://bm-inventory.com:80",
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
@@ -163,8 +161,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	Context("UpdateStatusFails and then succeeds", func() {
 		conf := ControllerConfig{
 			ClusterID: "cluster-id",
-			Host:      "https://bm-inventory.com",
-			Port:      80,
+			URL:       "https://bm-inventory.com:80",
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
@@ -194,8 +191,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	Context("ListNodes fails and then succeeds", func() {
 		conf := ControllerConfig{
 			ClusterID: "cluster-id",
-			Host:      "https://bm-inventory.com",
-			Port:      80,
+			URL:       "https://bm-inventory.com:80",
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
@@ -219,8 +215,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	Context("validating getInventoryNodes", func() {
 		conf := ControllerConfig{
 			ClusterID: "cluster-id",
-			Host:      "https://bm-inventory.com",
-			Port:      80,
+			URL:       "https://bm-inventory.com:80",
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
@@ -240,8 +235,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	Context("validating ApproveCsrs", func() {
 		conf := ControllerConfig{
 			ClusterID: "cluster-id",
-			Host:      "https://bm-inventory.com",
-			Port:      80,
+			URL:       "https://bm-inventory.com:80",
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
@@ -301,8 +295,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	Context("validating AddRouterCAToClusterCA", func() {
 		conf := ControllerConfig{
 			ClusterID: "cluster-id",
-			Host:      "https://bm-inventory.com",
-			Port:      80,
+			URL:       "https://bm-inventory.com:80",
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)

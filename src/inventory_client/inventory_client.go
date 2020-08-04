@@ -41,12 +41,17 @@ type EnabledHostData struct {
 	Host      *models.Host
 }
 
-func CreateInventoryClient(clusterId string, host string, port int, logger *logrus.Logger) *inventoryClient {
+func CreateInventoryClient(clusterId string, inventoryURL string, logger *logrus.Logger) (*inventoryClient, error) {
 	clientConfig := client.Config{}
-	clientConfig.URL, _ = url.Parse(createUrl(host, port))
+	var err error
+	clientConfig.URL, err = url.ParseRequestURI(createUrl(inventoryURL))
+	if err != nil {
+		return nil, err
+	}
+
 	clientConfig.Transport = requestid.Transport(http.DefaultTransport)
 	assistedInstallClient := client.New(clientConfig)
-	return &inventoryClient{logger, assistedInstallClient, strfmt.UUID(clusterId)}
+	return &inventoryClient{logger, assistedInstallClient, strfmt.UUID(clusterId)}, nil
 }
 
 func (c *inventoryClient) DownloadFile(filename string, dest string) error {
@@ -101,10 +106,9 @@ func (c *inventoryClient) GetEnabledHostsNamesHosts() (map[string]EnabledHostDat
 	return namesIdsMap, nil
 }
 
-func createUrl(host string, port int) string {
-	return fmt.Sprintf("http://%s:%d/%s",
-		host,
-		port,
+func createUrl(baseURL string) string {
+	return fmt.Sprintf("%s/%s",
+		baseURL,
 		client.DefaultBasePath,
 	)
 }

@@ -221,9 +221,8 @@ func (o *ops) PrepareController() error {
 
 func (o *ops) renderControllerCm() error {
 	var params = map[string]string{
-		"InventoryHost": config.GlobalConfig.Host,
-		"InventoryPort": fmt.Sprintf("\"%d\"", config.GlobalConfig.Port),
-		"ClusterId":     config.GlobalConfig.ClusterID,
+		"InventoryUrl": config.GlobalConfig.URL,
+		"ClusterId":    config.GlobalConfig.ClusterID,
 	}
 
 	return o.renderDeploymentFiles(filepath.Join(controllerDeployFolder, controllerDeployCmTemplate),
