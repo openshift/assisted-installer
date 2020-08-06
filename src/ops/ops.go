@@ -40,12 +40,14 @@ type Ops interface {
 }
 
 const (
-	controllerDeployFolder      = "/assisted-installer-controller/deploy"
-	manifestsFolder             = "/opt/openshift/manifests"
-	renderedControllerCm        = "assisted-installer-controller-cm.yaml"
-	controllerDeployCmTemplate  = "assisted-installer-controller-cm.yaml.template"
-	renderedControllerPod       = "assisted-installer-controller-pod.yaml"
-	controllerDeployPodTemplate = "assisted-installer-controller-pod.yaml.template"
+	controllerDeployFolder         = "/assisted-installer-controller/deploy"
+	manifestsFolder                = "/opt/openshift/manifests"
+	renderedControllerCm           = "assisted-installer-controller-cm.yaml"
+	controllerDeployCmTemplate     = "assisted-installer-controller-cm.yaml.template"
+	renderedControllerPod          = "assisted-installer-controller-pod.yaml"
+	controllerDeployPodTemplate    = "assisted-installer-controller-pod.yaml.template"
+	renderedControllerSecret       = "assisted-installer-controller-secret.yaml"
+	controllerDeploySecretTemplate = "assisted-installer-controller-secret.yaml.template"
 )
 
 type ops struct {
@@ -199,6 +201,10 @@ func (o *ops) PrepareController() error {
 		return err
 	}
 
+	if err := o.renderControllerSecret(); err != nil {
+		return err
+	}
+
 	if err := o.renderControllerPod(); err != nil {
 		return err
 	}
@@ -227,6 +233,15 @@ func (o *ops) renderControllerCm() error {
 
 	return o.renderDeploymentFiles(filepath.Join(controllerDeployFolder, controllerDeployCmTemplate),
 		params, renderedControllerCm)
+}
+
+func (o *ops) renderControllerSecret() error {
+	var params = map[string]string{
+		"PullSecretToken": config.GlobalConfig.PullSecretToken,
+	}
+
+	return o.renderDeploymentFiles(filepath.Join(controllerDeployFolder, controllerDeploySecretTemplate),
+		params, renderedControllerSecret)
 }
 
 func (o *ops) renderControllerPod() error {

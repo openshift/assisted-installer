@@ -22,6 +22,7 @@ type Config struct {
 	Hostname            string
 	ControllerImage     string
 	InstallationTimeout time.Duration
+	PullSecretToken     string
 }
 
 var GlobalConfig Config

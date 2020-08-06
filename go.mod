@@ -10,7 +10,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
-	github.com/openshift/assisted-service v0.0.0-20200804102354-9a7ac159dd96
+	github.com/openshift/assisted-service v0.0.0-20200805103259-9ca9af7cddc0
 	github.com/openshift/client-go v0.0.0-20200422192633-6f6c07fc2a70
 	github.com/ori-amizur/introspector v1.0.7-0.20200730083031-7fbd9c25093a
 	github.com/pkg/errors v0.9.1

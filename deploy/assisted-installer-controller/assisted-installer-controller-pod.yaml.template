@@ -28,7 +28,11 @@ spec:
                 configMapKeyRef:
                   name: assisted-installer-controller-config
                   key: inventory-url
-
+            - name: PULL_SECRET_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: assisted-installer-controller-secret
+                  key: pull-secret-token
           envFrom:
             - configMapRef:
                 name: assisted-installer-controller-config

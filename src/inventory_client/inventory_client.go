@@ -10,9 +10,11 @@ import (
 
 	"github.com/eranco74/assisted-installer/src/utils"
 	"github.com/go-openapi/strfmt"
+
 	"github.com/openshift/assisted-service/client"
 	"github.com/openshift/assisted-service/client/installer"
 	"github.com/openshift/assisted-service/models"
+	"github.com/openshift/assisted-service/pkg/auth"
 	"github.com/openshift/assisted-service/pkg/requestid"
 	"github.com/sirupsen/logrus"
 )
@@ -39,7 +41,7 @@ type EnabledHostData struct {
 	Host      *models.Host
 }
 
-func CreateInventoryClient(clusterId string, inventoryURL string, logger *logrus.Logger) (*inventoryClient, error) {
+func CreateInventoryClient(clusterId string, inventoryURL string, pullSecret string, logger *logrus.Logger) (*inventoryClient, error) {
 	clientConfig := client.Config{}
 	var err error
 	clientConfig.URL, err = url.ParseRequestURI(createUrl(inventoryURL))
@@ -48,6 +50,7 @@ func CreateInventoryClient(clusterId string, inventoryURL string, logger *logrus
 	}
 
 	clientConfig.Transport = requestid.Transport(http.DefaultTransport)
+	clientConfig.AuthInfo = auth.AgentAuthHeaderWriter(pullSecret)
 	assistedInstallClient := client.New(clientConfig)
 	return &inventoryClient{logger, assistedInstallClient, strfmt.UUID(clusterId)}, nil
 }
