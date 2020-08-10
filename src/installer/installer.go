@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/eranco74/assisted-installer/src/common"
+	"github.com/openshift/assisted-installer/src/common"
 
 	"path/filepath"
 	"time"
@@ -16,13 +16,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	"github.com/eranco74/assisted-installer/src/k8s_client"
+	"github.com/openshift/assisted-installer/src/k8s_client"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/eranco74/assisted-installer/src/config"
-	"github.com/eranco74/assisted-installer/src/inventory_client"
-	"github.com/eranco74/assisted-installer/src/ops"
-	"github.com/eranco74/assisted-installer/src/utils"
+	"github.com/openshift/assisted-installer/src/config"
+	"github.com/openshift/assisted-installer/src/inventory_client"
+	"github.com/openshift/assisted-installer/src/ops"
+	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/sirupsen/logrus"
 )
 

@@ -4,11 +4,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/eranco74/assisted-installer/src/common"
+	"github.com/openshift/assisted-installer/src/common"
 
-	"github.com/eranco74/assisted-installer/src/inventory_client"
-	"github.com/eranco74/assisted-installer/src/k8s_client"
-	"github.com/eranco74/assisted-installer/src/ops"
+	"github.com/openshift/assisted-installer/src/inventory_client"
+	"github.com/openshift/assisted-installer/src/k8s_client"
+	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-service/models"
 
 	"github.com/sirupsen/logrus"

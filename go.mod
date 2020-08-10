@@ -1,4 +1,4 @@
-module github.com/eranco74/assisted-installer
+module github.com/openshift/assisted-installer
 
 go 1.14
 

@@ -5,12 +5,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/eranco74/assisted-installer/src/k8s_client"
+	"github.com/openshift/assisted-installer/src/k8s_client"
 
-	assistedinstallercontroller "github.com/eranco74/assisted-installer/src/assisted_installer_controller"
-	"github.com/eranco74/assisted-installer/src/inventory_client"
-	"github.com/eranco74/assisted-installer/src/ops"
 	"github.com/kelseyhightower/envconfig"
+	assistedinstallercontroller "github.com/openshift/assisted-installer/src/assisted_installer_controller"
+	"github.com/openshift/assisted-installer/src/inventory_client"
+	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/sirupsen/logrus"
 )
 

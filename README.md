@@ -5,7 +5,7 @@ The Asssited Installer uses CoreOS Ignition as a configuration format. The ignit
 
 The Assisted Installer is executed by the Assisted Installation Service. Once the cluster installation begins (after host discovery), each host will get the relevant install command from the service. For example:
 ```bash
-sudo podman run -e CLUSTER_ID=<clusterID> -e BUCKET=<S3 bucket> -e S3_URL=<S3 url> -e DEVICE=<boot disk> -v /dev:/dev:rw --privileged --pid=host  quay.io/eranco74/assisted-installer:latest -r <node role>
+sudo podman run -e CLUSTER_ID=<clusterID> -e BUCKET=<S3 bucket> -e S3_URL=<S3 url> -e DEVICE=<boot disk> -v /dev:/dev:rw --privileged --pid=host  quay.io/openshift/assisted-installer:latest -r <node role>
 ```
 
 There are 3 different roles for installing a node using the assisted installer: 

@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/eranco74/assisted-installer/src/utils"
+	"github.com/openshift/assisted-installer/src/utils"
 	"k8s.io/apimachinery/pkg/labels"
 
 	"k8s.io/api/certificates/v1beta1"
 
-	"github.com/eranco74/assisted-installer/src/ops"
+	"github.com/openshift/assisted-installer/src/ops"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd"
 

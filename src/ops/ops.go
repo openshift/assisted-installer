@@ -7,9 +7,9 @@ import (
 	"os"
 	"text/template"
 
-	"github.com/eranco74/assisted-installer/src/inventory_client"
+	"github.com/openshift/assisted-installer/src/inventory_client"
 
-	"github.com/eranco74/assisted-installer/src/config"
+	"github.com/openshift/assisted-installer/src/config"
 
 	"io/ioutil"
 	"os/exec"
@@ -17,7 +17,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/eranco74/assisted-installer/src/utils"
+	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/sirupsen/logrus"
 )
 

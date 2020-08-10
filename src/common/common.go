@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/eranco74/assisted-installer/src/inventory_client"
+	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-service/models"
 	"github.com/sirupsen/logrus"
 )

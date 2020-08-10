@@ -3,12 +3,12 @@ package main
 import (
 	"os"
 
-	"github.com/eranco74/assisted-installer/src/config"
-	"github.com/eranco74/assisted-installer/src/installer"
-	"github.com/eranco74/assisted-installer/src/inventory_client"
-	"github.com/eranco74/assisted-installer/src/k8s_client"
-	"github.com/eranco74/assisted-installer/src/ops"
-	"github.com/eranco74/assisted-installer/src/utils"
+	"github.com/openshift/assisted-installer/src/config"
+	"github.com/openshift/assisted-installer/src/installer"
+	"github.com/openshift/assisted-installer/src/inventory_client"
+	"github.com/openshift/assisted-installer/src/k8s_client"
+	"github.com/openshift/assisted-installer/src/ops"
+	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/models"
 )
 

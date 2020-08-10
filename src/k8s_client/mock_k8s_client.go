@@ -7,8 +7,8 @@ package k8s_client
 import (
 	reflect "reflect"
 
-	ops "github.com/eranco74/assisted-installer/src/ops"
 	gomock "github.com/golang/mock/gomock"
+	ops "github.com/openshift/assisted-installer/src/ops"
 	v1beta1 "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/api/core/v1"
 )

@@ -4,8 +4,8 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/eranco74/assisted-installer/src/inventory_client"
 	"github.com/golang/mock/gomock"
+	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-service/models"
 
 	"github.com/sirupsen/logrus/hooks/test"

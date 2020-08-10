@@ -8,8 +8,8 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/eranco74/assisted-installer/src/utils"
 	"github.com/go-openapi/strfmt"
+	"github.com/openshift/assisted-installer/src/utils"
 
 	"github.com/openshift/assisted-service/client"
 	"github.com/openshift/assisted-service/client/installer"

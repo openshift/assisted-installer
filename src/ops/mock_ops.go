@@ -8,8 +8,8 @@ import (
 	io "io"
 	reflect "reflect"
 
-	inventory_client "github.com/eranco74/assisted-installer/src/inventory_client"
 	gomock "github.com/golang/mock/gomock"
+	inventory_client "github.com/openshift/assisted-installer/src/inventory_client"
 )
 
 // MockOps is a mock of Ops interface
