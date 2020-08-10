@@ -1,15 +1,18 @@
 pipeline {
 
-  environment { IMAGE = 'ocpmetal/assisted-installer'}
+  environment {
+        INSTALLER = 'quay.io/ocpmetal/assisted-installer'
+        CONTROLLER = 'quay.io/ocpmetal/assisted-installer-controller'
+  }
   agent {
     node {
-      label 'bm-inventory-subsystem'
+      label 'host'
     }
   }
   stages {
     stage('build') {
       steps {
-        sh 'docker build . -f Dockerfile.assisted-installer-build -t ocpmetal/assisted-installer'
+        sh 'skipper make'
       }
     }
 
@@ -24,10 +27,15 @@ pipeline {
                       sh '''docker login quay.io -u $USER -p $PASS'''
                   }
 
-                  sh '''docker tag  ${IMAGE} quay.io/ocpmetal/assisted-installer:latest'''
-                  sh '''docker tag  ${IMAGE} quay.io/ocpmetal/assisted-installer:${GIT_COMMIT}'''
-                  sh '''docker push quay.io/ocpmetal/assisted-installer:latest'''
-                  sh '''docker push quay.io/ocpmetal/assisted-installer:${GIT_COMMIT}'''
+                  sh '''docker tag  ${INSTALLER} ${INSTALLER}:latest'''
+                  sh '''docker tag  ${INSTALLER} ${INSTALLER}:${GIT_COMMIT}'''
+                  sh '''docker push ${INSTALLER}:latest'''
+                  sh '''docker push ${INSTALLER}:${GIT_COMMIT}'''
+
+                  sh '''docker tag  ${CONTROLLER} ${CONTROLLER}:latest'''
+                  sh '''docker tag  ${CONTROLLER} ${CONTROLLER}:${GIT_COMMIT}'''
+                  sh '''docker push ${CONTROLLER}:latest'''
+                  sh '''docker push ${CONTROLLER}:${GIT_COMMIT}'''
               }
    }
 }
