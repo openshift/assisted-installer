@@ -30,6 +30,8 @@ type ControllerConfig struct {
 	ClusterID       string `envconfig:"CLUSTER_ID" required:"true" `
 	URL             string `envconfig:"INVENTORY_URL" required:"true"`
 	PullSecretToken string `envconfig:"PULL_SECRET_TOKEN" required:"true"`
+	Insecure        bool   `envconfig:"SKIP_CERT_VERIFICATION" required:"false"`
+	CACertPath      string `envconfig:"CA_CERT_PATH" required:"false"`
 }
 
 type Controller interface {

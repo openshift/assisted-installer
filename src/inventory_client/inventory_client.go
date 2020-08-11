@@ -2,11 +2,16 @@ package inventory_client
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/go-openapi/strfmt"
 	"github.com/openshift/assisted-installer/src/utils"
@@ -41,7 +46,7 @@ type EnabledHostData struct {
 	Host      *models.Host
 }
 
-func CreateInventoryClient(clusterId string, inventoryURL string, pullSecret string, logger *logrus.Logger) (*inventoryClient, error) {
+func CreateInventoryClient(clusterId string, inventoryURL string, pullSecret string, insecure bool, caPath string, logger *logrus.Logger) (*inventoryClient, error) {
 	clientConfig := client.Config{}
 	var err error
 	clientConfig.URL, err = url.ParseRequestURI(createUrl(inventoryURL))
@@ -49,10 +54,56 @@ func CreateInventoryClient(clusterId string, inventoryURL string, pullSecret str
 		return nil, err
 	}
 
-	clientConfig.Transport = requestid.Transport(http.DefaultTransport)
+	var certs *x509.CertPool
+	if insecure {
+		logger.Warn("Certificate verification is turned off. This is not recommended in production environments")
+	} else {
+		certs, err = readCACertificate(caPath, logger)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	clientConfig.Transport = requestid.Transport(&http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: insecure,
+			RootCAs:            certs,
+		},
+	})
 	clientConfig.AuthInfo = auth.AgentAuthHeaderWriter(pullSecret)
 	assistedInstallClient := client.New(clientConfig)
 	return &inventoryClient{logger, assistedInstallClient, strfmt.UUID(clusterId)}, nil
+}
+
+func readCACertificate(capath string, logger *logrus.Logger) (*x509.CertPool, error) {
+
+	if capath == "" {
+		return nil, nil
+	}
+
+	caData, err := ioutil.ReadFile(capath)
+	if err != nil {
+		return nil, err
+	}
+
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(caData) {
+		return nil, fmt.Errorf("certificate corrupted or in invalid format: %s", capath)
+	} else {
+		logger.Infof("Using custom CA certificate: %s", capath)
+	}
+
+	return pool, nil
 }
 
 func (c *inventoryClient) DownloadFile(filename string, dest string) error {
