@@ -359,7 +359,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ClusterID:        "cluster-id",
 			HostID:           "host-id",
 			Device:           "/dev/vda",
-			URL:              "https://assisted-service.com",
+			URL:              "https://assisted-service.com:80",
 			OpenshiftVersion: openShiftVersion,
 		}
 		BeforeEach(func() {
