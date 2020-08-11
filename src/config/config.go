@@ -2,7 +2,6 @@ package config
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"time"
 
@@ -14,9 +13,7 @@ type Config struct {
 	ClusterID           string
 	HostID              string
 	Device              string
-	Host                string
 	URL                 string
-	Port                int
 	Verbose             bool
 	OpenshiftVersion    string
 	Hostname            string
@@ -38,8 +35,6 @@ func ProcessArgs() {
 	flag.StringVar(&ret.ClusterID, "cluster-id", "", "The cluster id")
 	flag.StringVar(&ret.HostID, "host-id", "", "This host id")
 	flag.StringVar(&ret.Device, "boot-device", "", "The boot device")
-	flag.StringVar(&ret.Host, "host", "", "The BM inventory host address (deprecated)")
-	flag.IntVar(&ret.Port, "port", 80, "The BM inventory port (deprecated)")
 	flag.StringVar(&ret.URL, "url", "", "The BM inventory URL, including a scheme and optionally a port (overrides the host and port arguments")
 	flag.StringVar(&ret.OpenshiftVersion, "openshift-version", "4.4", "Openshift version to install")
 	flag.StringVar(&ret.Hostname, "host-name", "", "hostname to be set for this node")
@@ -51,9 +46,5 @@ func ProcessArgs() {
 	flag.Parse()
 	if h != nil && *h {
 		printHelpAndExit()
-	}
-
-	if ret.URL == "" {
-		ret.URL = fmt.Sprintf("http://%s:%d", ret.Host, ret.Port)
 	}
 }
