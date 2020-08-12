@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/ori-amizur/introspector/pkg/journalLogger"
+	"github.com/openshift/assisted-installer-agent/pkg/journalLogger"
 
 	ignition "github.com/coreos/ignition/config/v2_2"
 	"github.com/coreos/ignition/config/v2_2/types"
