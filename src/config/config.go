@@ -20,6 +20,8 @@ type Config struct {
 	ControllerImage     string
 	InstallationTimeout time.Duration
 	PullSecretToken     string
+	InsecureConnection  bool
+	CACertPath          string
 }
 
 var GlobalConfig Config
@@ -42,6 +44,8 @@ func ProcessArgs() {
 	flag.StringVar(&ret.ControllerImage, "controller-image", "quay.io/ocpmetal/assisted-installer-controller:latest",
 		"Assisted Installer Controller image URL")
 	flag.DurationVar(&ret.InstallationTimeout, "installation-timeout", 120, "Installation timeout in minutes")
+	flag.BoolVar(&ret.InsecureConnection, "insecure", false, "Do not validate TLS certificate")
+	flag.StringVar(&ret.CACertPath, "cacert", "", "Path to custom CA certificate in PEM format")
 	h := flag.Bool("help", false, "Help message")
 	flag.Parse()
 	if h != nil && *h {
