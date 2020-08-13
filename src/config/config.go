@@ -18,6 +18,7 @@ type Config struct {
 	OpenshiftVersion    string
 	Hostname            string
 	ControllerImage     string
+	AgentImage			string
 	InstallationTimeout time.Duration
 	PullSecretToken     string
 	InsecureConnection  bool
@@ -43,6 +44,8 @@ func ProcessArgs() {
 	flag.BoolVar(&ret.Verbose, "verbose", false, "Increase verbosity, set log level to debug")
 	flag.StringVar(&ret.ControllerImage, "controller-image", "quay.io/ocpmetal/assisted-installer-controller:latest",
 		"Assisted Installer Controller image URL")
+	flag.StringVar(&ret.AgentImage, "agent-image", "quay.io/ocpmetal/assisted-installer-agent:latest",
+		"Assisted Installer Agent image URL that will be used to send logs on successful installation")
 	flag.DurationVar(&ret.InstallationTimeout, "installation-timeout", 120, "Installation timeout in minutes")
 	flag.BoolVar(&ret.InsecureConnection, "insecure", false, "Do not validate TLS certificate")
 	flag.StringVar(&ret.CACertPath, "cacert", "", "Path to custom CA certificate in PEM format")

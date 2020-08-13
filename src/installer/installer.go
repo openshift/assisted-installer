@@ -132,6 +132,7 @@ func (i *installer) InstallNode() error {
 		}
 	}
 	i.UpdateHostInstallProgress(models.HostStageRebooting, "")
+	_, _ = i.ops.UploadInstallationLogs()
 	if err = i.ops.Reboot(); err != nil {
 		return err
 	}
