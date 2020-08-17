@@ -3,11 +3,12 @@ package installer
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-openapi/strfmt"
 

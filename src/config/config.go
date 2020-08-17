@@ -18,7 +18,7 @@ type Config struct {
 	OpenshiftVersion    string
 	Hostname            string
 	ControllerImage     string
-	AgentImage			string
+	AgentImage          string
 	InstallationTimeout time.Duration
 	PullSecretToken     string
 	InsecureConnection  bool
