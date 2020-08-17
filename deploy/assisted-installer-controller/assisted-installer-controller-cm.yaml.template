@@ -8,3 +8,5 @@ metadata:
 data:
   cluster-id: {{.ClusterId}}
   inventory-url: {{.InventoryUrl}}
+  skip-cert-verification: '{{.SkipCertVerification}}'
+  ca-cert-path: '{{.CACertPath}}'

@@ -34,7 +34,7 @@ func main() {
 	logger.Infof("Start running assisted-installer with cluster-id %s, url %s",
 		Options.ControllerConfig.ClusterID, Options.ControllerConfig.URL)
 
-	client, err := inventory_client.CreateInventoryClient(Options.ControllerConfig.ClusterID, Options.ControllerConfig.URL, Options.ControllerConfig.PullSecretToken, Options.ControllerConfig.Insecure, Options.ControllerConfig.CACertPath, logger)
+	client, err := inventory_client.CreateInventoryClient(Options.ControllerConfig.ClusterID, Options.ControllerConfig.URL, Options.ControllerConfig.PullSecretToken, Options.ControllerConfig.SkipCertVerification, Options.ControllerConfig.CACertPath, logger)
 	if err != nil {
 		log.Fatalf("Failed to create inventory client %e", err)
 	}

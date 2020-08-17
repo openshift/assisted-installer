@@ -9,20 +9,20 @@ import (
 )
 
 type Config struct {
-	Role                string
-	ClusterID           string
-	HostID              string
-	Device              string
-	URL                 string
-	Verbose             bool
-	OpenshiftVersion    string
-	Hostname            string
-	ControllerImage     string
-	AgentImage          string
-	InstallationTimeout time.Duration
-	PullSecretToken     string
-	InsecureConnection  bool
-	CACertPath          string
+	Role                 string
+	ClusterID            string
+	HostID               string
+	Device               string
+	URL                  string
+	Verbose              bool
+	OpenshiftVersion     string
+	Hostname             string
+	ControllerImage      string
+	AgentImage           string
+	InstallationTimeout  time.Duration
+	PullSecretToken      string
+	SkipCertVerification bool
+	CACertPath           string
 }
 
 var GlobalConfig Config
@@ -47,7 +47,7 @@ func ProcessArgs() {
 	flag.StringVar(&ret.AgentImage, "agent-image", "quay.io/ocpmetal/assisted-installer-agent:latest",
 		"Assisted Installer Agent image URL that will be used to send logs on successful installation")
 	flag.DurationVar(&ret.InstallationTimeout, "installation-timeout", 120, "Installation timeout in minutes")
-	flag.BoolVar(&ret.InsecureConnection, "insecure", false, "Do not validate TLS certificate")
+	flag.BoolVar(&ret.SkipCertVerification, "insecure", false, "Do not validate TLS certificate")
 	flag.StringVar(&ret.CACertPath, "cacert", "", "Path to custom CA certificate in PEM format")
 	h := flag.Bool("help", false, "Help message")
 	flag.Parse()
