@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="46c202be-f9c0-4f2a-bd8e-126e7bfa6c08" name="Default Changelist" comment="" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Go File" />
+      </list>
+    </option>
+  </component>
+  <component name="GOROOT" path="/usr/lib/golang" />
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GoLibraries">
+    <option name="indexEntireGoPath" value="false" />
+  </component>
+  <component name="IgnoredFileRootStore">
+    <option name="generatedRoots">
+      <set>
+        <option value="$PROJECT_DIR$/.idea" />
+      </set>
+    </option>
+  </component>
+  <component name="ProjectId" id="1bUg8m0O5iUqBVzTS0wXPhnhEK6" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showExcludedFiles" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="DefaultGoTemplateProperty" value="Go File" />
+    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="go.import.settings.migrated" value="true" />
+    <property name="go.sdk.automatically.set" value="true" />
+    <property name="go.tried.to.enable.integration.vgo.integrator" value="true" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/../assisted-service" />
+  </component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/deploy" />
+      <recent name="$PROJECT_DIR$/src/ops" />
+      <recent name="$PROJECT_DIR$/src/assisted_installer_controller" />
+      <recent name="$PROJECT_DIR$/deploy/assisted-installer-controller" />
+      <recent name="$PROJECT_DIR$/deploy/finisher" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/deploy/assisted-installer-controller" />
+      <recent name="$PROJECT_DIR$/deploy" />
+      <recent name="$PROJECT_DIR$/src/ops" />
+      <recent name="$PROJECT_DIR$/deploy/openshift_resource" />
+      <recent name="$PROJECT_DIR$/deploy/assisted-backup" />
+    </key>
+  </component>
+  <component name="ServiceViewManager">
+    <option name="viewStates">
+      <list>
+        <serviceView>
+          <treeState>
+            <expand />
+            <select />
+          </treeState>
+        </serviceView>
+      </list>
+    </option>
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="1" />
+  </component>
+  <component name="Vcs.Log.History.Properties">
+    <option name="COLUMN_ORDER">
+      <list>
+        <option value="0" />
+        <option value="2" />
+        <option value="3" />
+        <option value="1" />
+      </list>
+    </option>
+  </component>
+  <component name="VgoProject">
+    <integration-enabled>true</integration-enabled>
+    <proxy>direct</proxy>
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="581" y="326" width="831" height="436" key="#com.intellij.fileTypes.FileTypeChooser" timestamp="1589401756084">
+      <screen x="0" y="27" width="1920" height="1020" />
+    </state>
+    <state x="581" y="326" width="831" height="436" key="#com.intellij.fileTypes.FileTypeChooser/0.27.1920.1020@0.27.1920.1020" timestamp="1589401756084" />
+    <state x="100" y="127" width="1720" height="820" key="DiffContextDialog" timestamp="1596098484450">
+      <screen x="0" y="27" width="1920" height="1020" />
+    </state>
+    <state x="100" y="127" width="1720" height="820" key="DiffContextDialog/0.27.1920.1020@0.27.1920.1020" timestamp="1596098484450" />
+    <state x="693" y="240" width="524" height="601" key="FileChooserDialogImpl" timestamp="1597305248328">
+      <screen x="0" y="27" width="1920" height="1020" />
+    </state>
+    <state x="693" y="240" width="524" height="601" key="FileChooserDialogImpl/0.27.1920.1020@0.27.1920.1020" timestamp="1597305248328" />
+    <state x="100" y="127" width="1720" height="820" key="VCS.FileHistoryDialog" timestamp="1597666243555">
+      <screen x="0" y="27" width="1920" height="1020" />
+    </state>
+    <state x="100" y="127" width="1720" height="820" key="VCS.FileHistoryDialog/0.27.1920.1020@0.27.1920.1020" timestamp="1597666243555" />
+    <state x="100" y="127" width="1720" height="820" key="com.intellij.history.integration.ui.views.FileHistoryDialog" timestamp="1594108081230">
+      <screen x="0" y="27" width="1920" height="1020" />
+    </state>
+    <state x="100" y="127" width="1720" height="820" key="com.intellij.history.integration.ui.views.FileHistoryDialog/0.27.1920.1020@0.27.1920.1020" timestamp="1594108081230" />
+    <state x="607" y="70" width="696" height="940" key="com.intellij.openapi.editor.actions.MultiplePasteAction$ClipboardContentChooser" timestamp="1589824588759">
+      <screen x="0" y="27" width="1920" height="1020" />
+    </state>
+    <state x="607" y="70" width="696" height="940" key="com.intellij.openapi.editor.actions.MultiplePasteAction$ClipboardContentChooser/0.27.1920.1020@0.27.1920.1020" timestamp="1589824588759" />
+    <state x="536" y="203" width="1155" height="762" key="find.popup" timestamp="1597659843306">
+      <screen x="0" y="27" width="1920" height="1020" />
+    </state>
+    <state x="536" y="203" width="1155" height="762" key="find.popup/0.27.1920.1020@0.27.1920.1020" timestamp="1597659843306" />
+    <state x="540" y="2" width="840" height="1032" key="search.everywhere.popup" timestamp="1597332045356">
+      <screen x="0" y="27" width="1920" height="1020" />
+    </state>
+    <state x="540" y="2" width="840" height="1032" key="search.everywhere.popup/0.27.1920.1020@0.27.1920.1020" timestamp="1597332045356" />
+    <state x="670" y="439" width="570" height="203" key="vcs.readOnlyHandler.ReadOnlyStatusDialog" timestamp="1593001297449">
+      <screen x="0" y="27" width="1920" height="1020" />
+    </state>
+    <state x="670" y="439" width="570" height="203" key="vcs.readOnlyHandler.ReadOnlyStatusDialog/0.27.1920.1020@0.27.1920.1020" timestamp="1593001297449" />
+  </component>
+</project>
