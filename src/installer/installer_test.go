@@ -3,6 +3,7 @@ package installer
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/pkg/errors"
 	"io/ioutil"
 	"path/filepath"
 	"testing"
@@ -74,6 +75,11 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	writeToDiskSuccess := func() {
 		mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, masterIgn), device, image, mockbmclient).Return(nil).Times(1)
 	}
+
+	uploadLogsSuccess := func() {
+		mockops.EXPECT().UploadInstallationLogs().Return("dummy", nil).Times(1)
+	}
+
 	rebootSuccess := func() {
 		mockops.EXPECT().Reboot().Return(nil).Times(1)
 	}
@@ -179,6 +185,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			//HostRoleMaster flow:
 			downloadFileSuccess(masterIgn)
 			writeToDiskSuccess()
+			uploadLogsSuccess()
 			rebootSuccess()
 			ret := i.InstallNode()
 			Expect(ret).Should(BeNil())
@@ -278,6 +285,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mkdirSuccess()
 			downloadFileSuccess(masterIgn)
 			writeToDiskSuccess()
+			uploadLogsSuccess()
 			rebootSuccess()
 			ret := i.InstallNode()
 			Expect(ret).Should(BeNil())
@@ -347,6 +355,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			cleanInstallDevice()
 			mkdirSuccess()
 			downloadFileSuccess(masterIgn)
+			uploadLogsSuccess()
 			writeToDiskSuccess()
 			err := fmt.Errorf("failed to reboot")
 			mockops.EXPECT().Reboot().Return(err).Times(1)
@@ -375,6 +384,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mkdirSuccess()
 			downloadFileSuccess(workerIgn)
 			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, workerIgn), device, image, mockbmclient).Return(nil).Times(1)
+			// failure must do nothing
+			mockops.EXPECT().UploadInstallationLogs().Return("", errors.Errorf("Dummy")).Times(1)
 			rebootSuccess()
 			ret := i.InstallNode()
 			Expect(ret).Should(BeNil())
