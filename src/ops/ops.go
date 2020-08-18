@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"text/template"
 
 	"github.com/openshift/assisted-installer/src/inventory_client"
@@ -228,8 +229,10 @@ func (o *ops) PrepareController() error {
 
 func (o *ops) renderControllerCm() error {
 	var params = map[string]string{
-		"InventoryUrl": config.GlobalConfig.URL,
-		"ClusterId":    config.GlobalConfig.ClusterID,
+		"InventoryUrl":         config.GlobalConfig.URL,
+		"ClusterId":            config.GlobalConfig.ClusterID,
+		"SkipCertVerification": strconv.FormatBool(config.GlobalConfig.SkipCertVerification),
+		"CACertPath":           config.GlobalConfig.CACertPath,
 	}
 
 	return o.renderDeploymentFiles(filepath.Join(controllerDeployFolder, controllerDeployCmTemplate),

@@ -27,11 +27,11 @@ var GeneralWaitTimeout = generalWaitTimeoutInt * time.Second
 // as a first step it will wait till nodes are added to cluster and update their status to Done
 
 type ControllerConfig struct {
-	ClusterID       string `envconfig:"CLUSTER_ID" required:"true" `
-	URL             string `envconfig:"INVENTORY_URL" required:"true"`
-	PullSecretToken string `envconfig:"PULL_SECRET_TOKEN" required:"true"`
-	Insecure        bool   `envconfig:"SKIP_CERT_VERIFICATION" required:"false"`
-	CACertPath      string `envconfig:"CA_CERT_PATH" required:"false"`
+	ClusterID            string `envconfig:"CLUSTER_ID" required:"true" `
+	URL                  string `envconfig:"INVENTORY_URL" required:"true"`
+	PullSecretToken      string `envconfig:"PULL_SECRET_TOKEN" required:"true"`
+	SkipCertVerification bool   `envconfig:"SKIP_CERT_VERIFICATION" required:"false" default:"false"`
+	CACertPath           string `envconfig:"CA_CERT_PATH" required:"false" default:""`
 }
 
 type Controller interface {
