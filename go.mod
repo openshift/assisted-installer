@@ -5,6 +5,7 @@ go 1.14
 require (
 	github.com/ajeddeloh/go-json v0.0.0-20200220154158-5ae607161559 // indirect
 	github.com/coreos/ignition v0.35.0
+	github.com/coreos/ignition/v2 v2.6.0
 	github.com/go-openapi/strfmt v0.19.5
 	github.com/golang/mock v1.4.4
 	github.com/kelseyhightower/envconfig v1.4.0
