@@ -357,6 +357,7 @@ func (o *ops) UploadInstallationLogs() (string, error) {
 	args := []string{"run", "--rm", "--privileged", "-v", "/run/systemd/journal/socket:/run/systemd/journal/socket",
 		"-v", "/var/log:/var/log", config.GlobalConfig.AgentImage, "logs_sender", "-tag", "agent", "-tag", "installer",
 		"-cluster-id", config.GlobalConfig.ClusterID, "-url", config.GlobalConfig.URL, "-host-id", config.GlobalConfig.HostID,
-		"-pull-secret-token", config.GlobalConfig.PullSecretToken}
+		"-pull-secret-token", config.GlobalConfig.PullSecretToken,
+		"-insecure", strconv.FormatBool(config.GlobalConfig.SkipCertVerification)}
 	return o.ExecPrivilegeCommand(o.logWriter, command, args...)
 }
