@@ -358,6 +358,10 @@ func (o *ops) UploadInstallationLogs() (string, error) {
 		"-v", "/var/log:/var/log", config.GlobalConfig.AgentImage, "logs_sender", "-tag", "agent", "-tag", "installer",
 		"-cluster-id", config.GlobalConfig.ClusterID, "-url", config.GlobalConfig.URL, "-host-id", config.GlobalConfig.HostID,
 		"-pull-secret-token", config.GlobalConfig.PullSecretToken,
-		"-insecure", strconv.FormatBool(config.GlobalConfig.SkipCertVerification)}
+		"-insecure", strconv.FormatBool(config.GlobalConfig.SkipCertVerification),
+	}
+	if config.GlobalConfig.CACertPath != "" {
+		args = append(args, "-cacert", config.GlobalConfig.CACertPath)
+	}
 	return o.ExecPrivilegeCommand(o.logWriter, command, args...)
 }
