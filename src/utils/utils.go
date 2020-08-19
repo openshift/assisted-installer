@@ -48,7 +48,7 @@ func InitLogger(verbose bool, enableJournal bool) *logrus.Logger {
 	// log to journal
 	if enableJournal {
 		journalLogger.SetJournalLogging(log, &journalLogger.JournalWriter{}, map[string]interface{}{
-			"TAG": "assisted-installer",
+			"TAG": "installer",
 		})
 	}
 
