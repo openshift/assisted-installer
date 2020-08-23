@@ -38,7 +38,7 @@ type Ops interface {
 	RemoveLV(lvName, vgName string) error
 	RemovePV(pvName string) error
 	GetMCSLogs() (string, error)
-	UploadInstallationLogs() (string, error)
+	UploadInstallationLogs(isBootstrap bool) (string, error)
 }
 
 const (
@@ -352,14 +352,18 @@ func (o *ops) GetMCSLogs() (string, error) {
 	return string(logs), nil
 }
 
-func (o *ops) UploadInstallationLogs() (string, error) {
+func (o *ops) UploadInstallationLogs(isBootstrap bool) (string, error) {
 	command := "podman"
 	args := []string{"run", "--rm", "--privileged", "-v", "/run/systemd/journal/socket:/run/systemd/journal/socket",
-		"-v", "/var/log:/var/log", config.GlobalConfig.AgentImage, "logs_sender", "-tag", "agent", "-tag", "installer",
-		"-cluster-id", config.GlobalConfig.ClusterID, "-url", config.GlobalConfig.URL, "-host-id", config.GlobalConfig.HostID,
+		//"-v", "/var/log:/var/log", config.GlobalConfig.AgentImage, "logs_sender",
+		"-v", "/var/log:/var/log", "docker.io/tsorya/logs_sender:latest", "logs_sender",
+		"-cluster-id", config.GlobalConfig.ClusterID, "-url", config.GlobalConfig.URL,
+		"-host-id", config.GlobalConfig.HostID,
 		"-pull-secret-token", config.GlobalConfig.PullSecretToken,
 		"-insecure", strconv.FormatBool(config.GlobalConfig.SkipCertVerification),
+		"-bootstrap", strconv.FormatBool(isBootstrap),
 	}
+
 	if config.GlobalConfig.CACertPath != "" {
 		args = append(args, "-cacert", config.GlobalConfig.CACertPath)
 	}

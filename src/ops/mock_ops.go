@@ -251,16 +251,16 @@ func (mr *MockOpsMockRecorder) GetMCSLogs() *gomock.Call {
 }
 
 // UploadInstallationLogs mocks base method
-func (m *MockOps) UploadInstallationLogs() (string, error) {
+func (m *MockOps) UploadInstallationLogs(isBootstrap bool) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UploadInstallationLogs")
+	ret := m.ctrl.Call(m, "UploadInstallationLogs", isBootstrap)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // UploadInstallationLogs indicates an expected call of UploadInstallationLogs
-func (mr *MockOpsMockRecorder) UploadInstallationLogs() *gomock.Call {
+func (mr *MockOpsMockRecorder) UploadInstallationLogs(isBootstrap interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadInstallationLogs", reflect.TypeOf((*MockOps)(nil).UploadInstallationLogs))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadInstallationLogs", reflect.TypeOf((*MockOps)(nil).UploadInstallationLogs), isBootstrap)
 }
