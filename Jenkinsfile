@@ -5,7 +5,7 @@ pipeline {
   }
   agent {
     node {
-        label 'host'
+        label 'centos_worker'
     }
   }
   stages {
