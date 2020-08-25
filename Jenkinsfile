@@ -41,9 +41,13 @@ pipeline {
                     if (env.BRANCH_NAME == 'master')
                         stage('notify master branch fail') {
                             withCredentials([string(credentialsId: 'slack-token', variable: 'TOKEN')]) {
+                               sh '''
                                echo '{"text":"Attention! assisted-installer master branch subsystem test failed, see: ' > data.txt
                                echo ${BUILD_URL} >> data.txt
                                echo '"}' >> data.txt
+                               curl -X POST -H 'Content-type: application/json' --data-binary "@data.txt"  https://hooks.slack.com/services/$TOKEN
+                               '''
+
                             }
                         }
                 }
