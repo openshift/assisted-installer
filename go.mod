@@ -6,12 +6,12 @@ require (
 	github.com/ajeddeloh/go-json v0.0.0-20200220154158-5ae607161559 // indirect
 	github.com/coreos/ignition v0.35.0
 	github.com/go-openapi/strfmt v0.19.5
-	github.com/golang/mock v1.4.3
+	github.com/golang/mock v1.4.4
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
 	github.com/openshift/assisted-installer-agent v0.0.0-20200811180147-bc9c7b899b8a
-	github.com/openshift/assisted-service v0.0.0-20200811075806-62dcbcd62c0b
+	github.com/openshift/assisted-service v0.0.0-20200830102625-2f0da134c290
 	github.com/openshift/client-go v0.0.0-20200422192633-6f6c07fc2a70
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.6.0
@@ -19,8 +19,8 @@ require (
 	github.com/vincent-petithory/dataurl v0.0.0-20191104211930-d1553a71de50
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	k8s.io/api v0.18.2
-	k8s.io/apimachinery v0.18.2
+	k8s.io/api v0.18.5
+	k8s.io/apimachinery v0.18.5
 	k8s.io/client-go v11.0.0+incompatible
 )
 
