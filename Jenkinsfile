@@ -1,13 +1,16 @@
+String cron_string = BRANCH_NAME == "master" ? "@daily" : ""
+
 pipeline {
+  agent { label 'centos_worker' }
+  triggers { cron(cron_string) }
   environment {
         INSTALLER = 'quay.io/ocpmetal/assisted-installer'
         CONTROLLER = 'quay.io/ocpmetal/assisted-installer-controller'
   }
-  agent {
-    node {
-        label 'centos_worker'
-    }
+  options {
+    timeout(time: 1, unit: 'HOURS')
   }
+
   stages {
     stage('build') {
         steps {
@@ -36,21 +39,21 @@ pipeline {
     }
   }
   post {
-            failure {
-                script {
-                    if (env.BRANCH_NAME == 'master')
-                        stage('notify master branch fail') {
-                            withCredentials([string(credentialsId: 'slack-token', variable: 'TOKEN')]) {
-                               sh '''
-                               echo '{"text":"Attention! assisted-installer master branch subsystem test failed, see: ' > data.txt
-                               echo ${BUILD_URL} >> data.txt
-                               echo '"}' >> data.txt
-                               curl -X POST -H 'Content-type: application/json' --data-binary "@data.txt"  https://hooks.slack.com/services/$TOKEN
-                               '''
+    failure {
+        script {
+            if (env.BRANCH_NAME == 'master')
+                stage('notify master branch fail') {
+                    withCredentials([string(credentialsId: 'slack-token', variable: 'TOKEN')]) {
+                        sh '''
+                        echo '{"text":"Attention! assisted-installer master branch subsystem test failed, see: ' > data.txt
+                        echo ${BUILD_URL} >> data.txt
+                        echo '"}' >> data.txt
+                        curl -X POST -H 'Content-type: application/json' --data-binary "@data.txt"  https://hooks.slack.com/services/$TOKEN
+                        '''
 
-                            }
-                        }
+                    }
                 }
-            }
+        }
+    }
   }
 }
