@@ -3,7 +3,6 @@ package config
 import (
 	"flag"
 	"os"
-	"time"
 
 	"github.com/openshift/assisted-service/models"
 )
@@ -19,7 +18,7 @@ type Config struct {
 	Hostname             string
 	ControllerImage      string
 	AgentImage           string
-	InstallationTimeout  time.Duration
+	InstallationTimeout  int
 	PullSecretToken      string
 	SkipCertVerification bool
 	CACertPath           string
@@ -46,7 +45,7 @@ func ProcessArgs() {
 		"Assisted Installer Controller image URL")
 	flag.StringVar(&ret.AgentImage, "agent-image", "quay.io/ocpmetal/assisted-installer-agent:latest",
 		"Assisted Installer Agent image URL that will be used to send logs on successful installation")
-	flag.DurationVar(&ret.InstallationTimeout, "installation-timeout", 120, "Installation timeout in minutes")
+	flag.IntVar(&ret.InstallationTimeout, "installation-timeout", 120, "Installation timeout in minutes")
 	flag.BoolVar(&ret.SkipCertVerification, "insecure", false, "Do not validate TLS certificate")
 	flag.StringVar(&ret.CACertPath, "cacert", "", "Path to custom CA certificate in PEM format")
 	h := flag.Bool("help", false, "Help message")
