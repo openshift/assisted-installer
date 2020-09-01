@@ -19,7 +19,7 @@ require (
 	github.com/thoas/go-funk v0.6.0
 	github.com/vincent-petithory/dataurl v0.0.0-20191104211930-d1553a71de50
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
+	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a
 	k8s.io/api v0.18.5
 	k8s.io/apimachinery v0.18.5
 	k8s.io/client-go v11.0.0+incompatible

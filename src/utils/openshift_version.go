@@ -18,7 +18,8 @@ var getOpenshiftMapping = func(openshiftVersion string) map[string]string {
 		"4.6": {
 			// rhcos: "https://releases-art-rhcos.svc.ci.openshift.org/art/storage/releases/rhcos-4.6/46.82.202007212240-0/x86_64/rhcos-46.82.202007212240-0-metal.x86_64.raw.gz",
 			rhcos: "https://releases-art-rhcos.svc.ci.openshift.org/art/storage/releases/rhcos-4.6/46.82.202008260918-0/x86_64/rhcos-46.82.202008260918-0-metal.x86_64.raw.gz",
-			mco:   "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:dc1a34f55c712b2b9c5e5a14dd85e67cbdae11fd147046ac2fef9eaf179ab221"},
+			//rhcos: "https://releases-art-rhcos.svc.ci.openshift.org/art/storage/releases/rhcos-4.6/46.82.202008260918-0/x86_64/rhcos-46.82.202008181646-0-metal.x86_64.raw.gz",
+			mco: "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:dc1a34f55c712b2b9c5e5a14dd85e67cbdae11fd147046ac2fef9eaf179ab221"},
 	}
 
 	return openshiftVersionMap[openshiftVersion]
