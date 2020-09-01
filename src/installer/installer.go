@@ -283,6 +283,11 @@ func (i *installer) waitForBootkube(ctx context.Context) {
 // wait for minimum master nodes to be in ready status
 func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, kc k8s_client.K8SClient) error {
 	nodesTimeout := time.Duration(i.Config.InstallationTimeout) * time.Minute
+
+	if nodesTimeout < 0 {
+		return fmt.Errorf("Nodes installation timeout %d multiplication by minutes caused an integer overflow", i.Config.InstallationTimeout)
+	}
+
 	var readyMasters []string
 	var inventoryHostsMap map[string]inventory_client.EnabledHostData
 	i.log.Infof("Waiting up to %v for %d master nodes", nodesTimeout, minMasterNodes)

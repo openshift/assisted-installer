@@ -39,7 +39,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockops            *ops.MockOps
 		mockbmclient       *inventory_client.MockInventoryClient
 		mockk8sclient      *k8s_client.MockK8SClient
-		i                  *installer
+		installerObj       *installer
 		hostId             = "host-id"
 		bootstrapIgn       = "bootstrap.ign"
 		masterIgn          = "master.ign"
@@ -110,7 +110,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			InstallationTimeout: 120,
 		}
 		BeforeEach(func() {
-			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
+			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
 		})
 		mcoImage, _ := utils.GetMCOByOpenshiftVersion(conf.OpenshiftVersion)
 		extractSuccess := func() {
@@ -163,6 +163,16 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		extractSecretFromIgnitionSuccess := func() {
 			mockops.EXPECT().ExtractFromIgnition(filepath.Join(InstallDir, bootstrapIgn), dockerConfigFile).Return(nil).Times(1)
 		}
+
+		bootstrapSetup := func() {
+			cleanInstallDevice()
+			mkdirSuccess()
+			downloadFileSuccess(bootstrapIgn)
+			extractSecretFromIgnitionSuccess()
+			extractSuccess()
+			daemonReload(nil)
+		}
+
 		It("bootstrap role happy flow", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageWaitingForControlPlane)},
@@ -170,12 +180,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				{string(models.HostStageWritingImageToDisk)},
 				{string(models.HostStageRebooting)},
 			})
-			cleanInstallDevice()
-			mkdirSuccess()
-			downloadFileSuccess(bootstrapIgn)
-			extractSecretFromIgnitionSuccess()
-			extractSuccess()
-			daemonReload(nil)
+			bootstrapSetup()
 			restartNetworkManager(nil)
 			prepareControllerSuccess()
 			startServicesSuccess()
@@ -188,7 +193,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			writeToDiskSuccess()
 			uploadLogsSuccess(true)
 			rebootSuccess()
-			ret := i.InstallNode()
+			ret := installerObj.InstallNode()
 			Expect(ret).Should(BeNil())
 		})
 		It("bootstrap role fail", func() {
@@ -197,12 +202,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
 				{string(models.HostStageWritingImageToDisk)},
 			})
-			cleanInstallDevice()
-			mkdirSuccess()
-			downloadFileSuccess(bootstrapIgn)
-			extractSecretFromIgnitionSuccess()
-			extractSuccess()
-			daemonReload(nil)
+			bootstrapSetup()
 			restartNetworkManager(nil)
 			prepareControllerSuccess()
 			startServicesSuccess()
@@ -212,7 +212,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			//HostRoleMaster flow:
 			downloadFileSuccess(masterIgn)
 			writeToDiskSuccess()
-			ret := i.InstallNode()
+			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
 		It("bootstrap fail to restart NetworkManager", func() {
@@ -221,18 +221,13 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				{string(models.HostStageWritingImageToDisk)},
 				{string(models.HostStageWaitingForControlPlane)},
 			})
-			cleanInstallDevice()
-			mkdirSuccess()
-			downloadFileSuccess(bootstrapIgn)
-			extractSecretFromIgnitionSuccess()
-			extractSuccess()
-			daemonReload(nil)
+			bootstrapSetup()
 			err := fmt.Errorf("Failed to restart NetworkManager")
 			restartNetworkManager(err)
 			//HostRoleMaster flow:
 			downloadFileSuccess(masterIgn)
 			writeToDiskSuccess()
-			ret := i.InstallNode()
+			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
 		It("Configuring state", func() {
@@ -260,9 +255,30 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockbmclient.EXPECT().UpdateHostInstallProgress("eb82821f-bf21-4614-9a3b-ecb07929f239", models.HostStageConfiguring, gomock.Any()).Return(nil).Times(1)
 
 			done := make(chan bool)
-			go i.updateConfiguringStatus(done)
+			go installerObj.updateConfiguringStatus(done)
 			time.Sleep(3 * time.Second)
 			done <- true
+		})
+		It("Installation timeout integer overflow", func() {
+			time, err := time.ParseDuration("120m")
+			Expect(err).ShouldNot(HaveOccurred())
+			installerObj.Config.InstallationTimeout = uint(time)
+
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+				{string(models.HostStageWaitingForControlPlane)},
+				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+				{string(models.HostStageWritingImageToDisk)},
+			})
+			bootstrapSetup()
+			restartNetworkManager(nil)
+			prepareControllerSuccess()
+			startServicesSuccess()
+			downloadFileSuccess(masterIgn)
+			writeToDiskSuccess()
+
+			ret := installerObj.InstallNode()
+			Expect(ret).Should(Equal(fmt.Errorf(
+				"Nodes installation timeout %d multiplication by minutes caused an integer overflow", installerObj.Config.InstallationTimeout)))
 		})
 	})
 	Context("Master role", func() {
@@ -274,7 +290,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			OpenshiftVersion: openShiftVersion,
 		}
 		BeforeEach(func() {
-			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
+			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
 		})
 		It("master role happy flow", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
@@ -288,7 +304,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			writeToDiskSuccess()
 			uploadLogsSuccess(false)
 			rebootSuccess()
-			ret := i.InstallNode()
+			ret := installerObj.InstallNode()
 			Expect(ret).Should(BeNil())
 		})
 		It("HostRoleMaster role happy flow with disk cleanup", func() {
@@ -301,7 +317,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			cleanInstallDeviceClean()
 			err := fmt.Errorf("failed to create dir")
 			mockops.EXPECT().Mkdir(InstallDir).Return(err).Times(1)
-			ret := i.InstallNode()
+			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
 		It("HostRoleMaster role failed to cleanup disk", func() {
@@ -312,7 +328,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			}
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
 			cleanInstallDeviceError()
-			ret := i.InstallNode()
+			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
 		It("HostRoleMaster role failed to create dir", func() {
@@ -320,7 +336,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			cleanInstallDevice()
 			err := fmt.Errorf("failed to create dir")
 			mockops.EXPECT().Mkdir(InstallDir).Return(err).Times(1)
-			ret := i.InstallNode()
+			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
 		It("HostRoleMaster role failed to get ignition", func() {
@@ -331,7 +347,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mkdirSuccess()
 			err := fmt.Errorf("failed to fetch file")
 			mockbmclient.EXPECT().DownloadFile(masterIgn, filepath.Join(InstallDir, masterIgn)).Return(err).Times(1)
-			ret := i.InstallNode()
+			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
 		It("HostRoleMaster role failed to write image to disk", func() {
@@ -344,7 +360,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			downloadFileSuccess(masterIgn)
 			err := fmt.Errorf("failed to write image to disk")
 			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, masterIgn), device, image, mockbmclient).Return(err).Times(3)
-			ret := i.InstallNode()
+			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(fmt.Errorf("failed after 3 attempts, last error: failed to write image to disk")))
 		})
 		It("HostRoleMaster role failed to reboot", func() {
@@ -360,7 +376,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			writeToDiskSuccess()
 			err := fmt.Errorf("failed to reboot")
 			mockops.EXPECT().Reboot().Return(err).Times(1)
-			ret := i.InstallNode()
+			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
 	})
@@ -373,7 +389,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			OpenshiftVersion: openShiftVersion,
 		}
 		BeforeEach(func() {
-			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
+			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
 		})
 		It("worker role happy flow", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
@@ -388,7 +404,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			// failure must do nothing
 			mockops.EXPECT().UploadInstallationLogs(false).Return("", errors.Errorf("Dummy")).Times(1)
 			rebootSuccess()
-			ret := i.InstallNode()
+			ret := installerObj.InstallNode()
 			Expect(ret).Should(BeNil())
 		})
 	})
@@ -401,10 +417,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			OpenshiftVersion: "Bad version",
 		}
 		BeforeEach(func() {
-			i = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
+			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
 		})
 		It("Bad openshift version", func() {
-			err := i.InstallNode()
+			err := installerObj.InstallNode()
 			Expect(err).To(HaveOccurred())
 		})
 	})
