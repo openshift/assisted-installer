@@ -16,10 +16,8 @@ var getOpenshiftMapping = func(openshiftVersion string) map[string]string {
 			rhcos: "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.5/4.5.1/rhcos-4.5.1-x86_64-metal.x86_64.raw.gz",       // 4.5.1 image in the openshift mirror
 			mco:   "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:58bed0f5c4fbe453b994f6b606fefe3e2aaf1d10dcbdf5debb73b93007c7bee5"}, // MCO from latest 4.5 nightly https://mirror.openshift.com/pub/openshift-v4/clients/ocp-dev-preview/4.5.0-0.nightly-2020-05-14-021132/
 		"4.6": {
-			// rhcos: "https://releases-art-rhcos.svc.ci.openshift.org/art/storage/releases/rhcos-4.6/46.82.202007212240-0/x86_64/rhcos-46.82.202007212240-0-metal.x86_64.raw.gz",
 			rhcos: "https://releases-art-rhcos.svc.ci.openshift.org/art/storage/releases/rhcos-4.6/46.82.202008260918-0/x86_64/rhcos-46.82.202008260918-0-metal.x86_64.raw.gz",
-			//rhcos: "https://releases-art-rhcos.svc.ci.openshift.org/art/storage/releases/rhcos-4.6/46.82.202008260918-0/x86_64/rhcos-46.82.202008181646-0-metal.x86_64.raw.gz",
-			mco: "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:dc1a34f55c712b2b9c5e5a14dd85e67cbdae11fd147046ac2fef9eaf179ab221"},
+			mco:   "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:dc1a34f55c712b2b9c5e5a14dd85e67cbdae11fd147046ac2fef9eaf179ab221"},
 	}
 
 	return openshiftVersionMap[openshiftVersion]
