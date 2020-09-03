@@ -1,6 +1,7 @@
 package assisted_installer_controller
 
 import (
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -11,9 +12,11 @@ import (
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-service/models"
 
+	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/certificates/v1beta1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -186,6 +189,77 @@ func (c controller) PostInstallConfigs(wg *sync.WaitGroup) {
 	c.unpatchEtcd()
 	c.waitForConsole()
 	c.sendCompleteInstallation(true, "")
+}
+
+func (c controller) UpdateBMHs(wg *sync.WaitGroup) {
+	defer wg.Done()
+	for {
+		time.Sleep(GeneralWaitTimeout)
+		exists, err := c.kc.IsMetalProvisioningExists()
+		if err == nil && exists {
+			c.log.Infof("Provisioning CR exists, no need to update BMHs")
+			return
+		}
+
+		bmhs, err := c.kc.ListBMHs()
+		if err != nil {
+			c.log.WithError(err).Errorf("Failed to BMH hosts")
+			continue
+		}
+
+		allUpdated := c.updateBMHStatus(bmhs)
+		if allUpdated {
+			c.log.Infof("Updated all the BMH CRs, finished successfully")
+			return
+		}
+	}
+}
+
+func (c controller) updateBMHStatus(bmhList metal3v1alpha1.BareMetalHostList) bool {
+	allUpdated := true
+	for _, bmh := range bmhList.Items {
+		c.log.Infof("Checking bmh %s", bmh.Name)
+		annotations := bmh.GetAnnotations()
+		content := []byte(annotations[metal3v1alpha1.StatusAnnotation])
+		if annotations[metal3v1alpha1.StatusAnnotation] == "" {
+			c.log.Infof("Skipping setting status of BMH host %s, status annotation not present", bmh.Name)
+			continue
+		}
+		allUpdated = false
+		objStatus, err := c.unmarshalStatusAnnotation(content)
+		if err != nil {
+			c.log.WithError(err).Errorf("Failed to unmarshal status annotation of %s", bmh.Name)
+			continue
+		}
+		bmh.Status = *objStatus
+		if bmh.Status.LastUpdated.IsZero() {
+			// Ensure the LastUpdated timestamp in set to avoid
+			// infinite loops if the annotation only contained
+			// part of the status information.
+			t := metav1.Now()
+			bmh.Status.LastUpdated = &t
+		}
+		err = c.kc.UpdateBMHStatus(&bmh)
+		if err != nil {
+			c.log.WithError(err).Errorf("Failed to update status of BMH %s", bmh.Name)
+			continue
+		}
+		delete(annotations, metal3v1alpha1.StatusAnnotation)
+		err = c.kc.UpdateBMH(&bmh)
+		if err != nil {
+			c.log.WithError(err).Errorf("Failed to remove status annotation from BMH %s", bmh.Name)
+		}
+	}
+	return allUpdated
+}
+
+func (c controller) unmarshalStatusAnnotation(content []byte) (*metal3v1alpha1.BareMetalHostStatus, error) {
+	bmhStatus := &metal3v1alpha1.BareMetalHostStatus{}
+	err := json.Unmarshal(content, bmhStatus)
+	if err != nil {
+		return nil, err
+	}
+	return bmhStatus, nil
 }
 
 func (c controller) unpatchEtcd() {

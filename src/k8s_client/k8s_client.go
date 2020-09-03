@@ -15,15 +15,26 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd"
 
+	bmoapis "github.com/metal3-io/baremetal-operator/pkg/apis"
+	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
 	operatorv1 "github.com/openshift/client-go/operator/clientset/versioned"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	certificatesv1beta1client "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
+	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	runtimeconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 )
+
+//var AddToSchemes runtime.SchemeBuilder
 
 //go:generate mockgen -source=k8s_client.go -package=k8s_client -destination=mock_k8s_client.go
 type K8SClient interface {
@@ -37,14 +48,19 @@ type K8SClient interface {
 	GetConfigMap(namespace string, name string) (*v1.ConfigMap, error)
 	GetPodLogs(namespace string, podName string, sinceSeconds int64) (string, error)
 	GetPods(namespace string, labelMatch map[string]string) ([]v1.Pod, error)
+	IsMetalProvisioningExists() (bool, error)
+	ListBMHs() (metal3v1alpha1.BareMetalHostList, error)
+	UpdateBMHStatus(bmh *metal3v1alpha1.BareMetalHost) error
+	UpdateBMH(bmh *metal3v1alpha1.BareMetalHost) error
 }
 
 type K8SClientBuilder func(configPath string, logger *logrus.Logger) (K8SClient, error)
 
 type k8sClient struct {
-	log      *logrus.Logger
-	client   *kubernetes.Clientset
-	ocClient *operatorv1.Clientset
+	log           *logrus.Logger
+	client        *kubernetes.Clientset
+	ocClient      *operatorv1.Clientset
+	runtimeClient runtimeclient.Client
 	// CertificateSigningRequestInterface is interface
 	csrClient certificatesv1beta1client.CertificateSigningRequestInterface
 }
@@ -64,7 +80,28 @@ func NewK8SClient(configPath string, logger *logrus.Logger) (K8SClient, error) {
 	}
 	csrClient := client.CertificatesV1beta1().CertificateSigningRequests()
 
-	return &k8sClient{logger, client, ocClient, csrClient}, nil
+	var runtimeClient runtimeclient.Client
+	if configPath == "" {
+		scheme := runtime.NewScheme()
+		err = clientgoscheme.AddToScheme(scheme)
+		if err != nil {
+			return &k8sClient{}, errors.Wrap(err, "faailed to add scheme to")
+		}
+
+		var AddToSchemes runtime.SchemeBuilder
+		AddToSchemes = append(AddToSchemes, metal3v1alpha1.SchemeBuilder.AddToScheme)
+		err = bmoapis.AddToScheme(scheme)
+		if err != nil {
+			return &k8sClient{}, errors.Wrap(err, "failed to add BMH scheme")
+		}
+
+		runtimeClient, err = runtimeclient.New(runtimeconfig.GetConfigOrDie(), runtimeclient.Options{Scheme: scheme})
+		if err != nil {
+			return &k8sClient{}, errors.Wrap(err, "failed to create runtime client")
+		}
+	}
+
+	return &k8sClient{logger, client, ocClient, runtimeClient, csrClient}, nil
 }
 
 func (c *k8sClient) ListMasterNodes() (*v1.NodeList, error) {
@@ -132,7 +169,7 @@ func (c k8sClient) ApproveCsr(csr *v1beta1.CertificateSigningRequest) error {
 		Message:        "This CSR was approved by the assisted-installer-controller",
 		LastUpdateTime: metav1.Now(),
 	})
-	if _, err := c.csrClient.UpdateApproval(csr); err != nil {
+	if _, err := c.csrClient.UpdateApproval(context.TODO(), csr, metav1.UpdateOptions{}); err != nil {
 		c.log.Errorf("Failed to approve csr %v, err %e", csr, err)
 		return err
 	}
@@ -181,4 +218,49 @@ func (c *k8sClient) GetPodLogs(namespace string, podName string, sinceSeconds in
 	}
 
 	return buf.String(), nil
+}
+
+func (c *k8sClient) IsMetalProvisioningExists() (bool, error) {
+	u := &unstructured.UnstructuredList{}
+	u.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "metal3.io",
+		Kind:    "Provisioning",
+		Version: "v1alpha1",
+	})
+	err := c.runtimeClient.Get(context.Background(), runtimeclient.ObjectKey{
+		Name: "provisioning-configuration",
+	}, u)
+
+	if apierrors.IsNotFound(err) {
+		c.log.Infof("Baremetal provisioning CR is not found")
+		return false, nil
+	}
+
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func (c *k8sClient) ListBMHs() (metal3v1alpha1.BareMetalHostList, error) {
+	hosts := metal3v1alpha1.BareMetalHostList{}
+	opts := &runtimeclient.ListOptions{
+		Namespace: "openshift-machine-api",
+	}
+
+	err := c.runtimeClient.List(context.Background(), &hosts, opts)
+	if err != nil {
+		c.log.Errorf("failed to list BMHs, error %s", err)
+		return metal3v1alpha1.BareMetalHostList{}, err
+	}
+	return hosts, nil
+}
+
+func (c *k8sClient) UpdateBMHStatus(bmh *metal3v1alpha1.BareMetalHost) error {
+	return c.runtimeClient.Status().Update(context.TODO(), bmh)
+}
+
+func (c *k8sClient) UpdateBMH(bmh *metal3v1alpha1.BareMetalHost) error {
+	return c.runtimeClient.Update(context.TODO(), bmh)
 }
