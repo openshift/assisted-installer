@@ -77,7 +77,7 @@ func (i *installer) InstallNode() error {
 		i.log.Errorf("failed to prepare install device %s, err %s", i.Device, err)
 		return err
 	}
-	i.log.Infof("Fnished cleaning up device %s", i.Device)
+	i.log.Infof("Finished cleaning up device %s", i.Device)
 
 	if err = i.ops.Mkdir(InstallDir); err != nil {
 		i.log.Errorf("Failed to create install dir: %s", err)
