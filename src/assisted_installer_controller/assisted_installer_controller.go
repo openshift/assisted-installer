@@ -196,6 +196,9 @@ func (c controller) UpdateBMHs(wg *sync.WaitGroup) {
 	for {
 		time.Sleep(GeneralWaitTimeout)
 		exists, err := c.kc.IsMetalProvisioningExists()
+		if err != nil {
+			continue
+		}
 		if err == nil && exists {
 			c.log.Infof("Provisioning CR exists, no need to update BMHs")
 			return
