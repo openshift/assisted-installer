@@ -50,6 +50,7 @@ func main() {
 	wg.Add(2)
 	go assistedController.ApproveCsrs(done, &wg)
 	go assistedController.PostInstallConfigs(&wg)
+	go assistedController.UpdateBMHs(&wg)
 	assistedController.WaitAndUpdateNodesStatus()
 	logger.Infof("Sleeping for 10 minutes to give a chance to approve all crs")
 	time.Sleep(10 * time.Minute)

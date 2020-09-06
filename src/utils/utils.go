@@ -11,8 +11,8 @@ import (
 
 	"github.com/openshift/assisted-installer-agent/pkg/journalLogger"
 
-	ignition "github.com/coreos/ignition/config/v2_2"
-	"github.com/coreos/ignition/config/v2_2/types"
+	ignition "github.com/coreos/ignition/v2/config/v3_1"
+	"github.com/coreos/ignition/v2/config/v3_1/types"
 	"github.com/openshift/assisted-service/models"
 
 	"github.com/vincent-petithory/dataurl"
@@ -62,7 +62,7 @@ func GetFileContentFromIgnition(ignitionData []byte, fileName string) ([]byte, e
 	}
 	for i := range bm.Storage.Files {
 		if bm.Storage.Files[i].Path == fileName {
-			pullSecret, err := dataurl.DecodeString(bm.Storage.Files[i].Contents.Source)
+			pullSecret, err := dataurl.DecodeString(*bm.Storage.Files[i].Contents.Source)
 			if err != nil {
 				return nil, err
 			}
@@ -78,18 +78,18 @@ func SetFileInIgnition(ignitionData []byte, filePath, fileContents string, mode 
 		return nil, err
 	}
 
+	rootUser := "root"
 	file := types.File{
 		Node: types.Node{
-			Filesystem: "root",
-			Path:       filePath,
-			Overwrite:  nil,
-			Group:      nil,
-			User:       nil,
+			Path:      filePath,
+			Overwrite: nil,
+			Group:     types.NodeGroup{},
+			User:      types.NodeUser{Name: &rootUser},
 		},
 		FileEmbedded1: types.FileEmbedded1{
-			Append: false,
-			Contents: types.FileContents{
-				Source: fileContents,
+			Append: []types.Resource{},
+			Contents: types.Resource{
+				Source: &fileContents,
 			},
 			Mode: &mode,
 		},

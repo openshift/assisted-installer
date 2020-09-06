@@ -8,6 +8,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
 	ops "github.com/openshift/assisted-installer/src/ops"
 	v1beta1 "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/api/core/v1"
@@ -181,4 +182,62 @@ func (m *MockK8SClient) GetPods(namespace string, labelMatch map[string]string) 
 func (mr *MockK8SClientMockRecorder) GetPods(namespace, labelMatch interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPods", reflect.TypeOf((*MockK8SClient)(nil).GetPods), namespace, labelMatch)
+}
+
+// IsMetalProvisioningExists mocks base method
+func (m *MockK8SClient) IsMetalProvisioningExists() (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsMetalProvisioningExists")
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsMetalProvisioningExists indicates an expected call of IsMetalProvisioningExists
+func (mr *MockK8SClientMockRecorder) IsMetalProvisioningExists() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsMetalProvisioningExists", reflect.TypeOf((*MockK8SClient)(nil).IsMetalProvisioningExists))
+}
+
+// ListBMHs mocks base method
+func (m *MockK8SClient) ListBMHs() (v1alpha1.BareMetalHostList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListBMHs")
+	ret0, _ := ret[0].(v1alpha1.BareMetalHostList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListBMHs indicates an expected call of ListBMHs
+func (mr *MockK8SClientMockRecorder) ListBMHs() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListBMHs", reflect.TypeOf((*MockK8SClient)(nil).ListBMHs))
+}
+
+// UpdateBMHStatus mocks base method
+func (m *MockK8SClient) UpdateBMHStatus(bmh *v1alpha1.BareMetalHost) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateBMHStatus", bmh)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateBMHStatus indicates an expected call of UpdateBMHStatus
+func (mr *MockK8SClientMockRecorder) UpdateBMHStatus(bmh interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateBMHStatus", reflect.TypeOf((*MockK8SClient)(nil).UpdateBMHStatus), bmh)
+}
+
+// UpdateBMH mocks base method
+func (m *MockK8SClient) UpdateBMH(bmh *v1alpha1.BareMetalHost) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateBMH", bmh)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateBMH indicates an expected call of UpdateBMH
+func (mr *MockK8SClientMockRecorder) UpdateBMH(bmh interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateBMH", reflect.TypeOf((*MockK8SClient)(nil).UpdateBMH), bmh)
 }

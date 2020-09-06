@@ -70,8 +70,33 @@ rules:
       - approve
 
   - apiGroups:
-    - operator.openshift.io
+      - operator.openshift.io
     resources:
       - etcds
     verbs:
       - patch
+  - apiGroups:
+      - metal3.io
+    resources:
+      - baremetalhosts
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+  - apiGroups:
+      - metal3.io
+    resources:
+      - baremetalhosts/status
+    verbs:
+      - get
+      - patch
+      - update
+  - apiGroups:
+      - metal3.io
+    resources:
+      - provisionings
+    verbs:
+      - get
+      - list
