@@ -6,6 +6,7 @@ import (
 
 	"github.com/openshift/assisted-installer/src/common"
 
+	"net/url"
 	"path/filepath"
 	"time"
 
@@ -106,6 +107,12 @@ func (i *installer) InstallNode() error {
 	err = i.setHostnameInIgnition(ignitionPath)
 	if err != nil {
 		i.log.Errorf("Failed to set hostname %s in ignition %s", i.Hostname, ignitionPath)
+		return err
+	}
+
+	err = i.setRedHatCertInIgnition(ignitionPath)
+	if err != nil {
+		i.log.Errorf("Failed to set Red Hat CA Cert in ignition %s", ignitionPath)
 		return err
 	}
 
@@ -411,4 +418,21 @@ func (i *installer) setHostnameInIgnition(ignitionPath string) error {
 		return nil
 	}
 	return i.ops.SetFileInIgnition(ignitionPath, "/etc/hostname", fmt.Sprintf("data:,%s", i.Hostname), 420)
+}
+
+func (i *installer) setRedHatCertInIgnition(ignitionPath string) error {
+	crtPath := "/etc/pki/ca-trust/source/anchors/rh-it-root-ca.crt"
+
+	_, err := i.ops.ExecPrivilegeCommand(utils.NewLogWriter(i.log), "stat", crtPath)
+	if err != nil {
+		i.log.Infof("CA Cert file not found. Skipping updating ignition.")
+		return nil
+	}
+
+	data, err := i.ops.ExecPrivilegeCommand(nil, "cat", crtPath)
+	if err != nil {
+		i.log.Errorf("Failed to read CA cert: %s", crtPath)
+		return err
+	}
+	return i.ops.SetFileInIgnition(ignitionPath, crtPath, fmt.Sprintf("data:,%s", url.PathEscape(data)), 644)
 }
