@@ -2,7 +2,7 @@ apiVersion: batch/v1 # for versions before 1.9.0 use apps/v1beta2
 kind: Job
 metadata:
   name: assisted-installer-controller
-  namespace: assisted-deployment
+  namespace: assisted-installer
 spec:
   template:
     metadata:

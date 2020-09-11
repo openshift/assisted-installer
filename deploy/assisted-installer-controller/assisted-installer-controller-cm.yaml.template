@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: assisted-installer-controller-config
-  namespace: assisted-deployment
+  namespace: assisted-installer
   labels:
     app: assisted-installer-controller
 data:
