@@ -359,12 +359,12 @@ func (o *ops) UploadInstallationLogs(isBootstrap bool) (string, error) {
 		"-cluster-id", config.GlobalConfig.ClusterID, "-url", config.GlobalConfig.URL,
 		"-host-id", config.GlobalConfig.HostID,
 		"-pull-secret-token", config.GlobalConfig.PullSecretToken,
-		"-insecure", strconv.FormatBool(config.GlobalConfig.SkipCertVerification),
-		"-bootstrap", strconv.FormatBool(isBootstrap),
+		fmt.Sprintf("-insecure=%s", strconv.FormatBool(config.GlobalConfig.SkipCertVerification)),
+		fmt.Sprintf("-bootstrap=%s", strconv.FormatBool(isBootstrap)),
 	}
 
 	if config.GlobalConfig.CACertPath != "" {
-		args = append(args, "-cacert", config.GlobalConfig.CACertPath)
+		args = append(args, fmt.Sprintf("-cacert=%s", config.GlobalConfig.CACertPath))
 	}
 	return o.ExecPrivilegeCommand(o.logWriter, command, args...)
 }
