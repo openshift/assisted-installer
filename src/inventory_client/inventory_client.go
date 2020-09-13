@@ -13,6 +13,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/thoas/go-funk"
+
 	"github.com/go-openapi/strfmt"
 	"github.com/openshift/assisted-installer/src/utils"
 
@@ -28,10 +30,11 @@ import (
 type InventoryClient interface {
 	DownloadFile(filename string, dest string) error
 	UpdateHostInstallProgress(hostId string, newStage models.HostStage, info string) error
-	GetEnabledHostsNamesHosts() (map[string]EnabledHostData, error)
+	GetEnabledHostsNamesHosts() (map[string]HostData, error)
 	UploadIngressCa(ingressCA string, clusterId string) error
 	GetCluster() (*models.Cluster, error)
 	CompleteInstallation(clusterId string, isSuccess bool, errorInfo string) error
+	GetHosts(skippedStatuses []string) (map[string]HostData, error)
 }
 
 type inventoryClient struct {
@@ -40,7 +43,7 @@ type inventoryClient struct {
 	clusterId strfmt.UUID
 }
 
-type EnabledHostData struct {
+type HostData struct {
 	IPs       []string
 	Inventory *models.Inventory
 	Host      *models.Host
@@ -140,9 +143,13 @@ func (c *inventoryClient) GetCluster() (*models.Cluster, error) {
 	return cluster.Payload, nil
 }
 
-func (c *inventoryClient) GetEnabledHostsNamesHosts() (map[string]EnabledHostData, error) {
-	namesIdsMap := make(map[string]EnabledHostData)
-	hosts, err := c.getEnabledHostsWithInventoryInfo()
+func (c *inventoryClient) GetEnabledHostsNamesHosts() (map[string]HostData, error) {
+	return c.GetHosts([]string{models.HostStatusDisabled})
+}
+
+func (c *inventoryClient) GetHosts(skippedStatuses []string) (map[string]HostData, error) {
+	namesIdsMap := make(map[string]HostData)
+	hosts, err := c.getHostsWithInventoryInfo(skippedStatuses)
 	if err != nil {
 		return nil, err
 	}
@@ -183,14 +190,14 @@ func (c *inventoryClient) createUpdateHostInstallProgressParams(hostId string, n
 	}
 }
 
-func (c *inventoryClient) getEnabledHostsWithInventoryInfo() (map[string]EnabledHostData, error) {
-	hostsWithHwInfo := make(map[string]EnabledHostData)
+func (c *inventoryClient) getHostsWithInventoryInfo(skippedStatuses []string) (map[string]HostData, error) {
+	hostsWithHwInfo := make(map[string]HostData)
 	hosts, err := c.ai.Installer.ListHosts(context.Background(), &installer.ListHostsParams{ClusterID: c.clusterId})
 	if err != nil {
 		return nil, err
 	}
 	for _, host := range hosts.Payload {
-		if *host.Status == models.HostStatusDisabled {
+		if funk.IndexOf(skippedStatuses, *host.Status) > -1 {
 			continue
 		}
 		hwInfo := models.Inventory{}
@@ -199,7 +206,7 @@ func (c *inventoryClient) getEnabledHostsWithInventoryInfo() (map[string]Enabled
 			c.log.Warnf("Failed to parse host %s inventory %s", host.ID.String(), host.Inventory)
 			return nil, err
 		}
-		hostsWithHwInfo[host.ID.String()] = EnabledHostData{Inventory: &hwInfo, Host: host}
+		hostsWithHwInfo[host.ID.String()] = HostData{Inventory: &hwInfo, Host: host}
 	}
 	return hostsWithHwInfo, nil
 }
