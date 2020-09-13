@@ -63,10 +63,10 @@ func (mr *MockInventoryClientMockRecorder) UpdateHostInstallProgress(hostId, new
 }
 
 // GetEnabledHostsNamesHosts mocks base method
-func (m *MockInventoryClient) GetEnabledHostsNamesHosts() (map[string]EnabledHostData, error) {
+func (m *MockInventoryClient) GetEnabledHostsNamesHosts() (map[string]HostData, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetEnabledHostsNamesHosts")
-	ret0, _ := ret[0].(map[string]EnabledHostData)
+	ret0, _ := ret[0].(map[string]HostData)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -118,4 +118,19 @@ func (m *MockInventoryClient) CompleteInstallation(clusterId string, isSuccess b
 func (mr *MockInventoryClientMockRecorder) CompleteInstallation(clusterId, isSuccess, errorInfo interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteInstallation", reflect.TypeOf((*MockInventoryClient)(nil).CompleteInstallation), clusterId, isSuccess, errorInfo)
+}
+
+// GetHosts mocks base method
+func (m *MockInventoryClient) GetHosts(skippedStatuses []string) (map[string]HostData, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetHosts", skippedStatuses)
+	ret0, _ := ret[0].(map[string]HostData)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetHosts indicates an expected call of GetHosts
+func (mr *MockInventoryClientMockRecorder) GetHosts(skippedStatuses interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHosts", reflect.TypeOf((*MockInventoryClient)(nil).GetHosts), skippedStatuses)
 }
