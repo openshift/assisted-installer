@@ -45,12 +45,18 @@ func main() {
 		client,
 		kc,
 	)
+
+	// While adding new routine don't miss to add wg.add(1)
+	// without adding it will panic
 	var wg sync.WaitGroup
 	done := make(chan bool)
-	wg.Add(2)
 	go assistedController.ApproveCsrs(done, &wg)
+	wg.Add(1)
 	go assistedController.PostInstallConfigs(&wg)
+	wg.Add(1)
 	go assistedController.UpdateBMHs(&wg)
+	wg.Add(1)
+
 	assistedController.WaitAndUpdateNodesStatus()
 	logger.Infof("Sleeping for 10 minutes to give a chance to approve all crs")
 	time.Sleep(10 * time.Minute)
