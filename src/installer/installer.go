@@ -24,6 +24,7 @@ import (
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/sirupsen/logrus"
+	"github.com/vincent-petithory/dataurl"
 )
 
 const (
@@ -106,6 +107,12 @@ func (i *installer) InstallNode() error {
 	err = i.setHostnameInIgnition(ignitionPath)
 	if err != nil {
 		i.log.Errorf("Failed to set hostname %s in ignition %s", i.Hostname, ignitionPath)
+		return err
+	}
+
+	err = i.setEtcHostInIgnition(ignitionPath)
+	if err != nil {
+		i.log.Errorf("Failed to set contents for etc/hosts file in ignition %s", ignitionPath)
 		return err
 	}
 
@@ -411,4 +418,13 @@ func (i *installer) setHostnameInIgnition(ignitionPath string) error {
 		return nil
 	}
 	return i.ops.SetFileInIgnition(ignitionPath, "/etc/hostname", fmt.Sprintf("data:,%s", i.Hostname), 420)
+}
+
+func (i *installer) setEtcHostInIgnition(ignitionPath string) error {
+	serviceIPs := config.GlobalConfig.ServiceIPs
+	if serviceIPs == "" {
+		i.log.Infof("No IPs to set, continuing")
+		return nil
+	}
+	return i.ops.SetFileInIgnition(ignitionPath, "/etc/hosts", fmt.Sprintf("data:,%s", dataurl.EncodeBytes([]byte(serviceIPs))), 420)
 }
