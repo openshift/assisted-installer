@@ -34,10 +34,10 @@ func (rrt RetryRoundTripper) retry(maxTries uint, backoff *backoff.Backoff, fn f
 	for i = 1; i <= maxTries; i++ {
 		res, err = fn(req)
 		if err != nil {
-			rrt.log.Warnf("Failed executing HTTP call: %s %s attempt number %d. Error: %s", req.Method, req.URL, i, err)
 			if i <= maxTries {
 				delay := backoff.Duration()
-				rrt.log.Warnf("Going to retry in: %s", delay.String())
+				rrt.log.WithError(err).Warnf("Failed executing HTTP call: %s %s, attempt number %d, Going to retry in: %s",
+					req.Method, req.URL, i, delay.String())
 				time.Sleep(delay)
 			}
 		} else {
