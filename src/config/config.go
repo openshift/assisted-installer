@@ -22,6 +22,9 @@ type Config struct {
 	PullSecretToken      string
 	SkipCertVerification bool
 	CACertPath           string
+	HTTPProxy            string
+	HTTPSProxy           string
+	NoProxy              string
 }
 
 var GlobalConfig Config
@@ -48,6 +51,9 @@ func ProcessArgs() {
 	flag.UintVar(&ret.InstallationTimeout, "installation-timeout", 120, "Installation timeout in minutes")
 	flag.BoolVar(&ret.SkipCertVerification, "insecure", false, "Do not validate TLS certificate")
 	flag.StringVar(&ret.CACertPath, "cacert", "", "Path to custom CA certificate in PEM format")
+	flag.StringVar(&ret.HTTPProxy, "http-proxy", "", "A proxy URL to use for creating HTTP connections outside the cluster")
+	flag.StringVar(&ret.HTTPSProxy, "https-proxy", "", "A proxy URL to use for creating HTTPS connections outside the cluster")
+	flag.StringVar(&ret.NoProxy, "no-proxy", "", "A comma-separated list of destination domain names, domains, IP addresses, or other network CIDRs to exclude proxying")
 	h := flag.Bool("help", false, "Help message")
 	flag.Parse()
 	if h != nil && *h {
