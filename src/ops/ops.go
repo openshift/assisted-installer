@@ -153,6 +153,7 @@ func (o *ops) ExtractFromIgnition(ignitionPath string, fileToExtract string) err
 
 	tmpFile := "/opt/extracted_from_ignition.json"
 	o.log.Infof("Writing extracted content to tmp file %s", tmpFile)
+	// #nosec
 	err = ioutil.WriteFile(tmpFile, extractedContent, 0644)
 	if err != nil {
 		o.log.Errorf("Error occurred while writing extracted content to %s", tmpFile)
@@ -278,6 +279,7 @@ func (o *ops) renderDeploymentFiles(srcTemplate string, params map[string]string
 
 	renderedControllerYaml := filepath.Join(manifestsFolder, dest)
 	o.log.Infof("Writing rendered data to %s", renderedControllerYaml)
+	// #nosec
 	if err = ioutil.WriteFile(renderedControllerYaml, buf.Bytes(), 0644); err != nil {
 		o.log.Errorf("Error occurred while trying to write rendered data to %s : %e", renderedControllerYaml, err)
 		return err

@@ -142,7 +142,8 @@ func (c *controller) ApproveCsrs(done <-chan bool, wg *sync.WaitGroup) {
 }
 
 func (c controller) approveCsrs(csrs *v1beta1.CertificateSigningRequestList) {
-	for _, csr := range csrs.Items {
+	for i := range csrs.Items {
+		csr := csrs.Items[i]
 		if !isCsrApproved(&csr) {
 			c.log.Infof("Approving csr %s", csr.Name)
 			// We can fail and it is ok, we will retry on the next time
@@ -210,7 +211,8 @@ func (c controller) UpdateBMHs(wg *sync.WaitGroup) {
 
 func (c controller) updateBMHStatus(bmhList metal3v1alpha1.BareMetalHostList) bool {
 	allUpdated := true
-	for _, bmh := range bmhList.Items {
+	for i := range bmhList.Items {
+		bmh := bmhList.Items[i]
 		c.log.Infof("Checking bmh %s", bmh.Name)
 		annotations := bmh.GetAnnotations()
 		content := []byte(annotations[metal3v1alpha1.StatusAnnotation])
