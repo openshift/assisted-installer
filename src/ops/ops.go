@@ -243,7 +243,7 @@ func (o *ops) PrepareController() error {
 }
 
 func (o *ops) renderControllerCm() error {
-	var params = map[string]string{
+	var params = map[string]interface{}{
 		"InventoryUrl":         config.GlobalConfig.URL,
 		"ClusterId":            config.GlobalConfig.ClusterID,
 		"SkipCertVerification": strconv.FormatBool(config.GlobalConfig.SkipCertVerification),
@@ -255,7 +255,7 @@ func (o *ops) renderControllerCm() error {
 }
 
 func (o *ops) renderControllerSecret() error {
-	var params = map[string]string{
+	var params = map[string]interface{}{
 		"PullSecretToken": config.GlobalConfig.PullSecretToken,
 	}
 
@@ -264,15 +264,19 @@ func (o *ops) renderControllerSecret() error {
 }
 
 func (o *ops) renderControllerPod() error {
-	var params = map[string]string{
+	var params = map[string]interface{}{
 		"ControllerImage": config.GlobalConfig.ControllerImage,
+	}
+
+	if config.GlobalConfig.ServiceIPs != "" {
+		params["AssistedServiceIPs"] = strings.Split(config.GlobalConfig.ServiceIPs, " ")
 	}
 
 	return o.renderDeploymentFiles(filepath.Join(controllerDeployFolder, controllerDeployPodTemplate),
 		params, renderedControllerPod)
 }
 
-func (o *ops) renderDeploymentFiles(srcTemplate string, params map[string]string, dest string) error {
+func (o *ops) renderDeploymentFiles(srcTemplate string, params map[string]interface{}, dest string) error {
 	templateData, err := ioutil.ReadFile(srcTemplate)
 	if err != nil {
 		o.log.Errorf("Error occurred while trying to read %s : %e", srcTemplate, err)

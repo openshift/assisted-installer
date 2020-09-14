@@ -8,7 +8,11 @@ spec:
     metadata:
       labels:
         app: assisted-installer-controller
-    spec:
+    spec:{{if .AssistedServiceIPs}}
+      hostAliases:{{range .AssistedServiceIPs}} 
+        - ip: "{{.}}"
+          hostnames:
+            - "assisted-api.local.openshift.io"{{end}}{{end}}
       containers:
         - name: assisted-installer-controller
           image: {{.ControllerImage}}

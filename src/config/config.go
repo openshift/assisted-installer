@@ -25,6 +25,7 @@ type Config struct {
 	HTTPProxy            string
 	HTTPSProxy           string
 	NoProxy              string
+	ServiceIPs           string
 }
 
 var GlobalConfig Config
@@ -54,6 +55,7 @@ func ProcessArgs() {
 	flag.StringVar(&ret.HTTPProxy, "http-proxy", "", "A proxy URL to use for creating HTTP connections outside the cluster")
 	flag.StringVar(&ret.HTTPSProxy, "https-proxy", "", "A proxy URL to use for creating HTTPS connections outside the cluster")
 	flag.StringVar(&ret.NoProxy, "no-proxy", "", "A comma-separated list of destination domain names, domains, IP addresses, or other network CIDRs to exclude proxying")
+	flag.StringVar(&ret.ServiceIPs, "assisted-service-ips", "", "All IPs of assisted service node")
 	h := flag.Bool("help", false, "Help message")
 	flag.Parse()
 	if h != nil && *h {
