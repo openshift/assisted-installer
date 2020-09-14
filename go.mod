@@ -7,6 +7,7 @@ require (
 	github.com/coreos/ignition/v2 v2.6.0
 	github.com/go-openapi/strfmt v0.19.5
 	github.com/golang/mock v1.4.4
+	github.com/jpillora/backoff v1.0.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/metal3-io/baremetal-operator v0.0.0-20200828204955-fc35b7691a8e
 	github.com/onsi/ginkgo v1.14.0

@@ -24,6 +24,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	retryDelay    = time.Duration(2) * time.Second
+	retryMaxDelay = time.Duration(10) * time.Second
+	MaxTries      = 10
+)
+
 //go:generate mockgen -source=inventory_client.go -package=inventory_client -destination=mock_inventory_client.go
 type InventoryClient interface {
 	DownloadFile(filename string, dest string) error
@@ -64,7 +70,7 @@ func CreateInventoryClient(clusterId string, inventoryURL string, pullSecret str
 		}
 	}
 
-	clientConfig.Transport = requestid.Transport(&http.Transport{
+	transport := requestid.Transport(&http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
 			Timeout:   30 * time.Second,
@@ -80,6 +86,14 @@ func CreateInventoryClient(clusterId string, inventoryURL string, pullSecret str
 			RootCAs:            certs,
 		},
 	})
+	// Add retry settings
+
+	clientConfig.Transport = RetryRoundTripper{transport,
+		logger,
+		retryDelay,
+		retryMaxDelay,
+		MaxTries}
+
 	clientConfig.AuthInfo = auth.AgentAuthHeaderWriter(pullSecret)
 	assistedInstallClient := client.New(clientConfig)
 	return &inventoryClient{logger, assistedInstallClient, strfmt.UUID(clusterId)}, nil
