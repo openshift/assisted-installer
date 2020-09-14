@@ -61,9 +61,17 @@ func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inv
 
 func (c *controller) WaitAndUpdateNodesStatus() {
 	c.log.Infof("Waiting till all nodes will join and update status to assisted installer")
-	assistedInstallerNodesMap := c.getInventoryNodesMap()
-	for len(assistedInstallerNodesMap) > 0 {
+	ignoreStatuses := []string{models.HostStatusDisabled,
+		models.HostStatusError, models.HostStatusInstalled}
+	for {
 		time.Sleep(GeneralWaitTimeout)
+		assistedInstallerNodesMap, err := c.ic.GetHosts(ignoreStatuses)
+		if err != nil {
+			c.log.WithError(err).Error("Failed to get node map from inventory")
+		}
+		if len(assistedInstallerNodesMap) == 0 {
+			break
+		}
 		c.log.Infof("Searching for host to change status")
 		nodes, err := c.kc.ListNodes()
 		if err != nil {
@@ -75,13 +83,12 @@ func (c *controller) WaitAndUpdateNodesStatus() {
 				continue
 			}
 
-			c.log.Infof("Found new joined node %s with inventory id %s, kuberentes id %s, updating its status to %s",
+			c.log.Infof("Found new joined node %s with inventory id %s, kubernetes id %s, updating its status to %s",
 				node.Name, host.Host.ID.String(), node.Status.NodeInfo.SystemUUID, models.HostStageDone)
 			if err := c.ic.UpdateHostInstallProgress(host.Host.ID.String(), models.HostStageDone, ""); err != nil {
 				c.log.Errorf("Failed to update node %s installation status, %s", node.Name, err)
 				continue
 			}
-			delete(assistedInstallerNodesMap, node.Name)
 		}
 		c.updateConfiguringStatusIfNeeded(assistedInstallerNodesMap)
 
@@ -108,29 +115,12 @@ func (c *controller) getMCSLogs() (string, error) {
 	return logs, nil
 }
 
-func (c *controller) updateConfiguringStatusIfNeeded(hosts map[string]inventory_client.EnabledHostData) {
+func (c *controller) updateConfiguringStatusIfNeeded(hosts map[string]inventory_client.HostData) {
 	logs, err := c.getMCSLogs()
 	if err != nil {
 		return
 	}
 	common.SetConfiguringStatusForHosts(c.ic, hosts, logs, true, c.log)
-}
-
-func (c *controller) getInventoryNodesMap() map[string]inventory_client.EnabledHostData {
-	c.log.Infof("Getting map of inventory nodes")
-	var assistedInstallerNodesMap map[string]inventory_client.EnabledHostData
-	var err error
-	for {
-		assistedInstallerNodesMap, err = c.ic.GetEnabledHostsNamesHosts()
-		if err != nil {
-			c.log.Errorf("Failed to get node map from inventory, will retry in 30 seconds, %s", err)
-			time.Sleep(GeneralWaitTimeout)
-			continue
-		}
-		break
-	}
-	c.log.Infof("Got map of host from inventory, number of nodes %d", len(assistedInstallerNodesMap))
-	return assistedInstallerNodesMap
 }
 
 func (c *controller) ApproveCsrs(done <-chan bool, wg *sync.WaitGroup) {

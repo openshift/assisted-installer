@@ -46,7 +46,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		workerIgn          = "worker.ign"
 		openShiftVersion   = "4.4"
 		image, _           = utils.GetRhcosImageByOpenshiftVersion(openShiftVersion)
-		inventoryNamesHost map[string]inventory_client.EnabledHostData
+		inventoryNamesHost map[string]inventory_client.HostData
 		kubeNamesIds       map[string]string
 	)
 	generalWaitTimeout = 100 * time.Minute
@@ -92,7 +92,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		node0Id := strfmt.UUID("7916fa89-ea7a-443e-a862-b3e930309f65")
 		node1Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f238")
 		node2Id := strfmt.UUID("b898d516-3e16-49d0-86a5-0ad5bd04e3ed")
-		inventoryNamesHost = map[string]inventory_client.EnabledHostData{"node0": {Host: &models.Host{ID: &node0Id}, IPs: []string{"192.168.126.10"}},
+		inventoryNamesHost = map[string]inventory_client.HostData{"node0": {Host: &models.Host{ID: &node0Id}, IPs: []string{"192.168.126.10"}},
 			"node1": {Host: &models.Host{ID: &node1Id}, IPs: []string{"192.168.126.11"}},
 			"node2": {Host: &models.Host{ID: &node2Id}, IPs: []string{"192.168.126.12"}}}
 	})
@@ -239,7 +239,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			node1Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f239")
 			node2Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f240")
 
-			testInventoryIdsIps := map[string]inventory_client.EnabledHostData{"node0": {Host: &models.Host{ID: &node0Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}},
+			testInventoryIdsIps := map[string]inventory_client.HostData{"node0": {Host: &models.Host{ID: &node0Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}},
 				IPs: []string{"192.168.126.10", "192.168.11.122", "fe80::5054:ff:fe9a:4738"}},
 				"node1": {Host: &models.Host{ID: &node1Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}}, IPs: []string{"192.168.126.11", "192.168.11.123", "fe80::5054:ff:fe9a:4739"}},
 				"node2": {Host: &models.Host{ID: &node2Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}}, IPs: []string{"192.168.126.12", "192.168.11.124", "fe80::5054:ff:fe9a:4740"}}}

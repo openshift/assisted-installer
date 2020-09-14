@@ -289,7 +289,7 @@ func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, 
 	}
 
 	var readyMasters []string
-	var inventoryHostsMap map[string]inventory_client.EnabledHostData
+	var inventoryHostsMap map[string]inventory_client.HostData
 	i.log.Infof("Waiting up to %v for %d master nodes", nodesTimeout, minMasterNodes)
 	apiContext, cancel := context.WithTimeout(ctx, nodesTimeout)
 	defer cancel()
@@ -318,7 +318,7 @@ func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, 
 	return nil
 }
 
-func (i *installer) getInventoryHostsMap(hostsMap map[string]inventory_client.EnabledHostData) map[string]inventory_client.EnabledHostData {
+func (i *installer) getInventoryHostsMap(hostsMap map[string]inventory_client.HostData) map[string]inventory_client.HostData {
 	var err error
 	if hostsMap == nil {
 		hostsMap, err = i.inventoryClient.GetEnabledHostsNamesHosts()
@@ -330,7 +330,7 @@ func (i *installer) getInventoryHostsMap(hostsMap map[string]inventory_client.En
 	return hostsMap
 }
 
-func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]string, inventoryHostsMap map[string]inventory_client.EnabledHostData) {
+func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]string, inventoryHostsMap map[string]inventory_client.HostData) {
 	nodeNameAndCondition := map[string][]v1.NodeCondition{}
 	for _, node := range nodes.Items {
 		nodeNameAndCondition[node.Name] = node.Status.Conditions
@@ -373,7 +373,7 @@ func (i *installer) cleanupInstallDevice() error {
 	return i.ops.RemovePV(i.Device)
 }
 
-func (i *installer) verifyHostCanMoveToConfigurationStatus(inventoryHostsMapWithIp map[string]inventory_client.EnabledHostData) {
+func (i *installer) verifyHostCanMoveToConfigurationStatus(inventoryHostsMapWithIp map[string]inventory_client.HostData) {
 	logs, err := i.ops.GetMCSLogs()
 	if err != nil {
 		i.log.Infof("Failed to get MCS logs, will retry")
@@ -388,7 +388,7 @@ func (i *installer) verifyHostCanMoveToConfigurationStatus(inventoryHostsMapWith
 func (i *installer) updateConfiguringStatus(done <-chan bool) {
 	i.log.Infof("Start waiting for configuring state")
 	ticker := time.NewTicker(generalWaitTimeout)
-	var inventoryHostsMapWithIp map[string]inventory_client.EnabledHostData
+	var inventoryHostsMapWithIp map[string]inventory_client.HostData
 	for {
 		select {
 		case <-done:
