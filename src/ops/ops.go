@@ -55,11 +55,24 @@ const (
 type ops struct {
 	log       *logrus.Logger
 	logWriter *utils.LogWriter
+	cmdEnv    []string
 }
 
 // NewOps return a new ops interface
 func NewOps(logger *logrus.Logger) Ops {
-	return &ops{logger, utils.NewLogWriter(logger)}
+	cmdEnv := os.Environ()
+	if config.GlobalConfig.HTTPProxy != "" || config.GlobalConfig.HTTPSProxy != "" {
+		if config.GlobalConfig.HTTPProxy != "" {
+			cmdEnv = append(cmdEnv, fmt.Sprintf("HTTP_PROXY=%s", config.GlobalConfig.HTTPProxy))
+		}
+		if config.GlobalConfig.HTTPSProxy != "" {
+			cmdEnv = append(cmdEnv, fmt.Sprintf("HTTPS_PROXY=%s", config.GlobalConfig.HTTPSProxy))
+		}
+		if config.GlobalConfig.NoProxy != "" {
+			cmdEnv = append(cmdEnv, fmt.Sprintf("NO_PROXY=%s", config.GlobalConfig.NoProxy))
+		}
+	}
+	return &ops{logger, utils.NewLogWriter(logger), cmdEnv}
 }
 
 // ExecPrivilegeCommand execute a command in the host environment via nsenter
@@ -82,6 +95,7 @@ func (o *ops) ExecCommand(liveLogger io.Writer, command string, args ...string) 
 		cmd.Stdout = &stdoutBuf
 		cmd.Stderr = &stdoutBuf
 	}
+	cmd.Env = o.cmdEnv
 	err := cmd.Run()
 	output := strings.TrimSpace(stdoutBuf.String())
 	if err != nil {
@@ -153,6 +167,7 @@ func (o *ops) ExtractFromIgnition(ignitionPath string, fileToExtract string) err
 
 	tmpFile := "/opt/extracted_from_ignition.json"
 	o.log.Infof("Writing extracted content to tmp file %s", tmpFile)
+	// #nosec
 	err = ioutil.WriteFile(tmpFile, extractedContent, 0644)
 	if err != nil {
 		o.log.Errorf("Error occurred while writing extracted content to %s", tmpFile)
@@ -278,6 +293,7 @@ func (o *ops) renderDeploymentFiles(srcTemplate string, params map[string]string
 
 	renderedControllerYaml := filepath.Join(manifestsFolder, dest)
 	o.log.Infof("Writing rendered data to %s", renderedControllerYaml)
+	// #nosec
 	if err = ioutil.WriteFile(renderedControllerYaml, buf.Bytes(), 0644); err != nil {
 		o.log.Errorf("Error occurred while trying to write rendered data to %s : %e", renderedControllerYaml, err)
 		return err
