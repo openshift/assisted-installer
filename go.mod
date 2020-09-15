@@ -13,7 +13,7 @@ require (
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
 	github.com/openshift/assisted-installer-agent v0.0.0-20200811180147-bc9c7b899b8a
-	github.com/openshift/assisted-service v0.0.0-20200830102625-2f0da134c290
+	github.com/openshift/assisted-service v1.0.10-0.20200915112911-f7df479d879c
 	github.com/openshift/client-go v0.0.0-20200422192633-6f6c07fc2a70
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.6.0
