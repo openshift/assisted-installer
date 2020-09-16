@@ -59,9 +59,9 @@ type ops struct {
 }
 
 // NewOps return a new ops interface
-func NewOps(logger *logrus.Logger) Ops {
+func NewOps(logger *logrus.Logger, proxySet bool) Ops {
 	cmdEnv := os.Environ()
-	if config.GlobalConfig.HTTPProxy != "" || config.GlobalConfig.HTTPSProxy != "" {
+	if proxySet && (config.GlobalConfig.HTTPProxy != "" || config.GlobalConfig.HTTPSProxy != "") {
 		if config.GlobalConfig.HTTPProxy != "" {
 			cmdEnv = append(cmdEnv, fmt.Sprintf("HTTP_PROXY=%s", config.GlobalConfig.HTTPProxy))
 		}

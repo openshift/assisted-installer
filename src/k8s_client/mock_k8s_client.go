@@ -241,3 +241,17 @@ func (mr *MockK8SClientMockRecorder) UpdateBMH(bmh interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateBMH", reflect.TypeOf((*MockK8SClient)(nil).UpdateBMH), bmh)
 }
+
+// SetEnvVars mocks base method
+func (m *MockK8SClient) SetEnvVars() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetEnvVars")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetEnvVars indicates an expected call of SetEnvVars
+func (mr *MockK8SClientMockRecorder) SetEnvVars() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetEnvVars", reflect.TypeOf((*MockK8SClient)(nil).SetEnvVars))
+}
