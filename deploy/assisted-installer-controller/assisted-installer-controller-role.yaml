@@ -60,6 +60,13 @@ rules:
     verbs:
       - update
   - apiGroups:
+      - config.openshift.io
+    resources:
+      - proxies
+    verbs:
+      - get
+      - list
+  - apiGroups:
       - certificates.k8s.io
     resourceNames:
       - kubernetes.io/kube-apiserver-client-kubelet
@@ -68,7 +75,6 @@ rules:
       - signers
     verbs:
       - approve
-
   - apiGroups:
       - operator.openshift.io
     resources:

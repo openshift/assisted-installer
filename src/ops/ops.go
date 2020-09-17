@@ -59,9 +59,9 @@ type ops struct {
 }
 
 // NewOps return a new ops interface
-func NewOps(logger *logrus.Logger) Ops {
+func NewOps(logger *logrus.Logger, proxySet bool) Ops {
 	cmdEnv := os.Environ()
-	if config.GlobalConfig.HTTPProxy != "" || config.GlobalConfig.HTTPSProxy != "" {
+	if proxySet && (config.GlobalConfig.HTTPProxy != "" || config.GlobalConfig.HTTPSProxy != "") {
 		if config.GlobalConfig.HTTPProxy != "" {
 			cmdEnv = append(cmdEnv, fmt.Sprintf("HTTP_PROXY=%s", config.GlobalConfig.HTTPProxy))
 		}
@@ -109,15 +109,15 @@ func (o *ops) ExecCommand(liveLogger io.Writer, command string, args ...string) 
 
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
-				o.log.Debugf("failed executing %s %v, out: %s, with status %d",
-					command, args, output, status.ExitStatus())
+				o.log.Debugf("failed executing %s %v, env vars %v, out: %s, with status %d",
+					command, args, output, cmd.Env, status.ExitStatus())
 
-				return output, fmt.Errorf("failed executing %s %v , error %s. Output %s", command, args, exitErr, output)
+				return output, fmt.Errorf("failed executing %s %v, env vars %v, error %s. Output %s", command, args, cmd.Env, exitErr, output)
 			}
 		}
-		return output, fmt.Errorf("failed executing %s %v , error %s. Output %s", command, args, err, output)
+		return output, fmt.Errorf("failed executing %s %v, env vars %v, error %s. Output %s", command, args, cmd.Env, err, output)
 	}
-	o.log.Debug("Command executed:", " command", command, " arguments", args, " output", output)
+	o.log.Debug("Command executed:", " command", command, " arguments", args, "env vars", cmd.Env, "output", output)
 	return output, err
 }
 
