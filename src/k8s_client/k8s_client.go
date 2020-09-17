@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/openshift/assisted-installer/src/utils"
 	"k8s.io/apimachinery/pkg/labels"
@@ -17,6 +18,7 @@ import (
 
 	bmoapis "github.com/metal3-io/baremetal-operator/pkg/apis"
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
+	configv1client "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 	operatorv1 "github.com/openshift/client-go/operator/clientset/versioned"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -52,6 +54,7 @@ type K8SClient interface {
 	ListBMHs() (metal3v1alpha1.BareMetalHostList, error)
 	UpdateBMHStatus(bmh *metal3v1alpha1.BareMetalHost) error
 	UpdateBMH(bmh *metal3v1alpha1.BareMetalHost) error
+	SetProxyEnvVars() error
 }
 
 type K8SClientBuilder func(configPath string, logger *logrus.Logger) (K8SClient, error)
@@ -62,7 +65,8 @@ type k8sClient struct {
 	ocClient      *operatorv1.Clientset
 	runtimeClient runtimeclient.Client
 	// CertificateSigningRequestInterface is interface
-	csrClient certificatesv1beta1client.CertificateSigningRequestInterface
+	csrClient   certificatesv1beta1client.CertificateSigningRequestInterface
+	proxyClient configv1client.ProxyInterface
 }
 
 func NewK8SClient(configPath string, logger *logrus.Logger) (K8SClient, error) {
@@ -79,13 +83,16 @@ func NewK8SClient(configPath string, logger *logrus.Logger) (K8SClient, error) {
 		return &k8sClient{}, errors.Wrap(err, "creating a Kubernetes client")
 	}
 	csrClient := client.CertificatesV1beta1().CertificateSigningRequests()
-
+	configClient, err := configv1client.NewForConfig(config)
+	if err != nil {
+		return &k8sClient{}, errors.Wrap(err, "creating openshift config client")
+	}
 	var runtimeClient runtimeclient.Client
 	if configPath == "" {
 		scheme := runtime.NewScheme()
 		err = clientgoscheme.AddToScheme(scheme)
 		if err != nil {
-			return &k8sClient{}, errors.Wrap(err, "faailed to add scheme to")
+			return &k8sClient{}, errors.Wrap(err, "failed to add scheme to")
 		}
 
 		var AddToSchemes runtime.SchemeBuilder
@@ -101,7 +108,7 @@ func NewK8SClient(configPath string, logger *logrus.Logger) (K8SClient, error) {
 		}
 	}
 
-	return &k8sClient{logger, client, ocClient, runtimeClient, csrClient}, nil
+	return &k8sClient{logger, client, ocClient, runtimeClient, csrClient, configClient.Proxies()}, nil
 }
 
 func (c *k8sClient) ListMasterNodes() (*v1.NodeList, error) {
@@ -182,6 +189,25 @@ func (c *k8sClient) GetConfigMap(namespace string, name string) (*v1.ConfigMap, 
 		return nil, err
 	}
 	return cm, nil
+}
+
+func (c *k8sClient) SetProxyEnvVars() error {
+	options := metav1.GetOptions{}
+	proxy, err := c.proxyClient.Get(context.TODO(), "cluster", options)
+	if err != nil {
+		return err
+	}
+	c.log.Infof("Using proxy %+v to set env-vars for installer-controller pod", proxy.Status)
+	if proxy.Status.HTTPProxy != "" {
+		os.Setenv("HTTP_PROXY", proxy.Status.HTTPProxy)
+	}
+	if proxy.Status.HTTPSProxy != "" {
+		os.Setenv("HTTPS_PROXY", proxy.Status.HTTPSProxy)
+	}
+	if proxy.Status.NoProxy != "" {
+		os.Setenv("NO_PROXY", proxy.Status.NoProxy)
+	}
+	return nil
 }
 
 func (c *k8sClient) GetPods(namespace string, labelMatch map[string]string) ([]v1.Pod, error) {

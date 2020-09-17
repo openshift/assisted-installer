@@ -28,7 +28,7 @@ func main() {
 
 	ai := installer.NewAssistedInstaller(logger,
 		config.GlobalConfig,
-		ops.NewOps(logger),
+		ops.NewOps(logger, true),
 		client,
 		k8s_client.NewK8SClient,
 	)

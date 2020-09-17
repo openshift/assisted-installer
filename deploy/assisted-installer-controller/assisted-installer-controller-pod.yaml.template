@@ -45,7 +45,6 @@ spec:
                   name: assisted-installer-controller-config
                   key: skip-cert-verification
                   optional: true
-
           envFrom:
             - configMapRef:
                 name: assisted-installer-controller-config

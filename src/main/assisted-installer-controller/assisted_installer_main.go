@@ -28,20 +28,25 @@ func main() {
 
 	kc, err := k8s_client.NewK8SClient("", logger)
 	if err != nil {
-		log.Fatalf("Failed to create k8 client %e", err)
+		log.Fatalf("Failed to create k8 client %v", err)
 	}
 
 	logger.Infof("Start running assisted-installer with cluster-id %s, url %s",
 		Options.ControllerConfig.ClusterID, Options.ControllerConfig.URL)
 
+	err = kc.SetProxyEnvVars()
+	if err != nil {
+		log.Fatalf("Failed to set env vars for installer-controller pod %v", err)
+	}
+
 	client, err := inventory_client.CreateInventoryClient(Options.ControllerConfig.ClusterID, Options.ControllerConfig.URL, Options.ControllerConfig.PullSecretToken, Options.ControllerConfig.SkipCertVerification, Options.ControllerConfig.CACertPath, logger)
 	if err != nil {
-		log.Fatalf("Failed to create inventory client %e", err)
+		log.Fatalf("Failed to create inventory client %v", err)
 	}
 
 	assistedController := assistedinstallercontroller.NewController(logger,
 		Options.ControllerConfig,
-		ops.NewOps(logger),
+		ops.NewOps(logger, false),
 		client,
 		kc,
 	)
