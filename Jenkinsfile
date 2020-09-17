@@ -39,9 +39,9 @@ pipeline {
     }
   }
   post {
-    failure {
+    always {
         script {
-            if (env.BRANCH_NAME == 'master')
+           if ((env.BRANCH_NAME == 'master') && (currentBuild.currentResult == "ABORTED" || currentBuild.currentResult == "FAILURE")){
                 stage('notify master branch fail') {
                     withCredentials([string(credentialsId: 'slack-token', variable: 'TOKEN')]) {
                         sh '''
@@ -53,6 +53,7 @@ pipeline {
 
                     }
                 }
+           }
         }
     }
   }
