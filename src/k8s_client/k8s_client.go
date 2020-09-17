@@ -54,7 +54,7 @@ type K8SClient interface {
 	ListBMHs() (metal3v1alpha1.BareMetalHostList, error)
 	UpdateBMHStatus(bmh *metal3v1alpha1.BareMetalHost) error
 	UpdateBMH(bmh *metal3v1alpha1.BareMetalHost) error
-	SetEnvVars() error
+	SetProxyEnvVars() error
 }
 
 type K8SClientBuilder func(configPath string, logger *logrus.Logger) (K8SClient, error)
@@ -191,7 +191,7 @@ func (c *k8sClient) GetConfigMap(namespace string, name string) (*v1.ConfigMap, 
 	return cm, nil
 }
 
-func (c *k8sClient) SetEnvVars() error {
+func (c *k8sClient) SetProxyEnvVars() error {
 	options := metav1.GetOptions{}
 	proxy, err := c.proxyClient.Get(context.TODO(), "cluster", options)
 	if err != nil {

@@ -34,7 +34,7 @@ func main() {
 	logger.Infof("Start running assisted-installer with cluster-id %s, url %s",
 		Options.ControllerConfig.ClusterID, Options.ControllerConfig.URL)
 
-	err = kc.SetEnvVars()
+	err = kc.SetProxyEnvVars()
 	if err != nil {
 		log.Fatalf("Failed to set env vars for installer-controller pod %v", err)
 	}
