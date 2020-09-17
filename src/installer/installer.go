@@ -105,12 +105,6 @@ func (i *installer) InstallNode() error {
 		return err
 	}
 
-	err = i.setHostnameInIgnition(ignitionPath)
-	if err != nil {
-		i.log.Errorf("Failed to set hostname %s in ignition %s", i.Hostname, ignitionPath)
-		return err
-	}
-
 	i.UpdateHostInstallProgress(models.HostStageWritingImageToDisk, "")
 
 	err = utils.Retry(3, time.Second, i.log, func() error {
@@ -376,7 +370,12 @@ func (i *installer) getInventoryHostsMap(hostsMap map[string]inventory_client.Ho
 			return nil, err
 		}
 		// no need for current host
-		delete(hostsMap, i.Hostname)
+		for name, hostData := range hostsMap {
+			if hostData.Host.ID.String() == i.HostID {
+				delete(hostsMap, name)
+				break
+			}
+		}
 	}
 	return hostsMap, nil
 }
@@ -472,12 +471,4 @@ func (i *installer) updateConfiguringStatus(ctx context.Context) {
 			}
 		}
 	}
-}
-
-func (i *installer) setHostnameInIgnition(ignitionPath string) error {
-	if i.Hostname == "" {
-		i.log.Infof("No hostname to set, continuing")
-		return nil
-	}
-	return i.ops.SetFileInIgnition(ignitionPath, "/etc/hostname", fmt.Sprintf("data:,%s", i.Hostname), 420)
 }
