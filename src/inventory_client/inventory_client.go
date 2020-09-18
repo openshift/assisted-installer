@@ -55,7 +55,8 @@ type HostData struct {
 	Host      *models.Host
 }
 
-func CreateInventoryClient(clusterId string, inventoryURL string, pullSecret string, insecure bool, caPath string, logger *logrus.Logger) (*inventoryClient, error) {
+func CreateInventoryClient(clusterId string, inventoryURL string, pullSecret string, insecure bool, caPath string,
+	logger *logrus.Logger, proxyFunc func(*http.Request) (*url.URL, error)) (*inventoryClient, error) {
 	clientConfig := client.Config{}
 	var err error
 	clientConfig.URL, err = url.ParseRequestURI(createUrl(inventoryURL))
@@ -74,7 +75,7 @@ func CreateInventoryClient(clusterId string, inventoryURL string, pullSecret str
 	}
 
 	transport := requestid.Transport(&http.Transport{
-		Proxy: http.ProxyFromEnvironment,
+		Proxy: proxyFunc,
 		DialContext: (&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
