@@ -7,13 +7,17 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
 
 	"github.com/openshift/assisted-installer-agent/pkg/journalLogger"
+	"golang.org/x/net/http/httpproxy"
 
 	ignition "github.com/coreos/ignition/v2/config/v3_1"
 	"github.com/coreos/ignition/v2/config/v3_1/types"
@@ -22,6 +26,11 @@ import (
 	"github.com/vincent-petithory/dataurl"
 
 	"github.com/sirupsen/logrus"
+)
+
+var (
+	envProxyOnce          sync.Once
+	envVarsProxyFuncValue func(*url.URL) (*url.URL, error)
 )
 
 type LogWriter struct {
@@ -218,4 +227,24 @@ func WaitForPredicate(timeout time.Duration, interval time.Duration, predicate f
 			}
 		}
 	}
+}
+
+// ProxyFromEnvVars provides an alternative to http.ProxyFromEnvironment since it is being initialized only
+// once and that happens by k8s before proxy settings was obtained. While this is no issue for k8s, it prevents
+// any out-of-cluster traffic from using the proxy
+func ProxyFromEnvVars(req *http.Request) (*url.URL, error) {
+	return envVarsProxyFunc()(req.URL)
+}
+
+func envVarsProxyFunc() func(*url.URL) (*url.URL, error) {
+	envProxyOnce.Do(func() {
+		config := &httpproxy.Config{
+			HTTPProxy:  os.Getenv("HTTP_PROXY"),
+			HTTPSProxy: os.Getenv("HTTPS_PROXY"),
+			NoProxy:    os.Getenv("NO_PROXY"),
+			CGI:        os.Getenv("REQUEST_METHOD") != "",
+		}
+		envVarsProxyFuncValue = config.ProxyFunc()
+	})
+	return envVarsProxyFuncValue
 }
