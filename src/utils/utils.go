@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/openshift/assisted-installer-agent/pkg/journalLogger"
+	"github.com/openshift/assisted-installer/src/config"
 
 	ignition "github.com/coreos/ignition/v2/config/v3_1"
 	"github.com/coreos/ignition/v2/config/v3_1/types"
@@ -93,6 +94,14 @@ func SetFileInIgnition(ignitionData []byte, filePath, fileContents string, mode 
 			},
 			Mode: &mode,
 		},
+	}
+	if config.GlobalConfig.ServiceIPs != "" && filePath == "/etc/hosts" {
+		file.FileEmbedded1.Append = []types.Resource{
+			{
+				Source: &fileContents,
+			},
+		}
+		file.FileEmbedded1.Contents = types.Resource{}
 	}
 	bm.Storage.Files = append(bm.Storage.Files, file)
 	return json.Marshal(bm)

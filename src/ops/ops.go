@@ -281,9 +281,23 @@ func (o *ops) renderDeploymentFiles(srcTemplate string, params map[string]string
 	o.log.Infof("Filling template file %s", srcTemplate)
 	tmpl := template.Must(template.New("assisted-controller").Parse(string(templateData)))
 	var buf bytes.Buffer
-	if err = tmpl.Execute(&buf, params); err != nil {
-		o.log.Errorf("Failed to render controller template: %e", err)
-		return err
+	var content []byte
+	if config.GlobalConfig.ServiceIPs != "" && strings.Contains(srcTemplate, controllerDeployPodTemplate) {
+		var onpremParams = map[string][]string{
+			"AssistedServiceIPs": strings.Split(config.GlobalConfig.ServiceIPs, " "),
+		}
+		if err = tmpl.Execute(&buf, onpremParams); err != nil {
+			fmt.Printf("Failed to render controller template: %e", err)
+			return err
+		}
+		// Now correctly set the value for controller image which got set to '<no value>'
+		content = []byte(strings.Replace(buf.String(), "<no value>", params["ControllerImage"], -1))
+	} else {
+		if err = tmpl.Execute(&buf, params); err != nil {
+			o.log.Errorf("Failed to render controller template: %e", err)
+			return err
+		}
+		content = buf.Bytes()
 	}
 
 	if err = o.Mkdir(manifestsFolder); err != nil {
@@ -294,7 +308,7 @@ func (o *ops) renderDeploymentFiles(srcTemplate string, params map[string]string
 	renderedControllerYaml := filepath.Join(manifestsFolder, dest)
 	o.log.Infof("Writing rendered data to %s", renderedControllerYaml)
 	// #nosec
-	if err = ioutil.WriteFile(renderedControllerYaml, buf.Bytes(), 0644); err != nil {
+	if err = ioutil.WriteFile(renderedControllerYaml, content, 0644); err != nil {
 		o.log.Errorf("Error occurred while trying to write rendered data to %s : %e", renderedControllerYaml, err)
 		return err
 	}

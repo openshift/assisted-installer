@@ -3,6 +3,7 @@ package installer
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/openshift/assisted-installer/src/common"
 
@@ -426,5 +427,10 @@ func (i *installer) setEtcHostInIgnition(ignitionPath string) error {
 		i.log.Infof("No IPs to set, continuing")
 		return nil
 	}
-	return i.ops.SetFileInIgnition(ignitionPath, "/etc/hosts", fmt.Sprintf("data:,%s", dataurl.EncodeBytes([]byte(serviceIPs))), 420)
+	ips := strings.Split(serviceIPs, " ")
+	content := ""
+	for _, ip := range ips {
+		content = content + fmt.Sprintf(ip+" assisted-api.local.openshift.io\n")
+	}
+	return i.ops.SetFileInIgnition(ignitionPath, "/etc/hosts", dataurl.EncodeBytes([]byte(content)), 420)
 }
