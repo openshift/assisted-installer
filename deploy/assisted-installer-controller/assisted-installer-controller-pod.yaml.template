@@ -48,6 +48,11 @@ spec:
           envFrom:
             - configMapRef:
                 name: assisted-installer-controller-config
+          {{if .CACertPath}}
+          volumeMounts:
+          - name: service-ca-cert-config
+            mountPath: {{.CACertPath}}
+          {{end}}
       restartPolicy: OnFailure
       nodeSelector:
         node-role.kubernetes.io/master: ""
@@ -56,3 +61,11 @@ spec:
       - key: node-role.kubernetes.io/master
         effect: NoSchedule
         operator: Exists
+      {{if .CACertPath}}
+      volumes:
+      - name: service-ca-cert-config
+        hostPath:
+          path: {{.CACertPath}}
+      {{end}}
+
+
