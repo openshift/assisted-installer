@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"os"
 
 	"github.com/openshift/assisted-installer/src/config"
@@ -21,7 +22,8 @@ func main() {
 	}
 
 	logger.Infof("Assisted installer started. Configuration is:\n %+v", config.GlobalConfig)
-	client, err := inventory_client.CreateInventoryClient(config.GlobalConfig.ClusterID, config.GlobalConfig.URL, config.GlobalConfig.PullSecretToken, config.GlobalConfig.SkipCertVerification, config.GlobalConfig.CACertPath, logger)
+	client, err := inventory_client.CreateInventoryClient(config.GlobalConfig.ClusterID, config.GlobalConfig.URL,
+		config.GlobalConfig.PullSecretToken, config.GlobalConfig.SkipCertVerification, config.GlobalConfig.CACertPath, logger, http.ProxyFromEnvironment)
 	if err != nil {
 		logger.Fatalf("Failed to create inventory client %e", err)
 	}

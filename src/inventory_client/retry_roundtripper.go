@@ -2,6 +2,7 @@ package inventory_client
 
 import (
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/jpillora/backoff"
@@ -36,8 +37,8 @@ func (rrt RetryRoundTripper) retry(maxTries uint, backoff *backoff.Backoff, fn f
 		if err != nil {
 			if i <= maxTries {
 				delay := backoff.Duration()
-				rrt.log.WithError(err).Warnf("Failed executing HTTP call: %s %s, attempt number %d, Going to retry in: %s",
-					req.Method, req.URL, i, delay)
+				rrt.log.WithError(err).Warnf("Failed executing HTTP call: %s %s, attempt number %d, Going to retry in: %s, request sent with: HTTP_PROXY: %s, http_proxy: %s, HTTPS_PROXY: %s, https_proxy: %s, NO_PROXY: %s, no_proxy: %s",
+					req.Method, req.URL, i, delay, os.Getenv("HTTP_PROXY"), os.Getenv("http_proxy"), os.Getenv("HTTPS_PROXY"), os.Getenv("https_proxy"), os.Getenv("NO_PROXY"), os.Getenv("no_proxy"))
 				time.Sleep(delay)
 			}
 		} else {
