@@ -240,14 +240,7 @@ func (i *installer) waitForControlPlane(ctx context.Context, kc k8s_client.K8SCl
 		i.log.Errorf("Timeout waiting for master nodes, %s", err)
 		return err
 	}
-
-	if err := kc.PatchEtcd(); err != nil {
-		i.log.Error(err)
-		return err
-	}
-
 	i.waitForBootkube(ctx)
-
 	return nil
 }
 

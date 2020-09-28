@@ -309,8 +309,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockbmclient.EXPECT().GetCluster().Return(&cluster, nil).Times(1)
 			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(&cm, nil).Times(1)
 			mockbmclient.EXPECT().UploadIngressCa(data["ca-bundle.crt"], c.ClusterID).Return(nil).Times(1)
-			mockk8sclient.EXPECT().UnPatchEtcd().Return(fmt.Errorf("dummy")).Times(1)
-			mockk8sclient.EXPECT().UnPatchEtcd().Return(nil).Times(1)
 			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any()).Return(nil, fmt.Errorf("dummy")).Times(1)
 			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any()).Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Pending"}}}, nil).Times(1)
 			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any()).Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Running"}}}, nil).Times(1)

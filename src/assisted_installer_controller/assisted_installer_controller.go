@@ -177,7 +177,6 @@ func (c controller) PostInstallConfigs(wg *sync.WaitGroup) {
 		break
 	}
 	c.addRouterCAToClusterCA()
-	c.unpatchEtcd()
 	c.waitForConsole()
 	c.sendCompleteInstallation(true, "")
 }
@@ -255,18 +254,6 @@ func (c controller) unmarshalStatusAnnotation(content []byte) (*metal3v1alpha1.B
 		return nil, err
 	}
 	return bmhStatus, nil
-}
-
-func (c controller) unpatchEtcd() {
-	c.log.Infof("Unpatching etcd")
-	for {
-		if err := c.kc.UnPatchEtcd(); err != nil {
-			c.log.Error(err)
-			continue
-		}
-		break
-	}
-
 }
 
 // AddRouterCAToClusterCA adds router CA to cluster CA in kubeconfig
