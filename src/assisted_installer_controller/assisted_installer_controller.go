@@ -68,6 +68,7 @@ func (c *controller) WaitAndUpdateNodesStatus() {
 		assistedInstallerNodesMap, err := c.ic.GetHosts(ignoreStatuses)
 		if err != nil {
 			c.log.WithError(err).Error("Failed to get node map from inventory")
+			continue
 		}
 		if len(assistedInstallerNodesMap) == 0 {
 			break
@@ -125,11 +126,12 @@ func (c *controller) updateConfiguringStatusIfNeeded(hosts map[string]inventory_
 
 func (c *controller) ApproveCsrs(done <-chan bool, wg *sync.WaitGroup) {
 	defer wg.Done()
-	c.log.Infof("Start approving csrs")
+	c.log.Infof("Start approving CSRs")
 	ticker := time.NewTicker(GeneralWaitTimeout)
 	for {
 		select {
 		case <-done:
+			c.log.Infof("Finish approving CSRs")
 			return
 		case <-ticker.C:
 			csrs, err := c.kc.ListCsrs()
@@ -145,7 +147,7 @@ func (c controller) approveCsrs(csrs *v1beta1.CertificateSigningRequestList) {
 	for i := range csrs.Items {
 		csr := csrs.Items[i]
 		if !isCsrApproved(&csr) {
-			c.log.Infof("Approving csr %s", csr.Name)
+			c.log.Infof("Approving CSR %s", csr.Name)
 			// We can fail and it is ok, we will retry on the next time
 			_ = c.kc.ApproveCsr(&csr)
 		}

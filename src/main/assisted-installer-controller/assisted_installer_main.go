@@ -77,7 +77,7 @@ func main() {
 	logger.Infof("Sleeping for 10 minutes to give a chance to approve all crs")
 	time.Sleep(10 * time.Minute)
 	done <- true
-	logger.Infof("Waiting fo all go routines to finish")
+	logger.Infof("Waiting to all go routines to finish")
 	wg.Wait()
 }
 
