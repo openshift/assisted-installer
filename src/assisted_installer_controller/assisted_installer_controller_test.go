@@ -119,7 +119,18 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			configuringSuccess()
 			listNodes()
 			c.WaitAndUpdateNodesStatus()
+		})
 
+		It("WaitAndUpdateNodesStatus getHost failure once", func() {
+			updateProgressSuccess(defaultStages, inventoryNamesIds)
+			configuringSuccess()
+			listNodes()
+
+			mockbmclient.EXPECT().GetHosts([]string{models.HostStatusDisabled,
+				models.HostStatusError, models.HostStatusInstalled}).Return(map[string]inventory_client.HostData{}, fmt.Errorf("dummy")).Times(1)
+			getInventoryNodes(1)
+
+			c.WaitAndUpdateNodesStatus()
 		})
 	})
 	Context("Waiting for 3 nodes, will appear one by one", func() {

@@ -162,7 +162,7 @@ func (c *k8sClient) RunOCctlCommand(args []string, kubeconfigPath string, o ops.
 func (c k8sClient) ListCsrs() (*v1beta1.CertificateSigningRequestList, error) {
 	csrs, err := c.csrClient.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		c.log.Errorf("Failed to get list of csrs. err : %e", err)
+		c.log.Errorf("Failed to get list of CSRs. err : %e", err)
 		return nil, err
 	}
 	return csrs, nil
@@ -177,7 +177,7 @@ func (c k8sClient) ApproveCsr(csr *v1beta1.CertificateSigningRequest) error {
 		LastUpdateTime: metav1.Now(),
 	})
 	if _, err := c.csrClient.UpdateApproval(context.TODO(), csr, metav1.UpdateOptions{}); err != nil {
-		c.log.Errorf("Failed to approve csr %v, err %e", csr, err)
+		c.log.Errorf("Failed to approve CSR %v, err %e", csr, err)
 		return err
 	}
 	return nil
