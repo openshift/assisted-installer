@@ -49,6 +49,7 @@ type K8SClient interface {
 	ListCsrs() (*v1beta1.CertificateSigningRequestList, error)
 	GetConfigMap(namespace string, name string) (*v1.ConfigMap, error)
 	GetPodLogs(namespace string, podName string, sinceSeconds int64) (string, error)
+	GetPodLogsAsBuffer(namespace string, podName string, sinceSeconds int64) (*bytes.Buffer, error)
 	GetPods(namespace string, labelMatch map[string]string) ([]v1.Pod, error)
 	IsMetalProvisioningExists() (bool, error)
 	ListBMHs() (metal3v1alpha1.BareMetalHostList, error)
@@ -226,6 +227,14 @@ func (c *k8sClient) GetPods(namespace string, labelMatch map[string]string) ([]v
 }
 
 func (c *k8sClient) GetPodLogs(namespace string, podName string, sinceSeconds int64) (string, error) {
+	buf, err := c.GetPodLogsAsBuffer(namespace, podName, sinceSeconds)
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+func (c *k8sClient) GetPodLogsAsBuffer(namespace string, podName string, sinceSeconds int64) (*bytes.Buffer, error) {
 	podLogOpts := v1.PodLogOptions{}
 	if sinceSeconds > 0 {
 		podLogOpts.SinceSeconds = &sinceSeconds
@@ -233,17 +242,16 @@ func (c *k8sClient) GetPodLogs(namespace string, podName string, sinceSeconds in
 	req := c.client.CoreV1().Pods(namespace).GetLogs(podName, &podLogOpts)
 	podLogs, err := req.Stream(context.TODO())
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer podLogs.Close()
 
 	buf := new(bytes.Buffer)
 	_, err = io.Copy(buf, podLogs)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-
-	return buf.String(), nil
+	return buf, nil
 }
 
 func (c *k8sClient) IsMetalProvisioningExists() (bool, error) {

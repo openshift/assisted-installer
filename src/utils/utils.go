@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -173,4 +175,27 @@ func GetHostIpsFromInventory(inventory *models.Inventory) ([]string, error) {
 		}
 	}
 	return ips, nil
+}
+
+func WriteToTarGz(w io.Writer, reader io.Reader, sizeOfData int64, fileName string) error {
+	// now lets create the header as needed for this file within the tarball
+	gw := gzip.NewWriter(w)
+	defer gw.Close()
+	tw := tar.NewWriter(gw)
+	defer tw.Close()
+	header := tar.Header{
+		Name:    fileName,
+		Size:    sizeOfData,
+		Mode:    0644,
+		ModTime: time.Now(),
+	}
+	// write the header to the tarball archive
+	if err := tw.WriteHeader(&header); err != nil {
+		return err
+	}
+	// copy the file data to the tarball
+	if _, err := io.Copy(tw, reader); err != nil {
+		return err
+	}
+	return nil
 }

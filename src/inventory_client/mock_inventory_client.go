@@ -5,6 +5,7 @@
 package inventory_client
 
 import (
+	io "io"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -133,4 +134,18 @@ func (m *MockInventoryClient) GetHosts(skippedStatuses []string) (map[string]Hos
 func (mr *MockInventoryClientMockRecorder) GetHosts(skippedStatuses interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHosts", reflect.TypeOf((*MockInventoryClient)(nil).GetHosts), skippedStatuses)
+}
+
+// UploadLogs mocks base method
+func (m *MockInventoryClient) UploadLogs(clusterId string, logsType models.LogsType, upfile io.Reader) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UploadLogs", clusterId, logsType, upfile)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UploadLogs indicates an expected call of UploadLogs
+func (mr *MockInventoryClientMockRecorder) UploadLogs(clusterId, logsType, upfile interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadLogs", reflect.TypeOf((*MockInventoryClient)(nil).UploadLogs), clusterId, logsType, upfile)
 }

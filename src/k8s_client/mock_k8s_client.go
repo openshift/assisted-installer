@@ -5,6 +5,7 @@
 package k8s_client
 
 import (
+	bytes "bytes"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -167,6 +168,21 @@ func (m *MockK8SClient) GetPodLogs(namespace, podName string, sinceSeconds int64
 func (mr *MockK8SClientMockRecorder) GetPodLogs(namespace, podName, sinceSeconds interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPodLogs", reflect.TypeOf((*MockK8SClient)(nil).GetPodLogs), namespace, podName, sinceSeconds)
+}
+
+// GetPodLogsAsBuffer mocks base method
+func (m *MockK8SClient) GetPodLogsAsBuffer(namespace, podName string, sinceSeconds int64) (*bytes.Buffer, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPodLogsAsBuffer", namespace, podName, sinceSeconds)
+	ret0, _ := ret[0].(*bytes.Buffer)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPodLogsAsBuffer indicates an expected call of GetPodLogsAsBuffer
+func (mr *MockK8SClientMockRecorder) GetPodLogsAsBuffer(namespace, podName, sinceSeconds interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPodLogsAsBuffer", reflect.TypeOf((*MockK8SClient)(nil).GetPodLogsAsBuffer), namespace, podName, sinceSeconds)
 }
 
 // GetPods mocks base method

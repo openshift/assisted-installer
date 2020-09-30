@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"net/url"
@@ -65,19 +66,21 @@ func main() {
 	// While adding new routine don't miss to add wg.add(1)
 	// without adding it will panic
 	var wg sync.WaitGroup
-	done := make(chan bool)
-	go assistedController.ApproveCsrs(done, &wg)
+	ctx, cancel := context.WithCancel(context.Background())
+	go assistedController.ApproveCsrs(ctx, &wg)
 	wg.Add(1)
 	go assistedController.PostInstallConfigs(&wg)
 	wg.Add(1)
 	go assistedController.UpdateBMHs(&wg)
 	wg.Add(1)
+	go assistedController.UploadControllerLogs(ctx, &wg)
+	wg.Add(1)
 
 	assistedController.WaitAndUpdateNodesStatus()
 	logger.Infof("Sleeping for 10 minutes to give a chance to approve all crs")
 	time.Sleep(10 * time.Minute)
-	done <- true
-	logger.Infof("Waiting to all go routines to finish")
+	cancel()
+	logger.Infof("Waiting fo all go routines to finish")
 	wg.Wait()
 }
 
