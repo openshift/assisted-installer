@@ -1,6 +1,8 @@
 package assisted_installer_controller
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -240,20 +242,20 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("Run ApproveCsrs and validate it exists on channel set", func() {
 			testList := v1beta1.CertificateSigningRequestList{}
 			mockk8sclient.EXPECT().ListCsrs().Return(&testList, nil).MinTimes(2).MaxTimes(5)
-			done := make(chan bool)
+			ctx, cancel := context.WithCancel(context.Background())
 			wg.Add(1)
-			go c.ApproveCsrs(done, &wg)
+			go c.ApproveCsrs(ctx, &wg)
 			time.Sleep(3 * time.Second)
-			done <- true
+			cancel()
 			wg.Wait()
 		})
 		It("Run ApproveCsrs when list returns error", func() {
 			mockk8sclient.EXPECT().ListCsrs().Return(nil, fmt.Errorf("dummy")).MinTimes(2).MaxTimes(5)
-			done := make(chan bool)
+			ctx, cancel := context.WithCancel(context.Background())
 			wg.Add(1)
-			go c.ApproveCsrs(done, &wg)
+			go c.ApproveCsrs(ctx, &wg)
 			time.Sleep(3 * time.Second)
-			done <- true
+			cancel()
 			wg.Wait()
 		})
 		It("Run ApproveCsrs with csrs list", func() {
@@ -276,11 +278,11 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().ListCsrs().Return(&testList, nil).MinTimes(1)
 			mockk8sclient.EXPECT().ApproveCsr(&csr).Return(nil).MinTimes(1)
 			mockk8sclient.EXPECT().ApproveCsr(&csrApproved).Return(nil).Times(0)
-			done := make(chan bool)
+			ctx, cancel := context.WithCancel(context.Background())
 			wg.Add(1)
-			go c.ApproveCsrs(done, &wg)
+			go c.ApproveCsrs(ctx, &wg)
 			time.Sleep(2 * time.Second)
-			done <- true
+			cancel()
 		})
 	})
 
@@ -332,6 +334,54 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			go c.PostInstallConfigs(&wg)
 			wg.Wait()
 		})
+	})
+	Context("Upload logs", func() {
+		conf := ControllerConfig{
+			ClusterID: "cluster-id",
+			URL:       "https://assisted-service.com:80",
+			Namespace: "assisted-installer",
+		}
+		var pod v1.Pod
+		BeforeEach(func() {
+			LogsUploadPeriod = 100 * time.Millisecond
+			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
+			pod = v1.Pod{TypeMeta: metav1.TypeMeta{},
+				ObjectMeta: metav1.ObjectMeta{Name: "test"}, Spec: v1.PodSpec{}, Status: v1.PodStatus{Phase: "Pending"}}
+		})
+		It("Validate upload logs, get pod fails", func() {
+			mockk8sclient.EXPECT().GetPods(conf.Namespace, gomock.Any()).Return(nil, fmt.Errorf("dummy")).MinTimes(2).MaxTimes(10)
+			ctx, cancel := context.WithCancel(context.Background())
+			wg.Add(1)
+			go c.UploadControllerLogs(ctx, &wg)
+			time.Sleep(1 * time.Second)
+			cancel()
+			wg.Wait()
+		})
+		It("Validate upload logs, Get pods logs failed", func() {
+			mockk8sclient.EXPECT().GetPods(conf.Namespace, gomock.Any()).Return([]v1.Pod{pod}, nil).MinTimes(1)
+			mockk8sclient.EXPECT().GetPodLogsAsBuffer(conf.Namespace, "test", gomock.Any()).Return(nil, fmt.Errorf("dummy")).MinTimes(1)
+			ctx, cancel := context.WithCancel(context.Background())
+			wg.Add(1)
+			go c.UploadControllerLogs(ctx, &wg)
+			time.Sleep(500 * time.Millisecond)
+			cancel()
+			wg.Wait()
+		})
+		It("Validate upload logs, Upload failed", func() {
+			r := bytes.NewBuffer([]byte("test"))
+			mockk8sclient.EXPECT().GetPodLogsAsBuffer(conf.Namespace, "test", gomock.Any()).Return(r, nil).Times(1)
+			mockbmclient.EXPECT().UploadLogs(conf.ClusterID, models.LogsTypeController, gomock.Any()).Return(fmt.Errorf("dummy")).Times(1)
+			err := c.uploadPodLogs("test", conf.Namespace, controllerLogsSecondsAgo)
+			Expect(err).To(HaveOccurred())
+		})
+		It("Validate upload logs happy flow", func() {
+			r := bytes.NewBuffer([]byte("test"))
+			mockk8sclient.EXPECT().GetPodLogsAsBuffer(conf.Namespace, "test", gomock.Any()).Return(r, nil).Times(1)
+			mockbmclient.EXPECT().UploadLogs(conf.ClusterID, models.LogsTypeController, gomock.Any()).Return(nil).Times(1)
+			err := c.uploadPodLogs("test", conf.Namespace, controllerLogsSecondsAgo)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
 	})
 })
 

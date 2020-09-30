@@ -6,12 +6,15 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"time"
+
+	"github.com/go-openapi/runtime"
 
 	"github.com/thoas/go-funk"
 
@@ -41,6 +44,7 @@ type InventoryClient interface {
 	GetCluster() (*models.Cluster, error)
 	CompleteInstallation(clusterId string, isSuccess bool, errorInfo string) error
 	GetHosts(skippedStatuses []string) (map[string]HostData, error)
+	UploadLogs(clusterId string, logsType models.LogsType, upfile io.Reader) error
 }
 
 type inventoryClient struct {
@@ -237,5 +241,13 @@ func (c *inventoryClient) CompleteInstallation(clusterId string, isSuccess bool,
 	_, err := c.ai.Installer.CompleteInstallation(context.Background(),
 		&installer.CompleteInstallationParams{ClusterID: strfmt.UUID(clusterId),
 			CompletionParams: &models.CompletionParams{IsSuccess: &isSuccess, ErrorInfo: errorInfo}})
+	return err
+}
+
+func (c *inventoryClient) UploadLogs(clusterId string, logsType models.LogsType, upfile io.Reader) error {
+	fileName := fmt.Sprintf("%s_logs.tar.gz", string(logsType))
+	_, err := c.ai.Installer.UploadLogs(context.Background(),
+		&installer.UploadLogsParams{ClusterID: strfmt.UUID(clusterId), LogsType: string(logsType),
+			Upfile: runtime.NamedReader(fileName, upfile)})
 	return err
 }

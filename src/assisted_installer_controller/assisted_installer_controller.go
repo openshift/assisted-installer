@@ -1,11 +1,16 @@
 package assisted_installer_controller
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"sync"
 	"time"
 
 	"github.com/openshift/assisted-installer/src/common"
+	"github.com/openshift/assisted-installer/src/utils"
+	"github.com/pkg/errors"
 
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/k8s_client"
@@ -20,10 +25,12 @@ import (
 )
 
 const (
-	generalWaitTimeoutInt = 30
+	generalWaitTimeoutInt    = 30
+	controllerLogsSecondsAgo = 30 * 60
 )
 
 var GeneralWaitTimeout = generalWaitTimeoutInt * time.Second
+var LogsUploadPeriod = 5 * time.Minute
 
 // assisted installer controller is added to control installation process after  bootstrap pivot
 // assisted installer will deploy it on installation process
@@ -35,6 +42,7 @@ type ControllerConfig struct {
 	PullSecretToken      string `envconfig:"PULL_SECRET_TOKEN" required:"true"`
 	SkipCertVerification bool   `envconfig:"SKIP_CERT_VERIFICATION" required:"false" default:"false"`
 	CACertPath           string `envconfig:"CA_CERT_PATH" required:"false" default:""`
+	Namespace            string `enconfig:"NAMESPACE" required:"false" default:"assisted-installer"`
 }
 
 type Controller interface {
@@ -124,13 +132,13 @@ func (c *controller) updateConfiguringStatusIfNeeded(hosts map[string]inventory_
 	common.SetConfiguringStatusForHosts(c.ic, hosts, logs, true, c.log)
 }
 
-func (c *controller) ApproveCsrs(done <-chan bool, wg *sync.WaitGroup) {
+func (c *controller) ApproveCsrs(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 	c.log.Infof("Start approving CSRs")
 	ticker := time.NewTicker(GeneralWaitTimeout)
 	for {
 		select {
-		case <-done:
+		case <-ctx.Done():
 			c.log.Infof("Finish approving CSRs")
 			return
 		case <-ticker.C:
@@ -310,6 +318,7 @@ func (c controller) waitForConsole() {
 				c.log.Infof("Found running console pod")
 				return
 			}
+			c.log.Infof("Console pod is in status %s. Continue waiting for it", pod.Status.Phase)
 		}
 	}
 }
@@ -324,4 +333,74 @@ func (c controller) sendCompleteInstallation(isSuccess bool, errorInfo string) {
 		break
 	}
 	c.log.Infof("Done complete installation step")
+}
+
+// get pod logs,
+// write tar.gz to pipe in a routine
+// upload tar.gz from pipe to assisted service.
+// close read and write pipes
+func (c controller) uploadPodLogs(podName string, namespace string, sinceSeconds int64) error {
+	c.log.Infof("Uploading logs for %s in %s", podName, namespace)
+	podLogs, err := c.kc.GetPodLogsAsBuffer(namespace, podName, sinceSeconds)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to get logs of pod %s", podName)
+	}
+	pr, pw := io.Pipe()
+	defer pr.Close()
+
+	go func() {
+		defer pw.Close()
+		err = utils.WriteToTarGz(pw, podLogs, int64(podLogs.Len()), fmt.Sprintf("%s.logs", podName))
+		if err != nil {
+			c.log.WithError(err).Warnf("Failed to create tar.gz")
+		}
+	}()
+	// if error will occur in goroutine above
+	//it will close writer and upload will fail
+	err = c.ic.UploadLogs(c.ClusterID, models.LogsTypeController, pr)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to upload logs")
+	}
+	return nil
+}
+
+// Uploading logs every 5 minutes
+// We will take logs of assisted controller and upload them to assisted-service
+// by creating tar gz of them.
+func (c *controller) UploadControllerLogs(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+	c.log.Infof("Start sending logs")
+	podName := ""
+	ticker := time.NewTicker(LogsUploadPeriod)
+	for {
+		select {
+		case <-ctx.Done():
+			if podName != "" {
+				c.log.Infof("Upload logs before exit")
+				_ = c.uploadPodLogs(podName, c.Namespace, controllerLogsSecondsAgo)
+
+			}
+			c.log.Infof("Done uploading logs")
+			return
+		case <-ticker.C:
+			if podName == "" {
+				pods, err := c.kc.GetPods(c.Namespace, map[string]string{"job-name": "assisted-installer-controller"})
+				if err != nil {
+					c.log.WithError(err).Warnf("Failed to get controller pod name")
+					continue
+				}
+				if len(pods) < 1 {
+					c.log.Infof("Didn't find myself, something strange had happened")
+					continue
+				}
+				podName = pods[0].Name
+			}
+			err := c.uploadPodLogs(podName, c.Namespace, controllerLogsSecondsAgo)
+			if err != nil {
+				c.log.WithError(err).Warnf("Failed to upload controller logs")
+				continue
+			}
+			c.log.Infof("Successfully uploaded controller logs")
+		}
+	}
 }
