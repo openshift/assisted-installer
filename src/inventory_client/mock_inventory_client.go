@@ -137,7 +137,7 @@ func (mr *MockInventoryClientMockRecorder) GetHosts(skippedStatuses interface{})
 }
 
 // UploadLogs mocks base method
-func (m *MockInventoryClient) UploadLogs(clusterId string, logsType models.LogsType, upfile io.ReadCloser) error {
+func (m *MockInventoryClient) UploadLogs(clusterId string, logsType models.LogsType, upfile io.Reader) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UploadLogs", clusterId, logsType, upfile)
 	ret0, _ := ret[0].(error)
