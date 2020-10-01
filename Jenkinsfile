@@ -16,6 +16,12 @@ pipeline {
         steps {
             sh 'skipper make'
         }
+        post {
+            always {
+                junit '**/reports/*test.xml'
+                cobertura coberturaReportFile: '**/reports/*coverage.xml', onlyStable: false, enableNewApi: true
+            }
+        }
     }
 
     stage('publish images on push to master') {

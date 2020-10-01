@@ -2,9 +2,10 @@ FROM golang:1.14.3
 ENV GO111MODULE=on
 
 RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.25.0
-RUN go get -u golang.org/x/tools/cmd/goimports@v0.0.0-20200520220537-cf2d1e09c845
-RUN go get -u github.com/onsi/ginkgo/ginkgo@v1.12.2  # installs the ginkgo CLI
-RUN go get -u github.com/golang/mock/mockgen@v1.4.3
-RUN apt-get update && apt-get install -y docker.io=18.09.1+dfsg1-7.1+deb10u2 \
- && rm -rf /var/lib/apt/lists/*
-
+RUN apt-get update && apt-get install -y docker.io=18.09.1+dfsg1-7.1+deb10u2 && rm -rf /var/lib/apt/lists/*
+RUN go get -u golang.org/x/tools/cmd/goimports@v0.0.0-20200520220537-cf2d1e09c845 \
+              github.com/onsi/ginkgo/ginkgo@v1.12.2  \
+              github.com/golang/mock/mockgen@v1.4.3  \
+              gotest.tools/gotestsum@v0.5.3 \
+              github.com/axw/gocov/gocov \
+              github.com/AlekSi/gocov-xml@v0.0.0-20190121064608-3a14fb1c4737
