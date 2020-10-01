@@ -34,11 +34,25 @@ func (rrt RetryRoundTripper) retry(maxRetries uint, backoff *backoff.Backoff, fn
 	var i uint
 	for i = 1; i <= maxRetries; i++ {
 		res, err = fn(req)
-		if err != nil || res.StatusCode < 200 || res.StatusCode >= 300 {
+		if err != nil || (res != nil && (res.StatusCode < 200 || res.StatusCode >= 300)) {
 			if i <= maxRetries {
 				delay := backoff.Duration()
-				rrt.log.WithError(err).Warnf("Failed executing HTTP call: %s %s status code %d, attempt number %d, Going to retry in: %s, request sent with: HTTP_PROXY: %s, http_proxy: %s, HTTPS_PROXY: %s, https_proxy: %s, NO_PROXY: %s, no_proxy: %s",
-					req.Method, req.URL, res.StatusCode, i, delay, os.Getenv("HTTP_PROXY"), os.Getenv("http_proxy"), os.Getenv("HTTPS_PROXY"), os.Getenv("https_proxy"), os.Getenv("NO_PROXY"), os.Getenv("no_proxy"))
+
+				fields := logrus.Fields{
+					"method":      req.Method,
+					"url":         req.URL,
+					"attempt":     i,
+					"delay":       delay,
+					"HTTP_PROXY":  os.Getenv("HTTP_PROXY"),
+					"HTTPS_PROXY": os.Getenv("HTTPS_PROXY"),
+					"NO_PROXY":    os.Getenv("NO_PROXY"),
+				}
+
+				if res != nil {
+					fields["statusCode"] = res.StatusCode
+				}
+
+				rrt.log.WithFields(fields).WithError(err).Warn("Failed executing HTTP call")
 				time.Sleep(delay)
 			}
 		} else {

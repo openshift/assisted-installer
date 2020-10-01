@@ -3,7 +3,6 @@ package inventory_client
 import (
 	"fmt"
 	"net/http"
-	"strings"
 	"testing"
 	"time"
 
@@ -24,6 +23,7 @@ const (
 	testRetryDelay    = time.Duration(1) * time.Second
 	testRetryMaxDelay = time.Duration(1) * time.Second
 	testMaxRetries    = 4
+	noStatusCode      = 999
 )
 
 var _ = Describe("inventory_client_tests", func() {
@@ -58,14 +58,14 @@ var _ = Describe("inventory_client_tests", func() {
 		)
 
 		It("positive_response", func() {
-			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v1/clusters/%s/hosts/%s/progress", clusterID, hostID), 200)
+			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v1/clusters/%s/hosts/%s/progress", clusterID, hostID), http.StatusOK)
 			Expect(client.UpdateHostInstallProgress(hostID, models.HostStageInstalling, "")).ShouldNot(HaveOccurred())
-			checkLogForRetries(hook.Entries[:], 0)
+			checkLogForRetries(hook.Entries[:], 0, noStatusCode)
 		})
 
-		It("negative_response", func() {
+		It("negative_server_error_response", func() {
 			Expect(client.UpdateHostInstallProgress(hostID, models.HostStageInstalling, "")).Should(HaveOccurred())
-			checkLogForRetries(hook.Entries[:], testMaxRetries)
+			checkLogForRetries(hook.Entries[:], testMaxRetries, http.StatusInternalServerError)
 		})
 
 		It("positive_late_response", func() {
@@ -75,11 +75,17 @@ var _ = Describe("inventory_client_tests", func() {
 				// Unhandled requests receives 500 as described in BeforeEach section
 
 				time.Sleep(testRetryMaxDelay * time.Duration(amountOfRetries))
-				expectServerCall(server, fmt.Sprintf("/api/assisted-install/v1/clusters/%s/hosts/%s/progress", clusterID, hostID), 200)
+				expectServerCall(server, fmt.Sprintf("/api/assisted-install/v1/clusters/%s/hosts/%s/progress", clusterID, hostID), http.StatusOK)
 			}()
 
 			Expect(client.UpdateHostInstallProgress(hostID, models.HostStageInstalling, "")).ShouldNot(HaveOccurred())
-			checkLogForRetries(hook.Entries[:], amountOfRetries)
+			checkLogForRetries(hook.Entries[:], amountOfRetries, http.StatusInternalServerError)
+		})
+
+		It("server_down", func() {
+			server.Close()
+			Expect(client.UpdateHostInstallProgress(hostID, models.HostStageInstalling, "")).Should(HaveOccurred())
+			checkLogForRetries(hook.Entries[:], testMaxRetries, noStatusCode)
 		})
 	})
 })
@@ -94,12 +100,14 @@ func expectServerCall(server *ghttp.Server, path string, statusCode int) {
 	)
 }
 
-func checkLogForRetries(entries []logrus.Entry, amount int) {
+func checkLogForRetries(entries []logrus.Entry, amount int, statusCode int) {
 	counter := 0
 
 	for _, entry := range entries {
-		if strings.Contains(entry.Message, "Going to retry") {
-			counter++
+		if entry.Message == "Failed executing HTTP call" {
+			if statusCode == noStatusCode || statusCode == entry.Data["statusCode"] {
+				counter++
+			}
 		}
 	}
 
