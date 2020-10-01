@@ -27,7 +27,7 @@ type Ops interface {
 	ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error)
 	ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error)
 	Mkdir(dirName string) error
-	WriteImageToDisk(ignitionPath string, device string, image string, progressReporter inventory_client.InventoryClient) error
+	WriteImageToDisk(ignitionPath string, device string, progressReporter inventory_client.InventoryClient) error
 	Reboot() error
 	ExtractFromIgnition(ignitionPath string, fileToExtract string) error
 	SetFileInIgnition(ignitionPath, filePath, contents string, mode int) error
@@ -136,10 +136,10 @@ func (o *ops) SystemctlAction(action string, args ...string) error {
 	return err
 }
 
-func (o *ops) WriteImageToDisk(ignitionPath string, device string, image string, progressReporter inventory_client.InventoryClient) error {
+func (o *ops) WriteImageToDisk(ignitionPath string, device string, progressReporter inventory_client.InventoryClient) error {
 	o.log.Info("Writing image and ignition to disk")
 	_, err := o.ExecPrivilegeCommand(NewCoreosInstallerLogWriter(o.log, progressReporter, config.GlobalConfig.HostID),
-		"coreos-installer", "install", "--image-url", image, "--insecure", "-i", ignitionPath, device)
+		"coreos-installer", "install", "--insecure", "-i", ignitionPath, device)
 	return err
 }
 func (o *ops) Reboot() error {

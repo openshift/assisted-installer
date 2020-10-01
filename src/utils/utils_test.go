@@ -39,35 +39,7 @@ var _ = Describe("Verify_utils", func() {
 
 		})
 	})
-	Context("Verify mco and rhcos image mapping", func() {
-		It("Get image and mco happy flow", func() {
-			openshiftVersion := "4.4"
-			image, err := GetRhcosImageByOpenshiftVersion(openshiftVersion)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(image).Should(Equal(getOpenshiftMapping(openshiftVersion)["rhcos"]))
 
-			mco, err := GetMCOByOpenshiftVersion(openshiftVersion)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(mco).Should(Equal(getOpenshiftMapping(openshiftVersion)["mco"]))
-
-			supported := IsOpenshiftVersionIsSupported(openshiftVersion)
-			Expect(supported).Should(Equal(true))
-		})
-		It("Get image and mco bad flow", func() {
-			openshiftVersion := "bad_version"
-			image, err := GetRhcosImageByOpenshiftVersion(openshiftVersion)
-			Expect(err).To(HaveOccurred())
-			Expect(image).Should(Equal(""))
-
-			mco, err := GetMCOByOpenshiftVersion(openshiftVersion)
-			Expect(err).To(HaveOccurred())
-			Expect(mco).Should(Equal(""))
-
-			supported := IsOpenshiftVersionIsSupported(openshiftVersion)
-			Expect(supported).Should(Equal(false))
-
-		})
-	})
 	Context("Find files", func() {
 		It("Read directory and return found files", func() {
 			found, err := GetListOfFilesFromFolder("../../test_files", "*.json")

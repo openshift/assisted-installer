@@ -111,12 +111,8 @@ func (i *installer) InstallNode() error {
 
 	i.UpdateHostInstallProgress(models.HostStageWritingImageToDisk, "")
 
-	image, _ := utils.GetRhcosImageByOpenshiftVersion(i.OpenshiftVersion)
-	i.log.Infof("Going to use image: %s", image)
-	// TODO report image to disk progress
-
 	err = utils.Retry(3, time.Second, i.log, func() error {
-		return i.ops.WriteImageToDisk(ignitionPath, i.Device, image, i.inventoryClient)
+		return i.ops.WriteImageToDisk(ignitionPath, i.Device, i.inventoryClient)
 	})
 	if err != nil {
 		i.log.Errorf("Failed to write image to disk %s", err)
