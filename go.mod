@@ -3,6 +3,9 @@ module github.com/openshift/assisted-installer
 go 1.14
 
 require (
+	github.com/PuerkitoBio/rehttp v1.0.0
+	github.com/aybabtme/iocontrol v0.0.0-20150809002002-ad15bcfc95a0 // indirect
+	github.com/benbjohnson/clock v1.0.3 // indirect
 	github.com/coreos/ignition/v2 v2.6.0
 	github.com/go-openapi/runtime v0.19.20
 	github.com/go-openapi/strfmt v0.19.5

@@ -1,8 +1,10 @@
 package inventory_client
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"testing"
 	"time"
 
@@ -11,7 +13,6 @@ import (
 	"github.com/onsi/gomega/ghttp"
 	"github.com/openshift/assisted-service/models"
 	"github.com/sirupsen/logrus"
-	"github.com/sirupsen/logrus/hooks/test"
 )
 
 func TestValidator(t *testing.T) {
@@ -23,14 +24,12 @@ const (
 	testRetryDelay    = time.Duration(1) * time.Second
 	testRetryMaxDelay = time.Duration(1) * time.Second
 	testMaxRetries    = 4
-	noStatusCode      = 999
 )
 
 var _ = Describe("inventory_client_tests", func() {
 	var (
 		clusterID = "cluster-id"
 		logger    = logrus.New()
-		hook      *test.Hook
 		client    *inventoryClient
 		server    *ghttp.Server
 	)
@@ -41,11 +40,9 @@ var _ = Describe("inventory_client_tests", func() {
 
 	BeforeEach(func() {
 		var err error
-		hook = test.NewLocal(logger)
-		server = ghttp.NewServer()
+		server = ghttp.NewUnstartedServer()
 		server.SetAllowUnhandledRequests(true)
 		server.SetUnhandledRequestStatusCode(http.StatusInternalServerError) // 500
-
 		client, err = CreateInventoryClientWithDelay(clusterID, "http://"+server.Addr(), "pullSecret", true, "",
 			logger, nil, testRetryDelay, testRetryMaxDelay, testMaxRetries)
 		Expect(err).ShouldNot(HaveOccurred())
@@ -54,62 +51,71 @@ var _ = Describe("inventory_client_tests", func() {
 
 	Context("UpdateHostInstallProgress", func() {
 		var (
-			hostID = "host-id"
+			hostID       = "host-id"
+			expectedJson = make(map[string]string)
 		)
 
+		BeforeEach(func() {
+			expectedJson["current_stage"] = "Installing"
+		})
+
 		It("positive_response", func() {
-			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v1/clusters/%s/hosts/%s/progress", clusterID, hostID), http.StatusOK)
+			server.Start()
+			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v1/clusters/%s/hosts/%s/progress", clusterID, hostID), expectedJson, http.StatusOK)
 			Expect(client.UpdateHostInstallProgress(hostID, models.HostStageInstalling, "")).ShouldNot(HaveOccurred())
-			checkLogForRetries(hook.Entries[:], 0, noStatusCode)
+			Expect(server.ReceivedRequests()).Should(HaveLen(1))
+
 		})
 
 		It("negative_server_error_response", func() {
+			server.Start()
 			Expect(client.UpdateHostInstallProgress(hostID, models.HostStageInstalling, "")).Should(HaveOccurred())
-			checkLogForRetries(hook.Entries[:], testMaxRetries, http.StatusInternalServerError)
+			Expect(server.ReceivedRequests()).Should(HaveLen(testMaxRetries + 1))
+
 		})
 
 		It("positive_late_response", func() {
-			amountOfRetries := 2
+			server.Start()
+			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v1/clusters/%s/hosts/%s/progress", clusterID, hostID), expectedJson, http.StatusInternalServerError)
+			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v1/clusters/%s/hosts/%s/progress", clusterID, hostID), expectedJson, http.StatusForbidden)
+			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v1/clusters/%s/hosts/%s/progress", clusterID, hostID), expectedJson, http.StatusOK)
 
+			Expect(client.UpdateHostInstallProgress(hostID, models.HostStageInstalling, "")).ShouldNot(HaveOccurred())
+			Expect(server.ReceivedRequests()).Should(HaveLen(3))
+		})
+
+		It("server_partially available", func() {
 			go func() {
-				// Unhandled requests receives 500 as described in BeforeEach section
 
-				time.Sleep(testRetryMaxDelay * time.Duration(amountOfRetries))
-				expectServerCall(server, fmt.Sprintf("/api/assisted-install/v1/clusters/%s/hosts/%s/progress", clusterID, hostID), http.StatusOK)
+				time.Sleep(testRetryMaxDelay * 2)
+				expectServerCall(server, fmt.Sprintf("/api/assisted-install/v1/clusters/%s/hosts/%s/progress", clusterID, hostID), expectedJson, http.StatusOK)
+				server.Start()
 			}()
 
 			Expect(client.UpdateHostInstallProgress(hostID, models.HostStageInstalling, "")).ShouldNot(HaveOccurred())
-			checkLogForRetries(hook.Entries[:], amountOfRetries, http.StatusInternalServerError)
+			Expect(server.ReceivedRequests()).Should(HaveLen(1))
 		})
 
 		It("server_down", func() {
+			server.Start()
 			server.Close()
 			Expect(client.UpdateHostInstallProgress(hostID, models.HostStageInstalling, "")).Should(HaveOccurred())
-			checkLogForRetries(hook.Entries[:], testMaxRetries, noStatusCode)
 		})
 	})
 })
 
-func expectServerCall(server *ghttp.Server, path string, statusCode int) {
+func expectServerCall(server *ghttp.Server, path string, expectedJson interface{}, returnedStatusCode int) {
 	var body = []byte("empty")
+	data, err := json.Marshal(expectedJson)
+	Expect(err).ShouldNot(HaveOccurred())
+	content := string(data) + "\n"
+
 	server.AppendHandlers(
 		ghttp.CombineHandlers(
 			ghttp.VerifyRequest("PUT", path),
-			ghttp.RespondWithPtr(&statusCode, &body),
+			ghttp.VerifyJSON(string(data)),
+			ghttp.VerifyHeader(http.Header{"Content-Length": []string{strconv.Itoa(len(content))}}),
+			ghttp.RespondWithPtr(&returnedStatusCode, &body),
 		),
 	)
-}
-
-func checkLogForRetries(entries []logrus.Entry, amount int, statusCode int) {
-	counter := 0
-
-	for _, entry := range entries {
-		if entry.Message == "Failed executing HTTP call" {
-			if statusCode == noStatusCode || statusCode == entry.Data["statusCode"] {
-				counter++
-			}
-		}
-	}
-
-	Expect(counter).Should(Equal(amount))
 }
