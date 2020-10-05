@@ -12,15 +12,16 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"syscall"
 	"time"
 
 	"github.com/go-openapi/runtime"
 
 	"github.com/thoas/go-funk"
 
+	"github.com/PuerkitoBio/rehttp"
 	"github.com/go-openapi/strfmt"
 	"github.com/openshift/assisted-installer/src/utils"
-
 	"github.com/openshift/assisted-service/client"
 	"github.com/openshift/assisted-service/client/installer"
 	"github.com/openshift/assisted-service/models"
@@ -67,7 +68,7 @@ func CreateInventoryClient(clusterId string, inventoryURL string, pullSecret str
 
 func CreateInventoryClientWithDelay(clusterId string, inventoryURL string, pullSecret string, insecure bool, caPath string,
 	logger *logrus.Logger, proxyFunc func(*http.Request) (*url.URL, error),
-	retryMinDelay, retryMaxDelay time.Duration, maxRetries uint) (*inventoryClient, error) {
+	retryMinDelay, retryMaxDelay time.Duration, maxRetries int) (*inventoryClient, error) {
 	clientConfig := client.Config{}
 	var err error
 	clientConfig.URL, err = url.ParseRequestURI(createUrl(inventoryURL))
@@ -102,16 +103,44 @@ func CreateInventoryClientWithDelay(clusterId string, inventoryURL string, pullS
 		},
 	})
 	// Add retry settings
+	tr := rehttp.NewTransport(
+		transport,
+		rehttp.RetryAny(
+			rehttp.RetryAll(
+				rehttp.RetryMaxRetries(maxRetries),
+				rehttp.RetryStatusInterval(400, 600),
+			),
+			rehttp.RetryAll(
+				rehttp.RetryMaxRetries(maxRetries),
+				rehttp.RetryTemporaryErr(),
+			),
+			rehttp.RetryAll(
+				rehttp.RetryMaxRetries(maxRetries),
+				RetryConnectionRefusedErr(),
+			),
+		),
+		rehttp.ExpJitterDelay(retryMinDelay, retryMaxDelay),
+	)
 
-	clientConfig.Transport = RetryRoundTripper{transport,
-		logger,
-		retryMinDelay,
-		retryMaxDelay,
-		maxRetries}
+	clientConfig.Transport = tr
 
 	clientConfig.AuthInfo = auth.AgentAuthHeaderWriter(pullSecret)
 	assistedInstallClient := client.New(clientConfig)
 	return &inventoryClient{logger, assistedInstallClient, strfmt.UUID(clusterId)}, nil
+}
+
+func RetryConnectionRefusedErr() rehttp.RetryFn {
+	return func(attempt rehttp.Attempt) bool {
+		if operr, ok := attempt.Error.(*net.OpError); ok {
+			if syserr, ok := operr.Err.(*os.SyscallError); ok {
+				if syserr.Err == syscall.ECONNREFUSED {
+					return true
+				}
+			}
+		}
+
+		return false
+	}
 }
 
 func readCACertificate(capath string, logger *logrus.Logger) (*x509.CertPool, error) {
