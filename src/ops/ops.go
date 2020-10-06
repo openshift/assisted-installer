@@ -266,6 +266,7 @@ func (o *ops) renderControllerSecret() error {
 func (o *ops) renderControllerPod() error {
 	var params = map[string]string{
 		"ControllerImage": config.GlobalConfig.ControllerImage,
+		"CACertPath":      config.GlobalConfig.CACertPath,
 	}
 
 	return o.renderDeploymentFiles(filepath.Join(controllerDeployFolder, controllerDeployPodTemplate),
