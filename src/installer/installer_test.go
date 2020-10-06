@@ -1,6 +1,7 @@
 package installer
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -253,10 +254,35 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockbmclient.EXPECT().UpdateHostInstallProgress("eb82821f-bf21-4614-9a3b-ecb07929f240", models.HostStageConfiguring, gomock.Any()).Return(nil).Times(1)
 			mockbmclient.EXPECT().UpdateHostInstallProgress("eb82821f-bf21-4614-9a3b-ecb07929f239", models.HostStageConfiguring, gomock.Any()).Return(nil).Times(1)
 
-			done := make(chan bool)
-			go installerObj.updateConfiguringStatus(done)
-			time.Sleep(3 * time.Second)
-			done <- true
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			go installerObj.updateConfiguringStatus(ctx)
+			time.Sleep(1 * time.Second)
+		})
+		It("Configuring state, all hosts were set", func() {
+			var logs string
+			generalWaitTimeout = 100 * time.Millisecond
+			logsInBytes, _ := ioutil.ReadFile("../../test_files/mcs_logs.txt")
+			logs = string(logsInBytes)
+			node1Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f239")
+			node2Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f240")
+
+			testInventoryIdsIps := map[string]inventory_client.HostData{
+				"node1": {Host: &models.Host{ID: &node1Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}}, IPs: []string{"192.168.126.11", "192.168.11.123", "fe80::5054:ff:fe9a:4739"}},
+				"node2": {Host: &models.Host{ID: &node2Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}}, IPs: []string{"192.168.126.12", "192.168.11.124", "fe80::5054:ff:fe9a:4740"}}}
+			mockbmclient.EXPECT().GetEnabledHostsNamesHosts().Return(nil, fmt.Errorf("dummy")).Times(1)
+			mockbmclient.EXPECT().GetEnabledHostsNamesHosts().Return(testInventoryIdsIps, nil).Times(1)
+			mockops.EXPECT().GetMCSLogs().Return("", fmt.Errorf("dummy")).Times(1)
+			mockops.EXPECT().GetMCSLogs().Return("dummy logs", nil).Times(1)
+			mockops.EXPECT().GetMCSLogs().Return("dummy logs", nil).Times(1)
+			mockops.EXPECT().GetMCSLogs().Return(logs, nil).AnyTimes()
+
+			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), models.HostStageConfiguring, gomock.Any()).Return(fmt.Errorf("dummy")).Times(1)
+			mockbmclient.EXPECT().UpdateHostInstallProgress("eb82821f-bf21-4614-9a3b-ecb07929f240", models.HostStageConfiguring, gomock.Any()).Return(nil).Times(1)
+			mockbmclient.EXPECT().UpdateHostInstallProgress("eb82821f-bf21-4614-9a3b-ecb07929f239", models.HostStageConfiguring, gomock.Any()).Return(nil).Times(1)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			installerObj.updateConfiguringStatus(ctx)
 		})
 		It("Installation timeout integer overflow", func() {
 			time, err := time.ParseDuration("120m")

@@ -139,11 +139,11 @@ func (i *installer) InstallNode() error {
 }
 
 func (i *installer) runBootstrap(ctx context.Context) error {
-	done := make(chan bool)
+	ctxLocal, cancel := context.WithCancel(ctx)
 	defer func() {
-		done <- true
+		cancel()
 	}()
-	go i.updateConfiguringStatus(done)
+	go i.updateConfiguringStatus(ctxLocal)
 
 	err := i.startBootstrap()
 	if err != nil {
@@ -291,8 +291,9 @@ func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, 
 	defer cancel()
 
 	wait.Until(func() {
-		inventoryHostsMap = i.getInventoryHostsMap(inventoryHostsMap)
-		if inventoryHostsMap == nil {
+		var err error
+		inventoryHostsMap, err = i.getInventoryHostsMap(inventoryHostsMap)
+		if err != nil {
 			return
 		}
 		nodes, err := kc.ListMasterNodes()
@@ -314,16 +315,18 @@ func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, 
 	return nil
 }
 
-func (i *installer) getInventoryHostsMap(hostsMap map[string]inventory_client.HostData) map[string]inventory_client.HostData {
+func (i *installer) getInventoryHostsMap(hostsMap map[string]inventory_client.HostData) (map[string]inventory_client.HostData, error) {
 	var err error
 	if hostsMap == nil {
 		hostsMap, err = i.inventoryClient.GetEnabledHostsNamesHosts()
 		if err != nil {
 			i.log.Warnf("Failed to get hosts info from inventory, err %s", err)
-			return nil
+			return nil, err
 		}
+		// no need for current host
+		delete(hostsMap, i.Hostname)
 	}
-	return hostsMap
+	return hostsMap, nil
 }
 
 func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]string, inventoryHostsMap map[string]inventory_client.HostData) {
@@ -378,25 +381,43 @@ func (i *installer) verifyHostCanMoveToConfigurationStatus(inventoryHostsMapWith
 	common.SetConfiguringStatusForHosts(i.inventoryClient, inventoryHostsMapWithIp, logs, true, i.log)
 }
 
+func (i *installer) filterAlreadyUpdatedHosts(inventoryHostsMapWithIp map[string]inventory_client.HostData) {
+	statesToFilter := map[models.HostStage]struct{}{models.HostStageConfiguring: {}, models.HostStageJoined: {},
+		models.HostStageDone: {}, models.HostStageWaitingForIgnition: {}}
+	for name, host := range inventoryHostsMapWithIp {
+		fmt.Println(name, host.Host.Progress.CurrentStage)
+		_, ok := statesToFilter[host.Host.Progress.CurrentStage]
+		if ok {
+			delete(inventoryHostsMapWithIp, name)
+		}
+	}
+}
+
 // will run as go routine and tries to find nodes that pulled ignition from mcs
 // it will get mcs logs of static pod that runs on bootstrap and will search for matched ip
 // when match is found it will update inventory service with new host status
-func (i *installer) updateConfiguringStatus(done <-chan bool) {
+func (i *installer) updateConfiguringStatus(ctx context.Context) {
 	i.log.Infof("Start waiting for configuring state")
 	ticker := time.NewTicker(generalWaitTimeout)
 	var inventoryHostsMapWithIp map[string]inventory_client.HostData
+	var err error
 	for {
 		select {
-		case <-done:
+		case <-ctx.Done():
 			i.log.Infof("Exiting updateConfiguringStatus go routine")
 			return
 		case <-ticker.C:
 			i.log.Infof("searching for hosts that pulled ignition already")
-			inventoryHostsMapWithIp = i.getInventoryHostsMap(inventoryHostsMapWithIp)
-			if inventoryHostsMapWithIp == nil {
+			inventoryHostsMapWithIp, err = i.getInventoryHostsMap(inventoryHostsMapWithIp)
+			if err != nil {
 				continue
 			}
 			i.verifyHostCanMoveToConfigurationStatus(inventoryHostsMapWithIp)
+			i.filterAlreadyUpdatedHosts(inventoryHostsMapWithIp)
+			if len(inventoryHostsMapWithIp) == 0 {
+				i.log.Infof("Exiting updateConfiguringStatus go routine")
+				return
+			}
 		}
 	}
 }
