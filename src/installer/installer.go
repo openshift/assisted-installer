@@ -17,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/openshift/assisted-installer/src/k8s_client"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/inventory_client"
@@ -30,7 +29,7 @@ const (
 	InstallDir     = "/opt/install-dir"
 	KubeconfigPath = "/opt/openshift/auth/kubeconfig-loopback"
 	// Change this to the MCD image from the relevant openshift release image
-	minMasterNodes   = 2
+	minMasterNodes   = 1
 	dockerConfigFile = "/root/.docker/config.json"
 )
 
@@ -83,17 +82,8 @@ func (i *installer) InstallNode() error {
 		i.log.Errorf("Failed to create install dir: %s", err)
 		return err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	errs, _ := errgroup.WithContext(ctx)
-	//cancel the context in case this method ends
-	defer cancel()
-	isBootstrap := false
 	if i.Config.Role == string(models.HostRoleBootstrap) {
-		isBootstrap = true
-		errs.Go(func() error {
-			return i.runBootstrap(ctx)
-		})
-		i.Config.Role = string(models.HostRoleMaster)
+		return i.runBootstrap(context.Background())
 	}
 
 	i.UpdateHostInstallProgress(models.HostStageInstalling, i.Config.Role)
@@ -120,17 +110,10 @@ func (i *installer) InstallNode() error {
 	} else {
 		i.log.Info("Done writing image to disk")
 	}
-	if isBootstrap {
-		i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, "")
-		if err = errs.Wait(); err != nil {
-			i.log.Error(err)
-			return err
-		}
-	}
 	i.UpdateHostInstallProgress(models.HostStageRebooting, "")
-	_, err = i.ops.UploadInstallationLogs(isBootstrap)
+	_, err = i.ops.UploadInstallationLogs(false)
 	if err != nil {
-		i.log.Errorf("upload installation logs %s", err)
+		i.log.Errorf("Upload installation logs %s", err)
 	}
 	if err = i.ops.Reboot(); err != nil {
 		return err
@@ -155,10 +138,15 @@ func (i *installer) runBootstrap(ctx context.Context) error {
 		i.log.Error(err)
 		return err
 	}
+	i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, "")
 	if err = i.waitForControlPlane(ctx, kc); err != nil {
 		return err
 	}
-	i.log.Info("Setting bootstrap node new role to master")
+	i.log.Info("Done running bootstrap")
+	_, err = i.ops.UploadInstallationLogs(true)
+	if err != nil {
+		i.log.Errorf("Upload installation logs %s", err)
+	}
 	return nil
 }
 

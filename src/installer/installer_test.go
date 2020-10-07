@@ -142,10 +142,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			kubeNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65"}
 			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
 			mockbmclient.EXPECT().UpdateHostInstallProgress(inventoryNamesHost["node0"].Host.ID.String(), models.HostStageJoined, "").Times(1)
-			kubeNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65",
-				"node1": "eb82821f-bf21-4614-9a3b-ecb07929f238"}
-			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
-			mockbmclient.EXPECT().UpdateHostInstallProgress(inventoryNamesHost["node1"].Host.ID.String(), models.HostStageJoined, "").Times(1)
 		}
 		patchEtcdSuccess := func() {
 			mockk8sclient.EXPECT().PatchEtcd().Return(nil).Times(1)
@@ -176,9 +172,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("bootstrap role happy flow", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageWaitingForControlPlane)},
-				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
-				{string(models.HostStageWritingImageToDisk)},
-				{string(models.HostStageRebooting)},
 			})
 			bootstrapSetup()
 			restartNetworkManager(nil)
@@ -188,19 +181,13 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			WaitMasterNodesSucccess()
 			waitForBootkubeSuccess()
 			bootkubeStatusSuccess()
-			//HostRoleMaster flow:
-			downloadFileSuccess(masterIgn)
-			writeToDiskSuccess()
 			uploadLogsSuccess(true)
-			rebootSuccess()
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(BeNil())
 		})
 		It("bootstrap role fail", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageWaitingForControlPlane)},
-				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
-				{string(models.HostStageWritingImageToDisk)},
 			})
 			bootstrapSetup()
 			restartNetworkManager(nil)
@@ -210,23 +197,15 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			err := fmt.Errorf("Etcd patch failed")
 			mockk8sclient.EXPECT().PatchEtcd().Return(err).Times(1)
 			//HostRoleMaster flow:
-			downloadFileSuccess(masterIgn)
-			writeToDiskSuccess()
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
 		It("bootstrap fail to restart NetworkManager", func() {
-			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
-				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
-				{string(models.HostStageWritingImageToDisk)},
-				{string(models.HostStageWaitingForControlPlane)},
-			})
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
 			bootstrapSetup()
 			err := fmt.Errorf("Failed to restart NetworkManager")
 			restartNetworkManager(err)
-			//HostRoleMaster flow:
-			downloadFileSuccess(masterIgn)
-			writeToDiskSuccess()
+
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
@@ -291,15 +270,11 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageWaitingForControlPlane)},
-				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
-				{string(models.HostStageWritingImageToDisk)},
 			})
 			bootstrapSetup()
 			restartNetworkManager(nil)
 			prepareControllerSuccess()
 			startServicesSuccess()
-			downloadFileSuccess(masterIgn)
-			writeToDiskSuccess()
 
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(fmt.Errorf(
