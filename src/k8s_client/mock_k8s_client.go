@@ -10,9 +10,10 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
+	v1 "github.com/openshift/api/config/v1"
 	ops "github.com/openshift/assisted-installer/src/ops"
 	v1beta1 "k8s.io/api/certificates/v1beta1"
-	v1 "k8s.io/api/core/v1"
+	v10 "k8s.io/api/core/v1"
 )
 
 // MockK8SClient is a mock of K8SClient interface
@@ -39,10 +40,10 @@ func (m *MockK8SClient) EXPECT() *MockK8SClientMockRecorder {
 }
 
 // ListMasterNodes mocks base method
-func (m *MockK8SClient) ListMasterNodes() (*v1.NodeList, error) {
+func (m *MockK8SClient) ListMasterNodes() (*v10.NodeList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListMasterNodes")
-	ret0, _ := ret[0].(*v1.NodeList)
+	ret0, _ := ret[0].(*v10.NodeList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -82,10 +83,10 @@ func (mr *MockK8SClientMockRecorder) UnPatchEtcd() *gomock.Call {
 }
 
 // ListNodes mocks base method
-func (m *MockK8SClient) ListNodes() (*v1.NodeList, error) {
+func (m *MockK8SClient) ListNodes() (*v10.NodeList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListNodes")
-	ret0, _ := ret[0].(*v1.NodeList)
+	ret0, _ := ret[0].(*v10.NodeList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -141,10 +142,10 @@ func (mr *MockK8SClientMockRecorder) ListCsrs() *gomock.Call {
 }
 
 // GetConfigMap mocks base method
-func (m *MockK8SClient) GetConfigMap(namespace, name string) (*v1.ConfigMap, error) {
+func (m *MockK8SClient) GetConfigMap(namespace, name string) (*v10.ConfigMap, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetConfigMap", namespace, name)
-	ret0, _ := ret[0].(*v1.ConfigMap)
+	ret0, _ := ret[0].(*v10.ConfigMap)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -186,10 +187,10 @@ func (mr *MockK8SClientMockRecorder) GetPodLogsAsBuffer(namespace, podName, sinc
 }
 
 // GetPods mocks base method
-func (m *MockK8SClient) GetPods(namespace string, labelMatch map[string]string) ([]v1.Pod, error) {
+func (m *MockK8SClient) GetPods(namespace string, labelMatch map[string]string) ([]v10.Pod, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPods", namespace, labelMatch)
-	ret0, _ := ret[0].([]v1.Pod)
+	ret0, _ := ret[0].([]v10.Pod)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -270,4 +271,19 @@ func (m *MockK8SClient) SetProxyEnvVars() error {
 func (mr *MockK8SClientMockRecorder) SetProxyEnvVars() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetProxyEnvVars", reflect.TypeOf((*MockK8SClient)(nil).SetProxyEnvVars))
+}
+
+// GetClusterVersion mocks base method
+func (m *MockK8SClient) GetClusterVersion(name string) (*v1.ClusterVersion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetClusterVersion", name)
+	ret0, _ := ret[0].(*v1.ClusterVersion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetClusterVersion indicates an expected call of GetClusterVersion
+func (mr *MockK8SClientMockRecorder) GetClusterVersion(name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClusterVersion", reflect.TypeOf((*MockK8SClient)(nil).GetClusterVersion), name)
 }

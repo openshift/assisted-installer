@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	configv1 "github.com/openshift/api/config/v1"
+
 	"github.com/openshift/assisted-installer/src/common"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/pkg/errors"
@@ -29,8 +31,9 @@ const (
 	controllerLogsSecondsAgo = 30 * 60
 )
 
-var GeneralWaitTimeout = generalWaitTimeoutInt * time.Second
+var GeneralWaitInterval = generalWaitTimeoutInt * time.Second
 var LogsUploadPeriod = 5 * time.Minute
+var WaitTimeout = 2 * time.Hour
 
 // assisted installer controller is added to control installation process after  bootstrap pivot
 // assisted installer will deploy it on installation process
@@ -72,7 +75,7 @@ func (c *controller) WaitAndUpdateNodesStatus() {
 	ignoreStatuses := []string{models.HostStatusDisabled,
 		models.HostStatusError, models.HostStatusInstalled}
 	for {
-		time.Sleep(GeneralWaitTimeout)
+		time.Sleep(GeneralWaitInterval)
 		assistedInstallerNodesMap, err := c.ic.GetHosts(ignoreStatuses)
 		if err != nil {
 			c.log.WithError(err).Error("Failed to get node map from inventory")
@@ -135,7 +138,7 @@ func (c *controller) updateConfiguringStatusIfNeeded(hosts map[string]inventory_
 func (c *controller) ApproveCsrs(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 	c.log.Infof("Start approving CSRs")
-	ticker := time.NewTicker(GeneralWaitTimeout)
+	ticker := time.NewTicker(GeneralWaitInterval)
 	for {
 		select {
 		case <-ctx.Done():
@@ -174,7 +177,7 @@ func isCsrApproved(csr *certificatesv1beta1.CertificateSigningRequest) bool {
 func (c controller) PostInstallConfigs(wg *sync.WaitGroup) {
 	defer wg.Done()
 	for {
-		time.Sleep(GeneralWaitTimeout)
+		time.Sleep(GeneralWaitInterval)
 		cluster, err := c.ic.GetCluster()
 		if err != nil {
 			c.log.WithError(err).Errorf("Failed to get cluster %s from assisted-service", c.ClusterID)
@@ -186,16 +189,45 @@ func (c controller) PostInstallConfigs(wg *sync.WaitGroup) {
 		}
 		break
 	}
-	c.addRouterCAToClusterCA()
-	c.unpatchEtcd()
-	c.waitForConsole()
-	c.sendCompleteInstallation(true, "")
+
+	errMessage := ""
+	err := c.postInstallConfigs()
+	if err != nil {
+		errMessage = err.Error()
+	}
+	success := err == nil
+	c.sendCompleteInstallation(success, errMessage)
+}
+
+func (c controller) postInstallConfigs() error {
+
+	err := utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.validateClusterVersion)
+	if err != nil {
+		return errors.Errorf("Timeout while waiting for cluster version to be available")
+	}
+
+	err = utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.addRouterCAToClusterCA)
+	if err != nil {
+		return errors.Errorf("Timeout while waiting router ca data")
+	}
+
+	err = utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.unpatchEtcd)
+	if err != nil {
+		return errors.Errorf("Timeout while trying to unpatch etcd")
+	}
+
+	err = utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.validateConsolePod)
+	if err != nil {
+		return errors.Errorf("Timeout while waiting for console pod to be running")
+	}
+
+	return nil
 }
 
 func (c controller) UpdateBMHs(wg *sync.WaitGroup) {
 	defer wg.Done()
 	for {
-		time.Sleep(GeneralWaitTimeout)
+		time.Sleep(GeneralWaitInterval)
 		exists, err := c.kc.IsMetalProvisioningExists()
 		if err != nil {
 			continue
@@ -267,64 +299,72 @@ func (c controller) unmarshalStatusAnnotation(content []byte) (*metal3v1alpha1.B
 	return bmhStatus, nil
 }
 
-func (c controller) unpatchEtcd() {
+func (c controller) unpatchEtcd() bool {
 	c.log.Infof("Unpatching etcd")
-	for {
-		if err := c.kc.UnPatchEtcd(); err != nil {
-			c.log.Error(err)
-			continue
-		}
-		break
+	if err := c.kc.UnPatchEtcd(); err != nil {
+		c.log.Error(err)
+		return false
 	}
-
+	return true
 }
 
 // AddRouterCAToClusterCA adds router CA to cluster CA in kubeconfig
-func (c controller) addRouterCAToClusterCA() {
+func (c controller) addRouterCAToClusterCA() bool {
 	cmName := "default-ingress-cert"
 	cmNamespace := "openshift-config-managed"
 	c.log.Infof("Start adding ingress ca to cluster")
-	for {
-		caConfigMap, err := c.kc.GetConfigMap(cmNamespace, cmName)
+	caConfigMap, err := c.kc.GetConfigMap(cmNamespace, cmName)
 
-		if err != nil {
-			c.log.WithError(err).Errorf("fetching %s configmap from %s namespace", cmName, cmNamespace)
-			continue
-		}
-
-		c.log.Infof("Sending ingress certificate to inventory service. Certificate data %s", caConfigMap.Data["ca-bundle.crt"])
-		err = c.ic.UploadIngressCa(caConfigMap.Data["ca-bundle.crt"], c.ClusterID)
-		if err != nil {
-			c.log.WithError(err).Errorf("Failed to upload ingress ca to assisted-service")
-			continue
-		}
-		c.log.Infof("Ingress ca successfully sent to inventory")
-		return
+	if err != nil {
+		c.log.WithError(err).Errorf("fetching %s configmap from %s namespace", cmName, cmNamespace)
+		return false
 	}
+
+	c.log.Infof("Sending ingress certificate to inventory service. Certificate data %s", caConfigMap.Data["ca-bundle.crt"])
+	err = c.ic.UploadIngressCa(caConfigMap.Data["ca-bundle.crt"], c.ClusterID)
+	if err != nil {
+		c.log.WithError(err).Errorf("Failed to upload ingress ca to assisted-service")
+		return false
+	}
+	c.log.Infof("Ingress ca successfully sent to inventory")
+	return true
+
 }
 
-func (c controller) waitForConsole() {
-	c.log.Infof("Waiting for console pod")
-
-	// TODO maybe need some timeout?
-	for {
-		pods, err := c.kc.GetPods("openshift-console", map[string]string{"app": "console", "component": "ui"})
-		if err != nil {
-			c.log.WithError(err).Warnf("Failed to get console pods")
-			continue
+func (c controller) validateConsolePod() bool {
+	c.log.Infof("Checking if console pod is running")
+	pods, err := c.kc.GetPods("openshift-console", map[string]string{"app": "console", "component": "ui"})
+	if err != nil {
+		c.log.WithError(err).Warnf("Failed to get console pods")
+		return false
+	}
+	for _, pod := range pods {
+		if pod.Status.Phase == "Running" {
+			c.log.Infof("Found running console pod")
+			return true
 		}
-		for _, pod := range pods {
-			if pod.Status.Phase == "Running" {
-				c.log.Infof("Found running console pod")
-				return
-			}
-			c.log.Infof("Console pod is in status %s. Continue waiting for it", pod.Status.Phase)
+		c.log.Infof("Console pod is in status %s. Continue waiting for it", pod.Status.Phase)
+	}
+	return false
+}
+
+func (c controller) validateClusterVersion() bool {
+	c.log.Infof("Waiting for cluster version to be available")
+	cv, err := c.kc.GetClusterVersion("version")
+	if err != nil {
+		c.log.WithError(err).Warnf("Failed to get cluster version")
+		return false
+	}
+	for _, condition := range cv.Status.Conditions {
+		if condition.Type == configv1.OperatorAvailable {
+			return condition.Status == configv1.ConditionTrue
 		}
 	}
+	return false
 }
 
 func (c controller) sendCompleteInstallation(isSuccess bool, errorInfo string) {
-	c.log.Infof("Start complete installation step")
+	c.log.Infof("Start complete installation step, with params success:%t, error info %s", isSuccess, errorInfo)
 	for {
 		if err := c.ic.CompleteInstallation(c.ClusterID, isSuccess, errorInfo); err != nil {
 			c.log.Error(err)

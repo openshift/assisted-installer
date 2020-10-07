@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	configv1 "github.com/openshift/api/config/v1"
+
 	"github.com/go-openapi/strfmt"
 
 	"github.com/openshift/assisted-service/models"
@@ -68,7 +70,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		kubeNamesIds = map[string]string{"node0": "6d6f00e8-70dd-48a5-859a-0f1459485ad9",
 			"node1": "2834ff2e-8965-48a5-859a-0f1459485a77",
 			"node2": "57df89ee-3546-48a5-859a-0f1459485a66"}
-		GeneralWaitTimeout = 100 * time.Millisecond
+		GeneralWaitInterval = 100 * time.Millisecond
 
 		defaultStages = []models.HostStage{models.HostStageDone,
 			models.HostStageDone,
@@ -237,7 +239,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
-			GeneralWaitTimeout = 1 * time.Second
+			GeneralWaitInterval = 1 * time.Second
 		})
 		It("Run ApproveCsrs and validate it exists on channel set", func() {
 			testList := v1beta1.CertificateSigningRequestList{}
@@ -293,19 +295,38 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
-			GeneralWaitTimeout = 1 * time.Second
+			GeneralWaitInterval = 1 * time.Second
 		})
-		It("Run addRouterCAToClusterCA", func() {
+		It("Run addRouterCAToClusterCA happy flow", func() {
 			cmName := "default-ingress-cert"
 			cmNamespace := "openshift-config-managed"
 			data := make(map[string]string)
 			data["ca-bundle.crt"] = "CA"
 			cm := v1.ConfigMap{Data: data}
-			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(nil, fmt.Errorf("dummy")).Times(1)
-			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(&cm, nil).Times(2)
-			mockbmclient.EXPECT().UploadIngressCa(data["ca-bundle.crt"], c.ClusterID).Return(fmt.Errorf("dummy")).Times(1)
+			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(&cm, nil).Times(1)
 			mockbmclient.EXPECT().UploadIngressCa(data["ca-bundle.crt"], c.ClusterID).Return(nil).Times(1)
-			c.addRouterCAToClusterCA()
+			res := c.addRouterCAToClusterCA()
+			Expect(res).Should(Equal(true))
+		})
+		It("Run addRouterCAToClusterCA Config map failed", func() {
+			cmName := "default-ingress-cert"
+			cmNamespace := "openshift-config-managed"
+			data := make(map[string]string)
+			data["ca-bundle.crt"] = "CA"
+			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(nil, fmt.Errorf("dummy")).Times(1)
+			res := c.addRouterCAToClusterCA()
+			Expect(res).Should(Equal(false))
+		})
+		It("Run addRouterCAToClusterCA UploadIngressCa failed", func() {
+			cmName := "default-ingress-cert"
+			cmNamespace := "openshift-config-managed"
+			data := make(map[string]string)
+			data["ca-bundle.crt"] = "CA"
+			cm := v1.ConfigMap{Data: data}
+			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(&cm, nil).Times(1)
+			mockbmclient.EXPECT().UploadIngressCa(data["ca-bundle.crt"], c.ClusterID).Return(fmt.Errorf("dummy")).Times(1)
+			res := c.addRouterCAToClusterCA()
+			Expect(res).Should(Equal(false))
 		})
 		It("Run PostInstallConfigs", func() {
 			cmName := "default-ingress-cert"
@@ -316,6 +337,12 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			cm := v1.ConfigMap{Data: data}
 			finalizing := models.ClusterStatusFinalizing
 			installing := models.ClusterStatusInstalling
+			badClusterVersion := &configv1.ClusterVersion{}
+			badClusterVersion.Status.Conditions = []configv1.ClusterOperatorStatusCondition{{Type: configv1.OperatorAvailable,
+				Status: configv1.ConditionFalse}}
+			goodClusterVersion := &configv1.ClusterVersion{}
+			goodClusterVersion.Status.Conditions = []configv1.ClusterOperatorStatusCondition{{Type: configv1.OperatorAvailable,
+				Status: configv1.ConditionTrue}}
 			cluster := models.Cluster{Status: &finalizing}
 			mockbmclient.EXPECT().GetCluster().Return(nil, fmt.Errorf("dummy")).Times(1)
 			mockbmclient.EXPECT().GetCluster().Return(&models.Cluster{Status: &installing}, nil).Times(1)
@@ -327,8 +354,29 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any()).Return(nil, fmt.Errorf("dummy")).Times(1)
 			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any()).Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Pending"}}}, nil).Times(1)
 			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any()).Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Running"}}}, nil).Times(1)
+			mockk8sclient.EXPECT().GetClusterVersion("version").Return(nil, fmt.Errorf("dummy")).Times(1)
+			mockk8sclient.EXPECT().GetClusterVersion("version").Return(badClusterVersion, nil).Times(1)
+			mockk8sclient.EXPECT().GetClusterVersion("version").Return(goodClusterVersion, nil).Times(1)
+
 			mockbmclient.EXPECT().CompleteInstallation("cluster-id", true, "").Return(fmt.Errorf("dummy")).Times(1)
 			mockbmclient.EXPECT().CompleteInstallation("cluster-id", true, "").Return(nil).Times(1)
+
+			wg.Add(1)
+			go c.PostInstallConfigs(&wg)
+			wg.Wait()
+		})
+		It("Run PostInstallConfigs failed", func() {
+			WaitTimeout = 2 * time.Second
+			finalizing := models.ClusterStatusFinalizing
+			badClusterVersion := &configv1.ClusterVersion{}
+			badClusterVersion.Status.Conditions = []configv1.ClusterOperatorStatusCondition{{Type: configv1.OperatorAvailable,
+				Status: configv1.ConditionFalse}}
+			cluster := models.Cluster{Status: &finalizing}
+			mockbmclient.EXPECT().GetCluster().Return(&cluster, nil).Times(1)
+			mockk8sclient.EXPECT().GetClusterVersion("version").Return(badClusterVersion, nil).MinTimes(1)
+
+			mockbmclient.EXPECT().CompleteInstallation("cluster-id", false, "Timeout while waiting for cluster "+
+				"version to be available").Return(nil).Times(1)
 
 			wg.Add(1)
 			go c.PostInstallConfigs(&wg)

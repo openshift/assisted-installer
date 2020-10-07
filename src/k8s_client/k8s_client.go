@@ -18,6 +18,7 @@ import (
 
 	bmoapis "github.com/metal3-io/baremetal-operator/pkg/apis"
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
+	configv1 "github.com/openshift/api/config/v1"
 	configv1client "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 	operatorv1 "github.com/openshift/client-go/operator/clientset/versioned"
 	"github.com/pkg/errors"
@@ -56,6 +57,7 @@ type K8SClient interface {
 	UpdateBMHStatus(bmh *metal3v1alpha1.BareMetalHost) error
 	UpdateBMH(bmh *metal3v1alpha1.BareMetalHost) error
 	SetProxyEnvVars() error
+	GetClusterVersion(name string) (*configv1.ClusterVersion, error)
 }
 
 type K8SClientBuilder func(configPath string, logger *logrus.Logger) (K8SClient, error)
@@ -109,7 +111,8 @@ func NewK8SClient(configPath string, logger *logrus.Logger) (K8SClient, error) {
 		}
 	}
 
-	return &k8sClient{logger, client, ocClient, runtimeClient, csrClient, configClient.Proxies()}, nil
+	return &k8sClient{logger, client, ocClient, runtimeClient, csrClient,
+		configClient.Proxies()}, nil
 }
 
 func (c *k8sClient) ListMasterNodes() (*v1.NodeList, error) {
@@ -297,4 +300,15 @@ func (c *k8sClient) UpdateBMHStatus(bmh *metal3v1alpha1.BareMetalHost) error {
 
 func (c *k8sClient) UpdateBMH(bmh *metal3v1alpha1.BareMetalHost) error {
 	return c.runtimeClient.Update(context.TODO(), bmh)
+}
+
+func (c *k8sClient) GetClusterVersion(name string) (*configv1.ClusterVersion, error) {
+	result := &configv1.ClusterVersion{}
+	err := c.client.RESTClient().Get().
+		AbsPath("/apis/config.openshift.io/v1").
+		Resource("clusterversions").
+		Name(name).
+		Do(context.Background()).
+		Into(result)
+	return result, err
 }
