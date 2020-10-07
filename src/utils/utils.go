@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/openshift/assisted-installer-agent/pkg/journalLogger"
 
 	ignition "github.com/coreos/ignition/v2/config/v3_1"
@@ -198,4 +200,22 @@ func WriteToTarGz(w io.Writer, reader io.Reader, sizeOfData int64, fileName stri
 		return err
 	}
 	return nil
+}
+
+func WaitForPredicate(timeout time.Duration, interval time.Duration, predicate func() bool) error {
+	timeoutAfter := time.After(timeout)
+	ticker := time.NewTicker(interval)
+	// Keep trying until we're time out or get true
+	for {
+		select {
+		// Got a timeout! fail with a timeout error
+		case <-timeoutAfter:
+			return errors.New("timed out")
+		// Got a tick, we should check on checkSomething()
+		case <-ticker.C:
+			if predicate() {
+				return nil
+			}
+		}
+	}
 }
