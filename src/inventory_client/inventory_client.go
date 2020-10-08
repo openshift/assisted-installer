@@ -40,6 +40,7 @@ const (
 //go:generate mockgen -source=inventory_client.go -package=inventory_client -destination=mock_inventory_client.go
 type InventoryClient interface {
 	DownloadFile(filename string, dest string) error
+	DownloadHostIgnition(hostID string, dest string) error
 	UpdateHostInstallProgress(hostId string, newStage models.HostStage, info string) error
 	GetEnabledHostsNamesHosts() (map[string]HostData, error)
 	UploadIngressCa(ingressCA string, clusterId string) error
@@ -176,6 +177,25 @@ func (c *inventoryClient) DownloadFile(filename string, dest string) error {
 		fo.Close()
 	}()
 	_, err = c.ai.Installer.DownloadClusterFiles(context.Background(), c.createDownloadParams(filename), fo)
+	return err
+}
+
+func (c *inventoryClient) DownloadHostIgnition(hostID string, dest string) error {
+	// open output file
+	fo, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	// close fo on exit and check for its returned error
+	defer func() {
+		fo.Close()
+	}()
+
+	params := installer.DownloadHostIgnitionParams{
+		ClusterID: c.clusterId,
+		HostID:    strfmt.UUID(hostID),
+	}
+	_, err = c.ai.Installer.DownloadHostIgnition(context.Background(), &params, fo)
 	return err
 }
 

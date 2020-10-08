@@ -99,8 +99,7 @@ func (i *installer) InstallNode() error {
 	}
 
 	i.UpdateHostInstallProgress(models.HostStageInstalling, i.Config.Role)
-	ignitionFileName := i.Config.Role + ".ign"
-	ignitionPath, err := i.getFileFromService(ignitionFileName)
+	ignitionPath, err := i.downloadHostIgnition()
 	if err != nil {
 		return err
 	}
@@ -232,6 +231,18 @@ func (i *installer) getFileFromService(filename string) (string, error) {
 	i.log.Infof("Getting %s file", filename)
 	dest := filepath.Join(InstallDir, filename)
 	err := i.inventoryClient.DownloadFile(filename, dest)
+	if err != nil {
+		i.log.Errorf("Failed to fetch file (%s) from server. err: %s", filename, err)
+	}
+	return dest, err
+}
+
+func (i *installer) downloadHostIgnition() (string, error) {
+	filename := fmt.Sprintf("%s-%s.ign", i.Config.Role, i.Config.HostID)
+	i.log.Infof("Getting %s file", filename)
+
+	dest := filepath.Join(InstallDir, filename)
+	err := i.inventoryClient.DownloadHostIgnition(i.Config.HostID, dest)
 	if err != nil {
 		i.log.Errorf("Failed to fetch file (%s) from server. err: %s", filename, err)
 	}
