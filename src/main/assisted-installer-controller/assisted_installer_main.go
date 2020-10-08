@@ -66,22 +66,27 @@ func main() {
 	// While adding new routine don't miss to add wg.add(1)
 	// without adding it will panic
 	var wg sync.WaitGroup
-	ctx, cancel := context.WithCancel(context.Background())
-	go assistedController.ApproveCsrs(ctx, &wg)
+	var wgLogs sync.WaitGroup
+	ctxApprove, cancelApprove := context.WithCancel(context.Background())
+	ctxLogs, cancelLogs := context.WithCancel(context.Background())
+	go assistedController.ApproveCsrs(ctxApprove, &wg)
 	wg.Add(1)
 	go assistedController.PostInstallConfigs(&wg)
 	wg.Add(1)
 	go assistedController.UpdateBMHs(&wg)
 	wg.Add(1)
-	go assistedController.UploadControllerLogs(ctx, &wg)
-	wg.Add(1)
+	go assistedController.UploadControllerLogs(ctxLogs, &wgLogs)
+	wgLogs.Add(1)
 
 	assistedController.WaitAndUpdateNodesStatus()
 	logger.Infof("Sleeping for 10 minutes to give a chance to approve all crs")
 	time.Sleep(10 * time.Minute)
-	cancel()
+	cancelApprove()
 	logger.Infof("Waiting fo all go routines to finish")
 	wg.Wait()
+	logger.Infof("All routines finished, closing logs")
+	cancelLogs()
+	wgLogs.Wait()
 }
 
 // ProxyFromEnvVars provides an alternative to http.ProxyFromEnvironment since it is being initialized only
