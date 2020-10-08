@@ -357,6 +357,7 @@ func (c controller) validateClusterVersion() bool {
 	}
 	for _, condition := range cv.Status.Conditions {
 		if condition.Type == configv1.OperatorAvailable {
+			c.log.Infof("Current cluster version status is %s, msg %s , reason %s", condition.Status, condition.Message, condition.Reason)
 			return condition.Status == configv1.ConditionTrue
 		}
 	}
