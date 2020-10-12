@@ -264,3 +264,17 @@ func (mr *MockOpsMockRecorder) UploadInstallationLogs(isBootstrap interface{}) *
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadInstallationLogs", reflect.TypeOf((*MockOps)(nil).UploadInstallationLogs), isBootstrap)
 }
+
+// ReloadHostFile mocks base method
+func (m *MockOps) ReloadHostFile(filepath string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReloadHostFile", filepath)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ReloadHostFile indicates an expected call of ReloadHostFile
+func (mr *MockOpsMockRecorder) ReloadHostFile(filepath interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReloadHostFile", reflect.TypeOf((*MockOps)(nil).ReloadHostFile), filepath)
+}

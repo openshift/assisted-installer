@@ -6,8 +6,10 @@ import (
 	"strings"
 
 	"github.com/openshift/assisted-installer/src/inventory_client"
+	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-service/models"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
 )
 
 func SetConfiguringStatusForHosts(client inventory_client.InventoryClient, inventoryHostsMapWithIp map[string]inventory_client.HostData,
@@ -41,4 +43,22 @@ func SetConfiguringStatusForHosts(client inventory_client.InventoryClient, inven
 			inventoryHostsMapWithIp[key].Host.Progress.CurrentStage = status
 		}
 	}
+}
+
+func IsPodInStatus(k8Client k8s_client.K8SClient, podNamePrefix string, namespace string, labelMatch map[string]string, status v1.PodPhase, log logrus.FieldLogger) bool {
+	pods, err := k8Client.GetPods(namespace, labelMatch)
+	if err != nil {
+		log.WithError(err).Warnf("Failed to get pod with prefix %s in namespace %s", podNamePrefix, namespace)
+		return false
+	}
+	log.Infof("Got %s pods, will search for one with given prefix %s", len(pods), podNamePrefix)
+	for _, pod := range pods {
+		if strings.HasPrefix(pod.Name, podNamePrefix) && pod.Status.Phase == status {
+			log.Infof("Found pod %s in status %s", pod.Name, status)
+			return true
+		} else if strings.HasPrefix(pod.Name, podNamePrefix) {
+			log.Infof("Found pod %s in status %s", pod.Name, status)
+		}
+	}
+	return false
 }
