@@ -27,11 +27,14 @@ import (
 )
 
 const (
-	InstallDir     = "/opt/install-dir"
-	KubeconfigPath = "/opt/openshift/auth/kubeconfig-loopback"
+	InstallDir             = "/opt/install-dir"
+	KubeconfigPathLoopBack = "/opt/openshift/auth/kubeconfig-loopback"
+	KubeconfigPath         = "/opt/openshift/auth/kubeconfig"
 	// Change this to the MCD image from the relevant openshift release image
-	minMasterNodes   = 2
-	dockerConfigFile = "/root/.docker/config.json"
+	minMasterNodes              = 2
+	dockerConfigFile            = "/root/.docker/config.json"
+	assistedControllerPrefix    = "assisted-installer-controller"
+	assistedControllerNamespace = "assisted-installer"
 )
 
 var generalWaitTimeout = 30 * time.Second
@@ -150,7 +153,7 @@ func (i *installer) runBootstrap(ctx context.Context) error {
 		i.log.Errorf("Bootstrap failed %s", err)
 		return err
 	}
-	kc, err := i.kcBuilder(KubeconfigPath, i.log)
+	kc, err := i.kcBuilder(KubeconfigPathLoopBack, i.log)
 	if err != nil {
 		i.log.Error(err)
 		return err
@@ -244,6 +247,12 @@ func (i *installer) waitForControlPlane(ctx context.Context, kc k8s_client.K8SCl
 
 	i.waitForBootkube(ctx)
 
+	// waiting for controller pod to be running
+	if err := i.waitForController(); err != nil {
+		i.log.Error(err)
+		return err
+	}
+
 	return nil
 }
 
@@ -274,6 +283,29 @@ func (i *installer) waitForBootkube(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func (i *installer) waitForController() error {
+	i.log.Infof("Waiting for controller pod to start running")
+	err := i.ops.ReloadHostFile("/etc/resolv.conf")
+	if err != nil {
+		i.log.WithError(err).Error("Failed to reload resolv.conf")
+		return err
+	}
+	kc, err := i.kcBuilder(KubeconfigPath, i.log)
+	if err != nil {
+		i.log.WithError(err).Errorf("Failed to create kc client from %s", KubeconfigPath)
+		return err
+	}
+	predicate := func() bool {
+		return common.IsPodInStatus(kc, assistedControllerPrefix, assistedControllerNamespace,
+			map[string]string{"job-name": assistedControllerPrefix}, v1.PodRunning, i.log)
+	}
+	err = utils.WaitForPredicate(5*time.Minute, 5*time.Second, predicate)
+	if err != nil {
+		return errors.Errorf("Timeout while waiting for controller pod to be running")
+	}
+	return nil
 }
 
 // wait for minimum master nodes to be in ready status

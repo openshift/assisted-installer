@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/pkg/errors"
 
 	"github.com/go-openapi/strfmt"
@@ -79,6 +81,16 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	uploadLogsSuccess := func(bootstrap bool) {
 		mockops.EXPECT().UploadInstallationLogs(bootstrap).Return("dummy", nil).Times(1)
+	}
+
+	getPodsSuccessfully := func() {
+		mockk8sclient.EXPECT().GetPods("assisted-installer", gomock.Any()).Return([]v1.Pod{{TypeMeta: metav1.TypeMeta{},
+			ObjectMeta: metav1.ObjectMeta{Name: assistedControllerPrefix + "aasdasd"},
+			Status:     v1.PodStatus{Phase: "Running"}}}, nil).Times(1)
+	}
+
+	resolvConfSuccess := func() {
+		mockops.EXPECT().ReloadHostFile("/etc/resolv.conf").Return(nil).Times(1)
 	}
 
 	rebootSuccess := func() {
@@ -188,6 +200,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			WaitMasterNodesSucccess()
 			waitForBootkubeSuccess()
 			bootkubeStatusSuccess()
+			resolvConfSuccess()
+			getPodsSuccessfully()
 			//HostRoleMaster flow:
 			downloadFileSuccess(masterIgn)
 			writeToDiskSuccess()
@@ -229,6 +243,18 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			writeToDiskSuccess()
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
+		})
+		It("waitForController reload resolv.conf failed", func() {
+			mockops.EXPECT().ReloadHostFile("/etc/resolv.conf").Return(fmt.Errorf("dummy")).Times(1)
+			err := installerObj.waitForController()
+			Expect(err).To(HaveOccurred())
+		})
+		It("waitForController reload get pods fails then succeeds", func() {
+			resolvConfSuccess()
+			mockk8sclient.EXPECT().GetPods("assisted-installer", gomock.Any()).Return(nil, fmt.Errorf("dummy")).Times(1)
+			getPodsSuccessfully()
+			err := installerObj.waitForController()
+			Expect(err).NotTo(HaveOccurred())
 		})
 		It("Configuring state", func() {
 			var logs string

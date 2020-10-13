@@ -39,6 +39,7 @@ type Ops interface {
 	RemovePV(pvName string) error
 	GetMCSLogs() (string, error)
 	UploadInstallationLogs(isBootstrap bool) (string, error)
+	ReloadHostFile(filepath string) error
 }
 
 const (
@@ -384,4 +385,30 @@ func (o *ops) UploadInstallationLogs(isBootstrap bool) (string, error) {
 		args = append(args, fmt.Sprintf("-cacert=%s", config.GlobalConfig.CACertPath))
 	}
 	return o.ExecPrivilegeCommand(o.logWriter, command, args...)
+}
+
+// Sometimes we will need to reload container files from host
+// For example /etc/resolv.conf, it can't be changed with Z flag but is updated by bootkube.sh
+// and we need this update for dns resolve of kubeapi
+func (o *ops) ReloadHostFile(filepath string) error {
+	o.log.Infof("Reloading %s", filepath)
+	output, err := o.ExecPrivilegeCommand(o.logWriter, "cat", filepath)
+	if err != nil {
+		o.log.Errorf("Failed to read %s on the host", filepath)
+		return err
+	}
+	f, err := os.OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	defer func() {
+		_ = f.Close()
+	}()
+	if err != nil {
+		o.log.Errorf("Failed to open local %s", filepath)
+		return err
+	}
+	_, err = f.WriteString(output)
+	if err != nil {
+		o.log.Errorf("Failed to write host %s data to local", filepath)
+		return err
+	}
+	return nil
 }
