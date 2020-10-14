@@ -45,8 +45,10 @@ func SetConfiguringStatusForHosts(client inventory_client.InventoryClient, inven
 	}
 }
 
-func IsPodInStatus(k8Client k8s_client.K8SClient, podNamePrefix string, namespace string, labelMatch map[string]string, status v1.PodPhase, log logrus.FieldLogger) bool {
-	pods, err := k8Client.GetPods(namespace, labelMatch)
+func IsPodInStatus(k8Client k8s_client.K8SClient, podNamePrefix string, namespace string, labelMatch map[string]string,
+	status v1.PodPhase, log logrus.FieldLogger) bool {
+
+	pods, err := k8Client.GetPods(namespace, labelMatch, "")
 	if err != nil {
 		log.WithError(err).Warnf("Failed to get pod with prefix %s in namespace %s", podNamePrefix, namespace)
 		return false

@@ -90,7 +90,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		return inventoryNamesIds
 	}
 	configuringSuccess := func() {
-		mockk8sclient.EXPECT().GetPods(gomock.Any(), gomock.Any()).Return([]v1.Pod{}, nil).AnyTimes()
+		mockk8sclient.EXPECT().GetPods(gomock.Any(), gomock.Any(), "").Return([]v1.Pod{}, nil).AnyTimes()
 		mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	}
 
@@ -351,9 +351,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockbmclient.EXPECT().UploadIngressCa(data["ca-bundle.crt"], c.ClusterID).Return(nil).Times(1)
 			mockk8sclient.EXPECT().UnPatchEtcd().Return(fmt.Errorf("dummy")).Times(1)
 			mockk8sclient.EXPECT().UnPatchEtcd().Return(nil).Times(1)
-			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any()).Return(nil, fmt.Errorf("dummy")).Times(1)
-			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any()).Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Pending"}}}, nil).Times(1)
-			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any()).Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Running"}}}, nil).Times(1)
+			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any(), "").Return(nil, fmt.Errorf("dummy")).Times(1)
+			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any(), "").Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Pending"}}}, nil).Times(1)
+			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any(), "").Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Running"}}}, nil).Times(1)
 			mockk8sclient.EXPECT().GetClusterVersion("version").Return(nil, fmt.Errorf("dummy")).Times(1)
 			mockk8sclient.EXPECT().GetClusterVersion("version").Return(badClusterVersion, nil).Times(1)
 			mockk8sclient.EXPECT().GetClusterVersion("version").Return(goodClusterVersion, nil).Times(1)
@@ -397,7 +397,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				ObjectMeta: metav1.ObjectMeta{Name: "test"}, Spec: v1.PodSpec{}, Status: v1.PodStatus{Phase: "Pending"}}
 		})
 		It("Validate upload logs, get pod fails", func() {
-			mockk8sclient.EXPECT().GetPods(conf.Namespace, gomock.Any()).Return(nil, fmt.Errorf("dummy")).MinTimes(2).MaxTimes(10)
+			mockk8sclient.EXPECT().GetPods(conf.Namespace, gomock.Any(), fmt.Sprintf("status.phase=%s", v1.PodRunning)).Return(nil, fmt.Errorf("dummy")).MinTimes(2).MaxTimes(10)
 			ctx, cancel := context.WithCancel(context.Background())
 			wg.Add(1)
 			go c.UploadControllerLogs(ctx, &wg)
@@ -406,7 +406,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			wg.Wait()
 		})
 		It("Validate upload logs, Get pods logs failed", func() {
-			mockk8sclient.EXPECT().GetPods(conf.Namespace, gomock.Any()).Return([]v1.Pod{pod}, nil).MinTimes(1)
+			mockk8sclient.EXPECT().GetPods(conf.Namespace, gomock.Any(), fmt.Sprintf("status.phase=%s", v1.PodRunning)).Return([]v1.Pod{pod}, nil).MinTimes(1)
 			mockk8sclient.EXPECT().GetPodLogsAsBuffer(conf.Namespace, "test", gomock.Any()).Return(nil, fmt.Errorf("dummy")).MinTimes(1)
 			ctx, cancel := context.WithCancel(context.Background())
 			wg.Add(1)
