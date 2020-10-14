@@ -9,10 +9,10 @@ import (
 	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
-
 	"github.com/openshift/assisted-installer/src/common"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/pkg/errors"
+	v1 "k8s.io/api/core/v1"
 
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/k8s_client"
@@ -111,7 +111,7 @@ func (c *controller) WaitAndUpdateNodesStatus() {
 func (c *controller) getMCSLogs() (string, error) {
 	logs := ""
 	namespace := "openshift-machine-config-operator"
-	pods, err := c.kc.GetPods(namespace, map[string]string{"k8s-app": "machine-config-server"})
+	pods, err := c.kc.GetPods(namespace, map[string]string{"k8s-app": "machine-config-server"}, "")
 	if err != nil {
 		c.log.WithError(err).Warnf("Failed to get mcs pods")
 		return "", nil
@@ -333,7 +333,7 @@ func (c controller) addRouterCAToClusterCA() bool {
 
 func (c controller) validateConsolePod() bool {
 	c.log.Infof("Checking if console pod is running")
-	pods, err := c.kc.GetPods("openshift-console", map[string]string{"app": "console", "component": "ui"})
+	pods, err := c.kc.GetPods("openshift-console", map[string]string{"app": "console", "component": "ui"}, "")
 	if err != nil {
 		c.log.WithError(err).Warnf("Failed to get console pods")
 		return false
@@ -450,7 +450,8 @@ func (c *controller) UploadControllerLogs(ctx context.Context, wg *sync.WaitGrou
 			return
 		case <-ticker.C:
 			if podName == "" {
-				pods, err := c.kc.GetPods(c.Namespace, map[string]string{"job-name": "assisted-installer-controller"})
+				pods, err := c.kc.GetPods(c.Namespace, map[string]string{"job-name": "assisted-installer-controller"},
+					fmt.Sprintf("status.phase=%s", v1.PodRunning))
 				if err != nil {
 					c.log.WithError(err).Warnf("Failed to get controller pod name")
 					continue

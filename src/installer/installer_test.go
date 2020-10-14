@@ -84,7 +84,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	}
 
 	getPodsSuccessfully := func() {
-		mockk8sclient.EXPECT().GetPods("assisted-installer", gomock.Any()).Return([]v1.Pod{{TypeMeta: metav1.TypeMeta{},
+		mockk8sclient.EXPECT().GetPods("assisted-installer", gomock.Any(), "").Return([]v1.Pod{{TypeMeta: metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{Name: assistedControllerPrefix + "aasdasd"},
 			Status:     v1.PodStatus{Phase: "Running"}}}, nil).Times(1)
 	}
@@ -251,7 +251,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 		It("waitForController reload get pods fails then succeeds", func() {
 			resolvConfSuccess()
-			mockk8sclient.EXPECT().GetPods("assisted-installer", gomock.Any()).Return(nil, fmt.Errorf("dummy")).Times(1)
+			mockk8sclient.EXPECT().GetPods("assisted-installer", gomock.Any(), "").Return(nil, fmt.Errorf("dummy")).Times(1)
 			getPodsSuccessfully()
 			err := installerObj.waitForController()
 			Expect(err).NotTo(HaveOccurred())

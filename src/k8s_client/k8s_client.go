@@ -51,7 +51,7 @@ type K8SClient interface {
 	GetConfigMap(namespace string, name string) (*v1.ConfigMap, error)
 	GetPodLogs(namespace string, podName string, sinceSeconds int64) (string, error)
 	GetPodLogsAsBuffer(namespace string, podName string, sinceSeconds int64) (*bytes.Buffer, error)
-	GetPods(namespace string, labelMatch map[string]string) ([]v1.Pod, error)
+	GetPods(namespace string, labelMatch map[string]string, fieldSelector string) ([]v1.Pod, error)
 	IsMetalProvisioningExists() (bool, error)
 	ListBMHs() (metal3v1alpha1.BareMetalHostList, error)
 	UpdateBMHStatus(bmh *metal3v1alpha1.BareMetalHost) error
@@ -214,13 +214,15 @@ func (c *k8sClient) SetProxyEnvVars() error {
 	return nil
 }
 
-func (c *k8sClient) GetPods(namespace string, labelMatch map[string]string) ([]v1.Pod, error) {
+func (c *k8sClient) GetPods(namespace string, labelMatch map[string]string, fieldSelector string) ([]v1.Pod, error) {
 	listOptions := metav1.ListOptions{}
 	if labelMatch != nil {
 		labelSelector := metav1.LabelSelector{MatchLabels: labelMatch}
 		listOptions.LabelSelector = labels.Set(labelSelector.MatchLabels).String()
 	}
-
+	if fieldSelector != "" {
+		listOptions.FieldSelector = fieldSelector
+	}
 	pod, err := c.client.CoreV1().Pods(namespace).List(context.TODO(), listOptions)
 	if err != nil {
 		return nil, err

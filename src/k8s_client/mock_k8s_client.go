@@ -187,18 +187,18 @@ func (mr *MockK8SClientMockRecorder) GetPodLogsAsBuffer(namespace, podName, sinc
 }
 
 // GetPods mocks base method
-func (m *MockK8SClient) GetPods(namespace string, labelMatch map[string]string) ([]v10.Pod, error) {
+func (m *MockK8SClient) GetPods(namespace string, labelMatch map[string]string, fieldSelector string) ([]v10.Pod, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPods", namespace, labelMatch)
+	ret := m.ctrl.Call(m, "GetPods", namespace, labelMatch, fieldSelector)
 	ret0, _ := ret[0].([]v10.Pod)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetPods indicates an expected call of GetPods
-func (mr *MockK8SClientMockRecorder) GetPods(namespace, labelMatch interface{}) *gomock.Call {
+func (mr *MockK8SClientMockRecorder) GetPods(namespace, labelMatch, fieldSelector interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPods", reflect.TypeOf((*MockK8SClient)(nil).GetPods), namespace, labelMatch)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPods", reflect.TypeOf((*MockK8SClient)(nil).GetPods), namespace, labelMatch, fieldSelector)
 }
 
 // IsMetalProvisioningExists mocks base method
