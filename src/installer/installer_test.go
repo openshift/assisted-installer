@@ -125,7 +125,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
 		})
 		mcoImage, _ := utils.GetMCOByOpenshiftVersion(conf.OpenshiftVersion)
-		extractSuccess := func() {
+		extractIgnitionToFS := func(out string, err error) {
 			mockops.EXPECT().ExecPrivilegeCommand(
 				gomock.Any(), "podman", "run", "--net", "host",
 				"--volume", "/:/rootfs:rw",
@@ -134,7 +134,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				"--entrypoint", "/usr/bin/machine-config-daemon",
 				mcoImage,
 				"start", "--node-name", "localhost", "--root-mount", "/rootfs", "--once-from",
-				filepath.Join(InstallDir, bootstrapIgn), "--skip-reboot")
+				filepath.Join(InstallDir, bootstrapIgn), "--skip-reboot").Return(out, err)
 		}
 		daemonReload := func(err error) {
 			mockops.EXPECT().SystemctlAction("daemon-reload").Return(err).Times(1)
@@ -181,7 +181,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mkdirSuccess()
 			downloadFileSuccess(bootstrapIgn)
 			extractSecretFromIgnitionSuccess()
-			extractSuccess()
+			extractIgnitionToFS("Sוuccess", nil)
 			daemonReload(nil)
 		}
 
@@ -229,6 +229,37 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
+		It("bootstrap role extract ignition retry", func() {
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+				{string(models.HostStageWaitingForControlPlane)},
+				{string(models.HostStageDone)},
+			})
+			extractIgnitionToFS("extract failure", fmt.Errorf("extract failed"))
+			bootstrapSetup()
+			restartNetworkManager(nil)
+			prepareControllerSuccess()
+			startServicesSuccess()
+			patchEtcdSuccess()
+			WaitMasterNodesSucccess()
+			waitForBootkubeSuccess()
+			bootkubeStatusSuccess()
+			uploadLogsSuccess(true)
+			ret := installerObj.InstallNode()
+			Expect(ret).Should(BeNil())
+		})
+		It("bootstrap role extract ignition retry exhausted", func() {
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
+			cleanInstallDevice()
+			mkdirSuccess()
+			downloadFileSuccess(bootstrapIgn)
+			extractSecretFromIgnitionSuccess()
+			extractIgnitionToFS("extract failure", fmt.Errorf("extract failed"))
+			extractIgnitionToFS("extract failure", fmt.Errorf("extract failed"))
+			extractIgnitionToFS("extract failure", fmt.Errorf("extract failed"))
+			ret := installerObj.InstallNode()
+			Expect(ret).Should(Equal(fmt.Errorf("extract failed")))
+		})
+
 		It("bootstrap fail to restart NetworkManager", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},

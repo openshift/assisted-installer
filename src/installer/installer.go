@@ -27,14 +27,14 @@ import (
 )
 
 const (
-	InstallDir             = "/opt/install-dir"
-	KubeconfigPathLoopBack = "/opt/openshift/auth/kubeconfig-loopback"
-	KubeconfigPath         = "/opt/openshift/auth/kubeconfig"
-	// Change this to the MCD image from the relevant openshift release image
+	InstallDir                  = "/opt/install-dir"
+	KubeconfigPathLoopBack      = "/opt/openshift/auth/kubeconfig-loopback"
+	KubeconfigPath              = "/opt/openshift/auth/kubeconfig"
 	minMasterNodes              = 2
 	dockerConfigFile            = "/root/.docker/config.json"
 	assistedControllerPrefix    = "assisted-installer-controller"
 	assistedControllerNamespace = "assisted-installer"
+	extractRetryCount           = 3
 )
 
 var generalWaitTimeout = 30 * time.Second
@@ -179,21 +179,10 @@ func (i *installer) startBootstrap() error {
 		return err
 	}
 
-	mcoImage, _ := utils.GetMCOByOpenshiftVersion(i.OpenshiftVersion)
-	i.log.Infof("Extracting ignition to disk using %s mcoImage", mcoImage)
-
-	_, err = i.ops.ExecPrivilegeCommand(utils.NewLogWriter(i.log), "podman", "run", "--net", "host",
-		"--volume", "/:/rootfs:rw",
-		"--volume", "/usr/bin/rpm-ostree:/usr/bin/rpm-ostree",
-		"--privileged",
-		"--entrypoint", "/usr/bin/machine-config-daemon",
-		mcoImage,
-		"start", "--node-name", "localhost", "--root-mount", "/rootfs", "--once-from", ignitionPath, "--skip-reboot")
+	err = i.extractIgnitionToFS(ignitionPath)
 	if err != nil {
-		i.log.Errorf("Failed to extract ignition to disk")
 		return err
 	}
-	i.log.Info("Done extracting ignition to filesystem")
 
 	// reload systemd configurations from filesystem and regenerate dependency trees
 	err = i.ops.SystemctlAction("daemon-reload")
@@ -222,6 +211,28 @@ func (i *installer) startBootstrap() error {
 	}
 	i.log.Info("Done setting up bootstrap")
 	return nil
+}
+
+func (i *installer) extractIgnitionToFS(ignitionPath string) (err error) {
+	mcoImage, _ := utils.GetMCOByOpenshiftVersion(i.OpenshiftVersion)
+	i.log.Infof("Extracting ignition to disk using %s mcoImage", mcoImage)
+	for j := 0; j < extractRetryCount; j++ {
+		_, err = i.ops.ExecPrivilegeCommand(utils.NewLogWriter(i.log), "podman", "run", "--net", "host",
+			"--volume", "/:/rootfs:rw",
+			"--volume", "/usr/bin/rpm-ostree:/usr/bin/rpm-ostree",
+			"--privileged",
+			"--entrypoint", "/usr/bin/machine-config-daemon",
+			mcoImage,
+			"start", "--node-name", "localhost", "--root-mount", "/rootfs", "--once-from", ignitionPath, "--skip-reboot")
+		if err != nil {
+			i.log.Errorf("Failed to extract ignition to disk")
+		} else {
+			i.log.Info("Done extracting ignition to filesystem")
+			return nil
+		}
+	}
+	i.log.Errorf("Failed to extract ignition to disk, giving up")
+	return err
 }
 
 func (i *installer) getFileFromService(filename string) (string, error) {
