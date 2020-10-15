@@ -248,3 +248,8 @@ func envVarsProxyFunc() func(*url.URL) (*url.URL, error) {
 	})
 	return envVarsProxyFuncValue
 }
+
+func SetNoProxyEnv(noProxy string) {
+	os.Setenv("NO_PROXY", noProxy)
+	os.Setenv("no_proxy", noProxy)
+}

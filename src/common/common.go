@@ -53,13 +53,14 @@ func IsPodInStatus(k8Client k8s_client.K8SClient, podNamePrefix string, namespac
 		log.WithError(err).Warnf("Failed to get pod with prefix %s in namespace %s", podNamePrefix, namespace)
 		return false
 	}
-	log.Infof("Got %s pods, will search for one with given prefix %s", len(pods), podNamePrefix)
+	log.Debugf("Got %d pods, will search for one with given prefix %s", len(pods), podNamePrefix)
 	for _, pod := range pods {
 		if strings.HasPrefix(pod.Name, podNamePrefix) && pod.Status.Phase == status {
 			log.Infof("Found pod %s in status %s", pod.Name, status)
 			return true
 		} else if strings.HasPrefix(pod.Name, podNamePrefix) {
 			log.Infof("Found pod %s in status %s", pod.Name, status)
+			return false
 		}
 	}
 	return false
