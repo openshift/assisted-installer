@@ -12,12 +12,10 @@ import (
 	"github.com/openshift/assisted-service/models"
 	"github.com/thoas/go-funk"
 
-	"github.com/pkg/errors"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
-
 	"github.com/openshift/assisted-installer/src/k8s_client"
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
+	v1 "k8s.io/api/core/v1"
 
 	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/inventory_client"
@@ -246,10 +244,7 @@ func (i *installer) getFileFromService(filename string) (string, error) {
 }
 
 func (i *installer) waitForControlPlane(ctx context.Context, kc k8s_client.K8SClient) error {
-	if err := i.waitForMasterNodes(ctx, minMasterNodes, kc); err != nil {
-		i.log.Errorf("Timeout waiting for master nodes, %s", err)
-		return err
-	}
+	i.waitForMasterNodes(ctx, minMasterNodes, kc)
 
 	if err := kc.PatchEtcd(); err != nil {
 		i.log.Error(err)
@@ -320,42 +315,43 @@ func (i *installer) waitForController() error {
 }
 
 // wait for minimum master nodes to be in ready status
-func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, kc k8s_client.K8SClient) error {
-	nodesTimeout := time.Duration(i.Config.InstallationTimeout) * time.Minute
-
-	if nodesTimeout < 0 {
-		return fmt.Errorf("Nodes installation timeout %d multiplication by minutes caused an integer overflow", i.Config.InstallationTimeout)
-	}
+func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, kc k8s_client.K8SClient) {
 
 	var readyMasters []string
 	var inventoryHostsMap map[string]inventory_client.HostData
-	i.log.Infof("Waiting up to %v for %d master nodes", nodesTimeout, minMasterNodes)
-	apiContext, cancel := context.WithTimeout(ctx, nodesTimeout)
-	defer cancel()
-
-	wait.Until(func() {
+	i.log.Infof("Waiting for %d master nodes", minMasterNodes)
+	sufficientMasterNodes := func() bool {
 		var err error
 		inventoryHostsMap, err = i.getInventoryHostsMap(inventoryHostsMap)
 		if err != nil {
-			return
+			return false
 		}
 		nodes, err := kc.ListMasterNodes()
 		if err != nil {
 			i.log.Warnf("Still waiting for master nodes: %v", err)
-			return
+			return false
 		}
 		i.updateReadyMasters(nodes, &readyMasters, inventoryHostsMap)
 		i.log.Infof("Found %d ready master nodes", len(readyMasters))
 		if len(readyMasters) >= minMasterNodes {
 			i.log.Infof("Waiting for master nodes - Done")
-			cancel()
+			return true
 		}
-	}, 5*time.Second, apiContext.Done())
-	err := apiContext.Err()
-	if err != nil && err != context.Canceled {
-		return errors.Wrap(err, "Waiting for master nodes")
+		return false
 	}
-	return nil
+
+	for {
+		select {
+		case <-ctx.Done():
+			i.log.Info("Context cancelled, terminating wait for master nodes\n")
+			return
+		case <-time.After(time.Second * time.Duration(5)):
+			// check if we have sufficient master nodes is done every 5 seconds
+			if sufficientMasterNodes() {
+				return
+			}
+		}
+	}
 }
 
 func (i *installer) getInventoryHostsMap(hostsMap map[string]inventory_client.HostData) (map[string]inventory_client.HostData, error) {

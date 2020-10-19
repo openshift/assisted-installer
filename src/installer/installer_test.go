@@ -114,12 +114,11 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	Context("Bootstrap role", func() {
 		conf := config.Config{Role: string(models.HostRoleBootstrap),
-			ClusterID:           "cluster-id",
-			HostID:              "host-id",
-			Device:              "/dev/vda",
-			URL:                 "https://assisted-service.com:80",
-			OpenshiftVersion:    openShiftVersion,
-			InstallationTimeout: 120,
+			ClusterID:        "cluster-id",
+			HostID:           "host-id",
+			Device:           "/dev/vda",
+			URL:              "https://assisted-service.com:80",
+			OpenshiftVersion: openShiftVersion,
 		}
 		BeforeEach(func() {
 			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
@@ -354,27 +353,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			installerObj.updateConfiguringStatus(ctx)
-		})
-		It("Installation timeout integer overflow", func() {
-			time, err := time.ParseDuration("120m")
-			Expect(err).ShouldNot(HaveOccurred())
-			installerObj.Config.InstallationTimeout = uint(time)
-
-			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
-				{string(models.HostStageWaitingForControlPlane)},
-				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
-				{string(models.HostStageWritingImageToDisk)},
-			})
-			bootstrapSetup()
-			restartNetworkManager(nil)
-			prepareControllerSuccess()
-			startServicesSuccess()
-			downloadFileSuccess(masterIgn)
-			writeToDiskSuccess()
-
-			ret := installerObj.InstallNode()
-			Expect(ret).Should(Equal(fmt.Errorf(
-				"Nodes installation timeout %d multiplication by minutes caused an integer overflow", installerObj.Config.InstallationTimeout)))
 		})
 	})
 	Context("Master role", func() {
