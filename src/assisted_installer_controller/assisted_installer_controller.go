@@ -462,7 +462,7 @@ func (c *controller) UploadControllerLogs(ctx context.Context, wg *sync.WaitGrou
 				}
 				podName = pods[0].Name
 			}
-			err := c.uploadPodLogs(podName, c.Namespace, controllerLogsSecondsAgo)
+			err := common.UploadPodLogs(c.kc, c.ic, c.ClusterID, podName, c.Namespace, controllerLogsSecondsAgo, c.log)
 			if err != nil {
 				c.log.WithError(err).Warnf("Failed to upload controller logs")
 				continue
