@@ -4,6 +4,8 @@ import (
 	"flag"
 	"os"
 
+	"github.com/openshift/assisted-installer/src/utils"
+
 	"github.com/openshift/assisted-service/models"
 )
 
@@ -58,6 +60,9 @@ func ProcessArgs() {
 	flag.StringVar(&ret.ServiceIPs, "service-ips", "", "All IPs of assisted service node")
 	h := flag.Bool("help", false, "Help message")
 	flag.Parse()
+	if ret.NoProxy != "" {
+		utils.SetNoProxyEnv(ret.NoProxy)
+	}
 	if h != nil && *h {
 		printHelpAndExit()
 	}
