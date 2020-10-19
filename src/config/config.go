@@ -51,7 +51,8 @@ func ProcessArgs() {
 		"Assisted Installer Controller image URL")
 	flag.StringVar(&ret.AgentImage, "agent-image", "quay.io/ocpmetal/assisted-installer-agent:latest",
 		"Assisted Installer Agent image URL that will be used to send logs on successful installation")
-	flag.UintVar(&ret.InstallationTimeout, "installation-timeout", 120, "Installation timeout in minutes")
+	// Remove installation-timeout once the assisted-service stop sending it.
+	flag.UintVar(&ret.InstallationTimeout, "installation-timeout", 120, "Installation timeout in minutes - OBSOLETE")
 	flag.BoolVar(&ret.SkipCertVerification, "insecure", false, "Do not validate TLS certificate")
 	flag.StringVar(&ret.CACertPath, "cacert", "", "Path to custom CA certificate in PEM format")
 	flag.StringVar(&ret.HTTPProxy, "http-proxy", "", "A proxy URL to use for creating HTTP connections outside the cluster")
