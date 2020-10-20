@@ -33,7 +33,7 @@ func main() {
 		log.Fatalf("Failed to create k8 client %v", err)
 	}
 
-	logger.Infof("Start running assisted-installer with cluster-id %s, url %s",
+	logger.Infof("Start running assisted-controller with cluster-id %s, url %s",
 		Options.ControllerConfig.ClusterID, Options.ControllerConfig.URL)
 
 	err = kc.SetProxyEnvVars()

@@ -304,8 +304,20 @@ func (i *installer) waitForController() error {
 		return err
 	}
 	predicate := func() bool {
-		return common.IsPodInStatus(kc, assistedControllerPrefix, assistedControllerNamespace,
+		controllerPod := common.GetPodInStatus(kc, assistedControllerPrefix, assistedControllerNamespace,
 			map[string]string{"job-name": assistedControllerPrefix}, v1.PodRunning, i.log)
+		if controllerPod != nil {
+			// uploading logs here cause we will finish installing bootstrap in couple of seconds
+			// just didn't wanted to start handling this logic in other place
+			// controller must be running for at least couple of minutes before this code so it will cover 90% of the cases
+			// if we will see that it is not enough, we will change the place.
+			err = common.UploadPodLogs(kc, i.inventoryClient, i.ClusterID, controllerPod.Name, assistedControllerNamespace, common.ControllerLogsSecondsAgo, i.log)
+			// if failed to upload logs, log why and continue
+			if err != nil {
+				i.log.WithError(err).Warnf("Failed to upload controller logs")
+			}
+		}
+		return controllerPod != nil
 	}
 	err = utils.WaitForPredicate(5*time.Minute, 5*time.Second, predicate)
 	if err != nil {

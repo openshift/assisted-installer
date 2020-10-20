@@ -1,6 +1,7 @@
 package installer
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -83,10 +84,13 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockops.EXPECT().UploadInstallationLogs(bootstrap).Return("dummy", nil).Times(1)
 	}
 
-	getPodsSuccessfully := func() {
+	waitForControllerSuccessfully := func(clusterId string) {
 		mockk8sclient.EXPECT().GetPods("assisted-installer", gomock.Any(), "").Return([]v1.Pod{{TypeMeta: metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{Name: assistedControllerPrefix + "aasdasd"},
 			Status:     v1.PodStatus{Phase: "Running"}}}, nil).Times(1)
+		r := bytes.NewBuffer([]byte("test"))
+		mockk8sclient.EXPECT().GetPodLogsAsBuffer(assistedControllerNamespace, assistedControllerPrefix+"aasdasd", gomock.Any()).Return(r, nil).Times(1)
+		mockbmclient.EXPECT().UploadLogs(clusterId, models.LogsTypeController, gomock.Any()).Return(nil).Times(1)
 	}
 
 	resolvConfSuccess := func() {
@@ -200,7 +204,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			waitForBootkubeSuccess()
 			bootkubeStatusSuccess()
 			resolvConfSuccess()
-			getPodsSuccessfully()
+			waitForControllerSuccessfully(conf.ClusterID)
 			//HostRoleMaster flow:
 			downloadFileSuccess(masterIgn)
 			writeToDiskSuccess()
@@ -245,7 +249,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			waitForBootkubeSuccess()
 			bootkubeStatusSuccess()
 			resolvConfSuccess()
-			getPodsSuccessfully()
+			waitForControllerSuccessfully(conf.ClusterID)
 			//HostRoleMaster flow:
 			downloadFileSuccess(masterIgn)
 			writeToDiskSuccess()
@@ -296,7 +300,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("waitForController reload get pods fails then succeeds", func() {
 			resolvConfSuccess()
 			mockk8sclient.EXPECT().GetPods("assisted-installer", gomock.Any(), "").Return(nil, fmt.Errorf("dummy")).Times(1)
-			getPodsSuccessfully()
+			waitForControllerSuccessfully(conf.ClusterID)
 			err := installerObj.waitForController()
 			Expect(err).NotTo(HaveOccurred())
 		})

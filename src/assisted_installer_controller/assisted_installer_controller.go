@@ -87,6 +87,7 @@ func (c *controller) WaitAndUpdateNodesStatus() {
 		c.log.Infof("Searching for host to change status")
 		nodes, err := c.kc.ListNodes()
 		if err != nil {
+			c.log.WithError(err).Warn("Failed to get list of nodes from ocp cluster")
 			continue
 		}
 		for _, node := range nodes.Items {
@@ -132,7 +133,7 @@ func (c *controller) updateConfiguringStatusIfNeeded(hosts map[string]inventory_
 	if err != nil {
 		return
 	}
-	common.SetConfiguringStatusForHosts(c.ic, hosts, logs, true, c.log)
+	common.SetConfiguringStatusForHosts(c.ic, hosts, logs, false, c.log)
 }
 
 func (c *controller) ApproveCsrs(ctx context.Context, wg *sync.WaitGroup) {
@@ -462,7 +463,7 @@ func (c *controller) UploadControllerLogs(ctx context.Context, wg *sync.WaitGrou
 				}
 				podName = pods[0].Name
 			}
-			err := c.uploadPodLogs(podName, c.Namespace, controllerLogsSecondsAgo)
+			err := common.UploadPodLogs(c.kc, c.ic, c.ClusterID, podName, c.Namespace, controllerLogsSecondsAgo, c.log)
 			if err != nil {
 				c.log.WithError(err).Warnf("Failed to upload controller logs")
 				continue
