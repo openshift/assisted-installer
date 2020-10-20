@@ -15,7 +15,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-const ControllerLogsSecondsAgo = 30 * 60
+const ControllerLogsSecondsAgo = 60 * 60
 
 func SetConfiguringStatusForHosts(client inventory_client.InventoryClient, inventoryHostsMapWithIp map[string]inventory_client.HostData,
 	mcsLogs string, fromBootstrap bool, log *logrus.Logger) {
