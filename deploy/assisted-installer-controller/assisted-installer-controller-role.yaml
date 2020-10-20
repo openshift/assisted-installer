@@ -100,6 +100,14 @@ rules:
       - patch
       - update
   - apiGroups:
+      - machine.openshift.io
+    resources:
+      - machines
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
       - metal3.io
     resources:
       - provisionings

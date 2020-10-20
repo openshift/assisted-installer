@@ -10,26 +10,23 @@ import (
 	"testing"
 	"time"
 
-	configv1 "github.com/openshift/api/config/v1"
-
 	"github.com/go-openapi/strfmt"
-
-	"github.com/openshift/assisted-service/models"
-
-	"k8s.io/api/certificates/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	v1 "k8s.io/api/core/v1"
-
-	"github.com/openshift/assisted-installer/src/k8s_client"
-
 	"github.com/golang/mock/gomock"
+	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/openshift/assisted-installer/src/inventory_client"
-	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/sirupsen/logrus"
+	"k8s.io/api/certificates/v1beta1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/assisted-installer/src/inventory_client"
+	"github.com/openshift/assisted-installer/src/k8s_client"
+	"github.com/openshift/assisted-installer/src/ops"
+	"github.com/openshift/assisted-service/models"
+	machinev1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 )
 
 func TestValidator(t *testing.T) {
@@ -380,6 +377,88 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			wg.Wait()
 		})
 	})
+
+	Context("update BMHs", func() {
+		conf := ControllerConfig{
+			ClusterID: "cluster-id",
+			URL:       "https://assisted-service.com:80",
+		}
+		t := metav1.Unix(98754, 0)
+		bmhStatus := metal3v1alpha1.BareMetalHostStatus{
+			LastUpdated: &t,
+			HardwareDetails: &metal3v1alpha1.HardwareDetails{
+				Hostname: "openshift-worker-0",
+			},
+		}
+		annBytes, _ := json.Marshal(&bmhStatus)
+
+		bmhList := metal3v1alpha1.BareMetalHostList{
+			Items: []metal3v1alpha1.BareMetalHost{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "openshift-worker-0",
+						Annotations: map[string]string{
+							metal3v1alpha1.StatusAnnotation: string(annBytes),
+						},
+					},
+				},
+			},
+		}
+		machineList := machinev1beta1.MachineList{
+			Items: []machinev1beta1.Machine{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "xyz-assisted-instal-8p7km-worker-0-25rnh",
+						Namespace: "openshift-machine-api",
+						Labels: map[string]string{
+							"machine.openshift.io/cluster-api-machine-role": "worker",
+						},
+					},
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Machine",
+						APIVersion: "metal3.io/v1alpha1",
+					},
+				},
+			},
+		}
+		BeforeEach(func() {
+			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
+			GeneralWaitInterval = 1 * time.Second
+		})
+		It("provisioning exists, early return", func() {
+			mockk8sclient.EXPECT().IsMetalProvisioningExists().Return(true, nil)
+			wg.Add(1)
+			go c.UpdateBMHs(&wg)
+			wg.Wait()
+		})
+		It("normal path", func() {
+			expect1 := &metal3v1alpha1.BareMetalHost{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "openshift-worker-0",
+					Annotations: map[string]string{
+						metal3v1alpha1.StatusAnnotation: string(annBytes),
+					},
+				},
+				Status: bmhStatus,
+			}
+
+			mockk8sclient.EXPECT().UpdateBMHStatus(expect1).Return(nil)
+
+			expect2 := expect1.DeepCopy()
+			expect2.Spec = metal3v1alpha1.BareMetalHostSpec{
+				ConsumerRef: &v1.ObjectReference{
+					APIVersion: "metal3.io/v1alpha1",
+					Kind:       "Machine",
+					Namespace:  "openshift-machine-api",
+					Name:       "xyz-assisted-instal-8p7km-worker-0-25rnh",
+				},
+			}
+			expect2.ObjectMeta.Annotations = map[string]string{}
+			mockk8sclient.EXPECT().UpdateBMH(expect2).Return(nil)
+			c.updateBMHs(bmhList, &machineList)
+		})
+	})
+
 	Context("Upload logs", func() {
 		conf := ControllerConfig{
 			ClusterID: "cluster-id",

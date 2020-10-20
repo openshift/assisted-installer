@@ -7,34 +7,33 @@ import (
 	"io"
 	"os"
 
-	"github.com/openshift/assisted-installer/src/utils"
-	"k8s.io/apimachinery/pkg/labels"
-
-	"k8s.io/api/certificates/v1beta1"
-
-	"github.com/openshift/assisted-installer/src/ops"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/clientcmd"
-
 	bmoapis "github.com/metal3-io/baremetal-operator/pkg/apis"
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
 	configv1 "github.com/openshift/api/config/v1"
 	configv1client "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 	operatorv1 "github.com/openshift/client-go/operator/clientset/versioned"
+	machinev1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"k8s.io/api/certificates/v1beta1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	certificatesv1beta1client "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
+	"k8s.io/client-go/tools/clientcmd"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	runtimeconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
+
+	"github.com/openshift/assisted-installer/src/ops"
+	"github.com/openshift/assisted-installer/src/utils"
 )
 
 //var AddToSchemes runtime.SchemeBuilder
@@ -45,6 +44,7 @@ type K8SClient interface {
 	PatchEtcd() error
 	UnPatchEtcd() error
 	ListNodes() (*v1.NodeList, error)
+	ListMachines() (*machinev1beta1.MachineList, error)
 	RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error)
 	ApproveCsr(csr *v1beta1.CertificateSigningRequest) error
 	ListCsrs() (*v1beta1.CertificateSigningRequestList, error)
@@ -98,11 +98,13 @@ func NewK8SClient(configPath string, logger *logrus.Logger) (K8SClient, error) {
 			return &k8sClient{}, errors.Wrap(err, "failed to add scheme to")
 		}
 
-		var AddToSchemes runtime.SchemeBuilder
-		AddToSchemes = append(AddToSchemes, metal3v1alpha1.SchemeBuilder.AddToScheme)
 		err = bmoapis.AddToScheme(scheme)
 		if err != nil {
 			return &k8sClient{}, errors.Wrap(err, "failed to add BMH scheme")
+		}
+		err = machinev1beta1.AddToScheme(scheme)
+		if err != nil {
+			return &k8sClient{}, errors.Wrap(err, "failed to add Machine scheme")
 		}
 
 		runtimeClient, err = runtimeclient.New(runtimeconfig.GetConfigOrDie(), runtimeclient.Options{Scheme: scheme})
@@ -129,6 +131,20 @@ func (c *k8sClient) ListNodes() (*v1.NodeList, error) {
 		return &v1.NodeList{}, err
 	}
 	return nodes, nil
+}
+
+func (c *k8sClient) ListMachines() (*machinev1beta1.MachineList, error) {
+	machines := machinev1beta1.MachineList{}
+	opts := &runtimeclient.ListOptions{
+		Namespace: "openshift-machine-api",
+	}
+
+	err := c.runtimeClient.List(context.Background(), &machines, opts)
+	if err != nil {
+		c.log.Errorf("failed to list Machines, error %s", err)
+		return &machinev1beta1.MachineList{}, err
+	}
+	return &machines, nil
 }
 
 func (c *k8sClient) PatchEtcd() error {

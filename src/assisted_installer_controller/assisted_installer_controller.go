@@ -9,21 +9,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/openshift/assisted-installer/src/common"
-	"github.com/openshift/assisted-installer/src/utils"
-	"github.com/pkg/errors"
-	v1 "k8s.io/api/core/v1"
-
-	"github.com/openshift/assisted-installer/src/inventory_client"
-	"github.com/openshift/assisted-installer/src/k8s_client"
-	"github.com/openshift/assisted-installer/src/ops"
-	"github.com/openshift/assisted-service/models"
-
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
+	mapiv1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/certificates/v1beta1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/openshift/assisted-installer/src/common"
+	"github.com/openshift/assisted-installer/src/inventory_client"
+	"github.com/openshift/assisted-installer/src/k8s_client"
+	"github.com/openshift/assisted-installer/src/ops"
+	"github.com/openshift/assisted-installer/src/utils"
+	"github.com/openshift/assisted-service/models"
 )
 
 const (
@@ -238,7 +238,13 @@ func (c controller) UpdateBMHs(wg *sync.WaitGroup) {
 			continue
 		}
 
-		allUpdated := c.updateBMHStatus(bmhs)
+		machines, err := c.unallocatedMachines(bmhs)
+		if err != nil {
+			c.log.WithError(err).Errorf("Failed to get machines")
+			continue
+		}
+
+		allUpdated := c.updateBMHs(bmhs, machines)
 		if allUpdated {
 			c.log.Infof("Updated all the BMH CRs, finished successfully")
 			return
@@ -246,40 +252,78 @@ func (c controller) UpdateBMHs(wg *sync.WaitGroup) {
 	}
 }
 
-func (c controller) updateBMHStatus(bmhList metal3v1alpha1.BareMetalHostList) bool {
+func (c controller) unallocatedMachines(bmhList metal3v1alpha1.BareMetalHostList) (*mapiv1beta1.MachineList, error) {
+	machineList, err := c.kc.ListMachines()
+	if err != nil {
+		return nil, err
+	}
+
+	unallocatedList := &mapiv1beta1.MachineList{Items: machineList.Items[:0]}
+
+	for _, machine := range machineList.Items {
+		role, ok := machine.Labels["machine.openshift.io/cluster-api-machine-role"]
+		unallocated := ok && role == "worker"
+		for _, bmh := range bmhList.Items {
+			if bmh.Spec.ConsumerRef != nil && bmh.Spec.ConsumerRef.Name == machine.Name {
+				unallocated = false
+			}
+		}
+		if unallocated {
+			unallocatedList.Items = append(unallocatedList.Items, machine)
+		}
+	}
+	return unallocatedList, nil
+}
+
+func (c controller) updateBMHs(bmhList metal3v1alpha1.BareMetalHostList, machineList *mapiv1beta1.MachineList) bool {
 	allUpdated := true
+
 	for i := range bmhList.Items {
 		bmh := bmhList.Items[i]
 		c.log.Infof("Checking bmh %s", bmh.Name)
 		annotations := bmh.GetAnnotations()
 		content := []byte(annotations[metal3v1alpha1.StatusAnnotation])
-		if annotations[metal3v1alpha1.StatusAnnotation] == "" {
+
+		if annotations[metal3v1alpha1.StatusAnnotation] == "" && bmh.Spec.ConsumerRef != nil {
 			c.log.Infof("Skipping setting status of BMH host %s, status annotation not present", bmh.Name)
 			continue
 		}
 		allUpdated = false
-		objStatus, err := c.unmarshalStatusAnnotation(content)
-		if err != nil {
-			c.log.WithError(err).Errorf("Failed to unmarshal status annotation of %s", bmh.Name)
-			continue
+		if annotations[metal3v1alpha1.StatusAnnotation] != "" {
+			objStatus, err := c.unmarshalStatusAnnotation(content)
+			if err != nil {
+				c.log.WithError(err).Errorf("Failed to unmarshal status annotation of %s", bmh.Name)
+				continue
+			}
+			bmh.Status = *objStatus
+			if bmh.Status.LastUpdated.IsZero() {
+				// Ensure the LastUpdated timestamp in set to avoid
+				// infinite loops if the annotation only contained
+				// part of the status information.
+				t := metav1.Now()
+				bmh.Status.LastUpdated = &t
+			}
+			err = c.kc.UpdateBMHStatus(&bmh)
+			if err != nil {
+				c.log.WithError(err).Errorf("Failed to update status of BMH %s", bmh.Name)
+				continue
+			}
+			delete(annotations, metal3v1alpha1.StatusAnnotation)
 		}
-		bmh.Status = *objStatus
-		if bmh.Status.LastUpdated.IsZero() {
-			// Ensure the LastUpdated timestamp in set to avoid
-			// infinite loops if the annotation only contained
-			// part of the status information.
-			t := metav1.Now()
-			bmh.Status.LastUpdated = &t
+		if bmh.Spec.ConsumerRef == nil {
+			machine := machineList.Items[0]
+			machineList.Items = machineList.Items[1:]
+			bmh.Spec.ConsumerRef = &v1.ObjectReference{
+				APIVersion: machine.APIVersion,
+				Kind:       machine.Kind,
+				Namespace:  machine.Namespace,
+				Name:       machine.Name,
+			}
 		}
-		err = c.kc.UpdateBMHStatus(&bmh)
+
+		err := c.kc.UpdateBMH(&bmh)
 		if err != nil {
-			c.log.WithError(err).Errorf("Failed to update status of BMH %s", bmh.Name)
-			continue
-		}
-		delete(annotations, metal3v1alpha1.StatusAnnotation)
-		err = c.kc.UpdateBMH(&bmh)
-		if err != nil {
-			c.log.WithError(err).Errorf("Failed to remove status annotation from BMH %s", bmh.Name)
+			c.log.WithError(err).Errorf("Failed to update BMH %s", bmh.Name)
 		}
 	}
 	return allUpdated
