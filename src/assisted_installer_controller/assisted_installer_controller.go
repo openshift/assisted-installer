@@ -28,7 +28,7 @@ import (
 
 const (
 	generalWaitTimeoutInt    = 30
-	controllerLogsSecondsAgo = 30 * 60
+	controllerLogsSecondsAgo = 120 * 60
 )
 
 var GeneralWaitInterval = generalWaitTimeoutInt * time.Second
