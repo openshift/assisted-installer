@@ -1,3 +1,4 @@
+CONTAINER_COMMAND = $(shell if [ -x "$(shell which docker)" ];then echo "docker" ; else echo "podman";fi)
 INSTALLER := $(or ${INSTALLER},quay.io/ocpmetal/assisted-installer:stable)
 GIT_REVISION := $(shell git rev-parse HEAD)
 CONTROLLER :=  $(or ${CONTROLLER}, quay.io/ocpmetal/assisted-installer-controller:stable)
@@ -30,16 +31,16 @@ build/controller: lint format
 	CGO_ENABLED=0 go build -o build/assisted-installer-controller src/main/assisted-installer-controller/assisted_installer_main.go
 
 image: build/installer
-	GIT_REVISION=${GIT_REVISION} docker build --build-arg GIT_REVISION -f Dockerfile.assisted-installer . -t $(INSTALLER)
+	GIT_REVISION=${GIT_REVISION} $(CONTAINER_COMMAND) build --build-arg GIT_REVISION -f Dockerfile.assisted-installer . -t $(INSTALLER)
 
 push: image
-	docker push $(INSTALLER)
+	$(CONTAINER_COMMAND) push $(INSTALLER)
 
 image_controller: build/controller
-	GIT_REVISION=${GIT_REVISION} docker build --build-arg GIT_REVISION -f Dockerfile.assisted-installer-controller . -t $(CONTROLLER)
+	GIT_REVISION=${GIT_REVISION} $(CONTAINER_COMMAND) build --build-arg GIT_REVISION -f Dockerfile.assisted-installer-controller . -t $(CONTROLLER)
 
 push_controller: image_controller
-	docker push $(CONTROLLER)
+	$(CONTAINER_COMMAND) push $(CONTROLLER)
 
 $(REPORTS):
 	-mkdir -p $(REPORTS)
