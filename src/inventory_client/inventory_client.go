@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"syscall"
 	"time"
 
@@ -209,7 +210,7 @@ func (c *inventoryClient) GetHosts(skippedStatuses []string) (map[string]HostDat
 		return nil, err
 	}
 	for _, hostData := range hosts {
-		hostname := hostData.Host.RequestedHostname
+		hostname := strings.ToLower(hostData.Host.RequestedHostname)
 		ips, err := utils.GetHostIpsFromInventory(hostData.Inventory)
 		if err != nil {
 			c.log.WithError(err).Errorf("failed to get ips of node %s", hostname)
