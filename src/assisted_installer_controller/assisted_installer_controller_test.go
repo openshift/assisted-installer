@@ -354,9 +354,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any(), "").Return(nil, fmt.Errorf("dummy")).Times(1)
 			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any(), "").Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Pending"}}}, nil).Times(1)
 			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any(), "").Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Running"}}}, nil).Times(1)
-			mockk8sclient.EXPECT().GetClusterVersion("version").Return(nil, fmt.Errorf("dummy")).Times(1)
-			mockk8sclient.EXPECT().GetClusterVersion("version").Return(badClusterVersion, nil).Times(1)
-			mockk8sclient.EXPECT().GetClusterVersion("version").Return(goodClusterVersion, nil).Times(1)
 
 			mockbmclient.EXPECT().CompleteInstallation("cluster-id", true, "").Return(fmt.Errorf("dummy")).Times(1)
 			mockbmclient.EXPECT().CompleteInstallation("cluster-id", true, "").Return(nil).Times(1)
@@ -373,10 +370,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				Status: configv1.ConditionFalse}}
 			cluster := models.Cluster{Status: &finalizing}
 			mockbmclient.EXPECT().GetCluster().Return(&cluster, nil).Times(1)
-			mockk8sclient.EXPECT().GetClusterVersion("version").Return(badClusterVersion, nil).MinTimes(1)
 
-			mockbmclient.EXPECT().CompleteInstallation("cluster-id", false, "Timeout while waiting for cluster "+
-				"version to be available").Return(nil).Times(1)
+			mockk8sclient.EXPECT().GetConfigMap(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("aaa")).MinTimes(1)
+			mockbmclient.EXPECT().CompleteInstallation("cluster-id", false,
+				"Timeout while waiting router ca data").Return(nil).Times(1)
 
 			wg.Add(1)
 			go c.PostInstallConfigs(&wg)
