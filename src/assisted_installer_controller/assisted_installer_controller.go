@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/assisted-installer/src/common"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/pkg/errors"
@@ -202,12 +201,7 @@ func (c controller) PostInstallConfigs(wg *sync.WaitGroup) {
 
 func (c controller) postInstallConfigs() error {
 
-	err := c.waitForClusterVersion()
-	if err != nil {
-		return err
-	}
-
-	err = utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.addRouterCAToClusterCA)
+	err := utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.addRouterCAToClusterCA)
 	if err != nil {
 		return errors.Errorf("Timeout while waiting router ca data")
 	}
@@ -347,47 +341,6 @@ func (c controller) validateConsolePod() bool {
 		c.log.Infof("Console pod is in status %s. Continue waiting for it", pod.Status.Phase)
 	}
 	return false
-}
-
-func (c controller) waitForClusterVersion() error {
-	func1 := func() bool {
-		available, msg := c.validateClusterVersion()
-		c.log.Infof("Cluster version is available:%t , message:%s", available, msg)
-
-		return available
-	}
-
-	err := utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, func1)
-	if err != nil {
-		return errors.Errorf("Timeout while waiting for cluster version to be available")
-	}
-	return nil
-}
-
-func (c controller) validateClusterVersion() (bool, string) {
-	c.log.Infof("Waiting for cluster version to be available")
-	cv, err := c.kc.GetClusterVersion("version")
-	if err != nil {
-		c.log.WithError(err).Warnf("Failed to get cluster version")
-		return false, ""
-	}
-	conditionsByType := map[configv1.ClusterStatusConditionType]configv1.ClusterOperatorStatusCondition{}
-	// condition type to dict
-	for _, condition := range cv.Status.Conditions {
-		conditionsByType[condition.Type] = condition
-	}
-	// check if it cluster version is available
-	condition, ok := conditionsByType[configv1.OperatorAvailable]
-	if ok && condition.Status == configv1.ConditionTrue {
-		return true, condition.Message
-	}
-	// if not available return message from progressing
-	condition, ok = conditionsByType[configv1.OperatorProgressing]
-	if ok {
-		return false, condition.Message
-	}
-
-	return false, ""
 }
 
 func (c controller) sendCompleteInstallation(isSuccess bool, errorInfo string) {
