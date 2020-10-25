@@ -3,6 +3,7 @@ package installer
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/openshift/assisted-installer/src/common"
 
@@ -390,7 +391,7 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 
 				i.log.Infof("Found a new ready master node %s with id %s", node.Name, node.Status.NodeInfo.SystemUUID)
 				*readyMasters = append(*readyMasters, node.Status.NodeInfo.SystemUUID)
-				host, ok := inventoryHostsMap[node.Name]
+				host, ok := inventoryHostsMap[strings.ToLower(node.Name)]
 				if !ok {
 					i.log.Warnf("Node %s is not in inventory hosts", node.Name)
 					break

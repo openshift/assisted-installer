@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
@@ -83,15 +84,15 @@ func (c *controller) WaitAndUpdateNodesStatus() {
 		if len(assistedInstallerNodesMap) == 0 {
 			break
 		}
-		c.log.Infof("Searching for host to change status")
+		c.log.Infof("Searching for host to change status, number to find %d", len(assistedInstallerNodesMap))
 		nodes, err := c.kc.ListNodes()
 		if err != nil {
-			c.log.WithError(err).Warn("Failed to get list of nodes from ocp cluster")
 			continue
 		}
 		for _, node := range nodes.Items {
-			host, ok := assistedInstallerNodesMap[node.Name]
+			host, ok := assistedInstallerNodesMap[strings.ToLower(node.Name)]
 			if !ok {
+				c.log.Warnf("Node %s is not in inventory hosts", node.Name)
 				continue
 			}
 
