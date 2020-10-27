@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"flag"
 	"os"
 
@@ -28,6 +29,7 @@ type Config struct {
 	HTTPSProxy           string
 	NoProxy              string
 	ServiceIPs           string
+	InstallerArgs        []string
 }
 
 var GlobalConfig Config
@@ -59,6 +61,10 @@ func ProcessArgs() {
 	flag.StringVar(&ret.HTTPSProxy, "https-proxy", "", "A proxy URL to use for creating HTTPS connections outside the cluster")
 	flag.StringVar(&ret.NoProxy, "no-proxy", "", "A comma-separated list of destination domain names, domains, IP addresses, or other network CIDRs to exclude proxying")
 	flag.StringVar(&ret.ServiceIPs, "service-ips", "", "All IPs of assisted service node")
+
+	var installerArgs string
+	flag.StringVar(&installerArgs, "installer-args", "", "JSON array of additional coreos-installer arguments")
+
 	h := flag.Bool("help", false, "Help message")
 	flag.Parse()
 	if ret.NoProxy != "" {
@@ -66,5 +72,13 @@ func ProcessArgs() {
 	}
 	if h != nil && *h {
 		printHelpAndExit()
+	}
+
+	if installerArgs != "" {
+		err := json.Unmarshal([]byte(installerArgs), &ret.InstallerArgs)
+		if err != nil {
+			println(err.Error())
+			printHelpAndExit()
+		}
 	}
 }
