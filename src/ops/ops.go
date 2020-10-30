@@ -4,22 +4,21 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"os"
-	"strconv"
-	"text/template"
-
-	"github.com/openshift/assisted-installer/src/inventory_client"
-
-	"github.com/openshift/assisted-installer/src/config"
-
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
+	"text/template"
 
-	"github.com/openshift/assisted-installer/src/utils"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	"github.com/openshift/assisted-installer/src/config"
+	"github.com/openshift/assisted-installer/src/inventory_client"
+	"github.com/openshift/assisted-installer/src/utils"
 )
 
 //go:generate mockgen -source=ops.go -package=ops -destination=mock_ops.go
@@ -83,6 +82,28 @@ func (o *ops) ExecPrivilegeCommand(liveLogger io.Writer, command string, args ..
 	return o.ExecCommand(liveLogger, commandBase, arguments...)
 }
 
+type ExecCommandError struct {
+	Command    string
+	Args       []string
+	Env        []string
+	ExitErr    error
+	Output     string
+	WaitStatus int
+}
+
+func (e *ExecCommandError) Error() string {
+	lastOutput := e.Output
+	if len(e.Output) > 200 {
+		lastOutput = "... " + e.Output[len(e.Output)-200:]
+	}
+
+	return fmt.Sprintf("failed executing %s %v, Error %s, LastOutput \"%s\"", e.Command, e.Args, e.ExitErr, lastOutput)
+}
+
+func (e *ExecCommandError) DetailedError() string {
+	return fmt.Sprintf("failed executing %s %v, env vars %v, error %s, waitStatus %d, Output \"%s\"", e.Command, e.Args, e.Env, e.ExitErr, e.WaitStatus, e.Output)
+}
+
 // ExecCommand executes command.
 func (o *ops) ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
 
@@ -107,15 +128,20 @@ func (o *ops) ExecCommand(liveLogger io.Writer, command string, args ...string) 
 			output = output[errorIndex:]
 		}
 
+		execErr := &ExecCommandError{
+			Command: command,
+			Args:    args,
+			Env:     cmd.Env,
+			ExitErr: err,
+			Output:  output,
+		}
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
-				o.log.Debugf("failed executing %s %v, env vars %v, out: %s, with status %d",
-					command, args, output, cmd.Env, status.ExitStatus())
-
-				return output, fmt.Errorf("failed executing %s %v, env vars %v, error %s. Output %s", command, args, cmd.Env, exitErr, output)
+				execErr.WaitStatus = status.ExitStatus()
 			}
 		}
-		return output, fmt.Errorf("failed executing %s %v, env vars %v, error %s. Output %s", command, args, cmd.Env, err, output)
+		o.log.Info(execErr.DetailedError())
+		return output, execErr
 	}
 	o.log.Debug("Command executed:", " command", command, " arguments", args, "env vars", cmd.Env, "output", output)
 	return output, err
@@ -131,9 +157,9 @@ func (o *ops) SystemctlAction(action string, args ...string) error {
 	o.log.Infof("Running systemctl %s %s", action, args)
 	_, err := o.ExecPrivilegeCommand(o.logWriter, "systemctl", append([]string{action}, args...)...)
 	if err != nil {
-		o.log.Errorf("Failed to executing systemctl %s %s", action, args)
+		o.log.Errorf("Failed executing systemctl %s %s", action, args)
 	}
-	return err
+	return errors.Wrapf(err, "Failed executing systemctl %s %s", action, args)
 }
 
 func (o *ops) WriteImageToDisk(ignitionPath string, device string, progressReporter inventory_client.InventoryClient) error {
@@ -142,6 +168,7 @@ func (o *ops) WriteImageToDisk(ignitionPath string, device string, progressRepor
 		"coreos-installer", "install", "--insecure", "-i", ignitionPath, device)
 	return err
 }
+
 func (o *ops) Reboot() error {
 	o.log.Info("Rebooting node")
 	_, err := o.ExecPrivilegeCommand(o.logWriter, "shutdown", "-r", "+1", "'Installation completed, server is going to reboot.'")
