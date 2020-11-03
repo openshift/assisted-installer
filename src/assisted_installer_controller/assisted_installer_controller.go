@@ -92,7 +92,6 @@ func (c *controller) WaitAndUpdateNodesStatus() {
 		for _, node := range nodes.Items {
 			host, ok := assistedInstallerNodesMap[strings.ToLower(node.Name)]
 			if !ok {
-				c.log.Warnf("Node %s is not in inventory hosts", node.Name)
 				continue
 			}
 
