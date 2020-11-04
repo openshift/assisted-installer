@@ -49,6 +49,20 @@ func (mr *MockInventoryClientMockRecorder) DownloadFile(filename, dest interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DownloadFile", reflect.TypeOf((*MockInventoryClient)(nil).DownloadFile), filename, dest)
 }
 
+// DownloadHostIgnition mocks base method
+func (m *MockInventoryClient) DownloadHostIgnition(hostID, dest string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DownloadHostIgnition", hostID, dest)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DownloadHostIgnition indicates an expected call of DownloadHostIgnition
+func (mr *MockInventoryClientMockRecorder) DownloadHostIgnition(hostID, dest interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DownloadHostIgnition", reflect.TypeOf((*MockInventoryClient)(nil).DownloadHostIgnition), hostID, dest)
+}
+
 // UpdateHostInstallProgress mocks base method
 func (m *MockInventoryClient) UpdateHostInstallProgress(hostId string, newStage models.HostStage, info string) error {
 	m.ctrl.T.Helper()

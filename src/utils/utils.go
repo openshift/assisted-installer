@@ -3,7 +3,6 @@ package utils
 import (
 	"archive/tar"
 	"compress/gzip"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -20,7 +19,6 @@ import (
 	"golang.org/x/net/http/httpproxy"
 
 	ignition "github.com/coreos/ignition/v2/config/v3_1"
-	"github.com/coreos/ignition/v2/config/v3_1/types"
 	"github.com/openshift/assisted-service/models"
 
 	"github.com/vincent-petithory/dataurl"
@@ -83,32 +81,6 @@ func GetFileContentFromIgnition(ignitionData []byte, fileName string) ([]byte, e
 		}
 	}
 	return nil, fmt.Errorf("path %s found in ignition", fileName)
-}
-
-func SetFileInIgnition(ignitionData []byte, filePath, fileContents string, mode int) ([]byte, error) {
-	bm, _, err := ignition.Parse(ignitionData)
-	if err != nil {
-		return nil, err
-	}
-
-	rootUser := "root"
-	file := types.File{
-		Node: types.Node{
-			Path:      filePath,
-			Overwrite: nil,
-			Group:     types.NodeGroup{},
-			User:      types.NodeUser{Name: &rootUser},
-		},
-		FileEmbedded1: types.FileEmbedded1{
-			Append: []types.Resource{},
-			Contents: types.Resource{
-				Source: &fileContents,
-			},
-			Mode: &mode,
-		},
-	}
-	bm.Storage.Files = append(bm.Storage.Files, file)
-	return json.Marshal(bm)
 }
 
 func GetListOfFilesFromFolder(root, pattern string) ([]string, error) {

@@ -46,8 +46,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		installerObj       *installer
 		hostId             = "host-id"
 		bootstrapIgn       = "bootstrap.ign"
-		masterIgn          = "master.ign"
-		workerIgn          = "worker.ign"
 		openShiftVersion   = "4.4"
 		inventoryNamesHost map[string]inventory_client.HostData
 		kubeNamesIds       map[string]string
@@ -60,6 +58,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	}
 	downloadFileSuccess := func(fileName string) {
 		mockbmclient.EXPECT().DownloadFile(fileName, filepath.Join(InstallDir, fileName)).Return(nil).Times(1)
+	}
+	downloadHostIgnitionSuccess := func(hostID string, fileName string) {
+		mockbmclient.EXPECT().DownloadHostIgnition(hostID, filepath.Join(InstallDir, fileName)).Return(nil).Times(1)
 	}
 
 	cleanInstallDevice := func() {
@@ -77,7 +78,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	}
 
 	writeToDiskSuccess := func() {
-		mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, masterIgn), device, mockbmclient).Return(nil).Times(1)
+		mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, "master-host-id.ign"), device, mockbmclient).Return(nil).Times(1)
 	}
 
 	uploadLogsSuccess := func(bootstrap bool) {
@@ -206,7 +207,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			resolvConfSuccess()
 			waitForControllerSuccessfully(conf.ClusterID)
 			//HostRoleMaster flow:
-			downloadFileSuccess(masterIgn)
+			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			writeToDiskSuccess()
 			uploadLogsSuccess(true)
 			rebootSuccess()
@@ -227,7 +228,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			err := fmt.Errorf("Etcd patch failed")
 			mockk8sclient.EXPECT().PatchEtcd().Return(err).Times(1)
 			//HostRoleMaster flow:
-			downloadFileSuccess(masterIgn)
+			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			writeToDiskSuccess()
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
@@ -251,7 +252,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			resolvConfSuccess()
 			waitForControllerSuccessfully(conf.ClusterID)
 			//HostRoleMaster flow:
-			downloadFileSuccess(masterIgn)
+			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			writeToDiskSuccess()
 			uploadLogsSuccess(true)
 			rebootSuccess()
@@ -267,7 +268,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			cleanInstallDevice()
 			mkdirSuccess()
 			downloadFileSuccess(bootstrapIgn)
-			downloadFileSuccess(masterIgn)
+			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			writeToDiskSuccess()
 			extractSecretFromIgnitionSuccess()
 			extractIgnitionToFS("extract failure", fmt.Errorf("extract failed"))
@@ -287,7 +288,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			err := fmt.Errorf("Failed to restart NetworkManager")
 			restartNetworkManager(err)
 			//HostRoleMaster flow:
-			downloadFileSuccess(masterIgn)
+			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			writeToDiskSuccess()
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
@@ -378,7 +379,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			})
 			cleanInstallDevice()
 			mkdirSuccess()
-			downloadFileSuccess(masterIgn)
+			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			writeToDiskSuccess()
 			uploadLogsSuccess(false)
 			rebootSuccess()
@@ -424,7 +425,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			cleanInstallDevice()
 			mkdirSuccess()
 			err := fmt.Errorf("failed to fetch file")
-			mockbmclient.EXPECT().DownloadFile(masterIgn, filepath.Join(InstallDir, masterIgn)).Return(err).Times(1)
+			mockbmclient.EXPECT().DownloadHostIgnition(hostId, filepath.Join(InstallDir, "master-host-id.ign")).Return(err).Times(1)
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
@@ -435,9 +436,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			})
 			cleanInstallDevice()
 			mkdirSuccess()
-			downloadFileSuccess(masterIgn)
+			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			err := fmt.Errorf("failed to write image to disk")
-			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, masterIgn), device, mockbmclient).Return(err).Times(3)
+			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, "master-host-id.ign"), device, mockbmclient).Return(err).Times(3)
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(fmt.Errorf("failed after 3 attempts, last error: failed to write image to disk")))
 		})
@@ -449,7 +450,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			})
 			cleanInstallDevice()
 			mkdirSuccess()
-			downloadFileSuccess(masterIgn)
+			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			uploadLogsSuccess(false)
 			writeToDiskSuccess()
 			err := fmt.Errorf("failed to reboot")
@@ -477,8 +478,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			})
 			cleanInstallDevice()
 			mkdirSuccess()
-			downloadFileSuccess(workerIgn)
-			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, workerIgn), device, mockbmclient).Return(nil).Times(1)
+			downloadHostIgnitionSuccess(hostId, "worker-host-id.ign")
+			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, "worker-host-id.ign"), device, mockbmclient).Return(nil).Times(1)
 			// failure must do nothing
 			mockops.EXPECT().UploadInstallationLogs(false).Return("", errors.Errorf("Dummy")).Times(1)
 			rebootSuccess()
