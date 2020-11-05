@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -224,4 +226,50 @@ func envVarsProxyFunc() func(*url.URL) (*url.URL, error) {
 func SetNoProxyEnv(noProxy string) {
 	os.Setenv("NO_PROXY", noProxy)
 	os.Setenv("no_proxy", noProxy)
+}
+
+func dumpSecretStructInternal(obj interface{}, sb *strings.Builder, depth int) {
+	v := reflect.ValueOf(obj)
+
+	sb.WriteString(fmt.Sprintf("struct %s {\n", v.Type().Name()))
+
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+
+		name, value, tag := v.Type().Field(i).Name,
+			field.Interface(),
+			reflect.TypeOf(obj).Field(i).Tag
+
+		for j := 0; j < depth; j++ {
+			sb.WriteString("\t")
+		}
+
+		sb.WriteString(fmt.Sprintf("%s = ", name))
+
+		if tag.Get("secret") == "true" {
+			sb.WriteString("<REDACTED>")
+		} else {
+			if field.Kind() == reflect.Struct {
+				dumpSecretStructInternal(value, sb, depth+1)
+			} else {
+				sb.WriteString(fmt.Sprint(value))
+			}
+		}
+
+		sb.WriteString("\n")
+	}
+
+	for j := 0; j < depth-1; j++ {
+		sb.WriteString("\t")
+	}
+
+	sb.WriteString(fmt.Sprintf("}"))
+}
+
+// DumpSecretStruct generates a string representation of a struct with
+// `secret:"true"` tagged fields removed
+func DumpSecretStruct(obj interface{}) string {
+	var sb strings.Builder
+	dumpSecretStructInternal(obj, &sb, 1)
+	return sb.String()
 }
