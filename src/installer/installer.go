@@ -431,6 +431,8 @@ func (i *installer) cleanupInstallDevice() error {
 		return err
 	}
 
+	_ = i.ops.Wipefs(i.Device)
+
 	return i.ops.RemovePV(i.Device)
 }
 
