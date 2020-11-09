@@ -35,6 +35,7 @@ type Ops interface {
 	RemoveVG(vgName string) error
 	RemoveLV(lvName, vgName string) error
 	RemovePV(pvName string) error
+	Wipefs(device string) error
 	GetMCSLogs() (string, error)
 	UploadInstallationLogs(isBootstrap bool) (string, error)
 	ReloadHostFile(filepath string) error
@@ -348,9 +349,17 @@ func (o *ops) RemoveLV(lvName, vgName string) error {
 }
 
 func (o *ops) RemovePV(pvName string) error {
-	output, err := o.ExecPrivilegeCommand(o.logWriter, "pvremove", pvName, "-y")
+	output, err := o.ExecPrivilegeCommand(o.logWriter, "pvremove", pvName, "-y", "-ff")
 	if err != nil {
 		o.log.Errorf("Failed to remove PV %s, output %s, error %s", pvName, output, err)
+	}
+	return err
+}
+
+func (o *ops) Wipefs(device string) error {
+	output, err := o.ExecPrivilegeCommand(o.logWriter, "wipefs", "-a", device)
+	if err != nil {
+		o.log.Errorf("Failed to wipefs device %s, output %s, error %s", device, output, err)
 	}
 	return err
 }
