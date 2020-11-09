@@ -389,6 +389,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			cleanInstallDeviceClean := func() {
 				mockops.EXPECT().GetVGByPV(device).Return("vg1", nil).Times(1)
 				mockops.EXPECT().RemoveVG("vg1").Return(nil).Times(1)
+				mockops.EXPECT().Wipefs(device).Return(nil).Times(1)
 				mockops.EXPECT().RemovePV(device).Return(nil).Times(1)
 			}
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
