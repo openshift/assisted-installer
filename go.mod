@@ -17,7 +17,7 @@ require (
 	github.com/onsi/gomega v1.10.1
 	github.com/openshift/api v0.0.0-20200326152221-912866ddb162
 	github.com/openshift/assisted-installer-agent v0.0.0-20200811180147-bc9c7b899b8a
-	github.com/openshift/assisted-service v1.0.10-0.20201103185959-9fbcf52e8938
+	github.com/openshift/assisted-service v1.0.10-0.20201109152238-bb2f4a5dbbd8
 	github.com/openshift/client-go v0.0.0-20200422192633-6f6c07fc2a70
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.7.0
