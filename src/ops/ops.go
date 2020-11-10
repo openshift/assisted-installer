@@ -26,7 +26,7 @@ type Ops interface {
 	ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error)
 	ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error)
 	Mkdir(dirName string) error
-	WriteImageToDisk(ignitionPath string, device string, progressReporter inventory_client.InventoryClient) error
+	WriteImageToDisk(ignitionPath string, device string, image string, progressReporter inventory_client.InventoryClient) error
 	Reboot() error
 	ExtractFromIgnition(ignitionPath string, fileToExtract string) error
 	SystemctlAction(action string, args ...string) error
@@ -163,10 +163,17 @@ func (o *ops) SystemctlAction(action string, args ...string) error {
 	return errors.Wrapf(err, "Failed executing systemctl %s %s", action, args)
 }
 
-func (o *ops) WriteImageToDisk(ignitionPath string, device string, progressReporter inventory_client.InventoryClient) error {
+func (o *ops) WriteImageToDisk(ignitionPath string, device string, image string, progressReporter inventory_client.InventoryClient) error {
 	o.log.Info("Writing image and ignition to disk")
-	_, err := o.ExecPrivilegeCommand(NewCoreosInstallerLogWriter(o.log, progressReporter, config.GlobalConfig.HostID),
-		"coreos-installer", "install", "--insecure", "-i", ignitionPath, device)
+	var err error
+	if image == "" {
+		_, err = o.ExecPrivilegeCommand(NewCoreosInstallerLogWriter(o.log, progressReporter, config.GlobalConfig.HostID),
+			"coreos-installer", "install", "--insecure", "-i", ignitionPath, device)
+	} else {
+		_, err = o.ExecPrivilegeCommand(NewCoreosInstallerLogWriter(o.log, progressReporter, config.GlobalConfig.HostID),
+			"coreos-installer", "install", "--image-url", image, "--insecure", "-i", ignitionPath, device)
+	}
+
 	return err
 }
 

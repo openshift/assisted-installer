@@ -47,6 +47,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		hostId             = "host-id"
 		bootstrapIgn       = "bootstrap.ign"
 		openShiftVersion   = "4.4"
+		image              string
 		inventoryNamesHost map[string]inventory_client.HostData
 		kubeNamesIds       map[string]string
 	)
@@ -78,7 +79,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	}
 
 	writeToDiskSuccess := func() {
-		mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, "master-host-id.ign"), device, mockbmclient).Return(nil).Times(1)
+		mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, "master-host-id.ign"), device, image, mockbmclient).Return(nil).Times(1)
 	}
 
 	uploadLogsSuccess := func(bootstrap bool) {
@@ -439,7 +440,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mkdirSuccess()
 			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			err := fmt.Errorf("failed to write image to disk")
-			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, "master-host-id.ign"), device, mockbmclient).Return(err).Times(3)
+			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, "master-host-id.ign"), device, image, mockbmclient).Return(err).Times(3)
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(fmt.Errorf("failed after 3 attempts, last error: failed to write image to disk")))
 		})
@@ -480,7 +481,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			cleanInstallDevice()
 			mkdirSuccess()
 			downloadHostIgnitionSuccess(hostId, "worker-host-id.ign")
-			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, "worker-host-id.ign"), device, mockbmclient).Return(nil).Times(1)
+			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, "worker-host-id.ign"), device, image, mockbmclient).Return(nil).Times(1)
 			// failure must do nothing
 			mockops.EXPECT().UploadInstallationLogs(false).Return("", errors.Errorf("Dummy")).Times(1)
 			rebootSuccess()
