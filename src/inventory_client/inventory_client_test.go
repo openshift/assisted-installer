@@ -12,8 +12,9 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
-	"github.com/openshift/assisted-service/models"
 	"github.com/sirupsen/logrus"
+
+	"github.com/openshift/assisted-service/models"
 )
 
 func TestValidator(t *testing.T) {

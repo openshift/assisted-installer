@@ -16,19 +16,18 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/PuerkitoBio/rehttp"
 	"github.com/go-openapi/runtime"
-
+	"github.com/go-openapi/strfmt"
+	"github.com/sirupsen/logrus"
 	"github.com/thoas/go-funk"
 
-	"github.com/PuerkitoBio/rehttp"
-	"github.com/go-openapi/strfmt"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/client"
 	"github.com/openshift/assisted-service/client/installer"
 	"github.com/openshift/assisted-service/models"
 	"github.com/openshift/assisted-service/pkg/auth"
 	"github.com/openshift/assisted-service/pkg/requestid"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -87,6 +86,7 @@ func CreateInventoryClientWithDelay(clusterId string, inventoryURL string, pullS
 		}
 	}
 
+	/* #nosec */
 	transport := requestid.Transport(&http.Transport{
 		Proxy: proxyFunc,
 		DialContext: (&net.Dialer{

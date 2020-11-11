@@ -6,14 +6,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/openshift/assisted-installer/src/k8s_client"
-	"github.com/openshift/assisted-installer/src/utils"
-
 	"github.com/kelseyhightower/envconfig"
+	"github.com/sirupsen/logrus"
+
 	assistedinstallercontroller "github.com/openshift/assisted-installer/src/assisted_installer_controller"
 	"github.com/openshift/assisted-installer/src/inventory_client"
+	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/ops"
-	"github.com/sirupsen/logrus"
+	"github.com/openshift/assisted-installer/src/utils"
 )
 
 var Options struct {

@@ -21,10 +21,7 @@ run:
   # from this option's value (see skip-dirs-use-default).
   skip-dirs:
     - build
-    - client
     - docs
-    - models
-    - restapi
 
 # output configuration options
 output:
@@ -69,3 +66,5 @@ linters-settings:
           - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
           - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
           - (github.com/golangci/golangci-l
+  goimports:
+    local-prefixes: github.com/openshift

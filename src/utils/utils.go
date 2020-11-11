@@ -14,19 +14,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/openshift/assisted-service/pkg/requestid"
-
+	ignition "github.com/coreos/ignition/v2/config/v3_1"
 	"github.com/pkg/errors"
-
-	"github.com/openshift/assisted-installer-agent/pkg/journalLogger"
+	"github.com/sirupsen/logrus"
+	"github.com/vincent-petithory/dataurl"
 	"golang.org/x/net/http/httpproxy"
 
-	ignition "github.com/coreos/ignition/v2/config/v3_1"
+	"github.com/openshift/assisted-installer-agent/pkg/journalLogger"
 	"github.com/openshift/assisted-service/models"
-
-	"github.com/vincent-petithory/dataurl"
-
-	"github.com/sirupsen/logrus"
+	"github.com/openshift/assisted-service/pkg/requestid"
 )
 
 var (

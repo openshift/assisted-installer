@@ -6,14 +6,15 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/openshift/assisted-installer/src/inventory_client"
-	"github.com/openshift/assisted-installer/src/k8s_client"
-	"github.com/openshift/assisted-installer/src/utils"
-	"github.com/openshift/assisted-service/models"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/thoas/go-funk"
 	v1 "k8s.io/api/core/v1"
+
+	"github.com/openshift/assisted-installer/src/inventory_client"
+	"github.com/openshift/assisted-installer/src/k8s_client"
+	"github.com/openshift/assisted-installer/src/utils"
+	"github.com/openshift/assisted-service/models"
 )
 
 const ControllerLogsSecondsAgo = 60 * 60

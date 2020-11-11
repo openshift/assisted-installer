@@ -4,14 +4,13 @@ import (
 	"io/ioutil"
 
 	"github.com/golang/mock/gomock"
-	"github.com/openshift/assisted-installer/src/inventory_client"
-	"github.com/openshift/assisted-service/models"
-
-	"github.com/sirupsen/logrus/hooks/test"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
+
+	"github.com/openshift/assisted-installer/src/inventory_client"
+	"github.com/openshift/assisted-service/models"
 )
 
 var _ = Describe("Verify CoreosInstallerLogger", func() {

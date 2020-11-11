@@ -9,10 +9,6 @@ import (
 
 	bmoapis "github.com/metal3-io/baremetal-operator/pkg/apis"
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
-	configv1 "github.com/openshift/api/config/v1"
-	configv1client "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
-	operatorv1 "github.com/openshift/client-go/operator/clientset/versioned"
-	machinev1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/certificates/v1beta1"
@@ -32,8 +28,12 @@ import (
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	runtimeconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 
+	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-installer/src/utils"
+	configv1client "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
+	operatorv1 "github.com/openshift/client-go/operator/clientset/versioned"
+	machinev1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 )
 
 //var AddToSchemes runtime.SchemeBuilder

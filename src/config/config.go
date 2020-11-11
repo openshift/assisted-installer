@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/openshift/assisted-installer/src/utils"
-
 	"github.com/openshift/assisted-service/models"
 )
 
