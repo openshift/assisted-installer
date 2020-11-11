@@ -11,6 +11,7 @@ import (
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/models"
+	"github.com/openshift/assisted-service/pkg/secretdump"
 )
 
 func main() {
@@ -21,7 +22,7 @@ func main() {
 		logger.Warnf("Missing Pull Secret Token environment variable")
 	}
 
-	logger.Infof("Assisted installer started. Configuration is:\n %+v", config.GlobalConfig)
+	logger.Infof("Assisted installer started. Configuration is:\n %s", secretdump.DumpSecretStruct(config.GlobalConfig))
 	client, err := inventory_client.CreateInventoryClient(config.GlobalConfig.ClusterID, config.GlobalConfig.URL,
 		config.GlobalConfig.PullSecretToken, config.GlobalConfig.SkipCertVerification, config.GlobalConfig.CACertPath, logger, http.ProxyFromEnvironment)
 	if err != nil {

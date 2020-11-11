@@ -21,7 +21,7 @@ type Config struct {
 	ControllerImage      string
 	AgentImage           string
 	InstallationTimeout  uint
-	PullSecretToken      string
+	PullSecretToken      string `secret:"true"`
 	SkipCertVerification bool
 	CACertPath           string
 	HTTPProxy            string
