@@ -909,9 +909,6 @@ github.com/openshift/api v0.0.0-20200326152221-912866ddb162/go.mod h1:RKMJ5CBnlj
 github.com/openshift/assisted-installer-agent v0.0.0-20200811180147-bc9c7b899b8a h1:mk+JGnFSuRTTWzODLs1gclp5om0+k4lH8btJSJxQA80=
 github.com/openshift/assisted-installer-agent v0.0.0-20200811180147-bc9c7b899b8a/go.mod h1:q1jXr/OgGA7bOBu1uzlZXOjExPHIoAXxzQlifXBmXLY=
 github.com/openshift/assisted-service v0.0.0-20200811075806-62dcbcd62c0b/go.mod h1:H96z5QdPNv7PZ+/p+VafuHyAUqlVcpOFTnfMl8QYzQ4=
-github.com/openshift/assisted-service v1.0.9 h1:dE7h81GFbJC4PC/5XGRP8qOM9tmh64KFHyI1cjTWQsA=
-github.com/openshift/assisted-service v1.0.10-0.20201103185959-9fbcf52e8938 h1:sbhPFKrPUre8v89KBIf8xAfko0KS/r4CKB/xUkWPrLw=
-github.com/openshift/assisted-service v1.0.10-0.20201103185959-9fbcf52e8938/go.mod h1:1fJjNU9dl8rXqfIqxRKcrB8D+f43QhzMDVnyf9I5/uI=
 github.com/openshift/assisted-service v1.0.10-0.20201109152238-bb2f4a5dbbd8 h1:CN4m36+mD0SRUk/qE7Dr9tIxSD6XXx5XSoPRlqFm0K0=
 github.com/openshift/assisted-service v1.0.10-0.20201109152238-bb2f4a5dbbd8/go.mod h1:1fJjNU9dl8rXqfIqxRKcrB8D+f43QhzMDVnyf9I5/uI=
 github.com/openshift/baremetal-operator v0.0.0-20200715132148-0f91f62a41fe h1:bu99IMkaN6o/JcxpWEb1eT8gDdL9hLcwOmfiVIbXWj8=
