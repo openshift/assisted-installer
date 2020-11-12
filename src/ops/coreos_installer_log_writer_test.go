@@ -2,7 +2,6 @@ package ops
 
 import (
 	"io/ioutil"
-	"testing"
 
 	"github.com/golang/mock/gomock"
 	"github.com/openshift/assisted-installer/src/inventory_client"
@@ -14,11 +13,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 )
-
-func TestCoreosInstallerLogger(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "installer_test")
-}
 
 var _ = Describe("Verify CoreosInstallerLogger", func() {
 	var (

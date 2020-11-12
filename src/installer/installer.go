@@ -107,7 +107,7 @@ func (i *installer) InstallNode() error {
 	i.UpdateHostInstallProgress(models.HostStageWritingImageToDisk, "")
 
 	err = utils.Retry(3, time.Second, i.log, func() error {
-		return i.ops.WriteImageToDisk(ignitionPath, i.Device, i.inventoryClient)
+		return i.ops.WriteImageToDisk(ignitionPath, i.Device, i.inventoryClient, i.Config.InstallerArgs)
 	})
 	if err != nil {
 		i.log.Errorf("Failed to write image to disk %s", err)
