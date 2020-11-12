@@ -27,7 +27,6 @@ import (
 	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/ops"
-	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -124,11 +123,12 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			Device:           "/dev/vda",
 			URL:              "https://assisted-service.com:80",
 			OpenshiftVersion: openShiftVersion,
+			MCOImage:         "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:dc1a34f55c712b2b9c5e5a14dd85e67cbdae11fd147046ac2fef9eaf179ab221",
 		}
 		BeforeEach(func() {
 			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
 		})
-		mcoImage, _ := utils.GetMCOByOpenshiftVersion(conf.OpenshiftVersion)
+		mcoImage := conf.MCOImage
 		extractIgnitionToFS := func(out string, err error) {
 			mockops.EXPECT().ExecPrivilegeCommand(
 				gomock.Any(), "podman", "run", "--net", "host",

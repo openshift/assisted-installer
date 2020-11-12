@@ -206,7 +206,11 @@ func (i *installer) startBootstrap() error {
 }
 
 func (i *installer) extractIgnitionToFS(ignitionPath string) (err error) {
-	mcoImage, _ := utils.GetMCOByOpenshiftVersion(i.OpenshiftVersion)
+	mcoImage := i.MCOImage
+	if mcoImage == "" {
+		mcoImage, _ = utils.GetMCOByOpenshiftVersion(i.OpenshiftVersion)
+	}
+
 	i.log.Infof("Extracting ignition to disk using %s mcoImage", mcoImage)
 	for j := 0; j < extractRetryCount; j++ {
 		_, err = i.ops.ExecPrivilegeCommand(utils.NewLogWriter(i.log), "podman", "run", "--net", "host",
