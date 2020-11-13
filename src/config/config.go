@@ -18,7 +18,6 @@ type Config struct {
 	URL                  string
 	Verbose              bool
 	OpenshiftVersion     string
-	Hostname             string
 	ControllerImage      string
 	AgentImage           string
 	InstallationTimeout  uint
@@ -47,7 +46,6 @@ func ProcessArgs() {
 	flag.StringVar(&ret.Device, "boot-device", "", "The boot device")
 	flag.StringVar(&ret.URL, "url", "", "The BM inventory URL, including a scheme and optionally a port (overrides the host and port arguments")
 	flag.StringVar(&ret.OpenshiftVersion, "openshift-version", "4.4", "Openshift version to install")
-	flag.StringVar(&ret.Hostname, "host-name", "", "hostname to be set for this node")
 	flag.BoolVar(&ret.Verbose, "verbose", false, "Increase verbosity, set log level to debug")
 	flag.StringVar(&ret.ControllerImage, "controller-image", "quay.io/ocpmetal/assisted-installer-controller:latest",
 		"Assisted Installer Controller image URL")
