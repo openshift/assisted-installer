@@ -6,6 +6,7 @@ pipeline {
   environment {
         INSTALLER = 'quay.io/ocpmetal/assisted-installer'
         CONTROLLER = 'quay.io/ocpmetal/assisted-installer-controller'
+        CONTROLLER_OCP = 'quay.io/ocpmetal/assisted-installer-controller-ocp'
   }
   options {
     timeout(time: 1, unit: 'HOURS')
@@ -41,6 +42,11 @@ pipeline {
             sh '''docker tag  ${CONTROLLER} ${CONTROLLER}:${GIT_COMMIT}'''
             sh '''docker push ${CONTROLLER}:latest'''
             sh '''docker push ${CONTROLLER}:${GIT_COMMIT}'''
+
+            sh '''docker tag  ${CONTROLLER_OCP} ${CONTROLLER_OCP}:latest'''
+            sh '''docker tag  ${CONTROLLER_OCP} ${CONTROLLER_OCP}:${GIT_COMMIT}'''
+            sh '''docker push ${CONTROLLER_OCP}:latest'''
+            sh '''docker push ${CONTROLLER_OCP}:${GIT_COMMIT}'''
         }
     }
   }

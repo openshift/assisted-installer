@@ -72,6 +72,7 @@ func waitAndUpdateNodesStatus(waitAndUpdateNodesStatusFunc func()) {
 	}
 }
 
+// Note: BMHs for day2 are currently not provided. Once added, CSRs approval can be skipped.
 func approveCsrs(approveCsrsFunc func(context.Context, *sync.WaitGroup), wg *sync.WaitGroup) {
 	// not cancelling approve to keep routine alive
 	ctx := context.Background()
