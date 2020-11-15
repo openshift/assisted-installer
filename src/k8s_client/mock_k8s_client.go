@@ -12,7 +12,8 @@ import (
 	v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
 	v1 "github.com/openshift/api/config/v1"
 	ops "github.com/openshift/assisted-installer/src/ops"
-	v1beta1 "k8s.io/api/certificates/v1beta1"
+	v1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	v1beta10 "k8s.io/api/certificates/v1beta1"
 	v10 "k8s.io/api/core/v1"
 )
 
@@ -97,6 +98,21 @@ func (mr *MockK8SClientMockRecorder) ListNodes() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListNodes", reflect.TypeOf((*MockK8SClient)(nil).ListNodes))
 }
 
+// ListMachines mocks base method
+func (m *MockK8SClient) ListMachines() (*v1beta1.MachineList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListMachines")
+	ret0, _ := ret[0].(*v1beta1.MachineList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListMachines indicates an expected call of ListMachines
+func (mr *MockK8SClientMockRecorder) ListMachines() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListMachines", reflect.TypeOf((*MockK8SClient)(nil).ListMachines))
+}
+
 // RunOCctlCommand mocks base method
 func (m *MockK8SClient) RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error) {
 	m.ctrl.T.Helper()
@@ -113,7 +129,7 @@ func (mr *MockK8SClientMockRecorder) RunOCctlCommand(args, kubeconfigPath, o int
 }
 
 // ApproveCsr mocks base method
-func (m *MockK8SClient) ApproveCsr(csr *v1beta1.CertificateSigningRequest) error {
+func (m *MockK8SClient) ApproveCsr(csr *v1beta10.CertificateSigningRequest) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ApproveCsr", csr)
 	ret0, _ := ret[0].(error)
@@ -127,10 +143,10 @@ func (mr *MockK8SClientMockRecorder) ApproveCsr(csr interface{}) *gomock.Call {
 }
 
 // ListCsrs mocks base method
-func (m *MockK8SClient) ListCsrs() (*v1beta1.CertificateSigningRequestList, error) {
+func (m *MockK8SClient) ListCsrs() (*v1beta10.CertificateSigningRequestList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListCsrs")
-	ret0, _ := ret[0].(*v1beta1.CertificateSigningRequestList)
+	ret0, _ := ret[0].(*v1beta10.CertificateSigningRequestList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
