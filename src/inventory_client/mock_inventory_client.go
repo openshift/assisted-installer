@@ -5,11 +5,13 @@
 package inventory_client
 
 import (
+	context "context"
 	io "io"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
 	models "github.com/openshift/assisted-service/models"
+	logrus "github.com/sirupsen/logrus"
 )
 
 // MockInventoryClient is a mock of InventoryClient interface
@@ -36,130 +38,130 @@ func (m *MockInventoryClient) EXPECT() *MockInventoryClientMockRecorder {
 }
 
 // DownloadFile mocks base method
-func (m *MockInventoryClient) DownloadFile(filename, dest string) error {
+func (m *MockInventoryClient) DownloadFile(ctx context.Context, filename, dest string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DownloadFile", filename, dest)
+	ret := m.ctrl.Call(m, "DownloadFile", ctx, filename, dest)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DownloadFile indicates an expected call of DownloadFile
-func (mr *MockInventoryClientMockRecorder) DownloadFile(filename, dest interface{}) *gomock.Call {
+func (mr *MockInventoryClientMockRecorder) DownloadFile(ctx, filename, dest interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DownloadFile", reflect.TypeOf((*MockInventoryClient)(nil).DownloadFile), filename, dest)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DownloadFile", reflect.TypeOf((*MockInventoryClient)(nil).DownloadFile), ctx, filename, dest)
 }
 
 // DownloadHostIgnition mocks base method
-func (m *MockInventoryClient) DownloadHostIgnition(hostID, dest string) error {
+func (m *MockInventoryClient) DownloadHostIgnition(ctx context.Context, hostID, dest string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DownloadHostIgnition", hostID, dest)
+	ret := m.ctrl.Call(m, "DownloadHostIgnition", ctx, hostID, dest)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DownloadHostIgnition indicates an expected call of DownloadHostIgnition
-func (mr *MockInventoryClientMockRecorder) DownloadHostIgnition(hostID, dest interface{}) *gomock.Call {
+func (mr *MockInventoryClientMockRecorder) DownloadHostIgnition(ctx, hostID, dest interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DownloadHostIgnition", reflect.TypeOf((*MockInventoryClient)(nil).DownloadHostIgnition), hostID, dest)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DownloadHostIgnition", reflect.TypeOf((*MockInventoryClient)(nil).DownloadHostIgnition), ctx, hostID, dest)
 }
 
 // UpdateHostInstallProgress mocks base method
-func (m *MockInventoryClient) UpdateHostInstallProgress(hostId string, newStage models.HostStage, info string) error {
+func (m *MockInventoryClient) UpdateHostInstallProgress(ctx context.Context, hostId string, newStage models.HostStage, info string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateHostInstallProgress", hostId, newStage, info)
+	ret := m.ctrl.Call(m, "UpdateHostInstallProgress", ctx, hostId, newStage, info)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UpdateHostInstallProgress indicates an expected call of UpdateHostInstallProgress
-func (mr *MockInventoryClientMockRecorder) UpdateHostInstallProgress(hostId, newStage, info interface{}) *gomock.Call {
+func (mr *MockInventoryClientMockRecorder) UpdateHostInstallProgress(ctx, hostId, newStage, info interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHostInstallProgress", reflect.TypeOf((*MockInventoryClient)(nil).UpdateHostInstallProgress), hostId, newStage, info)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHostInstallProgress", reflect.TypeOf((*MockInventoryClient)(nil).UpdateHostInstallProgress), ctx, hostId, newStage, info)
 }
 
 // GetEnabledHostsNamesHosts mocks base method
-func (m *MockInventoryClient) GetEnabledHostsNamesHosts() (map[string]HostData, error) {
+func (m *MockInventoryClient) GetEnabledHostsNamesHosts(ctx context.Context, log logrus.FieldLogger) (map[string]HostData, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetEnabledHostsNamesHosts")
+	ret := m.ctrl.Call(m, "GetEnabledHostsNamesHosts", ctx, log)
 	ret0, _ := ret[0].(map[string]HostData)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetEnabledHostsNamesHosts indicates an expected call of GetEnabledHostsNamesHosts
-func (mr *MockInventoryClientMockRecorder) GetEnabledHostsNamesHosts() *gomock.Call {
+func (mr *MockInventoryClientMockRecorder) GetEnabledHostsNamesHosts(ctx, log interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEnabledHostsNamesHosts", reflect.TypeOf((*MockInventoryClient)(nil).GetEnabledHostsNamesHosts))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEnabledHostsNamesHosts", reflect.TypeOf((*MockInventoryClient)(nil).GetEnabledHostsNamesHosts), ctx, log)
 }
 
 // UploadIngressCa mocks base method
-func (m *MockInventoryClient) UploadIngressCa(ingressCA, clusterId string) error {
+func (m *MockInventoryClient) UploadIngressCa(ctx context.Context, ingressCA, clusterId string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UploadIngressCa", ingressCA, clusterId)
+	ret := m.ctrl.Call(m, "UploadIngressCa", ctx, ingressCA, clusterId)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UploadIngressCa indicates an expected call of UploadIngressCa
-func (mr *MockInventoryClientMockRecorder) UploadIngressCa(ingressCA, clusterId interface{}) *gomock.Call {
+func (mr *MockInventoryClientMockRecorder) UploadIngressCa(ctx, ingressCA, clusterId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadIngressCa", reflect.TypeOf((*MockInventoryClient)(nil).UploadIngressCa), ingressCA, clusterId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadIngressCa", reflect.TypeOf((*MockInventoryClient)(nil).UploadIngressCa), ctx, ingressCA, clusterId)
 }
 
 // GetCluster mocks base method
-func (m *MockInventoryClient) GetCluster() (*models.Cluster, error) {
+func (m *MockInventoryClient) GetCluster(ctx context.Context) (*models.Cluster, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCluster")
+	ret := m.ctrl.Call(m, "GetCluster", ctx)
 	ret0, _ := ret[0].(*models.Cluster)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetCluster indicates an expected call of GetCluster
-func (mr *MockInventoryClientMockRecorder) GetCluster() *gomock.Call {
+func (mr *MockInventoryClientMockRecorder) GetCluster(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCluster", reflect.TypeOf((*MockInventoryClient)(nil).GetCluster))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCluster", reflect.TypeOf((*MockInventoryClient)(nil).GetCluster), ctx)
 }
 
 // CompleteInstallation mocks base method
-func (m *MockInventoryClient) CompleteInstallation(clusterId string, isSuccess bool, errorInfo string) error {
+func (m *MockInventoryClient) CompleteInstallation(ctx context.Context, clusterId string, isSuccess bool, errorInfo string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CompleteInstallation", clusterId, isSuccess, errorInfo)
+	ret := m.ctrl.Call(m, "CompleteInstallation", ctx, clusterId, isSuccess, errorInfo)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CompleteInstallation indicates an expected call of CompleteInstallation
-func (mr *MockInventoryClientMockRecorder) CompleteInstallation(clusterId, isSuccess, errorInfo interface{}) *gomock.Call {
+func (mr *MockInventoryClientMockRecorder) CompleteInstallation(ctx, clusterId, isSuccess, errorInfo interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteInstallation", reflect.TypeOf((*MockInventoryClient)(nil).CompleteInstallation), clusterId, isSuccess, errorInfo)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteInstallation", reflect.TypeOf((*MockInventoryClient)(nil).CompleteInstallation), ctx, clusterId, isSuccess, errorInfo)
 }
 
 // GetHosts mocks base method
-func (m *MockInventoryClient) GetHosts(skippedStatuses []string) (map[string]HostData, error) {
+func (m *MockInventoryClient) GetHosts(ctx context.Context, log logrus.FieldLogger, skippedStatuses []string) (map[string]HostData, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetHosts", skippedStatuses)
+	ret := m.ctrl.Call(m, "GetHosts", ctx, log, skippedStatuses)
 	ret0, _ := ret[0].(map[string]HostData)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetHosts indicates an expected call of GetHosts
-func (mr *MockInventoryClientMockRecorder) GetHosts(skippedStatuses interface{}) *gomock.Call {
+func (mr *MockInventoryClientMockRecorder) GetHosts(ctx, log, skippedStatuses interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHosts", reflect.TypeOf((*MockInventoryClient)(nil).GetHosts), skippedStatuses)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHosts", reflect.TypeOf((*MockInventoryClient)(nil).GetHosts), ctx, log, skippedStatuses)
 }
 
 // UploadLogs mocks base method
-func (m *MockInventoryClient) UploadLogs(clusterId string, logsType models.LogsType, upfile io.Reader) error {
+func (m *MockInventoryClient) UploadLogs(ctx context.Context, clusterId string, logsType models.LogsType, upfile io.Reader) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UploadLogs", clusterId, logsType, upfile)
+	ret := m.ctrl.Call(m, "UploadLogs", ctx, clusterId, logsType, upfile)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UploadLogs indicates an expected call of UploadLogs
-func (mr *MockInventoryClientMockRecorder) UploadLogs(clusterId, logsType, upfile interface{}) *gomock.Call {
+func (mr *MockInventoryClientMockRecorder) UploadLogs(ctx, clusterId, logsType, upfile interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadLogs", reflect.TypeOf((*MockInventoryClient)(nil).UploadLogs), clusterId, logsType, upfile)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadLogs", reflect.TypeOf((*MockInventoryClient)(nil).UploadLogs), ctx, clusterId, logsType, upfile)
 }

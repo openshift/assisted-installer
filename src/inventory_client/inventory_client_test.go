@@ -1,6 +1,7 @@
 package inventory_client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -62,14 +63,14 @@ var _ = Describe("inventory_client_tests", func() {
 		It("positive_response", func() {
 			server.Start()
 			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v1/clusters/%s/hosts/%s/progress", clusterID, hostID), expectedJson, http.StatusOK)
-			Expect(client.UpdateHostInstallProgress(hostID, models.HostStageInstalling, "")).ShouldNot(HaveOccurred())
+			Expect(client.UpdateHostInstallProgress(context.Background(), hostID, models.HostStageInstalling, "")).ShouldNot(HaveOccurred())
 			Expect(server.ReceivedRequests()).Should(HaveLen(1))
 
 		})
 
 		It("negative_server_error_response", func() {
 			server.Start()
-			Expect(client.UpdateHostInstallProgress(hostID, models.HostStageInstalling, "")).Should(HaveOccurred())
+			Expect(client.UpdateHostInstallProgress(context.Background(), hostID, models.HostStageInstalling, "")).Should(HaveOccurred())
 			Expect(server.ReceivedRequests()).Should(HaveLen(testMaxRetries + 1))
 
 		})
@@ -80,7 +81,7 @@ var _ = Describe("inventory_client_tests", func() {
 			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v1/clusters/%s/hosts/%s/progress", clusterID, hostID), expectedJson, http.StatusForbidden)
 			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v1/clusters/%s/hosts/%s/progress", clusterID, hostID), expectedJson, http.StatusOK)
 
-			Expect(client.UpdateHostInstallProgress(hostID, models.HostStageInstalling, "")).ShouldNot(HaveOccurred())
+			Expect(client.UpdateHostInstallProgress(context.Background(), hostID, models.HostStageInstalling, "")).ShouldNot(HaveOccurred())
 			Expect(server.ReceivedRequests()).Should(HaveLen(3))
 		})
 
@@ -92,14 +93,14 @@ var _ = Describe("inventory_client_tests", func() {
 				server.Start()
 			}()
 
-			Expect(client.UpdateHostInstallProgress(hostID, models.HostStageInstalling, "")).ShouldNot(HaveOccurred())
+			Expect(client.UpdateHostInstallProgress(context.Background(), hostID, models.HostStageInstalling, "")).ShouldNot(HaveOccurred())
 			Expect(server.ReceivedRequests()).Should(HaveLen(1))
 		})
 
 		It("server_down", func() {
 			server.Start()
 			server.Close()
-			Expect(client.UpdateHostInstallProgress(hostID, models.HostStageInstalling, "")).Should(HaveOccurred())
+			Expect(client.UpdateHostInstallProgress(context.Background(), hostID, models.HostStageInstalling, "")).Should(HaveOccurred())
 		})
 	})
 })

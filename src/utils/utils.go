@@ -3,6 +3,7 @@ package utils
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -12,6 +13,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/openshift/assisted-service/pkg/requestid"
 
 	"github.com/pkg/errors"
 
@@ -224,4 +227,12 @@ func envVarsProxyFunc() func(*url.URL) (*url.URL, error) {
 func SetNoProxyEnv(noProxy string) {
 	os.Setenv("NO_PROXY", noProxy)
 	os.Setenv("no_proxy", noProxy)
+}
+
+func GenerateRequestContext() context.Context {
+	return requestid.ToContext(context.Background(), requestid.NewID())
+}
+
+func RequestIDLogger(ctx context.Context, log *logrus.Logger) logrus.FieldLogger {
+	return requestid.RequestIDLogger(log, requestid.FromContext(ctx))
 }

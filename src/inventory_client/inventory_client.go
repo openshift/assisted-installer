@@ -39,19 +39,18 @@ const (
 
 //go:generate mockgen -source=inventory_client.go -package=inventory_client -destination=mock_inventory_client.go
 type InventoryClient interface {
-	DownloadFile(filename string, dest string) error
-	DownloadHostIgnition(hostID string, dest string) error
-	UpdateHostInstallProgress(hostId string, newStage models.HostStage, info string) error
-	GetEnabledHostsNamesHosts() (map[string]HostData, error)
-	UploadIngressCa(ingressCA string, clusterId string) error
-	GetCluster() (*models.Cluster, error)
-	CompleteInstallation(clusterId string, isSuccess bool, errorInfo string) error
-	GetHosts(skippedStatuses []string) (map[string]HostData, error)
-	UploadLogs(clusterId string, logsType models.LogsType, upfile io.Reader) error
+	DownloadFile(ctx context.Context, filename string, dest string) error
+	DownloadHostIgnition(ctx context.Context, hostID string, dest string) error
+	UpdateHostInstallProgress(ctx context.Context, hostId string, newStage models.HostStage, info string) error
+	GetEnabledHostsNamesHosts(ctx context.Context, log logrus.FieldLogger) (map[string]HostData, error)
+	UploadIngressCa(ctx context.Context, ingressCA string, clusterId string) error
+	GetCluster(ctx context.Context) (*models.Cluster, error)
+	CompleteInstallation(ctx context.Context, clusterId string, isSuccess bool, errorInfo string) error
+	GetHosts(ctx context.Context, log logrus.FieldLogger, skippedStatuses []string) (map[string]HostData, error)
+	UploadLogs(ctx context.Context, clusterId string, logsType models.LogsType, upfile io.Reader) error
 }
 
 type inventoryClient struct {
-	log       *logrus.Logger
 	ai        *client.AssistedInstall
 	clusterId strfmt.UUID
 }
@@ -128,7 +127,7 @@ func CreateInventoryClientWithDelay(clusterId string, inventoryURL string, pullS
 
 	clientConfig.AuthInfo = auth.AgentAuthHeaderWriter(pullSecret)
 	assistedInstallClient := client.New(clientConfig)
-	return &inventoryClient{logger, assistedInstallClient, strfmt.UUID(clusterId)}, nil
+	return &inventoryClient{assistedInstallClient, strfmt.UUID(clusterId)}, nil
 }
 
 func RetryConnectionRefusedErr() rehttp.RetryFn {
@@ -166,7 +165,7 @@ func readCACertificate(capath string, logger *logrus.Logger) (*x509.CertPool, er
 	return pool, nil
 }
 
-func (c *inventoryClient) DownloadFile(filename string, dest string) error {
+func (c *inventoryClient) DownloadFile(ctx context.Context, filename string, dest string) error {
 	// open output file
 	fo, err := os.Create(dest)
 	if err != nil {
@@ -176,11 +175,11 @@ func (c *inventoryClient) DownloadFile(filename string, dest string) error {
 	defer func() {
 		fo.Close()
 	}()
-	_, err = c.ai.Installer.DownloadClusterFiles(context.Background(), c.createDownloadParams(filename), fo)
+	_, err = c.ai.Installer.DownloadClusterFiles(ctx, c.createDownloadParams(filename), fo)
 	return err
 }
 
-func (c *inventoryClient) DownloadHostIgnition(hostID string, dest string) error {
+func (c *inventoryClient) DownloadHostIgnition(ctx context.Context, hostID string, dest string) error {
 	// open output file
 	fo, err := os.Create(dest)
 	if err != nil {
@@ -195,23 +194,23 @@ func (c *inventoryClient) DownloadHostIgnition(hostID string, dest string) error
 		ClusterID: c.clusterId,
 		HostID:    strfmt.UUID(hostID),
 	}
-	_, err = c.ai.Installer.DownloadHostIgnition(context.Background(), &params, fo)
+	_, err = c.ai.Installer.DownloadHostIgnition(ctx, &params, fo)
 	return err
 }
 
-func (c *inventoryClient) UpdateHostInstallProgress(hostId string, newStage models.HostStage, info string) error {
-	_, err := c.ai.Installer.UpdateHostInstallProgress(context.Background(), c.createUpdateHostInstallProgressParams(hostId, newStage, info))
+func (c *inventoryClient) UpdateHostInstallProgress(ctx context.Context, hostId string, newStage models.HostStage, info string) error {
+	_, err := c.ai.Installer.UpdateHostInstallProgress(ctx, c.createUpdateHostInstallProgressParams(hostId, newStage, info))
 	return err
 }
 
-func (c *inventoryClient) UploadIngressCa(ingressCA string, clusterId string) error {
-	_, err := c.ai.Installer.UploadClusterIngressCert(context.Background(),
+func (c *inventoryClient) UploadIngressCa(ctx context.Context, ingressCA string, clusterId string) error {
+	_, err := c.ai.Installer.UploadClusterIngressCert(ctx,
 		&installer.UploadClusterIngressCertParams{ClusterID: strfmt.UUID(clusterId), IngressCertParams: models.IngressCertParams(ingressCA)})
 	return err
 }
 
-func (c *inventoryClient) GetCluster() (*models.Cluster, error) {
-	cluster, err := c.ai.Installer.GetCluster(context.Background(), &installer.GetClusterParams{ClusterID: c.clusterId})
+func (c *inventoryClient) GetCluster(ctx context.Context) (*models.Cluster, error) {
+	cluster, err := c.ai.Installer.GetCluster(ctx, &installer.GetClusterParams{ClusterID: c.clusterId})
 	if err != nil {
 		return nil, err
 	}
@@ -219,13 +218,13 @@ func (c *inventoryClient) GetCluster() (*models.Cluster, error) {
 	return cluster.Payload, nil
 }
 
-func (c *inventoryClient) GetEnabledHostsNamesHosts() (map[string]HostData, error) {
-	return c.GetHosts([]string{models.HostStatusDisabled})
+func (c *inventoryClient) GetEnabledHostsNamesHosts(ctx context.Context, log logrus.FieldLogger) (map[string]HostData, error) {
+	return c.GetHosts(ctx, log, []string{models.HostStatusDisabled})
 }
 
-func (c *inventoryClient) GetHosts(skippedStatuses []string) (map[string]HostData, error) {
+func (c *inventoryClient) GetHosts(ctx context.Context, log logrus.FieldLogger, skippedStatuses []string) (map[string]HostData, error) {
 	namesIdsMap := make(map[string]HostData)
-	hosts, err := c.getHostsWithInventoryInfo(skippedStatuses)
+	hosts, err := c.getHostsWithInventoryInfo(ctx, log, skippedStatuses)
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +232,7 @@ func (c *inventoryClient) GetHosts(skippedStatuses []string) (map[string]HostDat
 		hostname := strings.ToLower(hostData.Host.RequestedHostname)
 		ips, err := utils.GetHostIpsFromInventory(hostData.Inventory)
 		if err != nil {
-			c.log.WithError(err).Errorf("failed to get ips of node %s", hostname)
+			log.WithError(err).Errorf("failed to get ips of node %s", hostname)
 		}
 		hostData.IPs = ips
 		namesIdsMap[hostname] = hostData
@@ -266,9 +265,9 @@ func (c *inventoryClient) createUpdateHostInstallProgressParams(hostId string, n
 	}
 }
 
-func (c *inventoryClient) getHostsWithInventoryInfo(skippedStatuses []string) (map[string]HostData, error) {
+func (c *inventoryClient) getHostsWithInventoryInfo(ctx context.Context, log logrus.FieldLogger, skippedStatuses []string) (map[string]HostData, error) {
 	hostsWithHwInfo := make(map[string]HostData)
-	hosts, err := c.ai.Installer.ListHosts(context.Background(), &installer.ListHostsParams{ClusterID: c.clusterId})
+	hosts, err := c.ai.Installer.ListHosts(ctx, &installer.ListHostsParams{ClusterID: c.clusterId})
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +278,7 @@ func (c *inventoryClient) getHostsWithInventoryInfo(skippedStatuses []string) (m
 		hwInfo := models.Inventory{}
 		err = json.Unmarshal([]byte(host.Inventory), &hwInfo)
 		if err != nil {
-			c.log.Warnf("Failed to parse host %s inventory %s", host.ID.String(), host.Inventory)
+			log.Warnf("Failed to parse host %s inventory %s", host.ID.String(), host.Inventory)
 			return nil, err
 		}
 		hostsWithHwInfo[host.ID.String()] = HostData{Inventory: &hwInfo, Host: host}
@@ -287,16 +286,16 @@ func (c *inventoryClient) getHostsWithInventoryInfo(skippedStatuses []string) (m
 	return hostsWithHwInfo, nil
 }
 
-func (c *inventoryClient) CompleteInstallation(clusterId string, isSuccess bool, errorInfo string) error {
-	_, err := c.ai.Installer.CompleteInstallation(context.Background(),
+func (c *inventoryClient) CompleteInstallation(ctx context.Context, clusterId string, isSuccess bool, errorInfo string) error {
+	_, err := c.ai.Installer.CompleteInstallation(ctx,
 		&installer.CompleteInstallationParams{ClusterID: strfmt.UUID(clusterId),
 			CompletionParams: &models.CompletionParams{IsSuccess: &isSuccess, ErrorInfo: errorInfo}})
 	return err
 }
 
-func (c *inventoryClient) UploadLogs(clusterId string, logsType models.LogsType, upfile io.Reader) error {
+func (c *inventoryClient) UploadLogs(ctx context.Context, clusterId string, logsType models.LogsType, upfile io.Reader) error {
 	fileName := fmt.Sprintf("%s_logs.tar.gz", string(logsType))
-	_, err := c.ai.Installer.UploadLogs(context.Background(),
+	_, err := c.ai.Installer.UploadLogs(ctx,
 		&installer.UploadLogsParams{ClusterID: strfmt.UUID(clusterId), LogsType: string(logsType),
 			Upfile: runtime.NamedReader(fileName, upfile)})
 	return err

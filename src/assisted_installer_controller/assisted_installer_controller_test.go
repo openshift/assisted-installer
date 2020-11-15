@@ -79,16 +79,16 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	getInventoryNodes := func(numOfFullListReturn int) map[string]inventory_client.HostData {
 		for i := 0; i < numOfFullListReturn; i++ {
-			mockbmclient.EXPECT().GetHosts([]string{models.HostStatusDisabled,
+			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled,
 				models.HostStatusError, models.HostStatusInstalled}).Return(inventoryNamesIds, nil).Times(1)
 		}
-		mockbmclient.EXPECT().GetHosts([]string{models.HostStatusDisabled,
+		mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled,
 			models.HostStatusError, models.HostStatusInstalled}).Return(map[string]inventory_client.HostData{}, nil).Times(1)
 		return inventoryNamesIds
 	}
 	configuringSuccess := func() {
 		mockk8sclient.EXPECT().GetPods(gomock.Any(), gomock.Any(), "").Return([]v1.Pod{}, nil).AnyTimes()
-		mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+		mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	}
 
 	updateProgressSuccess := func(stages []models.HostStage, inventoryNamesIds map[string]inventory_client.HostData) {
@@ -98,7 +98,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		}
 
 		for i, stage := range stages {
-			mockbmclient.EXPECT().UpdateHostInstallProgress(hostIds[i], stage, "").Return(nil).Times(1)
+			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostIds[i], stage, "").Return(nil).Times(1)
 		}
 	}
 
@@ -127,7 +127,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			configuringSuccess()
 			listNodes()
 
-			mockbmclient.EXPECT().GetHosts([]string{models.HostStatusDisabled,
+			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled,
 				models.HostStatusError, models.HostStatusInstalled}).Return(map[string]inventory_client.HostData{}, fmt.Errorf("dummy")).Times(1)
 			getInventoryNodes(1)
 
@@ -148,7 +148,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					hostIds = append(hostIds, host.Host.ID.String())
 				}
 				for i, stage := range stages {
-					mockbmclient.EXPECT().UpdateHostInstallProgress(hostIds[i], stage, "").Return(nil).Times(1)
+					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostIds[i], stage, "").Return(nil).Times(1)
 				}
 			}
 			kubeNamesIds = map[string]string{"node0": "6d6f00e8-70dd-48a5-859a-0f1459485ad9",
@@ -166,11 +166,11 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					for key, value := range inventoryNamesIds {
 						targetMap[key] = value
 					}
-					mockbmclient.EXPECT().GetHosts([]string{models.HostStatusDisabled,
+					mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled,
 						models.HostStatusError, models.HostStatusInstalled}).Return(targetMap, nil).Times(1)
 					delete(inventoryNamesIds, name)
 				}
-				mockbmclient.EXPECT().GetHosts([]string{models.HostStatusDisabled,
+				mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled,
 					models.HostStatusError, models.HostStatusInstalled}).Return(inventoryNamesIds, nil).Times(1)
 			}
 
@@ -196,8 +196,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					hostIds = append(hostIds, host.Host.ID.String())
 				}
 				for i, stage := range stages {
-					mockbmclient.EXPECT().UpdateHostInstallProgress(hostIds[i], stage, "").Return(fmt.Errorf("dummy")).Times(1)
-					mockbmclient.EXPECT().UpdateHostInstallProgress(hostIds[i], stage, "").Return(nil).Times(1)
+					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostIds[i], stage, "").Return(fmt.Errorf("dummy")).Times(1)
+					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostIds[i], stage, "").Return(nil).Times(1)
 				}
 			}
 			mockk8sclient.EXPECT().ListNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(2)
@@ -301,7 +301,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			data["ca-bundle.crt"] = "CA"
 			cm := v1.ConfigMap{Data: data}
 			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(&cm, nil).Times(1)
-			mockbmclient.EXPECT().UploadIngressCa(data["ca-bundle.crt"], c.ClusterID).Return(nil).Times(1)
+			mockbmclient.EXPECT().UploadIngressCa(gomock.Any(), data["ca-bundle.crt"], c.ClusterID).Return(nil).Times(1)
 			res := c.addRouterCAToClusterCA()
 			Expect(res).Should(Equal(true))
 		})
@@ -321,7 +321,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			data["ca-bundle.crt"] = "CA"
 			cm := v1.ConfigMap{Data: data}
 			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(&cm, nil).Times(1)
-			mockbmclient.EXPECT().UploadIngressCa(data["ca-bundle.crt"], c.ClusterID).Return(fmt.Errorf("dummy")).Times(1)
+			mockbmclient.EXPECT().UploadIngressCa(gomock.Any(), data["ca-bundle.crt"], c.ClusterID).Return(fmt.Errorf("dummy")).Times(1)
 			res := c.addRouterCAToClusterCA()
 			Expect(res).Should(Equal(false))
 		})
@@ -341,19 +341,19 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			goodClusterVersion.Status.Conditions = []configv1.ClusterOperatorStatusCondition{{Type: configv1.OperatorAvailable,
 				Status: configv1.ConditionTrue}}
 			cluster := models.Cluster{Status: &finalizing}
-			mockbmclient.EXPECT().GetCluster().Return(nil, fmt.Errorf("dummy")).Times(1)
-			mockbmclient.EXPECT().GetCluster().Return(&models.Cluster{Status: &installing}, nil).Times(1)
-			mockbmclient.EXPECT().GetCluster().Return(&cluster, nil).Times(1)
+			mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(nil, fmt.Errorf("dummy")).Times(1)
+			mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(&models.Cluster{Status: &installing}, nil).Times(1)
+			mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(&cluster, nil).Times(1)
 			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(&cm, nil).Times(1)
-			mockbmclient.EXPECT().UploadIngressCa(data["ca-bundle.crt"], c.ClusterID).Return(nil).Times(1)
+			mockbmclient.EXPECT().UploadIngressCa(gomock.Any(), data["ca-bundle.crt"], c.ClusterID).Return(nil).Times(1)
 			mockk8sclient.EXPECT().UnPatchEtcd().Return(fmt.Errorf("dummy")).Times(1)
 			mockk8sclient.EXPECT().UnPatchEtcd().Return(nil).Times(1)
 			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any(), "").Return(nil, fmt.Errorf("dummy")).Times(1)
 			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any(), "").Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Pending"}}}, nil).Times(1)
 			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any(), "").Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Running"}}}, nil).Times(1)
 
-			mockbmclient.EXPECT().CompleteInstallation("cluster-id", true, "").Return(fmt.Errorf("dummy")).Times(1)
-			mockbmclient.EXPECT().CompleteInstallation("cluster-id", true, "").Return(nil).Times(1)
+			mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(fmt.Errorf("dummy")).Times(1)
+			mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
 
 			wg.Add(1)
 			go c.PostInstallConfigs(&wg)
@@ -366,10 +366,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			badClusterVersion.Status.Conditions = []configv1.ClusterOperatorStatusCondition{{Type: configv1.OperatorAvailable,
 				Status: configv1.ConditionFalse}}
 			cluster := models.Cluster{Status: &finalizing}
-			mockbmclient.EXPECT().GetCluster().Return(&cluster, nil).Times(1)
+			mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(&cluster, nil).Times(1)
 
 			mockk8sclient.EXPECT().GetConfigMap(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("aaa")).MinTimes(1)
-			mockbmclient.EXPECT().CompleteInstallation("cluster-id", false,
+			mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", false,
 				"Timeout while waiting router ca data").Return(nil).Times(1)
 
 			wg.Add(1)
@@ -494,14 +494,14 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("Validate upload logs, Upload failed", func() {
 			r := bytes.NewBuffer([]byte("test"))
 			mockk8sclient.EXPECT().GetPodLogsAsBuffer(conf.Namespace, "test", gomock.Any()).Return(r, nil).Times(1)
-			mockbmclient.EXPECT().UploadLogs(conf.ClusterID, models.LogsTypeController, gomock.Any()).Return(fmt.Errorf("dummy")).Times(1)
+			mockbmclient.EXPECT().UploadLogs(gomock.Any(), conf.ClusterID, models.LogsTypeController, gomock.Any()).Return(fmt.Errorf("dummy")).Times(1)
 			err := c.uploadPodLogs("test", conf.Namespace, controllerLogsSecondsAgo)
 			Expect(err).To(HaveOccurred())
 		})
 		It("Validate upload logs happy flow", func() {
 			r := bytes.NewBuffer([]byte("test"))
 			mockk8sclient.EXPECT().GetPodLogsAsBuffer(conf.Namespace, "test", gomock.Any()).Return(r, nil).Times(1)
-			mockbmclient.EXPECT().UploadLogs(conf.ClusterID, models.LogsTypeController, gomock.Any()).Return(nil).Times(1)
+			mockbmclient.EXPECT().UploadLogs(gomock.Any(), conf.ClusterID, models.LogsTypeController, gomock.Any()).Return(nil).Times(1)
 			err := c.uploadPodLogs("test", conf.Namespace, controllerLogsSecondsAgo)
 			Expect(err).NotTo(HaveOccurred())
 		})

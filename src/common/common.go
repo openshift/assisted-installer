@@ -40,9 +40,11 @@ func SetConfiguringStatusForHosts(client inventory_client.InventoryClient, inven
 			if fromBootstrap && host.Host.Role == models.HostRoleWorker {
 				status = models.HostStageWaitingForIgnition
 			}
-			log.Infof("Host %s found in mcs logs, moving it to %s state", host.Host.ID.String(), status)
-			if err := client.UpdateHostInstallProgress(host.Host.ID.String(), status, ""); err != nil {
-				log.Errorf("Failed to update node installation status, %s", err)
+			ctx := utils.GenerateRequestContext()
+			requestLog := utils.RequestIDLogger(ctx, log)
+			requestLog.Infof("Host %s found in mcs logs, moving it to %s state", host.Host.ID.String(), status)
+			if err := client.UpdateHostInstallProgress(ctx, host.Host.ID.String(), status, ""); err != nil {
+				requestLog.Errorf("Failed to update node installation status, %s", err)
 				continue
 			}
 			inventoryHostsMapWithIp[key].Host.Progress.CurrentStage = status
@@ -76,7 +78,7 @@ func GetPodInStatus(k8Client k8s_client.K8SClient, podNamePrefix string, namespa
 // upload tar.gz from pipe to assisted service.
 // close read and write pipes
 func UploadPodLogs(kc k8s_client.K8SClient, ic inventory_client.InventoryClient, clusterId string, podName string, namespace string,
-	sinceSeconds int64, log logrus.FieldLogger) error {
+	sinceSeconds int64, log *logrus.Logger) error {
 	log.Infof("Uploading logs for %s in %s", podName, namespace)
 	podLogs, err := kc.GetPodLogsAsBuffer(namespace, podName, sinceSeconds)
 	if err != nil {
@@ -94,8 +96,10 @@ func UploadPodLogs(kc k8s_client.K8SClient, ic inventory_client.InventoryClient,
 	}()
 	// if error will occur in goroutine above
 	//it will close writer and upload will fail
-	err = ic.UploadLogs(clusterId, models.LogsTypeController, pr)
+	ctx := utils.GenerateRequestContext()
+	err = ic.UploadLogs(ctx, clusterId, models.LogsTypeController, pr)
 	if err != nil {
+		utils.RequestIDLogger(ctx, log).WithError(err).Error("Failed to upload logs")
 		return errors.Wrapf(err, "Failed to upload logs")
 	}
 	return nil
