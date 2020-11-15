@@ -40,15 +40,15 @@ var _ = Describe("verify common", func() {
 				"node1": {Host: &models.Host{ID: &node1Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}, Role: models.HostRoleMaster}, IPs: []string{"192.168.126.11", "192.168.11.123", "fe80::5054:ff:fe9a:4739"}},
 				"node2": {Host: &models.Host{ID: &node2Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}, Role: models.HostRoleWorker}, IPs: []string{"192.168.126.12", "192.168.11.124", "fe80::5054:ff:fe9a:4740"}}}
 
-			mockbmclient.EXPECT().UpdateHostInstallProgress(node1Id.String(), models.HostStageConfiguring, gomock.Any()).Return(fmt.Errorf("dummy")).Times(1)
-			mockbmclient.EXPECT().UpdateHostInstallProgress(node2Id.String(), models.HostStageWaitingForIgnition, gomock.Any()).Return(nil).Times(1)
+			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), node1Id.String(), models.HostStageConfiguring, gomock.Any()).Return(fmt.Errorf("dummy")).Times(1)
+			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), node2Id.String(), models.HostStageWaitingForIgnition, gomock.Any()).Return(nil).Times(1)
 			SetConfiguringStatusForHosts(mockbmclient, testInventoryIdsIps, logs, true, l)
 			Expect(testInventoryIdsIps["node0"].Host.Progress.CurrentStage).Should(Equal(models.HostStageRebooting))
 			Expect(testInventoryIdsIps["node1"].Host.Progress.CurrentStage).Should(Equal(models.HostStageRebooting))
 			Expect(testInventoryIdsIps["node2"].Host.Progress.CurrentStage).Should(Equal(models.HostStageWaitingForIgnition))
 
-			mockbmclient.EXPECT().UpdateHostInstallProgress(node1Id.String(), models.HostStageConfiguring, gomock.Any()).Return(nil).Times(1)
-			mockbmclient.EXPECT().UpdateHostInstallProgress(node2Id.String(), models.HostStageConfiguring, gomock.Any()).Return(nil).Times(1)
+			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), node1Id.String(), models.HostStageConfiguring, gomock.Any()).Return(nil).Times(1)
+			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), node2Id.String(), models.HostStageConfiguring, gomock.Any()).Return(nil).Times(1)
 			SetConfiguringStatusForHosts(mockbmclient, testInventoryIdsIps, logs, false, l)
 			Expect(testInventoryIdsIps["node1"].Host.Progress.CurrentStage).Should(Equal(models.HostStageConfiguring))
 			Expect(testInventoryIdsIps["node2"].Host.Progress.CurrentStage).Should(Equal(models.HostStageConfiguring))

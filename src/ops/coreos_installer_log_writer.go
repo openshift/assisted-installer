@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/openshift/assisted-installer/src/utils"
+
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-service/models"
 	"github.com/sirupsen/logrus"
@@ -56,7 +58,8 @@ func (l *CoreosInstallerLogWriter) reportProgress() {
 	}
 	if currentPercent >= l.lastProgress+MinProgressDelta {
 		// If the progress is more than 5% report it
-		if err := l.progressReporter.UpdateHostInstallProgress(l.hostID, models.HostStageWritingImageToDisk, match[2]); err == nil {
+		ctx := utils.GenerateRequestContext()
+		if err := l.progressReporter.UpdateHostInstallProgress(ctx, l.hostID, models.HostStageWritingImageToDisk, match[2]); err == nil {
 			l.lastProgress = currentPercent
 		}
 	}

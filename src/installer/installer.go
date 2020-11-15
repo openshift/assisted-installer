@@ -228,23 +228,27 @@ func (i *installer) extractIgnitionToFS(ignitionPath string) (err error) {
 }
 
 func (i *installer) getFileFromService(filename string) (string, error) {
-	i.log.Infof("Getting %s file", filename)
+	ctx := utils.GenerateRequestContext()
+	log := utils.RequestIDLogger(ctx, i.log)
+	log.Infof("Getting %s file", filename)
 	dest := filepath.Join(InstallDir, filename)
-	err := i.inventoryClient.DownloadFile(filename, dest)
+	err := i.inventoryClient.DownloadFile(ctx, filename, dest)
 	if err != nil {
-		i.log.Errorf("Failed to fetch file (%s) from server. err: %s", filename, err)
+		log.Errorf("Failed to fetch file (%s) from server. err: %s", filename, err)
 	}
 	return dest, err
 }
 
 func (i *installer) downloadHostIgnition() (string, error) {
+	ctx := utils.GenerateRequestContext()
+	log := utils.RequestIDLogger(ctx, i.log)
 	filename := fmt.Sprintf("%s-%s.ign", i.Config.Role, i.Config.HostID)
-	i.log.Infof("Getting %s file", filename)
+	log.Infof("Getting %s file", filename)
 
 	dest := filepath.Join(InstallDir, filename)
-	err := i.inventoryClient.DownloadHostIgnition(i.Config.HostID, dest)
+	err := i.inventoryClient.DownloadHostIgnition(ctx, i.Config.HostID, dest)
 	if err != nil {
-		i.log.Errorf("Failed to fetch file (%s) from server. err: %s", filename, err)
+		log.Errorf("Failed to fetch file (%s) from server. err: %s", filename, err)
 	}
 	return dest, err
 }
@@ -269,10 +273,12 @@ func (i *installer) waitForControlPlane(ctx context.Context, kc k8s_client.K8SCl
 }
 
 func (i *installer) UpdateHostInstallProgress(newStage models.HostStage, info string) {
-	i.log.Infof("Updating node installation stage: %s - %s", newStage, info)
+	ctx := utils.GenerateRequestContext()
+	log := utils.RequestIDLogger(ctx, i.log)
+	log.Infof("Updating node installation stage: %s - %s", newStage, info)
 	if i.HostID != "" {
-		if err := i.inventoryClient.UpdateHostInstallProgress(i.HostID, newStage, info); err != nil {
-			i.log.Errorf("Failed to update node installation stage, %s", err)
+		if err := i.inventoryClient.UpdateHostInstallProgress(ctx, i.HostID, newStage, info); err != nil {
+			log.Errorf("Failed to update node installation stage, %s", err)
 		}
 	}
 }
@@ -375,9 +381,11 @@ func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, 
 func (i *installer) getInventoryHostsMap(hostsMap map[string]inventory_client.HostData) (map[string]inventory_client.HostData, error) {
 	var err error
 	if hostsMap == nil {
-		hostsMap, err = i.inventoryClient.GetEnabledHostsNamesHosts()
+		ctx := utils.GenerateRequestContext()
+		log := utils.RequestIDLogger(ctx, i.log)
+		hostsMap, err = i.inventoryClient.GetEnabledHostsNamesHosts(ctx, log)
 		if err != nil {
-			i.log.Warnf("Failed to get hosts info from inventory, err %s", err)
+			log.Warnf("Failed to get hosts info from inventory, err %s", err)
 			return nil, err
 		}
 		// no need for current host
@@ -398,16 +406,18 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 		for _, cond := range node.Status.Conditions {
 			if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue &&
 				!funk.ContainsString(*readyMasters, node.Status.NodeInfo.SystemUUID) {
-
-				i.log.Infof("Found a new ready master node %s with id %s", node.Name, node.Status.NodeInfo.SystemUUID)
+				ctx := utils.GenerateRequestContext()
+				log := utils.RequestIDLogger(ctx, i.log)
+				log.Infof("Found a new ready master node %s with id %s", node.Name, node.Status.NodeInfo.SystemUUID)
 				*readyMasters = append(*readyMasters, node.Status.NodeInfo.SystemUUID)
 				host, ok := inventoryHostsMap[strings.ToLower(node.Name)]
 				if !ok {
-					i.log.Warnf("Node %s is not in inventory hosts", node.Name)
+					log.Warnf("Node %s is not in inventory hosts", node.Name)
 					break
 				}
-				if err := i.inventoryClient.UpdateHostInstallProgress(host.Host.ID.String(), models.HostStageJoined, ""); err != nil {
-					i.log.Errorf("Failed to update node installation status, %s", err)
+				ctx = utils.GenerateRequestContext()
+				if err := i.inventoryClient.UpdateHostInstallProgress(ctx, host.Host.ID.String(), models.HostStageJoined, ""); err != nil {
+					utils.RequestIDLogger(ctx, i.log).Errorf("Failed to update node installation status, %s", err)
 				}
 			}
 		}

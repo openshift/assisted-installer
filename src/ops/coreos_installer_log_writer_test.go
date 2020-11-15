@@ -36,9 +36,9 @@ var _ = Describe("Verify CoreosInstallerLogger", func() {
 		updateProgressSuccess := func(stages [][]string) {
 			for _, stage := range stages {
 				if len(stage) == 2 {
-					mockbmclient.EXPECT().UpdateHostInstallProgress("hostID", models.HostStage(stage[0]), stage[1]).Return(nil).Times(1)
+					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), "hostID", models.HostStage(stage[0]), stage[1]).Return(nil).Times(1)
 				} else {
-					mockbmclient.EXPECT().UpdateHostInstallProgress("hostID", models.HostStage(stage[0]), "").Return(nil).Times(1)
+					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), "hostID", models.HostStage(stage[0]), "").Return(nil).Times(1)
 				}
 			}
 		}

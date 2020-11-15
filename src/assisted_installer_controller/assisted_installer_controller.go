@@ -76,15 +76,17 @@ func (c *controller) WaitAndUpdateNodesStatus() {
 		models.HostStatusError, models.HostStatusInstalled}
 	for {
 		time.Sleep(GeneralWaitInterval)
-		assistedInstallerNodesMap, err := c.ic.GetHosts(ignoreStatuses)
+		ctx := utils.GenerateRequestContext()
+		log := utils.RequestIDLogger(ctx, c.log)
+		assistedInstallerNodesMap, err := c.ic.GetHosts(ctx, log, ignoreStatuses)
 		if err != nil {
-			c.log.WithError(err).Error("Failed to get node map from inventory")
+			log.WithError(err).Error("Failed to get node map from inventory")
 			continue
 		}
 		if len(assistedInstallerNodesMap) == 0 {
 			break
 		}
-		c.log.Infof("Searching for host to change status, number to find %d", len(assistedInstallerNodesMap))
+		log.Infof("Searching for host to change status, number to find %d", len(assistedInstallerNodesMap))
 		nodes, err := c.kc.ListNodes()
 		if err != nil {
 			continue
@@ -95,10 +97,12 @@ func (c *controller) WaitAndUpdateNodesStatus() {
 				continue
 			}
 
-			c.log.Infof("Found new joined node %s with inventory id %s, kubernetes id %s, updating its status to %s",
+			ctx := utils.GenerateRequestContext()
+			log := utils.RequestIDLogger(ctx, c.log)
+			log.Infof("Found new joined node %s with inventory id %s, kubernetes id %s, updating its status to %s",
 				node.Name, host.Host.ID.String(), node.Status.NodeInfo.SystemUUID, models.HostStageDone)
-			if err := c.ic.UpdateHostInstallProgress(host.Host.ID.String(), models.HostStageDone, ""); err != nil {
-				c.log.Errorf("Failed to update node %s installation status, %s", node.Name, err)
+			if err := c.ic.UpdateHostInstallProgress(ctx, host.Host.ID.String(), models.HostStageDone, ""); err != nil {
+				log.Errorf("Failed to update node %s installation status, %s", node.Name, err)
 				continue
 			}
 		}
@@ -178,9 +182,10 @@ func (c controller) PostInstallConfigs(wg *sync.WaitGroup) {
 	defer wg.Done()
 	for {
 		time.Sleep(GeneralWaitInterval)
-		cluster, err := c.ic.GetCluster()
+		ctx := utils.GenerateRequestContext()
+		cluster, err := c.ic.GetCluster(ctx)
 		if err != nil {
-			c.log.WithError(err).Errorf("Failed to get cluster %s from assisted-service", c.ClusterID)
+			utils.RequestIDLogger(ctx, c.log).WithError(err).Errorf("Failed to get cluster %s from assisted-service", c.ClusterID)
 			continue
 		}
 		// waiting till cluster will be installed(3 masters must be installed)
@@ -307,21 +312,22 @@ func (c controller) unpatchEtcd() bool {
 func (c controller) addRouterCAToClusterCA() bool {
 	cmName := "default-ingress-cert"
 	cmNamespace := "openshift-config-managed"
-	c.log.Infof("Start adding ingress ca to cluster")
+	ctx := utils.GenerateRequestContext()
+	log := utils.RequestIDLogger(ctx, c.log)
+	log.Infof("Start adding ingress ca to cluster")
 	caConfigMap, err := c.kc.GetConfigMap(cmNamespace, cmName)
 
 	if err != nil {
-		c.log.WithError(err).Errorf("fetching %s configmap from %s namespace", cmName, cmNamespace)
+		log.WithError(err).Errorf("fetching %s configmap from %s namespace", cmName, cmNamespace)
 		return false
 	}
-
-	c.log.Infof("Sending ingress certificate to inventory service. Certificate data %s", caConfigMap.Data["ca-bundle.crt"])
-	err = c.ic.UploadIngressCa(caConfigMap.Data["ca-bundle.crt"], c.ClusterID)
+	log.Infof("Sending ingress certificate to inventory service. Certificate data %s", caConfigMap.Data["ca-bundle.crt"])
+	err = c.ic.UploadIngressCa(ctx, caConfigMap.Data["ca-bundle.crt"], c.ClusterID)
 	if err != nil {
-		c.log.WithError(err).Errorf("Failed to upload ingress ca to assisted-service")
+		log.WithError(err).Errorf("Failed to upload ingress ca to assisted-service")
 		return false
 	}
-	c.log.Infof("Ingress ca successfully sent to inventory")
+	log.Infof("Ingress ca successfully sent to inventory")
 	return true
 
 }
@@ -346,8 +352,9 @@ func (c controller) validateConsolePod() bool {
 func (c controller) sendCompleteInstallation(isSuccess bool, errorInfo string) {
 	c.log.Infof("Start complete installation step, with params success:%t, error info %s", isSuccess, errorInfo)
 	for {
-		if err := c.ic.CompleteInstallation(c.ClusterID, isSuccess, errorInfo); err != nil {
-			c.log.Error(err)
+		ctx := utils.GenerateRequestContext()
+		if err := c.ic.CompleteInstallation(ctx, c.ClusterID, isSuccess, errorInfo); err != nil {
+			utils.RequestIDLogger(ctx, c.log).Error(err)
 			continue
 		}
 		break
@@ -377,8 +384,10 @@ func (c controller) uploadPodLogs(podName string, namespace string, sinceSeconds
 	}()
 	// if error will occur in goroutine above
 	//it will close writer and upload will fail
-	err = c.ic.UploadLogs(c.ClusterID, models.LogsTypeController, pr)
+	ctx := utils.GenerateRequestContext()
+	err = c.ic.UploadLogs(ctx, c.ClusterID, models.LogsTypeController, pr)
 	if err != nil {
+		utils.RequestIDLogger(ctx, c.log).WithError(err).Error("Failed to upload logs")
 		return errors.Wrapf(err, "Failed to upload logs")
 	}
 	return nil
