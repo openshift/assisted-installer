@@ -9,6 +9,9 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    labels:
+      - "approved"
+      - "lgtm"
 
   - package-ecosystem: "docker"
     directory: "/"
