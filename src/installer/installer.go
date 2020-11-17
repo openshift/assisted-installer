@@ -177,13 +177,13 @@ func (i *installer) startBootstrap() error {
 	}
 
 	// reload systemd configurations from filesystem and regenerate dependency trees
-	err = i.ops.SystemctlAction("daemon-reload")
+	_, err = i.ops.SystemctlAction("daemon-reload")
 	if err != nil {
 		return err
 	}
 
 	// restart NetworkManager to trigger NetworkManager/dispatcher.d/30-local-dns-prepender
-	err = i.ops.SystemctlAction("restart", "NetworkManager.service")
+	_, err = i.ops.SystemctlAction("restart", "NetworkManager.service")
 	if err != nil {
 		i.log.Error(err)
 		return err
@@ -196,7 +196,7 @@ func (i *installer) startBootstrap() error {
 
 	servicesToStart := []string{"bootkube.service", "approve-csr.service", "progress.service"}
 	for _, service := range servicesToStart {
-		err = i.ops.SystemctlAction("start", service)
+		_, err = i.ops.SystemctlAction("start", service)
 		if err != nil {
 			return err
 		}
@@ -209,13 +209,7 @@ func (i *installer) extractIgnitionToFS(ignitionPath string) (err error) {
 	mcoImage, _ := utils.GetMCOByOpenshiftVersion(i.OpenshiftVersion)
 	i.log.Infof("Extracting ignition to disk using %s mcoImage", mcoImage)
 	for j := 0; j < extractRetryCount; j++ {
-		_, err = i.ops.ExecPrivilegeCommand(utils.NewLogWriter(i.log), "podman", "run", "--net", "host",
-			"--volume", "/:/rootfs:rw",
-			"--volume", "/usr/bin/rpm-ostree:/usr/bin/rpm-ostree",
-			"--privileged",
-			"--entrypoint", "/usr/bin/machine-config-daemon",
-			mcoImage,
-			"start", "--node-name", "localhost", "--root-mount", "/rootfs", "--once-from", ignitionPath, "--skip-reboot")
+		err = i.ops.ExtractIgnitionWithMCO(mcoImage, ignitionPath)
 		if err != nil {
 			i.log.Errorf("Failed to extract ignition to disk")
 		} else {
@@ -292,10 +286,10 @@ func (i *installer) waitForBootkube(ctx context.Context) {
 			return
 		case <-time.After(time.Second * time.Duration(5)):
 			// check if bootkube is done every 5 seconds
-			if _, err := i.ops.ExecPrivilegeCommand(nil, "stat", "/opt/openshift/.bootkube.done"); err == nil {
+			if err := i.ops.CheckBootkubeDone(); err == nil {
 				// in case bootkube is done log the status and return
 				i.log.Info("bootkube service completed")
-				out, _ := i.ops.ExecPrivilegeCommand(utils.NewLogWriter(i.log), "systemctl", "status", "bootkube.service")
+				out, _ := i.ops.SystemctlAction("status", "bootkube.service")
 				i.log.Info(out)
 				return
 			}

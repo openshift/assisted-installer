@@ -3,7 +3,6 @@ package k8s_client
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"os"
 
@@ -31,9 +30,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	runtimeconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
-
-	"github.com/openshift/assisted-installer/src/ops"
-	"github.com/openshift/assisted-installer/src/utils"
 )
 
 //var AddToSchemes runtime.SchemeBuilder
@@ -45,7 +41,6 @@ type K8SClient interface {
 	UnPatchEtcd() error
 	ListNodes() (*v1.NodeList, error)
 	ListMachines() (*machinev1beta1.MachineList, error)
-	RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error)
 	ApproveCsr(csr *v1beta1.CertificateSigningRequest) error
 	ListCsrs() (*v1beta1.CertificateSigningRequestList, error)
 	GetConfigMap(namespace string, name string) (*v1.ConfigMap, error)
@@ -67,9 +62,8 @@ type k8sClient struct {
 	client        *kubernetes.Clientset
 	ocClient      *operatorv1.Clientset
 	runtimeClient runtimeclient.Client
-	// CertificateSigningRequestInterface is interface
-	csrClient   certificatesv1beta1client.CertificateSigningRequestInterface
-	proxyClient configv1client.ProxyInterface
+	csrClient     certificatesv1beta1client.CertificateSigningRequestInterface
+	proxyClient   configv1client.ProxyInterface
 }
 
 func NewK8SClient(configPath string, logger *logrus.Logger) (K8SClient, error) {
@@ -167,16 +161,6 @@ func (c *k8sClient) UnPatchEtcd() error {
 	}
 	c.log.Info(result)
 	return nil
-}
-
-func (c *k8sClient) RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error) {
-	c.log.Infof("Running oc command with args %v", args)
-	args = append([]string{fmt.Sprintf("--kubeconfig=%s", kubeconfigPath)}, args...)
-	outPut, err := o.ExecPrivilegeCommand(utils.NewLogWriter(c.log), "oc", args...)
-	if err != nil {
-		return "", err
-	}
-	return outPut, nil
 }
 
 func (c k8sClient) ListCsrs() (*v1beta1.CertificateSigningRequestList, error) {

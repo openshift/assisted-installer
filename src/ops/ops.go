@@ -3,14 +3,11 @@ package ops
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"text/template"
 
 	"github.com/pkg/errors"
@@ -18,18 +15,19 @@ import (
 
 	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/inventory_client"
+	opsexec "github.com/openshift/assisted-installer/src/ops/exec"
 	"github.com/openshift/assisted-installer/src/utils"
 )
 
 //go:generate mockgen -source=ops.go -package=ops -destination=mock_ops.go
 type Ops interface {
-	ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error)
-	ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error)
 	Mkdir(dirName string) error
 	WriteImageToDisk(ignitionPath string, device string, progressReporter inventory_client.InventoryClient, extra []string) error
 	Reboot() error
 	ExtractFromIgnition(ignitionPath string, fileToExtract string) error
-	SystemctlAction(action string, args ...string) error
+	ExtractIgnitionWithMCO(mcoImage string, ignitionPath string) error
+	CheckBootkubeDone() error
+	SystemctlAction(action string, args ...string) (string, error)
 	PrepareController() error
 	GetVGByPV(pvName string) (string, error)
 	RemoveVG(vgName string) error
@@ -56,6 +54,7 @@ type ops struct {
 	log       *logrus.Logger
 	logWriter *utils.LogWriter
 	cmdEnv    []string
+	Runner    opsexec.Excecutor
 }
 
 // NewOps return a new ops interface
@@ -72,101 +71,30 @@ func NewOps(logger *logrus.Logger, proxySet bool) Ops {
 			cmdEnv = append(cmdEnv, fmt.Sprintf("NO_PROXY=%s", config.GlobalConfig.NoProxy))
 		}
 	}
-	return &ops{logger, utils.NewLogWriter(logger), cmdEnv}
-}
-
-// ExecPrivilegeCommand execute a command in the host environment via nsenter
-func (o *ops) ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
-	commandBase := "nsenter"
-	arguments := []string{"-t", "1", "-m", "-i", "--", command}
-	arguments = append(arguments, args...)
-	return o.ExecCommand(liveLogger, commandBase, arguments...)
-}
-
-type ExecCommandError struct {
-	Command    string
-	Args       []string
-	Env        []string
-	ExitErr    error
-	Output     string
-	WaitStatus int
-}
-
-func (e *ExecCommandError) Error() string {
-	lastOutput := e.Output
-	if len(e.Output) > 200 {
-		lastOutput = "... " + e.Output[len(e.Output)-200:]
-	}
-
-	return fmt.Sprintf("failed executing %s %v, Error %s, LastOutput \"%s\"", e.Command, e.Args, e.ExitErr, lastOutput)
-}
-
-func (e *ExecCommandError) DetailedError() string {
-	return fmt.Sprintf("failed executing %s %v, env vars %v, error %s, waitStatus %d, Output \"%s\"", e.Command, e.Args, e.Env, e.ExitErr, e.WaitStatus, e.Output)
-}
-
-// ExecCommand executes command.
-func (o *ops) ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
-
-	var stdoutBuf bytes.Buffer
-	cmd := exec.Command(command, args...)
-	if liveLogger != nil {
-		cmd.Stdout = io.MultiWriter(liveLogger, &stdoutBuf)
-		cmd.Stderr = io.MultiWriter(liveLogger, &stdoutBuf)
-	} else {
-		cmd.Stdout = &stdoutBuf
-		cmd.Stderr = &stdoutBuf
-	}
-	cmd.Env = o.cmdEnv
-	err := cmd.Run()
-	output := strings.TrimSpace(stdoutBuf.String())
-	if err != nil {
-
-		// Get all lines from Error message
-		errorIndex := strings.Index(output, "Error")
-		// if Error not found return all output
-		if errorIndex > -1 {
-			output = output[errorIndex:]
-		}
-
-		execErr := &ExecCommandError{
-			Command: command,
-			Args:    args,
-			Env:     cmd.Env,
-			ExitErr: err,
-			Output:  output,
-		}
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
-				execErr.WaitStatus = status.ExitStatus()
-			}
-		}
-		o.log.Info(execErr.DetailedError())
-		return output, execErr
-	}
-	o.log.Debug("Command executed:", " command", command, " arguments", args, "env vars", cmd.Env, "output", output)
-	return output, err
+	logWriter := utils.NewLogWriter(logger)
+	runner := opsexec.NewExecutor(logger, logWriter, cmdEnv)
+	return &ops{logger, logWriter, cmdEnv, *runner}
 }
 
 func (o *ops) Mkdir(dirName string) error {
 	o.log.Infof("Creating directory: %s", dirName)
-	_, err := o.ExecPrivilegeCommand(o.logWriter, "mkdir", "-p", dirName)
+	_, err := o.Runner.ExecPrivilegeCommand(o.logWriter, "mkdir", "-p", dirName)
 	return err
 }
 
-func (o *ops) SystemctlAction(action string, args ...string) error {
+func (o *ops) SystemctlAction(action string, args ...string) (string, error) {
 	o.log.Infof("Running systemctl %s %s", action, args)
-	_, err := o.ExecPrivilegeCommand(o.logWriter, "systemctl", append([]string{action}, args...)...)
+	output, err := o.Runner.ExecPrivilegeCommand(o.logWriter, "systemctl", append([]string{action}, args...)...)
 	if err != nil {
 		o.log.Errorf("Failed executing systemctl %s %s", action, args)
 	}
-	return errors.Wrapf(err, "Failed executing systemctl %s %s", action, args)
+	return output, errors.Wrapf(err, "Failed executing systemctl %s %s", action, args)
 }
 
 func (o *ops) WriteImageToDisk(ignitionPath string, device string, progressReporter inventory_client.InventoryClient, extraArgs []string) error {
 	allArgs := installerArgs(ignitionPath, device, extraArgs)
 	o.log.Infof("Writing image and ignition to disk with arguments: %v", allArgs)
-	_, err := o.ExecPrivilegeCommand(NewCoreosInstallerLogWriter(o.log, progressReporter, config.GlobalConfig.HostID),
+	_, err := o.Runner.ExecPrivilegeCommand(NewCoreosInstallerLogWriter(o.log, progressReporter, config.GlobalConfig.HostID),
 		"coreos-installer", allArgs...)
 	return err
 }
@@ -181,12 +109,23 @@ func installerArgs(ignitionPath string, device string, extra []string) []string 
 
 func (o *ops) Reboot() error {
 	o.log.Info("Rebooting node")
-	_, err := o.ExecPrivilegeCommand(o.logWriter, "shutdown", "-r", "+1", "'Installation completed, server is going to reboot.'")
+	_, err := o.Runner.ExecPrivilegeCommand(o.logWriter, "shutdown", "-r", "+1", "'Installation completed, server is going to reboot.'")
 	if err != nil {
 		o.log.Errorf("Failed to reboot node, err: %s", err)
 		return err
 	}
 	return nil
+}
+
+func (o *ops) ExtractIgnitionWithMCO(mcoImage string, ignitionPath string) error {
+	_, err := o.Runner.ExecPrivilegeCommand(o.logWriter, "podman", "run", "--net", "host",
+		"--volume", "/:/rootfs:rw",
+		"--volume", "/usr/bin/rpm-ostree:/usr/bin/rpm-ostree",
+		"--privileged",
+		"--entrypoint", "/usr/bin/machine-config-daemon",
+		mcoImage,
+		"start", "--node-name", "localhost", "--root-mount", "/rootfs", "--once-from", ignitionPath, "--skip-reboot")
+	return err
 }
 
 func (o *ops) ExtractFromIgnition(ignitionPath string, fileToExtract string) error {
@@ -213,12 +152,12 @@ func (o *ops) ExtractFromIgnition(ignitionPath string, fileToExtract string) err
 
 	o.log.Infof("Moving %s to %s", tmpFile, fileToExtract)
 	dir := filepath.Dir(fileToExtract)
-	_, err = o.ExecPrivilegeCommand(o.logWriter, "mkdir", "-p", filepath.Dir(fileToExtract))
+	_, err = o.Runner.ExecPrivilegeCommand(o.logWriter, "mkdir", "-p", filepath.Dir(fileToExtract))
 	if err != nil {
 		o.log.Errorf("Failed to create directory %s ", dir)
 		return err
 	}
-	_, err = o.ExecPrivilegeCommand(o.logWriter, "mv", tmpFile, fileToExtract)
+	_, err = o.Runner.ExecPrivilegeCommand(o.logWriter, "mv", tmpFile, fileToExtract)
 	if err != nil {
 		o.log.Errorf("Error occurred while moving %s to %s", tmpFile, fileToExtract)
 		return err
@@ -320,8 +259,14 @@ func (o *ops) renderDeploymentFiles(srcTemplate string, params map[string]interf
 	return nil
 }
 
+func (o *ops) CheckBootkubeDone() error {
+	cmdctx := &opsexec.CmdContext{Out: nil, Env: o.cmdEnv, Dir: ""}
+	_, err := o.Runner.ExecPrivilegeCommandWithContext(cmdctx, "stat", "/opt/openshift/.bootkube.done")
+	return err
+}
+
 func (o *ops) GetVGByPV(pvName string) (string, error) {
-	output, err := o.ExecPrivilegeCommand(o.logWriter, "vgs", "--noheadings", "-o", "vg_name,pv_name")
+	output, err := o.Runner.ExecPrivilegeCommand(o.logWriter, "vgs", "--noheadings", "-o", "vg_name,pv_name")
 	if err != nil {
 		o.log.Errorf("Failed to list VGs in the system")
 		return "", err
@@ -342,7 +287,7 @@ func (o *ops) GetVGByPV(pvName string) (string, error) {
 }
 
 func (o *ops) RemoveVG(vgName string) error {
-	output, err := o.ExecPrivilegeCommand(o.logWriter, "vgremove", vgName, "-y")
+	output, err := o.Runner.ExecPrivilegeCommand(o.logWriter, "vgremove", vgName, "-y")
 	if err != nil {
 		o.log.Errorf("Failed to remove VG %s, output %s, error %s", vgName, output, err)
 	}
@@ -350,7 +295,7 @@ func (o *ops) RemoveVG(vgName string) error {
 }
 
 func (o *ops) RemoveLV(lvName, vgName string) error {
-	output, err := o.ExecPrivilegeCommand(o.logWriter, "lvremove", fmt.Sprintf("/dev/%s/%s", vgName, lvName), "-y")
+	output, err := o.Runner.ExecPrivilegeCommand(o.logWriter, "lvremove", fmt.Sprintf("/dev/%s/%s", vgName, lvName), "-y")
 	if err != nil {
 		o.log.Errorf("Failed to remove LVM %s, output %s, error %s", fmt.Sprintf("/dev/%s/%s", vgName, lvName), output, err)
 	}
@@ -358,7 +303,7 @@ func (o *ops) RemoveLV(lvName, vgName string) error {
 }
 
 func (o *ops) RemovePV(pvName string) error {
-	output, err := o.ExecPrivilegeCommand(o.logWriter, "pvremove", pvName, "-y", "-ff")
+	output, err := o.Runner.ExecPrivilegeCommand(o.logWriter, "pvremove", pvName, "-y", "-ff")
 	if err != nil {
 		o.log.Errorf("Failed to remove PV %s, output %s, error %s", pvName, output, err)
 	}
@@ -366,7 +311,7 @@ func (o *ops) RemovePV(pvName string) error {
 }
 
 func (o *ops) Wipefs(device string) error {
-	output, err := o.ExecPrivilegeCommand(o.logWriter, "wipefs", "-a", device)
+	output, err := o.Runner.ExecPrivilegeCommand(o.logWriter, "wipefs", "-a", device)
 	if err != nil {
 		o.log.Errorf("Failed to wipefs device %s, output %s, error %s", device, output, err)
 	}
@@ -409,7 +354,7 @@ func (o *ops) UploadInstallationLogs(isBootstrap bool) (string, error) {
 	if config.GlobalConfig.CACertPath != "" {
 		args = append(args, fmt.Sprintf("-cacert=%s", config.GlobalConfig.CACertPath))
 	}
-	return o.ExecPrivilegeCommand(o.logWriter, command, args...)
+	return o.Runner.ExecPrivilegeCommand(o.logWriter, command, args...)
 }
 
 // Sometimes we will need to reload container files from host
@@ -417,7 +362,7 @@ func (o *ops) UploadInstallationLogs(isBootstrap bool) (string, error) {
 // and we need this update for dns resolve of kubeapi
 func (o *ops) ReloadHostFile(filepath string) error {
 	o.log.Infof("Reloading %s", filepath)
-	output, err := o.ExecPrivilegeCommand(o.logWriter, "cat", filepath)
+	output, err := o.Runner.ExecPrivilegeCommand(o.logWriter, "cat", filepath)
 	if err != nil {
 		o.log.Errorf("Failed to read %s on the host", filepath)
 		return err

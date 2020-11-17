@@ -130,26 +130,18 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 		mcoImage, _ := utils.GetMCOByOpenshiftVersion(conf.OpenshiftVersion)
 		extractIgnitionToFS := func(out string, err error) {
-			mockops.EXPECT().ExecPrivilegeCommand(
-				gomock.Any(), "podman", "run", "--net", "host",
-				"--volume", "/:/rootfs:rw",
-				"--volume", "/usr/bin/rpm-ostree:/usr/bin/rpm-ostree",
-				"--privileged",
-				"--entrypoint", "/usr/bin/machine-config-daemon",
-				mcoImage,
-				"start", "--node-name", "localhost", "--root-mount", "/rootfs", "--once-from",
-				filepath.Join(InstallDir, bootstrapIgn), "--skip-reboot").Return(out, err)
+			mockops.EXPECT().ExtractIgnitionWithMCO(mcoImage, filepath.Join(InstallDir, bootstrapIgn)).Return(err)
 		}
 		daemonReload := func(err error) {
-			mockops.EXPECT().SystemctlAction("daemon-reload").Return(err).Times(1)
+			mockops.EXPECT().SystemctlAction("daemon-reload").Return("", err).Times(1)
 		}
 		restartNetworkManager := func(err error) {
-			mockops.EXPECT().SystemctlAction("restart", "NetworkManager.service").Return(err).Times(1)
+			mockops.EXPECT().SystemctlAction("restart", "NetworkManager.service").Return("", err).Times(1)
 		}
 		startServicesSuccess := func() {
 			services := []string{"bootkube.service", "progress.service", "approve-csr.service"}
 			for i := range services {
-				mockops.EXPECT().SystemctlAction("start", services[i]).Return(nil).Times(1)
+				mockops.EXPECT().SystemctlAction("start", services[i]).Return("", nil).Times(1)
 			}
 		}
 		WaitMasterNodesSucccess := func() {
@@ -170,10 +162,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockops.EXPECT().PrepareController().Return(nil).Times(1)
 		}
 		waitForBootkubeSuccess := func() {
-			mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "stat", "/opt/openshift/.bootkube.done").Return("OK", nil).Times(1)
+			mockops.EXPECT().CheckBootkubeDone().Return(nil).Times(1)
 		}
 		bootkubeStatusSuccess := func() {
-			mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "systemctl", "status", "bootkube.service").Return("1", nil).Times(1)
+			mockops.EXPECT().SystemctlAction("status", "bootkube.service").Return("1", nil).Times(1)
 		}
 
 		extractSecretFromIgnitionSuccess := func() {

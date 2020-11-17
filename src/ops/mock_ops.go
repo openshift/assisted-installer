@@ -5,7 +5,6 @@
 package ops
 
 import (
-	io "io"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -33,46 +32,6 @@ func NewMockOps(ctrl *gomock.Controller) *MockOps {
 // EXPECT returns an object that allows the caller to indicate expected use
 func (m *MockOps) EXPECT() *MockOpsMockRecorder {
 	return m.recorder
-}
-
-// ExecPrivilegeCommand mocks base method
-func (m *MockOps) ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
-	m.ctrl.T.Helper()
-	varargs := []interface{}{liveLogger, command}
-	for _, a := range args {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "ExecPrivilegeCommand", varargs...)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ExecPrivilegeCommand indicates an expected call of ExecPrivilegeCommand
-func (mr *MockOpsMockRecorder) ExecPrivilegeCommand(liveLogger, command interface{}, args ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{liveLogger, command}, args...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecPrivilegeCommand", reflect.TypeOf((*MockOps)(nil).ExecPrivilegeCommand), varargs...)
-}
-
-// ExecCommand mocks base method
-func (m *MockOps) ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
-	m.ctrl.T.Helper()
-	varargs := []interface{}{liveLogger, command}
-	for _, a := range args {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "ExecCommand", varargs...)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ExecCommand indicates an expected call of ExecCommand
-func (mr *MockOpsMockRecorder) ExecCommand(liveLogger, command interface{}, args ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{liveLogger, command}, args...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecCommand", reflect.TypeOf((*MockOps)(nil).ExecCommand), varargs...)
 }
 
 // Mkdir mocks base method
@@ -131,16 +90,45 @@ func (mr *MockOpsMockRecorder) ExtractFromIgnition(ignitionPath, fileToExtract i
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExtractFromIgnition", reflect.TypeOf((*MockOps)(nil).ExtractFromIgnition), ignitionPath, fileToExtract)
 }
 
+// ExtractIgnitionWithMCO mocks base method
+func (m *MockOps) ExtractIgnitionWithMCO(mcoImage, ignitionPath string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ExtractIgnitionWithMCO", mcoImage, ignitionPath)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ExtractIgnitionWithMCO indicates an expected call of ExtractIgnitionWithMCO
+func (mr *MockOpsMockRecorder) ExtractIgnitionWithMCO(mcoImage, ignitionPath interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExtractIgnitionWithMCO", reflect.TypeOf((*MockOps)(nil).ExtractIgnitionWithMCO), mcoImage, ignitionPath)
+}
+
+// CheckBootkubeDone mocks base method
+func (m *MockOps) CheckBootkubeDone() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CheckBootkubeDone")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CheckBootkubeDone indicates an expected call of CheckBootkubeDone
+func (mr *MockOpsMockRecorder) CheckBootkubeDone() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckBootkubeDone", reflect.TypeOf((*MockOps)(nil).CheckBootkubeDone))
+}
+
 // SystemctlAction mocks base method
-func (m *MockOps) SystemctlAction(action string, args ...string) error {
+func (m *MockOps) SystemctlAction(action string, args ...string) (string, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{action}
 	for _, a := range args {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "SystemctlAction", varargs...)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // SystemctlAction indicates an expected call of SystemctlAction
@@ -248,6 +236,21 @@ func (m *MockOps) GetMCSLogs() (string, error) {
 func (mr *MockOpsMockRecorder) GetMCSLogs() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMCSLogs", reflect.TypeOf((*MockOps)(nil).GetMCSLogs))
+}
+
+// GetMustGatherLogs mocks base method
+func (m *MockOps) GetMustGatherLogs(workDir, kubeconfigPath string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMustGatherLogs", workDir, kubeconfigPath)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMustGatherLogs indicates an expected call of GetMustGatherLogs
+func (mr *MockOpsMockRecorder) GetMustGatherLogs(workDir, kubeconfigPath interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMustGatherLogs", reflect.TypeOf((*MockOps)(nil).GetMustGatherLogs), workDir, kubeconfigPath)
 }
 
 // UploadInstallationLogs mocks base method

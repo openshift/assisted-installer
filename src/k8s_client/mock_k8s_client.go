@@ -11,7 +11,6 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
 	v1 "github.com/openshift/api/config/v1"
-	ops "github.com/openshift/assisted-installer/src/ops"
 	v1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	v1beta10 "k8s.io/api/certificates/v1beta1"
 	v10 "k8s.io/api/core/v1"
@@ -111,21 +110,6 @@ func (m *MockK8SClient) ListMachines() (*v1beta1.MachineList, error) {
 func (mr *MockK8SClientMockRecorder) ListMachines() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListMachines", reflect.TypeOf((*MockK8SClient)(nil).ListMachines))
-}
-
-// RunOCctlCommand mocks base method
-func (m *MockK8SClient) RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RunOCctlCommand", args, kubeconfigPath, o)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// RunOCctlCommand indicates an expected call of RunOCctlCommand
-func (mr *MockK8SClientMockRecorder) RunOCctlCommand(args, kubeconfigPath, o interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunOCctlCommand", reflect.TypeOf((*MockK8SClient)(nil).RunOCctlCommand), args, kubeconfigPath, o)
 }
 
 // ApproveCsr mocks base method
