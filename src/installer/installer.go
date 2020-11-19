@@ -177,6 +177,16 @@ func (i *installer) startBootstrap() error {
 		return err
 	}
 
+	err = i.generateSshKeyPair()
+	if err != nil {
+		return err
+	}
+
+	err = i.ops.CreateOpenshiftSshManifest(assistedInstallerSshManifest, sshManifestTmpl, sshPubKeyPath)
+	if err != nil {
+		return err
+	}
+
 	// reload systemd configurations from filesystem and regenerate dependency trees
 	err = i.ops.SystemctlAction("daemon-reload")
 	if err != nil {
@@ -230,6 +240,19 @@ func (i *installer) extractIgnitionToFS(ignitionPath string) (err error) {
 	}
 	i.log.Errorf("Failed to extract ignition to disk, giving up")
 	return err
+}
+
+func (i *installer) generateSshKeyPair() error {
+	i.log.Info("Generating new SSH key pair")
+	if err := i.ops.Mkdir(sshDir); err != nil {
+		i.log.WithError(err).Error("Failed to create SSH dir")
+		return err
+	}
+	if _, err := i.ops.ExecPrivilegeCommand(utils.NewLogWriter(i.log), "ssh-keygen", "-q", "-f", sshKeyPath, "-N", ""); err != nil {
+		i.log.WithError(err).Error("Failed to generate SSH key pair")
+		return err
+	}
+	return nil
 }
 
 func (i *installer) getFileFromService(filename string) (string, error) {
