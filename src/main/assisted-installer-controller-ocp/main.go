@@ -58,9 +58,13 @@ func main() {
 	logger.Infof("Controller deployed on OCP cluster")
 
 	var wg sync.WaitGroup
+	var status assistedinstallercontroller.ControllerStatus
+	var waitAndUpdateFunc = func() {
+		assistedController.WaitAndUpdateNodesStatus(&status)
+	}
 	go approveCsrs(assistedController.ApproveCsrs, &wg)
 	wg.Add(1)
-	go waitAndUpdateNodesStatus(assistedController.WaitAndUpdateNodesStatus)
+	go waitAndUpdateNodesStatus(waitAndUpdateFunc)
 	wg.Add(1)
 	wg.Wait()
 }
