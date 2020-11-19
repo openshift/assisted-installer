@@ -278,3 +278,17 @@ func (mr *MockOpsMockRecorder) ReloadHostFile(filepath interface{}) *gomock.Call
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReloadHostFile", reflect.TypeOf((*MockOps)(nil).ReloadHostFile), filepath)
 }
+
+// CreateOpenshiftSshManifest mocks base method
+func (m *MockOps) CreateOpenshiftSshManifest(filePath, template, sshPubKeyPath string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateOpenshiftSshManifest", filePath, template, sshPubKeyPath)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateOpenshiftSshManifest indicates an expected call of CreateOpenshiftSshManifest
+func (mr *MockOpsMockRecorder) CreateOpenshiftSshManifest(filePath, template, sshPubKeyPath interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOpenshiftSshManifest", reflect.TypeOf((*MockOps)(nil).CreateOpenshiftSshManifest), filePath, template, sshPubKeyPath)
+}
