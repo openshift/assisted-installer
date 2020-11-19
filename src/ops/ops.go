@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
+	"strconv"
+	"text/template"
+
+	"io/ioutil"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
-	"text/template"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -39,6 +40,7 @@ type Ops interface {
 	GetMCSLogs() (string, error)
 	UploadInstallationLogs(isBootstrap bool) (string, error)
 	ReloadHostFile(filepath string) error
+	CreateOpenshiftSshManifest(filePath, template, sshPubKeyPath string) error
 }
 
 const (
@@ -433,6 +435,30 @@ func (o *ops) ReloadHostFile(filepath string) error {
 	_, err = f.WriteString(output)
 	if err != nil {
 		o.log.Errorf("Failed to write host %s data to local", filepath)
+		return err
+	}
+	return nil
+}
+
+func (o *ops) CreateOpenshiftSshManifest(filePath, tmpl, sshPubKeyPath string) error {
+	o.log.Info("Create an openshift manifets for SSH public key")
+	sshPublicKey, err := o.ExecPrivilegeCommand(o.logWriter, "cat", sshPubKeyPath)
+	if err != nil {
+		o.log.WithError(err).Errorf("Failed to read SSH pub key from %s", sshPubKeyPath)
+		return err
+	}
+	f, err := os.Create(filePath)
+	if err != nil {
+		o.log.WithError(err).Errorf("Failed to create %s", filePath)
+		return err
+	}
+	defer f.Close()
+	t := template.Must(template.New("openshift SSH manifest").Parse(tmpl))
+	sshConfig := struct {
+		SshPubKey string
+	}{sshPublicKey}
+	if err := t.Execute(f, sshConfig); err != nil {
+		o.log.WithError(err).Error("Failed to execute template")
 		return err
 	}
 	return nil
