@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: assisted-installer-controller
+  namespace: REPLACE_NAMESPACE
+spec:
+  selector:
+    matchLabels:
+      app: assisted-installer-controller
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: assisted-installer-controller
+    spec:
+      containers:
+        - name: assisted-installer-controller
+          image: REPLACE_CONTROLLER_OCP_IMAGE
+          imagePullPolicy: Always
+          command:
+            - /assisted-installer-controller-ocp
+          env:
+            # Define the environment variable
+            - name: INVENTORY_URL
+              value: REPLACE_INVENTORY_URL
+            - name: CLUSTER_ID
+              value: REPLACE_CLUSTER_ID
+            - name: PULL_SECRET_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: assisted-installer-controller-secret
+                  key: pull-secret-token
+            - name: SKIP_CERT_VERIFICATION
+              valueFrom:
+                configMapKeyRef:
+                  name: assisted-installer-controller-config
+                  key: skip-cert-verification
+                  optional: true
+          envFrom:
+            - configMapRef:
+                name: assisted-installer-controller-config
+      restartPolicy: Always
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      serviceAccountName: assisted-installer-controller
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+        operator: Exists

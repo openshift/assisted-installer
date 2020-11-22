@@ -2,9 +2,11 @@ CONTAINER_COMMAND = $(shell if [ -x "$(shell which docker)" ];then echo "docker"
 INSTALLER := $(or ${INSTALLER},quay.io/ocpmetal/assisted-installer:stable)
 GIT_REVISION := $(shell git rev-parse HEAD)
 CONTROLLER :=  $(or ${CONTROLLER}, quay.io/ocpmetal/assisted-installer-controller:stable)
+CONTROLLER_OCP :=  $(or ${CONTROLLER_OCP}, quay.io/ocpmetal/assisted-installer-controller-ocp:latest)
 ROOT_DIR = $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 REPORTS = $(ROOT_DIR)/reports
 TEST_PUBLISH_FLAGS = --junitfile-testsuite-name=relative --junitfile-testcase-classname=relative --junitfile $(REPORTS)/unittest.xml
+NAMESPACE := $(or ${NAMESPACE},assisted-installer)
 
 all: image image_controller unit-test
 
@@ -30,6 +32,10 @@ build/controller: lint format
 	mkdir -p build
 	CGO_ENABLED=0 go build -o build/assisted-installer-controller src/main/assisted-installer-controller/assisted_installer_main.go
 
+build/controller_ocp: lint format
+	mkdir -p build
+	CGO_ENABLED=0 go build -o build/assisted-installer-controller-ocp src/main/assisted-installer-controller-ocp/main.go
+
 image: build/installer
 	GIT_REVISION=${GIT_REVISION} $(CONTAINER_COMMAND) build --build-arg GIT_REVISION -f Dockerfile.assisted-installer . -t $(INSTALLER)
 
@@ -41,6 +47,16 @@ image_controller: build/controller
 
 push_controller: image_controller
 	$(CONTAINER_COMMAND) push $(CONTROLLER)
+
+image_controller_ocp: build/controller_ocp
+	GIT_REVISION=${GIT_REVISION} $(CONTAINER_COMMAND) build --build-arg GIT_REVISION -f Dockerfile.assisted-installer-controller-ocp . -t $(CONTROLLER_OCP)
+
+push_controller_ocp: image_controller_ocp
+	$(CONTAINER_COMMAND) push $(CONTROLLER_OCP)
+
+deploy_controller_on_ocp_cluster:
+	python3 ./deploy/assisted-installer-controller-ocp/deploy_assisted_controller.py --target "ocp" --profile "minikube" \
+	    --namespace $(NAMESPACE) --inventory-url ${SERVICE_BASE_URL} --cluster-id ${CLUSTER_ID} --controller-image ${CONTROLLER_OCP}
 
 $(REPORTS):
 	-mkdir -p $(REPORTS)

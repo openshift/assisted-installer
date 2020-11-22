@@ -1,0 +1,7 @@
+FROM bash
+copy build/assisted-installer-controller-ocp /
+ARG GIT_REVISION
+LABEL "git_revision"=${GIT_REVISION}
+ARG QUAY_TAG_EXPIRATION
+LABEL "quay.expires-after"=${QUAY_TAG_EXPIRATION}
+ENTRYPOINT ["/assisted-installer-controller-ocp"]
