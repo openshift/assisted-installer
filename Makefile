@@ -8,7 +8,7 @@ REPORTS = $(ROOT_DIR)/reports
 TEST_PUBLISH_FLAGS = --junitfile-testsuite-name=relative --junitfile-testcase-classname=relative --junitfile $(REPORTS)/unittest.xml
 NAMESPACE := $(or ${NAMESPACE},assisted-installer)
 
-all: image image_controller unit-test
+all: image image_controller image_controller_ocp unit-test
 
 lint:
 	golangci-lint run -v
