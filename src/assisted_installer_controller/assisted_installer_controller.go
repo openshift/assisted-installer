@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
@@ -49,7 +50,11 @@ type ControllerConfig struct {
 }
 
 type Controller interface {
-	WaitAndUpdateNodesStatus()
+	WaitAndUpdateNodesStatus(status *ControllerStatus)
+}
+
+type ControllerStatus struct {
+	errCounter uint32
 }
 
 type controller struct {
@@ -70,22 +75,41 @@ func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inv
 	}
 }
 
-func (c *controller) WaitAndUpdateNodesStatus() {
+func (status *ControllerStatus) Error() {
+	atomic.AddUint32(&status.errCounter, 1)
+}
+
+func (status *ControllerStatus) HasError() bool {
+	return atomic.LoadUint32(&status.errCounter) > 0
+}
+
+func (c *controller) WaitAndUpdateNodesStatus(status *ControllerStatus) {
 	c.log.Infof("Waiting till all nodes will join and update status to assisted installer")
-	ignoreStatuses := []string{models.HostStatusDisabled,
-		models.HostStatusError, models.HostStatusInstalled}
+	ignoreStatuses := []string{models.HostStatusDisabled, models.HostStatusInstalled}
+	var hostsInError int
 	for {
 		time.Sleep(GeneralWaitInterval)
 		ctx := utils.GenerateRequestContext()
 		log := utils.RequestIDLogger(ctx, c.log)
+
 		assistedInstallerNodesMap, err := c.ic.GetHosts(ctx, log, ignoreStatuses)
 		if err != nil {
 			log.WithError(err).Error("Failed to get node map from inventory")
 			continue
 		}
+		errNodesMap := common.FilterHostsByStatus(assistedInstallerNodesMap, []string{models.HostStatusError})
+		hostsInError = len(errNodesMap)
+
+		//if all hosts are in error, mark the failure and finish
+		if hostsInError > 0 && hostsInError == len(assistedInstallerNodesMap) {
+			status.Error()
+			break
+		}
+		//if all hosts are successfully installed, finish
 		if len(assistedInstallerNodesMap) == 0 {
 			break
 		}
+		//otherwise, update the progress status and keep waiting
 		log.Infof("Searching for host to change status, number to find %d", len(assistedInstallerNodesMap))
 		nodes, err := c.kc.ListNodes()
 		if err != nil {
@@ -107,9 +131,8 @@ func (c *controller) WaitAndUpdateNodesStatus() {
 			}
 		}
 		c.updateConfiguringStatusIfNeeded(assistedInstallerNodesMap)
-
 	}
-	c.log.Infof("All nodes were found. WaitAndUpdateNodesStatus - Done")
+	c.log.Infof("Done waiting for all the nodes. Nodes in error status: %d\n", hostsInError)
 }
 
 func (c *controller) getMCSLogs() (string, error) {
@@ -178,7 +201,7 @@ func isCsrApproved(csr *certificatesv1beta1.CertificateSigningRequest) bool {
 	return false
 }
 
-func (c controller) PostInstallConfigs(wg *sync.WaitGroup) {
+func (c controller) PostInstallConfigs(wg *sync.WaitGroup, status *ControllerStatus) {
 	defer wg.Done()
 	for {
 		time.Sleep(GeneralWaitInterval)
@@ -199,6 +222,7 @@ func (c controller) PostInstallConfigs(wg *sync.WaitGroup) {
 	err := c.postInstallConfigs()
 	if err != nil {
 		errMessage = err.Error()
+		status.Error()
 	}
 	success := err == nil
 	c.sendCompleteInstallation(success, errMessage)

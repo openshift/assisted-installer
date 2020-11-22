@@ -59,24 +59,26 @@ func main() {
 	// without adding it will panic
 	var wg sync.WaitGroup
 	var wgLogs sync.WaitGroup
+	var status assistedinstallercontroller.ControllerStatus
+
 	ctxApprove, cancelApprove := context.WithCancel(context.Background())
 	ctxLogs, cancelLogs := context.WithCancel(context.Background())
+
 	go assistedController.ApproveCsrs(ctxApprove, &wg)
 	wg.Add(1)
-	go assistedController.PostInstallConfigs(&wg)
+	go assistedController.PostInstallConfigs(&wg, &status)
 	wg.Add(1)
 	go assistedController.UpdateBMHs(&wg)
 	wg.Add(1)
 	go assistedController.UploadControllerLogs(ctxLogs, &wgLogs)
 	wgLogs.Add(1)
 
-	assistedController.WaitAndUpdateNodesStatus()
-	logger.Infof("Sleeping for 10 minutes to give a chance to approve all crs")
+	assistedController.WaitAndUpdateNodesStatus(&status)
+	logger.Infof("Sleeping for 10 minutes to give a chance to approve all csrs")
 	time.Sleep(10 * time.Minute)
 	cancelApprove()
 	logger.Infof("Waiting fo all go routines to finish")
 	wg.Wait()
-	logger.Infof("All routines finished, closing logs")
 	cancelLogs()
 	wgLogs.Wait()
 }

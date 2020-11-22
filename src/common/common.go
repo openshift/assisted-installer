@@ -12,10 +12,21 @@ import (
 	"github.com/openshift/assisted-service/models"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/thoas/go-funk"
 	v1 "k8s.io/api/core/v1"
 )
 
 const ControllerLogsSecondsAgo = 60 * 60
+
+func FilterHostsByStatus(hosts map[string]inventory_client.HostData, status []string) map[string]inventory_client.HostData {
+	hostsbystatus := make(map[string]inventory_client.HostData)
+	for hostname, hostData := range hosts {
+		if funk.ContainsString(status, *hostData.Host.Status) {
+			hostsbystatus[hostname] = hostData
+		}
+	}
+	return hostsbystatus
+}
 
 func SetConfiguringStatusForHosts(client inventory_client.InventoryClient, inventoryHostsMapWithIp map[string]inventory_client.HostData,
 	mcsLogs string, fromBootstrap bool, log *logrus.Logger) {
