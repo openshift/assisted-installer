@@ -52,8 +52,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	generalWaitTimeout = 100 * time.Minute
 	device := "/dev/vda"
 	l.SetOutput(ioutil.Discard)
-	mkdirSuccess := func() {
-		mockops.EXPECT().Mkdir(InstallDir).Return(nil).Times(1)
+	mkdirSuccess := func(filepath string) {
+		mockops.EXPECT().Mkdir(filepath).Return(nil).Times(1)
 	}
 	downloadFileSuccess := func(fileName string) {
 		mockbmclient.EXPECT().DownloadFile(gomock.Any(), fileName, filepath.Join(InstallDir, fileName)).Return(nil).Times(1)
@@ -117,6 +117,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	}
 
 	Context("Bootstrap role", func() {
+
 		conf := config.Config{Role: string(models.HostRoleBootstrap),
 			ClusterID:        "cluster-id",
 			HostID:           "host-id",
@@ -179,13 +180,22 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		extractSecretFromIgnitionSuccess := func() {
 			mockops.EXPECT().ExtractFromIgnition(filepath.Join(InstallDir, bootstrapIgn), dockerConfigFile).Return(nil).Times(1)
 		}
+		generateSshKeyPairSuccess := func() {
+			mkdirSuccess(sshDir)
+			mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "ssh-keygen", "-q", "-f", sshKeyPath, "-N", "").Return("OK", nil).Times(1)
+		}
+		createOpenshiftSshManifestSuccess := func() {
+			mockops.EXPECT().CreateOpenshiftSshManifest(assistedInstallerSshManifest, sshManifestTmpl, sshPubKeyPath).Return(nil).Times(1)
+		}
 
 		bootstrapSetup := func() {
 			cleanInstallDevice()
-			mkdirSuccess()
+			mkdirSuccess(InstallDir)
 			downloadFileSuccess(bootstrapIgn)
 			extractSecretFromIgnitionSuccess()
-			extractIgnitionToFS("Sוuccess", nil)
+			extractIgnitionToFS("Success", nil)
+			generateSshKeyPairSuccess()
+			createOpenshiftSshManifestSuccess()
 			daemonReload(nil)
 		}
 
@@ -233,6 +243,26 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
+		It("bootstrap role creating SSH manifest failed", func() {
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+				{string(models.HostStageWaitingForControlPlane)},
+				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+				{string(models.HostStageWritingImageToDisk)},
+			})
+			cleanInstallDevice()
+			mkdirSuccess(InstallDir)
+			downloadFileSuccess(bootstrapIgn)
+			extractSecretFromIgnitionSuccess()
+			extractIgnitionToFS("Success", nil)
+			generateSshKeyPairSuccess()
+			err := fmt.Errorf("generate SSH keys failed")
+			mockops.EXPECT().CreateOpenshiftSshManifest(assistedInstallerSshManifest, sshManifestTmpl, sshPubKeyPath).Return(err).Times(1)
+			//HostRoleMaster flow:
+			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
+			writeToDiskSuccess()
+			ret := installerObj.InstallNode()
+			Expect(ret).To(HaveOccurred())
+		})
 		It("bootstrap role extract ignition retry", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageWaitingForControlPlane)},
@@ -266,7 +296,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				{string(models.HostStageWaitingForControlPlane)},
 			})
 			cleanInstallDevice()
-			mkdirSuccess()
+			mkdirSuccess(InstallDir)
 			downloadFileSuccess(bootstrapIgn)
 			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			writeToDiskSuccess()
@@ -378,7 +408,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				{string(models.HostStageRebooting)},
 			})
 			cleanInstallDevice()
-			mkdirSuccess()
+			mkdirSuccess(InstallDir)
 			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			writeToDiskSuccess()
 			uploadLogsSuccess(false)
@@ -424,7 +454,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				{string(models.HostStageInstalling), conf.Role},
 			})
 			cleanInstallDevice()
-			mkdirSuccess()
+			mkdirSuccess(InstallDir)
 			err := fmt.Errorf("failed to fetch file")
 			mockbmclient.EXPECT().DownloadHostIgnition(gomock.Any(), hostId, filepath.Join(InstallDir, "master-host-id.ign")).Return(err).Times(1)
 			ret := installerObj.InstallNode()
@@ -436,7 +466,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				{string(models.HostStageWritingImageToDisk)},
 			})
 			cleanInstallDevice()
-			mkdirSuccess()
+			mkdirSuccess(InstallDir)
 			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			err := fmt.Errorf("failed to write image to disk")
 			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, "master-host-id.ign"), device, mockbmclient, nil).Return(err).Times(3)
@@ -450,7 +480,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				{string(models.HostStageRebooting)},
 			})
 			cleanInstallDevice()
-			mkdirSuccess()
+			mkdirSuccess(InstallDir)
 			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			uploadLogsSuccess(false)
 			writeToDiskSuccess()
@@ -478,7 +508,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				{string(models.HostStageRebooting)},
 			})
 			cleanInstallDevice()
-			mkdirSuccess()
+			mkdirSuccess(InstallDir)
 			downloadHostIgnitionSuccess(hostId, "worker-host-id.ign")
 			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, "worker-host-id.ign"), device, mockbmclient, nil).Return(nil).Times(1)
 			// failure must do nothing
