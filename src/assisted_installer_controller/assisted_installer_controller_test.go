@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"sync"
 	"testing"
@@ -490,6 +491,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		}
 		var pod v1.Pod
 		BeforeEach(func() {
+			status = &ControllerStatus{}
 			LogsUploadPeriod = 100 * time.Millisecond
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
 			pod = v1.Pod{TypeMeta: metav1.TypeMeta{},
@@ -499,7 +501,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().GetPods(conf.Namespace, gomock.Any(), fmt.Sprintf("status.phase=%s", v1.PodRunning)).Return(nil, fmt.Errorf("dummy")).MinTimes(2).MaxTimes(10)
 			ctx, cancel := context.WithCancel(context.Background())
 			wg.Add(1)
-			go c.UploadControllerLogs(ctx, &wg)
+			go c.UploadLogs(ctx, &wg, status)
 			time.Sleep(1 * time.Second)
 			cancel()
 			wg.Wait()
@@ -509,26 +511,76 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().GetPodLogsAsBuffer(conf.Namespace, "test", gomock.Any()).Return(nil, fmt.Errorf("dummy")).MinTimes(1)
 			ctx, cancel := context.WithCancel(context.Background())
 			wg.Add(1)
-			go c.UploadControllerLogs(ctx, &wg)
+			go c.UploadLogs(ctx, &wg, status)
 			time.Sleep(500 * time.Millisecond)
 			cancel()
 			wg.Wait()
 		})
-		It("Validate upload logs, Upload failed", func() {
+		It("Validate upload logs (controllers logs only), Upload failed", func() {
 			r := bytes.NewBuffer([]byte("test"))
 			mockk8sclient.EXPECT().GetPodLogsAsBuffer(conf.Namespace, "test", gomock.Any()).Return(r, nil).Times(1)
 			mockbmclient.EXPECT().UploadLogs(gomock.Any(), conf.ClusterID, models.LogsTypeController, gomock.Any()).Return(fmt.Errorf("dummy")).Times(1)
-			err := c.uploadPodLogs("test", conf.Namespace, controllerLogsSecondsAgo)
+			err := c.uploadSummaryLogs("test", conf.Namespace, controllerLogsSecondsAgo, false)
 			Expect(err).To(HaveOccurred())
 		})
-		It("Validate upload logs happy flow", func() {
+		It("Validate upload logs happy flow (controllers logs only)", func() {
 			r := bytes.NewBuffer([]byte("test"))
 			mockk8sclient.EXPECT().GetPodLogsAsBuffer(conf.Namespace, "test", gomock.Any()).Return(r, nil).Times(1)
 			mockbmclient.EXPECT().UploadLogs(gomock.Any(), conf.ClusterID, models.LogsTypeController, gomock.Any()).Return(nil).Times(1)
-			err := c.uploadPodLogs("test", conf.Namespace, controllerLogsSecondsAgo)
+			err := c.uploadSummaryLogs("test", conf.Namespace, controllerLogsSecondsAgo, false)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
+	})
+
+	Context("Upload logs with oc must-gather", func() {
+		conf := ControllerConfig{
+			ClusterID: "cluster-id",
+			URL:       "https://assisted-service.com:80",
+			Namespace: "assisted-installer",
+		}
+
+		var pod v1.Pod
+		var ctx context.Context
+		var cancel context.CancelFunc
+
+		callUploadLogs := func() {
+			wg.Add(1)
+			go c.UploadLogs(ctx, &wg, status)
+			time.Sleep(150 * time.Millisecond)
+			cancel()
+			wg.Wait()
+		}
+
+		BeforeEach(func() {
+			status = &ControllerStatus{}
+			LogsUploadPeriod = 100 * time.Millisecond
+			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
+			pod = v1.Pod{TypeMeta: metav1.TypeMeta{},
+				ObjectMeta: metav1.ObjectMeta{Name: "test"}, Spec: v1.PodSpec{}, Status: v1.PodStatus{Phase: "Pending"}}
+
+			ctx, cancel = context.WithCancel(context.Background())
+			r := bytes.NewBuffer([]byte("test"))
+			mockk8sclient.EXPECT().GetPods(conf.Namespace, gomock.Any(), fmt.Sprintf("status.phase=%s", v1.PodRunning)).Return([]v1.Pod{pod}, nil).AnyTimes()
+			mockk8sclient.EXPECT().GetPodLogsAsBuffer(conf.Namespace, "test", gomock.Any()).Return(r, nil).AnyTimes()
+			mockbmclient.EXPECT().UploadLogs(gomock.Any(), conf.ClusterID, models.LogsTypeController, gomock.Any()).DoAndReturn(
+				func(ctx context.Context, clusterId string, logsType models.LogsType, reader io.Reader) error {
+					_, _ = new(bytes.Buffer).ReadFrom(reader)
+					return nil
+				}).AnyTimes()
+		})
+		It("Validate upload logs (with must-gather logs)", func() {
+			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any()).Return("../../test_files/tartest.tar.gz", nil).Times(1)
+			mockbmclient.EXPECT().DownloadFile(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
+			status.Error()
+			callUploadLogs()
+		})
+
+		It("Validate must-gather logs are not collected with no error", func() {
+			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any()).Times(0)
+			mockbmclient.EXPECT().DownloadFile(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+			callUploadLogs()
+		})
 	})
 })
 
