@@ -37,13 +37,13 @@ build/controller_ocp: lint format
 	CGO_ENABLED=0 go build -o build/assisted-installer-controller-ocp src/main/assisted-installer-controller-ocp/main.go
 
 image: build/installer
-	GIT_REVISION=${GIT_REVISION} $(CONTAINER_COMMAND) build --build-arg GIT_REVISION -f Dockerfile.assisted-installer . -t $(INSTALLER)
+	GIT_REVISION=${GIT_REVISION} $(CONTAINER_COMMAND) build --network=host --build-arg GIT_REVISION -f Dockerfile.assisted-installer . -t $(INSTALLER)
 
 push: image
 	$(CONTAINER_COMMAND) push $(INSTALLER)
 
 image_controller: build/controller
-	GIT_REVISION=${GIT_REVISION} $(CONTAINER_COMMAND) build --build-arg GIT_REVISION -f Dockerfile.assisted-installer-controller . -t $(CONTROLLER)
+	GIT_REVISION=${GIT_REVISION} $(CONTAINER_COMMAND) build --network=host --build-arg GIT_REVISION -f Dockerfile.assisted-installer-controller . -t $(CONTROLLER)
 
 push_controller: image_controller
 	$(CONTAINER_COMMAND) push $(CONTROLLER)

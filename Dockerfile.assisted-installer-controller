@@ -1,4 +1,8 @@
-FROM bash
+FROM quay.io/app-sre/centos:8
+
+RUN yum -y install make gcc unzip wget curl && yum clean all && \
+    curl -SsL https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/4.6.0/openshift-client-linux-4.6.0.tar.gz | tar -xz -C /usr/bin;
+    
 copy build/assisted-installer-controller /
 ARG GIT_REVISION
 LABEL "git_revision"=${GIT_REVISION}
