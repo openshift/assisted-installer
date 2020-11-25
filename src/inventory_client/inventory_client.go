@@ -27,6 +27,7 @@ import (
 	"github.com/openshift/assisted-service/client/installer"
 	"github.com/openshift/assisted-service/models"
 	"github.com/openshift/assisted-service/pkg/auth"
+	aserror "github.com/openshift/assisted-service/pkg/error"
 	"github.com/openshift/assisted-service/pkg/requestid"
 	"github.com/sirupsen/logrus"
 )
@@ -176,7 +177,7 @@ func (c *inventoryClient) DownloadFile(ctx context.Context, filename string, des
 		fo.Close()
 	}()
 	_, err = c.ai.Installer.DownloadClusterFiles(ctx, c.createDownloadParams(filename), fo)
-	return err
+	return aserror.GetAssistedError(err)
 }
 
 func (c *inventoryClient) DownloadHostIgnition(ctx context.Context, hostID string, dest string) error {
@@ -195,24 +196,24 @@ func (c *inventoryClient) DownloadHostIgnition(ctx context.Context, hostID strin
 		HostID:    strfmt.UUID(hostID),
 	}
 	_, err = c.ai.Installer.DownloadHostIgnition(ctx, &params, fo)
-	return err
+	return aserror.GetAssistedError(err)
 }
 
 func (c *inventoryClient) UpdateHostInstallProgress(ctx context.Context, hostId string, newStage models.HostStage, info string) error {
 	_, err := c.ai.Installer.UpdateHostInstallProgress(ctx, c.createUpdateHostInstallProgressParams(hostId, newStage, info))
-	return err
+	return aserror.GetAssistedError(err)
 }
 
 func (c *inventoryClient) UploadIngressCa(ctx context.Context, ingressCA string, clusterId string) error {
 	_, err := c.ai.Installer.UploadClusterIngressCert(ctx,
 		&installer.UploadClusterIngressCertParams{ClusterID: strfmt.UUID(clusterId), IngressCertParams: models.IngressCertParams(ingressCA)})
-	return err
+	return aserror.GetAssistedError(err)
 }
 
 func (c *inventoryClient) GetCluster(ctx context.Context) (*models.Cluster, error) {
 	cluster, err := c.ai.Installer.GetCluster(ctx, &installer.GetClusterParams{ClusterID: c.clusterId})
 	if err != nil {
-		return nil, err
+		return nil, aserror.GetAssistedError(err)
 	}
 
 	return cluster.Payload, nil
@@ -269,7 +270,7 @@ func (c *inventoryClient) getHostsWithInventoryInfo(ctx context.Context, log log
 	hostsWithHwInfo := make(map[string]HostData)
 	hosts, err := c.ai.Installer.ListHosts(ctx, &installer.ListHostsParams{ClusterID: c.clusterId})
 	if err != nil {
-		return nil, err
+		return nil, aserror.GetAssistedError(err)
 	}
 	for _, host := range hosts.Payload {
 		if funk.IndexOf(skippedStatuses, *host.Status) > -1 {
@@ -290,7 +291,7 @@ func (c *inventoryClient) CompleteInstallation(ctx context.Context, clusterId st
 	_, err := c.ai.Installer.CompleteInstallation(ctx,
 		&installer.CompleteInstallationParams{ClusterID: strfmt.UUID(clusterId),
 			CompletionParams: &models.CompletionParams{IsSuccess: &isSuccess, ErrorInfo: errorInfo}})
-	return err
+	return aserror.GetAssistedError(err)
 }
 
 func (c *inventoryClient) UploadLogs(ctx context.Context, clusterId string, logsType models.LogsType, upfile io.Reader) error {
@@ -298,5 +299,5 @@ func (c *inventoryClient) UploadLogs(ctx context.Context, clusterId string, logs
 	_, err := c.ai.Installer.UploadLogs(ctx,
 		&installer.UploadLogsParams{ClusterID: strfmt.UUID(clusterId), LogsType: string(logsType),
 			Upfile: runtime.NamedReader(fileName, upfile)})
-	return err
+	return aserror.GetAssistedError(err)
 }
