@@ -34,6 +34,7 @@ const (
 	assistedControllerPrefix    = "assisted-installer-controller"
 	assistedControllerNamespace = "assisted-installer"
 	extractRetryCount           = 3
+	waitForControllerTimeout    = 30 * time.Minute
 )
 
 var generalWaitTimeout = 30 * time.Second
@@ -335,7 +336,7 @@ func (i *installer) waitForController() error {
 		}
 		return controllerPod != nil
 	}
-	err = utils.WaitForPredicate(5*time.Minute, 5*time.Second, predicate)
+	err = utils.WaitForPredicate(waitForControllerTimeout, 5*time.Second, predicate)
 	if err != nil {
 		return errors.Errorf("Timeout while waiting for controller pod to be running")
 	}
