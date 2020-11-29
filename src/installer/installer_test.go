@@ -85,6 +85,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	}
 
 	waitForControllerSuccessfully := func(clusterId string) {
+		mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostId, models.HostStageWaitingForControlPlane, "waiting for controller pod").Return(nil).Times(1)
 		mockk8sclient.EXPECT().GetPods("assisted-installer", gomock.Any(), "").Return([]v1.Pod{{TypeMeta: metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{Name: assistedControllerPrefix + "aasdasd"},
 			Status:     v1.PodStatus{Phase: "Running"}}}, nil).Times(1)
@@ -324,7 +325,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			Expect(ret).Should(Equal(err))
 		})
 		It("waitForController reload resolv.conf failed", func() {
+			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostId, models.HostStageWaitingForControlPlane, "waiting for controller pod").Return(nil).Times(1)
 			mockops.EXPECT().ReloadHostFile("/etc/resolv.conf").Return(fmt.Errorf("dummy")).Times(1)
+
 			err := installerObj.waitForController()
 			Expect(err).To(HaveOccurred())
 		})
