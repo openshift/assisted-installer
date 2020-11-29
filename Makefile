@@ -7,6 +7,8 @@ ROOT_DIR = $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 REPORTS = $(ROOT_DIR)/reports
 TEST_PUBLISH_FLAGS = --junitfile-testsuite-name=relative --junitfile-testcase-classname=relative --junitfile $(REPORTS)/unittest.xml
 NAMESPACE := $(or ${NAMESPACE},assisted-installer)
+GIT_REVISION := $(shell git rev-parse HEAD)
+PUBLISH_TAG := $(or ${GIT_REVISION})
 
 all: image image_controller image_controller_ocp unit-test
 
@@ -60,6 +62,16 @@ deploy_controller_on_ocp_cluster:
 
 $(REPORTS):
 	-mkdir -p $(REPORTS)
+
+define publish_image
+        docker tag ${1} ${2}
+        docker push ${2}
+endef # publish_image
+
+publish:
+	$(call publish_image,${INSTALLER},quay.io/ocpmetal/assisted-installer:${PUBLISH_TAG})
+	$(call publish_image,${CONTROLLER},quay.io/ocpmetal/assisted-installer-controller:${PUBLISH_TAG})
+	$(call publish_image,${CONTROLLER_OCP},quay.io/ocpmetal/assisted-installer-controller-ocp:${PUBLISH_TAG})
 
 clean:
 	-rm -rf build $(REPORTS)

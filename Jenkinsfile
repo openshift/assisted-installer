@@ -4,15 +4,26 @@ pipeline {
   agent { label 'centos_worker' }
   triggers { cron(cron_string) }
   environment {
-        INSTALLER = 'quay.io/ocpmetal/assisted-installer'
-        CONTROLLER = 'quay.io/ocpmetal/assisted-installer-controller'
-        CONTROLLER_OCP = 'quay.io/ocpmetal/assisted-installer-controller-ocp'
+
+        // Credentials
+        SLACK_TOKEN = credentials('slack-token')
+        QUAY_IO_CREDS = credentials('ocpmetal_cred')
+
   }
   options {
     timeout(time: 1, unit: 'HOURS')
   }
 
   stages {
+
+    stage('Init') {
+        steps {
+            // Login to quay.io
+            sh "docker login quay.io -u ${QUAY_IO_CREDS_USR} -p ${QUAY_IO_CREDS_PSW}"
+            sh "podman login quay.io -u ${QUAY_IO_CREDS_USR} -p ${QUAY_IO_CREDS_PSW}"
+        }
+    }
+
     stage('build') {
         steps {
             sh 'skipper make'
@@ -25,28 +36,21 @@ pipeline {
         }
     }
 
+    stage('publish images') {
+        when {
+            expression {!env.BRANCH_NAME.startsWith('PR')}
+        }
+        steps{
+            sh "make publish"
+        }
+    }
+
     stage('publish images on push to master') {
         when {
             branch 'master'
         }
         steps {
-            withCredentials([usernamePassword(credentialsId: 'ocpmetal_cred', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
-                sh '''docker login quay.io -u $USER -p $PASS'''
-            }
-            sh '''docker tag  ${INSTALLER} ${INSTALLER}:latest'''
-            sh '''docker tag  ${INSTALLER} ${INSTALLER}:${GIT_COMMIT}'''
-            sh '''docker push ${INSTALLER}:latest'''
-            sh '''docker push ${INSTALLER}:${GIT_COMMIT}'''
-
-            sh '''docker tag  ${CONTROLLER} ${CONTROLLER}:latest'''
-            sh '''docker tag  ${CONTROLLER} ${CONTROLLER}:${GIT_COMMIT}'''
-            sh '''docker push ${CONTROLLER}:latest'''
-            sh '''docker push ${CONTROLLER}:${GIT_COMMIT}'''
-
-            sh '''docker tag  ${CONTROLLER_OCP} ${CONTROLLER_OCP}:latest'''
-            sh '''docker tag  ${CONTROLLER_OCP} ${CONTROLLER_OCP}:${GIT_COMMIT}'''
-            sh '''docker push ${CONTROLLER_OCP}:latest'''
-            sh '''docker push ${CONTROLLER_OCP}:${GIT_COMMIT}'''
+            sh "make publish PUBLISH_TAG=latest"
         }
     }
   }
@@ -54,17 +58,11 @@ pipeline {
     always {
         script {
            if ((env.BRANCH_NAME == 'master') && (currentBuild.currentResult == "ABORTED" || currentBuild.currentResult == "FAILURE")){
-                stage('notify master branch fail') {
-                    withCredentials([string(credentialsId: 'slack-token', variable: 'TOKEN')]) {
-                        sh '''
-                        echo '{"text":"Attention! assisted-installer master branch subsystem test failed, see: ' > data.txt
-                        echo ${BUILD_URL} >> data.txt
-                        echo '"}' >> data.txt
-                        curl -X POST -H 'Content-type: application/json' --data-binary "@data.txt"  https://hooks.slack.com/services/$TOKEN
-                        '''
-
-                    }
-                }
+               script {
+                   def data = [text: "Attention! ${BUILD_TAG} job failed, see: ${BUILD_URL}"]
+                   writeJSON(file: 'data.txt', json: data, pretty: 4)
+               }
+               sh '''curl -X POST -H 'Content-type: application/json' --data-binary "@data.txt" https://hooks.slack.com/services/${SLACK_TOKEN}'''
            }
         }
     }
