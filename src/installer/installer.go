@@ -123,11 +123,11 @@ func (i *installer) InstallNode() error {
 			return err
 		}
 	}
-	i.UpdateHostInstallProgress(models.HostStageRebooting, "")
 	_, err = i.ops.UploadInstallationLogs(isBootstrap)
 	if err != nil {
 		i.log.Errorf("upload installation logs %s", err)
 	}
+	i.UpdateHostInstallProgress(models.HostStageRebooting, "")
 	if err = i.ops.Reboot(); err != nil {
 		return err
 	}
