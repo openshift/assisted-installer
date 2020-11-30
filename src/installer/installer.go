@@ -34,7 +34,7 @@ const (
 	assistedControllerPrefix    = "assisted-installer-controller"
 	assistedControllerNamespace = "assisted-installer"
 	extractRetryCount           = 3
-	waitForControllerTimeout    = 30 * time.Minute
+	waitForeverTimeout          = time.Duration(1<<63 - 1) // wait forever ~ 292 years
 )
 
 var generalWaitTimeout = 30 * time.Second
@@ -333,6 +333,7 @@ func (i *installer) waitForBootkube(ctx context.Context) {
 
 func (i *installer) waitForController() error {
 	i.log.Infof("Waiting for controller pod to start running")
+	i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, "waiting for controller pod")
 	err := i.ops.ReloadHostFile("/etc/resolv.conf")
 	if err != nil {
 		i.log.WithError(err).Error("Failed to reload resolv.conf")
@@ -359,7 +360,8 @@ func (i *installer) waitForController() error {
 		}
 		return controllerPod != nil
 	}
-	err = utils.WaitForPredicate(waitForControllerTimeout, 5*time.Second, predicate)
+	// wait forever
+	err = utils.WaitForPredicate(waitForeverTimeout, 5*time.Second, predicate)
 	if err != nil {
 		return errors.Errorf("Timeout while waiting for controller pod to be running")
 	}
