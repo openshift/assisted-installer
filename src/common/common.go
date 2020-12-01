@@ -100,7 +100,8 @@ func UploadPodLogs(kc k8s_client.K8SClient, ic inventory_client.InventoryClient,
 
 	go func() {
 		defer pw.Close()
-		err = utils.WriteToTarGz(pw, podLogs, int64(podLogs.Len()), fmt.Sprintf("%s.logs", podName))
+		tarEntry := utils.NewTarEntry(podLogs, nil, int64(podLogs.Len()), fmt.Sprintf("%s.logs", podName))
+		err = utils.WriteToTarGz(pw, []utils.TarEntry{*tarEntry})
 		if err != nil {
 			log.WithError(err).Warnf("Failed to create tar.gz")
 		}

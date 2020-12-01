@@ -10,6 +10,7 @@ import (
 
 	"io/ioutil"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -41,6 +42,7 @@ type Ops interface {
 	UploadInstallationLogs(isBootstrap bool) (string, error)
 	ReloadHostFile(filepath string) error
 	CreateOpenshiftSshManifest(filePath, template, sshPubKeyPath string) error
+	GetMustGatherLogs(workDir string, kubeconfigPath string) (string, error)
 }
 
 const (
@@ -462,4 +464,45 @@ func (o *ops) CreateOpenshiftSshManifest(filePath, tmpl, sshPubKeyPath string) e
 		return err
 	}
 	return nil
+}
+
+func (o *ops) GetMustGatherLogs(workDir string, kubeconfigPath string) (string, error) {
+	//invoke oc adm must-gather command in the working directory
+	o.log.Infof("collecting must-gather logs into %s", workDir)
+	command := fmt.Sprintf("cd %s && oc --kubeconfig=%s adm must-gather", workDir, kubeconfigPath)
+	output, err := o.ExecCommand(o.logWriter, "bash", "-c", command)
+	if err != nil {
+		return "", err
+	}
+	o.log.Info(output)
+
+	//find the directory of logs which is the output of the command
+	//this is a temp directory so we have to find it by its prefix
+	files, err := ioutil.ReadDir(workDir)
+	if err != nil {
+		o.log.WithError(err).Errorf("Failed to read must-gather working dir %s\n", workDir)
+		return "", err
+	}
+	logsDir := ""
+	for _, file := range files {
+		if file.IsDir() && strings.Contains(file.Name(), "must-gather") {
+			logsDir = file.Name()
+			break
+		}
+	}
+	if logsDir == "" {
+		lerr := fmt.Errorf("Failed to find must-gather output")
+		o.log.Errorf(lerr.Error())
+		return "", lerr
+	}
+
+	//tar the log directory and return the path to the tarball
+	tarName := "must-gather.tar.gz"
+	command = fmt.Sprintf("cd %s && tar zcf %s %s", workDir, tarName, logsDir)
+	_, err = o.ExecCommand(o.logWriter, "bash", "-c", command)
+	if err != nil {
+		o.log.WithError(err).Errorf("Failed to tar must-gather logs\n")
+		return "", err
+	}
+	return path.Join(workDir, tarName), nil
 }

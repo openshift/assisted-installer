@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"path"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -48,7 +50,6 @@ type ControllerConfig struct {
 	CACertPath           string `envconfig:"CA_CERT_PATH" required:"false" default:""`
 	Namespace            string `enconfig:"NAMESPACE" required:"false" default:"assisted-installer"`
 }
-
 type Controller interface {
 	WaitAndUpdateNodesStatus(status *ControllerStatus)
 }
@@ -430,41 +431,88 @@ func (c controller) sendCompleteInstallation(isSuccess bool, errorInfo string) {
 	c.log.Infof("Done complete installation step")
 }
 
-// get pod logs,
-// write tar.gz to pipe in a routine
-// upload tar.gz from pipe to assisted service.
-// close read and write pipes
-func (c controller) uploadPodLogs(podName string, namespace string, sinceSeconds int64) error {
+/**
+ * This function upload the following logs at once to the service at the end of the installation process
+ * It takes a linient approach so if some logs are not available it ignores them and moves on
+ * currently the bundled logs are:
+ * - controller logs
+ * - oc must-gather logs
+ **/
+func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSeconds int64, isMustGatherEnabled bool) error {
+	var tarentries = make([]utils.TarEntry, 0)
+	ctx := utils.GenerateRequestContext()
+
 	c.log.Infof("Uploading logs for %s in %s", podName, namespace)
-	podLogs, err := c.kc.GetPodLogsAsBuffer(namespace, podName, sinceSeconds)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to get logs of pod %s", podName)
+	if podLogs, err := c.kc.GetPodLogsAsBuffer(namespace, podName, sinceSeconds); err == nil {
+		tarentries = append(tarentries,
+			*utils.NewTarEntry(podLogs, nil, int64(podLogs.Len()), fmt.Sprintf("%s.logs", podName)))
 	}
+
+	if isMustGatherEnabled {
+		c.log.Infof("Uploading oc must-gather logs")
+		if tarfile, err := c.collectMustGatherLogs(ctx); err == nil {
+			if entry, tarerr := utils.NewTarEntryFromFile(tarfile); tarerr == nil {
+				tarentries = append(tarentries, *entry)
+			}
+		}
+	}
+
+	if len(tarentries) == 0 {
+		return errors.New("No logs are available for sending summary logs")
+	}
+
+	//write the combined input of the summary sources into a pipe and offload it
+	//to the UploadLogs request to the assisted-service
 	pr, pw := io.Pipe()
 	defer pr.Close()
 
 	go func() {
 		defer pw.Close()
-		err = utils.WriteToTarGz(pw, podLogs, int64(podLogs.Len()), fmt.Sprintf("%s.logs", podName))
+		err := utils.WriteToTarGz(pw, tarentries)
 		if err != nil {
-			c.log.WithError(err).Warnf("Failed to create tar.gz")
+			c.log.WithError(err).Warnf("Failed to create tar.gz body of the log uplaod request")
 		}
 	}()
 	// if error will occur in goroutine above
 	//it will close writer and upload will fail
-	ctx := utils.GenerateRequestContext()
-	err = c.ic.UploadLogs(ctx, c.ClusterID, models.LogsTypeController, pr)
+	err := c.ic.UploadLogs(ctx, c.ClusterID, models.LogsTypeController, pr)
 	if err != nil {
 		utils.RequestIDLogger(ctx, c.log).WithError(err).Error("Failed to upload logs")
-		return errors.Wrapf(err, "Failed to upload logs")
 	}
-	return nil
+
+	return err
+}
+
+func (c controller) collectMustGatherLogs(ctx context.Context) (string, error) {
+	tempDir, ferr := ioutil.TempDir("", "controller-must-gather-logs-")
+	if ferr != nil {
+		c.log.Errorf("Failed to create temp directory for must-gather-logs %v\n", ferr)
+		return "", ferr
+	}
+
+	//donwload kubeconfig file
+	kubeconfig_file_name := "kubeconfig-noingress"
+	kubeconfigPath := path.Join(tempDir, kubeconfig_file_name)
+	err := c.ic.DownloadFile(ctx, kubeconfig_file_name, kubeconfigPath)
+	if err != nil {
+		c.log.Errorf("Failed to download noingress kubeconfig %v\n", err)
+		return "", err
+	}
+
+	//collect must gather logs
+	logtar, err := c.ops.GetMustGatherLogs(tempDir, kubeconfigPath)
+	if err != nil {
+		c.log.Errorf("Failed to collect must-gather logs %v\n", err)
+		return "", err
+	}
+
+	return logtar, nil
 }
 
 // Uploading logs every 5 minutes
 // We will take logs of assisted controller and upload them to assisted-service
 // by creating tar gz of them.
-func (c *controller) UploadControllerLogs(ctx context.Context, wg *sync.WaitGroup) {
+func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup, status *ControllerStatus) {
 	defer wg.Done()
 	c.log.Infof("Start sending logs")
 	podName := ""
@@ -473,9 +521,8 @@ func (c *controller) UploadControllerLogs(ctx context.Context, wg *sync.WaitGrou
 		select {
 		case <-ctx.Done():
 			if podName != "" {
-				c.log.Infof("Upload logs before exit")
-				_ = c.uploadPodLogs(podName, c.Namespace, controllerLogsSecondsAgo)
-
+				c.log.Infof("Upload final controller and cluster logs before exit")
+				_ = c.uploadSummaryLogs(podName, c.Namespace, controllerLogsSecondsAgo, status.HasError())
 			}
 			c.log.Infof("Done uploading logs")
 			return
@@ -498,7 +545,7 @@ func (c *controller) UploadControllerLogs(ctx context.Context, wg *sync.WaitGrou
 				c.log.WithError(err).Warnf("Failed to upload controller logs")
 				continue
 			}
-			c.log.Infof("Successfully uploaded controller logs")
+			c.log.Infof("Successfully uploaded controller logs (intermediate snapshot) ...")
 		}
 	}
 }
