@@ -245,7 +245,7 @@ func (o *ops) PrepareController() error {
 	}
 
 	// Copy deploy files to manifestsFolder
-	files, err := utils.GetListOfFilesFromFolder(controllerDeployFolder, "*.yaml")
+	files, err := utils.FindFiles(controllerDeployFolder, utils.W_FILEONLY, "*.yaml")
 	if err != nil {
 		o.log.Errorf("Error occurred while trying to get list of files from %s : %e", controllerDeployFolder, err)
 		return err
@@ -379,7 +379,7 @@ func (o *ops) Wipefs(device string) error {
 
 func (o *ops) GetMCSLogs() (string, error) {
 
-	files, err := utils.GetListOfFilesFromFolder("/var/log/containers/", "*machine-config-server*.log")
+	files, err := utils.FindFiles("/var/log/containers/", utils.W_FILEONLY, "*machine-config-server*.log")
 	if err != nil {
 		o.log.WithError(err).Errorf("Error occurred while trying to get list of files from %s", "/var/log/containers/")
 		return "", err
@@ -478,23 +478,18 @@ func (o *ops) GetMustGatherLogs(workDir string, kubeconfigPath string) (string, 
 
 	//find the directory of logs which is the output of the command
 	//this is a temp directory so we have to find it by its prefix
-	files, err := ioutil.ReadDir(workDir)
+	files, err := utils.FindFiles(workDir, utils.W_DIRONLY, "must-gather*")
 	if err != nil {
 		o.log.WithError(err).Errorf("Failed to read must-gather working dir %s\n", workDir)
 		return "", err
 	}
-	logsDir := ""
-	for _, file := range files {
-		if file.IsDir() && strings.Contains(file.Name(), "must-gather") {
-			logsDir = file.Name()
-			break
-		}
-	}
-	if logsDir == "" {
+
+	if len(files) == 0 {
 		lerr := fmt.Errorf("Failed to find must-gather output")
 		o.log.Errorf(lerr.Error())
 		return "", lerr
 	}
+	logsDir := filepath.Base(files[0])
 
 	//tar the log directory and return the path to the tarball
 	tarName := "must-gather.tar.gz"

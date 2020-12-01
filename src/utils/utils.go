@@ -32,6 +32,22 @@ var (
 	envVarsProxyFuncValue func(*url.URL) (*url.URL, error)
 )
 
+type WalkMode uint32
+
+const (
+	W_FILEONLY WalkMode = iota
+	W_DIRONLY
+	W_ALL
+)
+
+func (wm WalkMode) IncludeFiles() bool {
+	return wm == W_FILEONLY || wm == W_ALL
+}
+
+func (wm WalkMode) IncludeDirs() bool {
+	return wm == W_DIRONLY || wm == W_ALL
+}
+
 type LogWriter struct {
 	log *logrus.Logger
 }
@@ -84,13 +100,16 @@ func GetFileContentFromIgnition(ignitionData []byte, fileName string) ([]byte, e
 	return nil, fmt.Errorf("path %s found in ignition", fileName)
 }
 
-func GetListOfFilesFromFolder(root, pattern string) ([]string, error) {
+func FindFiles(root string, mode WalkMode, pattern string) ([]string, error) {
 	var matches []string
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() {
+		if path == root {
+			return nil
+		}
+		if !(info.IsDir() && mode.IncludeDirs() || !info.IsDir() && mode.IncludeFiles()) {
 			return nil
 		}
 		if matched, err := filepath.Match(pattern, filepath.Base(path)); err != nil {
