@@ -42,17 +42,30 @@ var _ = Describe("Verify_utils", func() {
 
 	Context("Find files", func() {
 		It("Read directory and return found files", func() {
-			found, err := GetListOfFilesFromFolder("../../test_files", "*.json")
+			found, err := FindFiles("../../test_files", W_FILEONLY, "*.json")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(found)).Should(Equal(1))
 			Expect(filepath.Base(found[0])).Should(Equal("node.json"))
 
-			found, err = GetListOfFilesFromFolder("../../test_files", "*.not_exists")
+			found, err = FindFiles("../../test_files", W_FILEONLY, "*.not_exists")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(found)).Should(Equal(0))
 
-			_, err = GetListOfFilesFromFolder("../../test_files_not_exists", "*.json")
+			_, err = FindFiles("../../test_files_not_exists", W_FILEONLY, "*.json")
 			Expect(err).Should(HaveOccurred())
+		})
+
+		It("Read directory and return matched dir", func() {
+			found, err := FindFiles("../../test_files", W_DIRONLY, "dir_*")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(found)).Should(Equal(1))
+			Expect(filepath.Base(found[0])).Should(Equal("dir_for_test"))
+		})
+
+		It("Read directory and return all matches", func() {
+			found, err := FindFiles("../../test_files", W_ALL, "*test*")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(found)).Should(Equal(3))
 		})
 	})
 
