@@ -1,4 +1,4 @@
-FROM bash
+FROM quay.io/app-sre/centos:8
 copy build/assisted-installer-controller-ocp /
 ARG GIT_REVISION
 LABEL "git_revision"=${GIT_REVISION}
