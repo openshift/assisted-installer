@@ -27,7 +27,7 @@ require (
 	golang.org/x/net v0.0.0-20201002202402-0a1ea396d57c
 	golang.org/x/sync v0.0.0-20201008141435-b3e1573b7520
 	k8s.io/api v0.19.4
-	k8s.io/apimachinery v0.19.2
+	k8s.io/apimachinery v0.19.4
 	k8s.io/client-go v12.0.0+incompatible
 	sigs.k8s.io/controller-runtime v0.6.2
 )
