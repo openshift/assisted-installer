@@ -11,13 +11,16 @@ import (
 	"time"
 
 	"github.com/go-openapi/strfmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/pkg/errors"
+
+	v1 "k8s.io/api/core/v1"
+
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/inventory_client"
@@ -162,6 +165,18 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
 			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), inventoryNamesHost["node1"].Host.ID.String(), models.HostStageJoined, "").Times(1)
 		}
+		getNetworkTypeSuccessOpenshiftSDN := func() {
+			mockk8sclient.EXPECT().GetNetworkType().Return("OpenshiftSDN", nil).Times(2)
+		}
+		getNetworkTypeSuccessOVNKubernetes := func() {
+			mockk8sclient.EXPECT().GetNetworkType().Return("OVNKubernetes", nil).Times(2)
+		}
+		patchControlPlaneReplicasSuccess := func() {
+			mockk8sclient.EXPECT().PatchControlPlaneReplicas().Return(nil).Times(1)
+		}
+		unpatchControlPlaneReplicasSuccess := func() {
+			mockk8sclient.EXPECT().UnPatchControlPlaneReplicas().Return(nil).Times(1)
+		}
 		prepareControllerSuccess := func() {
 			mockops.EXPECT().PrepareController().Return(nil).Times(1)
 		}
@@ -205,6 +220,34 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			restartNetworkManager(nil)
 			prepareControllerSuccess()
 			startServicesSuccess()
+			getNetworkTypeSuccessOpenshiftSDN()
+			WaitMasterNodesSucccess()
+			waitForBootkubeSuccess()
+			bootkubeStatusSuccess()
+			resolvConfSuccess()
+			waitForControllerSuccessfully(conf.ClusterID)
+			//HostRoleMaster flow:
+			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
+			writeToDiskSuccess(gomock.Any())
+			uploadLogsSuccess(true)
+			rebootSuccess()
+			ret := installerObj.InstallNode()
+			Expect(ret).Should(BeNil())
+		})
+		It("bootstrap role happy flow ovn-kubernetes", func() {
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+				{string(models.HostStageWaitingForControlPlane)},
+				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+				{string(models.HostStageWritingImageToDisk)},
+				{string(models.HostStageRebooting)},
+			})
+			bootstrapSetup()
+			restartNetworkManager(nil)
+			prepareControllerSuccess()
+			startServicesSuccess()
+			getNetworkTypeSuccessOVNKubernetes()
+			patchControlPlaneReplicasSuccess()
+			unpatchControlPlaneReplicasSuccess()
 			WaitMasterNodesSucccess()
 			waitForBootkubeSuccess()
 			bootkubeStatusSuccess()
@@ -250,6 +293,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			restartNetworkManager(nil)
 			prepareControllerSuccess()
 			startServicesSuccess()
+			getNetworkTypeSuccessOpenshiftSDN()
 			WaitMasterNodesSucccess()
 			waitForBootkubeSuccess()
 			bootkubeStatusSuccess()

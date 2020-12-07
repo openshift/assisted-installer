@@ -3,9 +3,13 @@ package k8s_client
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"strings"
+
+	"gopkg.in/yaml.v2"
 
 	bmoapis "github.com/metal3-io/baremetal-operator/pkg/apis"
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
@@ -43,6 +47,8 @@ type K8SClient interface {
 	ListMasterNodes() (*v1.NodeList, error)
 	PatchEtcd() error
 	UnPatchEtcd() error
+	PatchControlPlaneReplicas() error
+	UnPatchControlPlaneReplicas() error
 	ListNodes() (*v1.NodeList, error)
 	ListMachines() (*machinev1beta1.MachineList, error)
 	RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error)
@@ -58,6 +64,7 @@ type K8SClient interface {
 	UpdateBMH(bmh *metal3v1alpha1.BareMetalHost) error
 	SetProxyEnvVars() error
 	GetClusterVersion(name string) (*configv1.ClusterVersion, error)
+	GetNetworkType() (string, error)
 }
 
 type K8SClientBuilder func(configPath string, logger *logrus.Logger) (K8SClient, error)
@@ -71,6 +78,11 @@ type k8sClient struct {
 	csrClient   certificatesv1beta1client.CertificateSigningRequestInterface
 	proxyClient configv1client.ProxyInterface
 }
+
+const (
+	KUBE_SYSTEM_NAMESPACE  = "kube-system"
+	CLUSTER_CONFIG_V1_NAME = "cluster-config-v1"
+)
 
 func NewK8SClient(configPath string, logger *logrus.Logger) (K8SClient, error) {
 	config, err := clientcmd.BuildConfigFromFlags("", configPath)
@@ -167,6 +179,99 @@ func (c *k8sClient) UnPatchEtcd() error {
 	}
 	c.log.Info(result)
 	return nil
+}
+
+func (c *k8sClient) GetNetworkType() (string, error) {
+	cm, err := c.GetConfigMap(KUBE_SYSTEM_NAMESPACE, CLUSTER_CONFIG_V1_NAME)
+	if err != nil {
+		return "", errors.Wrap(err, "Failed to get config map")
+	}
+	installConfig, found := cm.Data["install-config"]
+	if !found {
+		return "", errors.New("Failed to get install config")
+	}
+	var networkingDecoder struct {
+		Networking struct {
+			NetworkType string `yaml:"networkType"`
+		} `yaml:"networking"`
+	}
+	err = yaml.Unmarshal([]byte(installConfig), &networkingDecoder)
+	if err != nil {
+		return "", errors.Wrapf(err, "Failed to unmarshal %s", installConfig)
+	}
+	return networkingDecoder.Networking.NetworkType, nil
+}
+
+func updateItem(item *yaml.MapItem, path []string, value string) error {
+	if len(path) == 0 {
+		item.Value = value
+		return nil
+	}
+	slice, ok := item.Value.(yaml.MapSlice)
+	if !ok {
+		return errors.New("Underlying is not a slice")
+	}
+	return updateSlice(slice, path, value)
+}
+
+func updateSlice(slice yaml.MapSlice, path []string, value string) error {
+	for i := range slice {
+		if slice[i].Key == interface{}(path[0]) {
+			return updateItem(&slice[i], path[1:], value)
+		}
+	}
+	return errors.Errorf("%s was not found", path[0])
+}
+
+func updateSliceValue(slice yaml.MapSlice, path string, value string) error {
+	splitPath := strings.Split(path, ".")
+	return updateSlice(slice, splitPath, value)
+}
+
+func (c *k8sClient) updateControlPlaneReplicas(value string) error {
+	cm, err := c.GetConfigMap(KUBE_SYSTEM_NAMESPACE, CLUSTER_CONFIG_V1_NAME)
+	if err != nil {
+		return errors.Wrap(err, "Failed to get config map")
+	}
+	installConfigStr, found := cm.Data["install-config"]
+	if !found {
+		return errors.New("Failed to get install config")
+	}
+	var installConfig yaml.MapSlice
+	if err = yaml.Unmarshal([]byte(installConfigStr), &installConfig); err != nil {
+		return errors.Wrap(err, "Failed to unmarshal install-config")
+	}
+	if err = updateSliceValue(installConfig, "controlPlane.replicas", value); err != nil {
+		return err
+	}
+	b, err := yaml.Marshal(&installConfig)
+	if err != nil {
+		return errors.Wrap(err, "Failed to marshal install-config yaml")
+	}
+	jsonPayload := map[string]map[string]string{
+		"data": {
+			"install-config": string(b),
+		},
+	}
+	data, err := json.Marshal(&jsonPayload)
+	if err != nil {
+		return errors.Wrap(err, "Failed to JSON marshal")
+	}
+	result, err := c.client.CoreV1().ConfigMaps(KUBE_SYSTEM_NAMESPACE).Patch(context.TODO(), CLUSTER_CONFIG_V1_NAME, types.MergePatchType, data, metav1.PatchOptions{})
+	if err != nil {
+		return errors.Wrap(err, "Failed to patch control plane replicas")
+	}
+	c.log.Debug(result)
+	c.log.Infof("Changed control plane replicas to %s", value)
+	return nil
+}
+
+func (c *k8sClient) PatchControlPlaneReplicas() error {
+	return c.updateControlPlaneReplicas("2")
+}
+
+func (c *k8sClient) UnPatchControlPlaneReplicas() error {
+	return c.updateControlPlaneReplicas("3")
 }
 
 func (c *k8sClient) RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error) {

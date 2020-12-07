@@ -83,6 +83,34 @@ func (mr *MockK8SClientMockRecorder) UnPatchEtcd() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnPatchEtcd", reflect.TypeOf((*MockK8SClient)(nil).UnPatchEtcd))
 }
 
+// PatchControlPlaneReplicas mocks base method
+func (m *MockK8SClient) PatchControlPlaneReplicas() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PatchControlPlaneReplicas")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PatchControlPlaneReplicas indicates an expected call of PatchControlPlaneReplicas
+func (mr *MockK8SClientMockRecorder) PatchControlPlaneReplicas() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchControlPlaneReplicas", reflect.TypeOf((*MockK8SClient)(nil).PatchControlPlaneReplicas))
+}
+
+// UnPatchControlPlaneReplicas mocks base method
+func (m *MockK8SClient) UnPatchControlPlaneReplicas() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UnPatchControlPlaneReplicas")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UnPatchControlPlaneReplicas indicates an expected call of UnPatchControlPlaneReplicas
+func (mr *MockK8SClientMockRecorder) UnPatchControlPlaneReplicas() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnPatchControlPlaneReplicas", reflect.TypeOf((*MockK8SClient)(nil).UnPatchControlPlaneReplicas))
+}
+
 // ListNodes mocks base method
 func (m *MockK8SClient) ListNodes() (*v10.NodeList, error) {
 	m.ctrl.T.Helper()
@@ -302,4 +330,19 @@ func (m *MockK8SClient) GetClusterVersion(name string) (*v1.ClusterVersion, erro
 func (mr *MockK8SClientMockRecorder) GetClusterVersion(name interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClusterVersion", reflect.TypeOf((*MockK8SClient)(nil).GetClusterVersion), name)
+}
+
+// GetNetworkType mocks base method
+func (m *MockK8SClient) GetNetworkType() (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNetworkType")
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNetworkType indicates an expected call of GetNetworkType
+func (mr *MockK8SClientMockRecorder) GetNetworkType() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNetworkType", reflect.TypeOf((*MockK8SClient)(nil).GetNetworkType))
 }
