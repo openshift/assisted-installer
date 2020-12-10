@@ -275,18 +275,9 @@ func (c controller) UpdateBMHs(wg *sync.WaitGroup) {
 	defer wg.Done()
 	for {
 		time.Sleep(GeneralWaitInterval)
-		exists, err := c.kc.IsMetalProvisioningExists()
-		if err != nil {
-			continue
-		}
-		if err == nil && exists {
-			c.log.Infof("Provisioning CR exists, no need to update BMHs")
-			return
-		}
-
 		bmhs, err := c.kc.ListBMHs()
 		if err != nil {
-			c.log.WithError(err).Errorf("Failed to BMH hosts")
+			c.log.WithError(err).Errorf("Failed to list BMH hosts")
 			continue
 		}
 
@@ -294,13 +285,13 @@ func (c controller) UpdateBMHs(wg *sync.WaitGroup) {
 
 		machines, err := c.unallocatedMachines(bmhs)
 		if err != nil {
-			c.log.WithError(err).Errorf("Failed to get machines")
+			c.log.WithError(err).Errorf("Failed to find unallocated machines")
 			continue
 		}
 
 		c.log.Infof("Number of unallocated Machines is %d", len(machines.Items))
 
-		allUpdated := c.updateBMHs(bmhs, machines)
+		allUpdated := c.updateBMHs(&bmhs, machines)
 		if allUpdated {
 			c.log.Infof("Updated all the BMH CRs, finished successfully")
 			return
@@ -334,68 +325,33 @@ func (c controller) unallocatedMachines(bmhList metal3v1alpha1.BareMetalHostList
 	return unallocatedList, nil
 }
 
-func (c controller) updateBMHs(bmhList metal3v1alpha1.BareMetalHostList, machineList *mapiv1beta1.MachineList) bool {
-	allUpdated := true
+func (c controller) copyBMHAnnotationsToStatus(bmh *metal3v1alpha1.BareMetalHost) (bool, error) {
+	annotations := bmh.GetAnnotations()
+	content := []byte(annotations[metal3v1alpha1.StatusAnnotation])
 
-	for i := range bmhList.Items {
-		bmh := bmhList.Items[i]
-		c.log.Infof("Checking bmh %s", bmh.Name)
-		annotations := bmh.GetAnnotations()
-		content := []byte(annotations[metal3v1alpha1.StatusAnnotation])
-
-		if annotations[metal3v1alpha1.StatusAnnotation] == "" && bmh.Spec.ConsumerRef != nil {
-			c.log.Infof("Skipping setting status of BMH host %s, status annotation not present", bmh.Name)
-			continue
-		}
-		allUpdated = false
-		if annotations[metal3v1alpha1.StatusAnnotation] != "" {
-			c.log.Infof("Updating annotations for bmh %s", bmh.Name)
-			objStatus, err := c.unmarshalStatusAnnotation(content)
-			if err != nil {
-				c.log.WithError(err).Errorf("Failed to unmarshal status annotation of %s", bmh.Name)
-				continue
-			}
-			bmh.Status = *objStatus
-			if bmh.Status.LastUpdated.IsZero() {
-				// Ensure the LastUpdated timestamp in set to avoid
-				// infinite loops if the annotation only contained
-				// part of the status information.
-				t := metav1.Now()
-				bmh.Status.LastUpdated = &t
-			}
-			err = c.kc.UpdateBMHStatus(&bmh)
-			if err != nil {
-				c.log.WithError(err).Errorf("Failed to update status of BMH %s", bmh.Name)
-				continue
-			}
-			delete(annotations, metal3v1alpha1.StatusAnnotation)
-		}
-
-		if bmh.Spec.ConsumerRef == nil {
-			/*
-				update consumer ref for workers only in case machineset controller has already
-				created an unassigned Machine (base on machineset replica count)
-			*/
-			if len(machineList.Items) == 0 {
-				c.log.Infof("No available machine for bmh %s, need to wait for machineset controller to create one", bmh.Name)
-				continue
-			}
-			c.log.Infof("Updating consumer ref for bmh %s", bmh.Name)
-			machine := machineList.Items[0]
-			machineList.Items = machineList.Items[1:]
-			bmh.Spec.ConsumerRef = &v1.ObjectReference{
-				APIVersion: machine.APIVersion,
-				Kind:       machine.Kind,
-				Namespace:  machine.Namespace,
-				Name:       machine.Name,
-			}
-		}
-		err := c.kc.UpdateBMH(&bmh)
-		if err != nil {
-			c.log.WithError(err).Errorf("Failed to update BMH %s", bmh.Name)
-		}
+	if annotations[metal3v1alpha1.StatusAnnotation] == "" {
+		c.log.Infof("Skipping setting status of BMH host %s, status annotation not present", bmh.Name)
+		return false, nil
 	}
-	return allUpdated
+	objStatus, err := c.unmarshalStatusAnnotation(content)
+	if err != nil {
+		c.log.WithError(err).Errorf("Failed to unmarshal status annotation of %s", bmh.Name)
+		return false, err
+	}
+	bmh.Status = *objStatus
+	if bmh.Status.LastUpdated.IsZero() {
+		// Ensure the LastUpdated timestamp in set to avoid
+		// infinite loops if the annotation only contained
+		// part of the status information.
+		t := metav1.Now()
+		bmh.Status.LastUpdated = &t
+	}
+	err = c.kc.UpdateBMHStatus(bmh)
+	if err != nil {
+		c.log.WithError(err).Errorf("Failed to update status of BMH %s", bmh.Name)
+		return false, err
+	}
+	return true, nil
 }
 
 func (c controller) unmarshalStatusAnnotation(content []byte) (*metal3v1alpha1.BareMetalHostStatus, error) {
@@ -405,6 +361,127 @@ func (c controller) unmarshalStatusAnnotation(content []byte) (*metal3v1alpha1.B
 		return nil, err
 	}
 	return bmhStatus, nil
+}
+
+// updateBMHWithProvisioning() If we are in None or Unmanaged state:
+// - set ExternallyProvisioned
+// - Removing pausedAnnotation from BMH master hosts
+// - set the consumer ref
+func (c controller) updateBMHWithProvisioning(bmh *metal3v1alpha1.BareMetalHost, machineList *mapiv1beta1.MachineList) error {
+	if bmh.Status.Provisioning.State != metal3v1alpha1.StateNone && bmh.Status.Provisioning.State != metal3v1alpha1.StateUnmanaged {
+		c.log.Infof("bmh %s Provisioning.State=%s - ignoring", bmh.Name, bmh.Status.Provisioning.State)
+		return nil
+	}
+	var err error
+	needsUpdate := !bmh.Spec.ExternallyProvisioned
+	bmh.Spec.ExternallyProvisioned = true
+	// when baremetal operator is enabled, we need to remove the pausedAnnotation
+	// to indicated that the statusAnnotation is available. This is only on
+	// the master nodes.
+	annotations := bmh.GetAnnotations()
+	if _, ok := annotations[metal3v1alpha1.PausedAnnotation]; ok {
+		c.log.Infof("Removing pausedAnnotation from BMH host %s", bmh.Name)
+		delete(annotations, metal3v1alpha1.PausedAnnotation)
+		needsUpdate = true
+	}
+	if bmh.Spec.ConsumerRef == nil {
+		err = c.updateConsumerRef(bmh, machineList)
+		if err != nil {
+			return err
+		}
+		needsUpdate = true
+	}
+	if needsUpdate {
+		c.log.Infof("Updating bmh %s", bmh.Name)
+		err = c.kc.UpdateBMH(bmh)
+		if err != nil {
+			return errors.Wrapf(err, "Failed to update BMH %s", bmh.Name)
+		}
+	}
+	return nil
+}
+
+// updateBMHWithNOProvisioning()
+// - move the BMH status annotation to the Status sub resource
+// - set the consumer ref
+func (c controller) updateBMHWithNOProvisioning(bmh *metal3v1alpha1.BareMetalHost, machineList *mapiv1beta1.MachineList) error {
+	statusUpdated, err := c.copyBMHAnnotationsToStatus(bmh)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to copy BMH Annotations to Status %s", bmh.Name)
+	}
+	if statusUpdated {
+		// refresh the BMH after the StatusUpdate to get the new generation
+		bmh, err = c.kc.GetBMH(bmh.Name)
+		if err != nil {
+			return errors.Wrapf(err, "Failed to refresh the BMH %s", bmh.Name)
+		}
+	}
+	needsUpdate := false
+	annotations := bmh.GetAnnotations()
+	if _, ok := annotations[metal3v1alpha1.StatusAnnotation]; ok {
+		delete(annotations, metal3v1alpha1.StatusAnnotation)
+		needsUpdate = true
+	}
+
+	if bmh.Spec.ConsumerRef == nil {
+		err = c.updateConsumerRef(bmh, machineList)
+		if err != nil {
+			return err
+		}
+		needsUpdate = true
+	}
+	if needsUpdate {
+		c.log.Infof("Updating bmh %s", bmh.Name)
+		err = c.kc.UpdateBMH(bmh)
+		if err != nil {
+			return errors.Wrapf(err, "Failed to update BMH %s", bmh.Name)
+		}
+	}
+	return nil
+}
+
+func (c controller) updateConsumerRef(bmh *metal3v1alpha1.BareMetalHost, machineList *mapiv1beta1.MachineList) error {
+	//	update consumer ref for workers only in case machineset controller has already
+	//	created an unassigned Machine (base on machineset replica count)
+	if len(machineList.Items) == 0 {
+		return fmt.Errorf("No available machine for bmh %s, need to wait for machineset controller to create one", bmh.Name)
+	}
+	c.log.Infof("Updating consumer ref for bmh %s", bmh.Name)
+	machine := &machineList.Items[0]
+	machineList.Items = machineList.Items[1:]
+	bmh.Spec.ConsumerRef = &v1.ObjectReference{
+		APIVersion: machine.APIVersion,
+		Kind:       machine.Kind,
+		Namespace:  machine.Namespace,
+		Name:       machine.Name,
+	}
+	return nil
+}
+
+func (c controller) updateBMHs(bmhList *metal3v1alpha1.BareMetalHostList, machineList *mapiv1beta1.MachineList) bool {
+	provisioningExists, err := c.kc.IsMetalProvisioningExists()
+	if err != nil {
+		c.log.WithError(err).Errorf("Failed get IsMetalProvisioningExists")
+		return false
+	}
+
+	allUpdated := true
+	for i := range bmhList.Items {
+		bmh := bmhList.Items[i]
+		c.log.Infof("Checking bmh %s", bmh.Name)
+
+		if provisioningExists {
+			err = c.updateBMHWithProvisioning(&bmh, machineList)
+		} else {
+			err = c.updateBMHWithNOProvisioning(&bmh, machineList)
+		}
+		if err != nil {
+			c.log.WithError(err).Errorf("Failed to update BMH %s", bmh.Name)
+			allUpdated = false
+			continue
+		}
+	}
+	return allUpdated
 }
 
 func (c controller) unpatchEtcd() bool {

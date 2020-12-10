@@ -521,12 +521,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
 			GeneralWaitInterval = 1 * time.Second
 		})
-		It("provisioning exists, early return", func() {
-			mockk8sclient.EXPECT().IsMetalProvisioningExists().Return(true, nil)
-			wg.Add(1)
-			go c.UpdateBMHs(&wg)
-			wg.Wait()
-		})
 		It("worker machine does not exists", func() {
 			emptyMachineList := &machinev1beta1.MachineList{Items: machineList.Items[:0]}
 			expect1 := &metal3v1alpha1.BareMetalHost{
@@ -538,15 +532,17 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				},
 				Status: bmhStatus,
 			}
+			mockk8sclient.EXPECT().IsMetalProvisioningExists().Return(false, nil)
 			mockk8sclient.EXPECT().UpdateBMHStatus(expect1).Return(nil)
-			bmhListTemp := metal3v1alpha1.BareMetalHostList{
+			bmhListTemp := &metal3v1alpha1.BareMetalHostList{
 				Items: []metal3v1alpha1.BareMetalHost{
 					*(bmhList.Items[0].DeepCopy()),
 				},
 			}
+			mockk8sclient.EXPECT().GetBMH(expect1.Name).Return(expect1, nil)
 			c.updateBMHs(bmhListTemp, emptyMachineList)
 		})
-		It("normal path", func() {
+		It("no MetalProvisioning", func() {
 			expect1 := &metal3v1alpha1.BareMetalHost{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "openshift-worker-0",
@@ -557,7 +553,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				Status: bmhStatus,
 			}
 
+			mockk8sclient.EXPECT().IsMetalProvisioningExists().Return(false, nil)
 			mockk8sclient.EXPECT().UpdateBMHStatus(expect1).Return(nil)
+			mockk8sclient.EXPECT().GetBMH(expect1.Name).Return(expect1, nil)
 
 			expect2 := expect1.DeepCopy()
 			expect2.Spec = metal3v1alpha1.BareMetalHostSpec{
@@ -570,7 +568,32 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			}
 			expect2.ObjectMeta.Annotations = map[string]string{}
 			mockk8sclient.EXPECT().UpdateBMH(expect2).Return(nil)
-			c.updateBMHs(bmhList, &machineList)
+			c.updateBMHs(bmhList.DeepCopy(), machineList.DeepCopy())
+		})
+		It("has MetalProvisioning", func() {
+			bmhListWithPause := bmhList.DeepCopy()
+			bmhListWithPause.Items[0].Annotations[metal3v1alpha1.PausedAnnotation] = ""
+			expect1 := &metal3v1alpha1.BareMetalHost{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "openshift-worker-0",
+					Annotations: map[string]string{
+						metal3v1alpha1.StatusAnnotation: string(annBytes),
+					},
+				},
+				Spec: metal3v1alpha1.BareMetalHostSpec{
+					ExternallyProvisioned: true,
+					ConsumerRef: &v1.ObjectReference{
+						APIVersion: "metal3.io/v1alpha1",
+						Kind:       "Machine",
+						Namespace:  "openshift-machine-api",
+						Name:       "xyz-assisted-instal-8p7km-worker-0-25rnh",
+					},
+				},
+			}
+
+			mockk8sclient.EXPECT().IsMetalProvisioningExists().Return(true, nil)
+			mockk8sclient.EXPECT().UpdateBMH(expect1).Return(nil)
+			c.updateBMHs(bmhListWithPause, machineList.DeepCopy())
 		})
 	})
 
