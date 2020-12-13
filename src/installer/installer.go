@@ -223,7 +223,7 @@ func (i *installer) extractIgnitionToFS(ignitionPath string) (err error) {
 			mcoImage,
 			"start", "--node-name", "localhost", "--root-mount", "/rootfs", "--once-from", ignitionPath, "--skip-reboot")
 		if err != nil {
-			i.log.Errorf("Failed to extract ignition to disk")
+			i.log.WithError(err).Error("Failed to extract ignition to disk")
 		} else {
 			i.log.Info("Done extracting ignition to filesystem")
 			return nil
