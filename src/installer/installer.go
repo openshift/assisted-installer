@@ -66,12 +66,6 @@ func NewAssistedInstaller(log *logrus.Logger, cfg config.Config, ops ops.Ops, ic
 func (i *installer) InstallNode() error {
 	i.log.Infof("Installing node with role: %s", i.Config.Role)
 
-	if !utils.IsOpenshiftVersionIsSupported(i.OpenshiftVersion) {
-		err := fmt.Errorf("openshift version %s is not supported", i.OpenshiftVersion)
-		i.log.Error(err)
-		return err
-	}
-
 	i.UpdateHostInstallProgress(models.HostStageStartingInstallation, i.Config.Role)
 
 	i.log.Infof("Start cleaning up device %s", i.Device)
@@ -218,9 +212,6 @@ func (i *installer) startBootstrap() error {
 
 func (i *installer) extractIgnitionToFS(ignitionPath string) (err error) {
 	mcoImage := i.MCOImage
-	if mcoImage == "" {
-		mcoImage, _ = utils.GetMCOByOpenshiftVersion(i.OpenshiftVersion)
-	}
 
 	i.log.Infof("Extracting ignition to disk using %s mcoImage", mcoImage)
 	for j := 0; j < extractRetryCount; j++ {

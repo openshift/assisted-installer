@@ -523,22 +523,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			Expect(ret).Should(BeNil())
 		})
 	})
-	Context("Bad openshift version", func() {
-		conf := config.Config{Role: string(models.HostRoleMaster),
-			ClusterID:        "cluster-id",
-			HostID:           "host-id",
-			Device:           "/dev/vda",
-			URL:              "https://assisted-service.com:80",
-			OpenshiftVersion: "Bad version",
-		}
-		BeforeEach(func() {
-			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
-		})
-		It("Bad openshift version", func() {
-			err := installerObj.InstallNode()
-			Expect(err).To(HaveOccurred())
-		})
-	})
 	AfterEach(func() {
 		ctrl.Finish()
 	})
