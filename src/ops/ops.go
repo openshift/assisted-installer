@@ -283,8 +283,9 @@ func (o *ops) renderControllerSecret() error {
 
 func (o *ops) renderControllerPod() error {
 	var params = map[string]interface{}{
-		"ControllerImage": config.GlobalConfig.ControllerImage,
-		"CACertPath":      config.GlobalConfig.CACertPath,
+		"ControllerImage":  config.GlobalConfig.ControllerImage,
+		"CACertPath":       config.GlobalConfig.CACertPath,
+		"OpenshiftVersion": config.GlobalConfig.OpenshiftVersion,
 	}
 
 	if config.GlobalConfig.ServiceIPs != "" {

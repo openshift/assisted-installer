@@ -112,8 +112,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	Context("Waiting for 3 nodes", func() {
 		conf := ControllerConfig{
-			ClusterID: "cluster-id",
-			URL:       "https://assisted-service.com:80",
+			ClusterID:        "cluster-id",
+			URL:              "https://assisted-service.com:80",
+			OpenshiftVersion: "4.7",
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
@@ -157,8 +158,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	})
 	Context("Waiting for 3 nodes, will appear one by one", func() {
 		conf := ControllerConfig{
-			ClusterID: "cluster-id",
-			URL:       "https://assisted-service.com:80",
+			ClusterID:        "cluster-id",
+			URL:              "https://assisted-service.com:80",
+			OpenshiftVersion: "4.7",
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
@@ -205,8 +207,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	})
 	Context("UpdateStatusFails and then succeeds", func() {
 		conf := ControllerConfig{
-			ClusterID: "cluster-id",
-			URL:       "https://assisted-service.com:80",
+			ClusterID:        "cluster-id",
+			URL:              "https://assisted-service.com:80",
+			OpenshiftVersion: "4.7",
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
@@ -232,8 +235,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	})
 	Context("ListNodes fails and then succeeds", func() {
 		conf := ControllerConfig{
-			ClusterID: "cluster-id",
-			URL:       "https://assisted-service.com:80",
+			ClusterID:        "cluster-id",
+			URL:              "https://assisted-service.com:80",
+			OpenshiftVersion: "4.7",
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
@@ -253,8 +257,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	})
 	Context("validating ApproveCsrs", func() {
 		conf := ControllerConfig{
-			ClusterID: "cluster-id",
-			URL:       "https://assisted-service.com:80",
+			ClusterID:        "cluster-id",
+			URL:              "https://assisted-service.com:80",
+			OpenshiftVersion: "4.7",
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
@@ -309,8 +314,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	Context("validating AddRouterCAToClusterCA", func() {
 		conf := ControllerConfig{
-			ClusterID: "cluster-id",
-			URL:       "https://assisted-service.com:80",
+			ClusterID:        "cluster-id",
+			URL:              "https://assisted-service.com:80",
+			OpenshiftVersion: "4.7",
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
@@ -368,8 +374,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(&cluster, nil).Times(1)
 			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(&cm, nil).Times(1)
 			mockbmclient.EXPECT().UploadIngressCa(gomock.Any(), data["ca-bundle.crt"], c.ClusterID).Return(nil).Times(1)
-			mockk8sclient.EXPECT().UnPatchEtcd().Return(fmt.Errorf("dummy")).Times(1)
-			mockk8sclient.EXPECT().UnPatchEtcd().Return(nil).Times(1)
 			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any(), "").Return(nil, fmt.Errorf("dummy")).Times(1)
 			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any(), "").Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Pending"}}}, nil).Times(1)
 			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any(), "").Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Running"}}}, nil).Times(1)
@@ -404,8 +408,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	Context("update BMHs", func() {
 		conf := ControllerConfig{
-			ClusterID: "cluster-id",
-			URL:       "https://assisted-service.com:80",
+			ClusterID:        "cluster-id",
+			URL:              "https://assisted-service.com:80",
+			OpenshiftVersion: "4.7",
 		}
 		t := metav1.Unix(98754, 0)
 		bmhStatus := metal3v1alpha1.BareMetalHostStatus{
@@ -485,9 +490,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	Context("Upload logs", func() {
 		conf := ControllerConfig{
-			ClusterID: "cluster-id",
-			URL:       "https://assisted-service.com:80",
-			Namespace: "assisted-installer",
+			ClusterID:        "cluster-id",
+			URL:              "https://assisted-service.com:80",
+			Namespace:        "assisted-installer",
+			OpenshiftVersion: "4.7",
 		}
 		var pod v1.Pod
 		BeforeEach(func() {
@@ -535,9 +541,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	Context("Upload logs with oc must-gather", func() {
 		conf := ControllerConfig{
-			ClusterID: "cluster-id",
-			URL:       "https://assisted-service.com:80",
-			Namespace: "assisted-installer",
+			ClusterID:        "cluster-id",
+			URL:              "https://assisted-service.com:80",
+			Namespace:        "assisted-installer",
+			OpenshiftVersion: "4.7",
 		}
 
 		var pod v1.Pod

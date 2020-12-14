@@ -48,7 +48,8 @@ type ControllerConfig struct {
 	PullSecretToken      string `envconfig:"PULL_SECRET_TOKEN" required:"true"`
 	SkipCertVerification bool   `envconfig:"SKIP_CERT_VERIFICATION" required:"false" default:"false"`
 	CACertPath           string `envconfig:"CA_CERT_PATH" required:"false" default:""`
-	Namespace            string `enconfig:"NAMESPACE" required:"false" default:"assisted-installer"`
+	Namespace            string `envconfig:"NAMESPACE" required:"false" default:"assisted-installer"`
+	OpenshiftVersion     string `envconfig:"OPENSHIFT_VERSION" required:"true"`
 }
 type Controller interface {
 	WaitAndUpdateNodesStatus(status *ControllerStatus)
@@ -236,9 +237,17 @@ func (c controller) postInstallConfigs() error {
 		return errors.Errorf("Timeout while waiting router ca data")
 	}
 
-	err = utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.unpatchEtcd)
+	unpatch, err := utils.EtcdPatchRequired(c.ControllerConfig.OpenshiftVersion)
 	if err != nil {
-		return errors.Errorf("Timeout while trying to unpatch etcd")
+		return err
+	}
+	if unpatch {
+		err = utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.unpatchEtcd)
+		if err != nil {
+			return errors.Errorf("Timeout while trying to unpatch etcd")
+		}
+	} else {
+		c.log.Infof("Skipping etcd unpatch for cluster version %s", c.ControllerConfig.OpenshiftVersion)
 	}
 
 	err = utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.validateConsolePod)

@@ -21,7 +21,7 @@ The Assisted Installer will:
 1. fetch the bootstrap ignition file (currently from S3 but will change soon) and utilize the MCO container for writing the configuration to disk (using once-from option).
 1. start the bootstrap services (bootkube.service, approve-csr.service, progress.service), at this point the bootstrap will start a temporary control plane.
 1. fetch the cluster kubeconfig from the assisted-service and wait for 2 master nodes to appear.
-1. patch the etcd configuration to allow etcd to start with less than 3 members.
+1. patch the etcd configuration to allow etcd to start with less than 3 members (<4.7 only).
 1. wait for 2 **ready** master nodes and for the bootkube service to complete.
 1. pivot to master by executing the master installation flow.
 
@@ -33,7 +33,6 @@ The Assisted Installer will:
 The node will start with the new CoreOS image and ignition, and will contact the machine-config-server running on the bootstrap node in order to complete the installation.
 
 # Known changes to be done:
- - Patch etcd back to it's original configuration, need to check if patch is required for OCP 4.5.0.
  - Create a machine CR for the bootstrap node in order to approve the CSR for this node.
  - Optimize install time by storing the CoreOS image on the live CD rather than downloading it from the internet.
  - Use the relevant CoreOS image for the OCP release.
