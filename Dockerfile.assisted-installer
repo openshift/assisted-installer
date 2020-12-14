@@ -1,4 +1,4 @@
-FROM quay.io/app-sre/centos:8
+FROM quay.io/centos/centos:centos8
 copy build/installer /
 ARG GIT_REVISION
 LABEL "git_revision"=${GIT_REVISION}
