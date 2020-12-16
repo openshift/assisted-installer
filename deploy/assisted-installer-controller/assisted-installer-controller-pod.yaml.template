@@ -49,9 +49,8 @@ spec:
                   name: assisted-installer-controller-config
                   key: skip-cert-verification
                   optional: true
-          envFrom:
-            - configMapRef:
-                name: assisted-installer-controller-config
+            - name: OPENSHIFT_VERSION
+              value: "{{.OpenshiftVersion}}"
           {{if .CACertPath}}
           volumeMounts:
           - name: service-ca-cert-config

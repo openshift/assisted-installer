@@ -275,9 +275,18 @@ func (i *installer) downloadHostIgnition() (string, error) {
 func (i *installer) waitForControlPlane(ctx context.Context, kc k8s_client.K8SClient) error {
 	i.waitForMasterNodes(ctx, minMasterNodes, kc)
 
-	if err := kc.PatchEtcd(); err != nil {
+	patch, err := utils.EtcdPatchRequired(i.Config.OpenshiftVersion)
+	if err != nil {
 		i.log.Error(err)
 		return err
+	}
+	if patch {
+		if err := kc.PatchEtcd(); err != nil {
+			i.log.Error(err)
+			return err
+		}
+	} else {
+		i.log.Infof("Skipping etcd patch for cluster version %s", i.Config.OpenshiftVersion)
 	}
 
 	i.waitForBootkube(ctx)

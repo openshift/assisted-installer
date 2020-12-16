@@ -22,9 +22,9 @@ import (
 	ignition "github.com/coreos/ignition/v2/config/v3_1"
 	"github.com/openshift/assisted-service/models"
 
-	"github.com/vincent-petithory/dataurl"
-
+	"github.com/hashicorp/go-version"
 	"github.com/sirupsen/logrus"
+	"github.com/vincent-petithory/dataurl"
 )
 
 var (
@@ -229,4 +229,17 @@ func GenerateRequestContext() context.Context {
 
 func RequestIDLogger(ctx context.Context, log *logrus.Logger) logrus.FieldLogger {
 	return requestid.RequestIDLogger(log, requestid.FromContext(ctx))
+}
+
+func EtcdPatchRequired(openshiftVersion string) (bool, error) {
+	clusterVersion, err := version.NewVersion(openshiftVersion)
+	if err != nil {
+		return false, err
+	}
+	v47, err := version.NewVersion("4.7")
+	if err != nil {
+		return false, err
+	}
+
+	return clusterVersion.LessThan(v47), nil
 }

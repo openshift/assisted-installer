@@ -45,7 +45,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		installerObj       *installer
 		hostId             = "host-id"
 		bootstrapIgn       = "bootstrap.ign"
-		openShiftVersion   = "4.4"
+		openShiftVersion   = "4.7"
 		inventoryNamesHost map[string]inventory_client.HostData
 		kubeNamesIds       map[string]string
 	)
@@ -165,9 +165,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
 			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), inventoryNamesHost["node1"].Host.ID.String(), models.HostStageJoined, "").Times(1)
 		}
-		patchEtcdSuccess := func() {
-			mockk8sclient.EXPECT().PatchEtcd().Return(nil).Times(1)
-		}
 		prepareControllerSuccess := func() {
 			mockops.EXPECT().PrepareController().Return(nil).Times(1)
 		}
@@ -211,7 +208,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			restartNetworkManager(nil)
 			prepareControllerSuccess()
 			startServicesSuccess()
-			patchEtcdSuccess()
 			WaitMasterNodesSucccess()
 			waitForBootkubeSuccess()
 			bootkubeStatusSuccess()
@@ -224,25 +220,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			rebootSuccess()
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(BeNil())
-		})
-		It("bootstrap role fail", func() {
-			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
-				{string(models.HostStageWaitingForControlPlane)},
-				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
-				{string(models.HostStageWritingImageToDisk)},
-			})
-			bootstrapSetup()
-			restartNetworkManager(nil)
-			prepareControllerSuccess()
-			startServicesSuccess()
-			WaitMasterNodesSucccess()
-			err := fmt.Errorf("Etcd patch failed")
-			mockk8sclient.EXPECT().PatchEtcd().Return(err).Times(1)
-			//HostRoleMaster flow:
-			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
-			writeToDiskSuccess(gomock.Any())
-			ret := installerObj.InstallNode()
-			Expect(ret).Should(Equal(err))
 		})
 		It("bootstrap role creating SSH manifest failed", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
@@ -276,7 +253,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			restartNetworkManager(nil)
 			prepareControllerSuccess()
 			startServicesSuccess()
-			patchEtcdSuccess()
 			WaitMasterNodesSucccess()
 			waitForBootkubeSuccess()
 			bootkubeStatusSuccess()
