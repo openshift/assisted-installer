@@ -13,6 +13,7 @@ import (
 	"time"
 
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
+	configv1 "github.com/openshift/api/config/v1"
 	mapiv1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -35,6 +36,7 @@ const (
 )
 
 var GeneralWaitInterval = generalWaitTimeoutInt * time.Second
+var generalProgressUpdateInt = 60 * time.Second
 var LogsUploadPeriod = 5 * time.Minute
 var WaitTimeout = 2 * time.Hour
 
@@ -232,7 +234,12 @@ func (c controller) PostInstallConfigs(wg *sync.WaitGroup, status *ControllerSta
 
 func (c controller) postInstallConfigs() error {
 
-	err := utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.addRouterCAToClusterCA)
+	err := c.waitForClusterVersion()
+	if err != nil {
+		return err
+	}
+
+	err = utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.addRouterCAToClusterCA)
 	if err != nil {
 		return errors.Errorf("Timeout while waiting router ca data")
 	}
@@ -425,6 +432,50 @@ func (c controller) validateConsolePod() bool {
 		c.log.Infof("Console pod is in status %s. Continue waiting for it", pod.Status.Phase)
 	}
 	return false
+}
+
+func (c controller) waitForClusterVersion() error {
+	isClusterVersionAvailable := func() bool {
+		available, msg := c.validateClusterVersion()
+		status := fmt.Sprintf("Cluster version is available: %t , message: %s", available, msg)
+		c.log.Infof(status)
+		if err := c.ic.UpdateClusterInstallProgress(utils.GenerateRequestContext(), c.ClusterID, status); err != nil {
+			c.log.Errorf("Failed to update cluster %s installation progress status: %s", c.ClusterID, err)
+		}
+		return available
+	}
+
+	err := utils.WaitForPredicate(WaitTimeout, generalProgressUpdateInt, isClusterVersionAvailable)
+	if err != nil {
+		return errors.Errorf("Timeout while waiting for cluster version to be available")
+	}
+	return nil
+}
+
+func (c controller) validateClusterVersion() (bool, string) {
+	c.log.Infof("Waiting for cluster version to be available")
+	cv, err := c.kc.GetClusterVersion("version")
+	if err != nil {
+		c.log.WithError(err).Warnf("Failed to get cluster version")
+		return false, ""
+	}
+	conditionsByType := map[configv1.ClusterStatusConditionType]configv1.ClusterOperatorStatusCondition{}
+	// condition type to dict
+	for _, condition := range cv.Status.Conditions {
+		conditionsByType[condition.Type] = condition
+	}
+	// check if it cluster version is available
+	condition, ok := conditionsByType[configv1.OperatorAvailable]
+	if ok && condition.Status == configv1.ConditionTrue {
+		return true, condition.Message
+	}
+	// if not available return message from progressing
+	condition, ok = conditionsByType[configv1.OperatorProgressing]
+	if ok {
+		return false, condition.Message
+	}
+
+	return false, ""
 }
 
 func (c controller) sendCompleteInstallation(isSuccess bool, errorInfo string) {
