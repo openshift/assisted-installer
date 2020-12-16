@@ -37,7 +37,7 @@ The node will start with the new CoreOS image and ignition, and will contact the
  - Create a machine CR for the bootstrap node in order to approve the CSR for this node.
  - Optimize install time by storing the CoreOS image on the live CD rather than downloading it from the internet.
  - Use the relevant CoreOS image for the OCP release.
- - Get the ignition from the bm-inventroy instead of S3.
+ - Get the ignition from the bm-inventory instead of S3.
 
 # Build
 To build and push your image to docker registry  just run make.
