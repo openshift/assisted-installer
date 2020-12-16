@@ -136,6 +136,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				gomock.Any(), "podman", "run", "--net", "host",
 				"--volume", "/:/rootfs:rw",
 				"--volume", "/usr/bin/rpm-ostree:/usr/bin/rpm-ostree",
+				"--volume", "/var/run/dbus:/var/run/dbus",
+				"--volume", "/run/systemd:/run/systemd",
 				"--privileged",
 				"--entrypoint", "/usr/bin/machine-config-daemon",
 				mcoImage,
