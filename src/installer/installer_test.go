@@ -10,24 +10,20 @@ import (
 	"testing"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/pkg/errors"
-
 	"github.com/go-openapi/strfmt"
-
-	v1 "k8s.io/api/core/v1"
-
-	"github.com/openshift/assisted-installer/src/k8s_client"
-	"github.com/openshift/assisted-service/models"
-
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/inventory_client"
+	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/ops"
-	"github.com/sirupsen/logrus"
+	"github.com/openshift/assisted-service/models"
 )
 
 func TestValidator(t *testing.T) {
@@ -134,6 +130,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		extractIgnitionToFS := func(out string, err error) {
 			mockops.EXPECT().ExecPrivilegeCommand(
 				gomock.Any(), "podman", "run", "--net", "host",
+				"--pid=host",
 				"--volume", "/:/rootfs:rw",
 				"--volume", "/usr/bin/rpm-ostree:/usr/bin/rpm-ostree",
 				"--privileged",
