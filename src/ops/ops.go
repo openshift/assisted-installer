@@ -402,7 +402,7 @@ func (o *ops) GetMCSLogs() (string, error) {
 
 func (o *ops) UploadInstallationLogs(isBootstrap bool) (string, error) {
 	command := "podman"
-	args := []string{"run", "--rm", "--privileged", "--net=host", "-v", "/run/systemd/journal/socket:/run/systemd/journal/socket",
+	args := []string{"run", "--rm", "--privileged", "--net=host", "--pid=host", "-v", "/run/systemd/journal/socket:/run/systemd/journal/socket",
 		"-v", "/var/log:/var/log", config.GlobalConfig.AgentImage, "logs_sender",
 		"-cluster-id", config.GlobalConfig.ClusterID, "-url", config.GlobalConfig.URL,
 		"-host-id", config.GlobalConfig.HostID,
