@@ -321,6 +321,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
 			GeneralWaitInterval = 1 * time.Second
+			status = &ControllerStatus{}
 		})
 		It("Run addRouterCAToClusterCA happy flow", func() {
 			cmName := "default-ingress-cert"
@@ -377,13 +378,18 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any(), "").Return(nil, fmt.Errorf("dummy")).Times(1)
 			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any(), "").Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Pending"}}}, nil).Times(1)
 			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any(), "").Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Running"}}}, nil).Times(1)
+			mockk8sclient.EXPECT().GetClusterVersion("version").Return(nil, fmt.Errorf("dummy")).Times(1)
+			mockk8sclient.EXPECT().GetClusterVersion("version").Return(badClusterVersion, nil).Times(1)
+			mockk8sclient.EXPECT().GetClusterVersion("version").Return(goodClusterVersion, nil).Times(1)
 
 			mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(fmt.Errorf("dummy")).Times(1)
 			mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
+			mockbmclient.EXPECT().UpdateClusterInstallProgress(gomock.Any(), gomock.Any(), gomock.Any()).MinTimes(1)
 
 			wg.Add(1)
 			go c.PostInstallConfigs(&wg, status)
 			wg.Wait()
+
 			Expect(status.HasError()).Should(Equal(false))
 		})
 		It("Run PostInstallConfigs failed", func() {
@@ -395,9 +401,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			cluster := models.Cluster{Status: &finalizing}
 			mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(&cluster, nil).Times(1)
 
-			mockk8sclient.EXPECT().GetConfigMap(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("aaa")).MinTimes(1)
-			mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", false,
-				"Timeout while waiting router ca data").Return(nil).Times(1)
+			mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", false, "Timeout while waiting for cluster "+
+				"version to be available").Return(nil).Times(1)
 
 			wg.Add(1)
 			go c.PostInstallConfigs(&wg, status)

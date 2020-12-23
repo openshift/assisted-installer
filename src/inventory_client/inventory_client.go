@@ -49,6 +49,7 @@ type InventoryClient interface {
 	CompleteInstallation(ctx context.Context, clusterId string, isSuccess bool, errorInfo string) error
 	GetHosts(ctx context.Context, log logrus.FieldLogger, skippedStatuses []string) (map[string]HostData, error)
 	UploadLogs(ctx context.Context, clusterId string, logsType models.LogsType, upfile io.Reader) error
+	UpdateClusterInstallProgress(ctx context.Context, clusterId string, progress string) error
 }
 
 type inventoryClient struct {
@@ -299,5 +300,13 @@ func (c *inventoryClient) UploadLogs(ctx context.Context, clusterId string, logs
 	_, err := c.ai.Installer.UploadLogs(ctx,
 		&installer.UploadLogsParams{ClusterID: strfmt.UUID(clusterId), LogsType: string(logsType),
 			Upfile: runtime.NamedReader(fileName, upfile)})
+	return aserror.GetAssistedError(err)
+}
+
+func (c *inventoryClient) UpdateClusterInstallProgress(ctx context.Context, clusterId string, progress string) error {
+	_, err := c.ai.Installer.UpdateClusterInstallProgress(ctx, &installer.UpdateClusterInstallProgressParams{
+		ClusterID:       strfmt.UUID(clusterId),
+		ClusterProgress: progress,
+	})
 	return aserror.GetAssistedError(err)
 }

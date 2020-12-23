@@ -165,3 +165,17 @@ func (mr *MockInventoryClientMockRecorder) UploadLogs(ctx, clusterId, logsType, 
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadLogs", reflect.TypeOf((*MockInventoryClient)(nil).UploadLogs), ctx, clusterId, logsType, upfile)
 }
+
+// UpdateClusterInstallProgress mocks base method
+func (m *MockInventoryClient) UpdateClusterInstallProgress(ctx context.Context, clusterId, progress string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateClusterInstallProgress", ctx, clusterId, progress)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateClusterInstallProgress indicates an expected call of UpdateClusterInstallProgress
+func (mr *MockInventoryClientMockRecorder) UpdateClusterInstallProgress(ctx, clusterId, progress interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateClusterInstallProgress", reflect.TypeOf((*MockInventoryClient)(nil).UpdateClusterInstallProgress), ctx, clusterId, progress)
+}
