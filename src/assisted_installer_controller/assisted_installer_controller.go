@@ -53,6 +53,7 @@ type ControllerConfig struct {
 	Namespace            string `envconfig:"NAMESPACE" required:"false" default:"assisted-installer"`
 	OpenshiftVersion     string `envconfig:"OPENSHIFT_VERSION" required:"true"`
 	HighAvailabilityMode string `envconfig:"HIGH_AVAILABILITY_MODE" required:"false" default:"Full"`
+	CheckClusterVersion  bool   `envconfig:"CHECK_CLUSTER_VERSION" required:"false" default:"false"`
 }
 type Controller interface {
 	WaitAndUpdateNodesStatus(status *ControllerStatus)
@@ -234,10 +235,13 @@ func (c controller) PostInstallConfigs(wg *sync.WaitGroup, status *ControllerSta
 }
 
 func (c controller) postInstallConfigs() error {
+	var err error
 
-	err := c.waitForClusterVersion()
-	if err != nil {
-		return err
+	if c.CheckClusterVersion {
+		err = c.waitForClusterVersion()
+		if err != nil {
+			return err
+		}
 	}
 
 	err = utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.addRouterCAToClusterCA)
