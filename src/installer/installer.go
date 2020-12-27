@@ -32,6 +32,8 @@ const (
 	assistedControllerNamespace = "assisted-installer"
 	extractRetryCount           = 3
 	waitForeverTimeout          = time.Duration(1<<63 - 1) // wait forever ~ 292 years
+	ovnKubernetes               = "OVNKubernetes"
+	networkTypeTimeoutSeconds   = 300
 )
 
 var generalWaitTimeout = 30 * time.Second
@@ -270,9 +272,38 @@ func (i *installer) downloadHostIgnition() (string, error) {
 	return dest, err
 }
 
+func waitForNetworkType(kc k8s_client.K8SClient) error {
+	return utils.WaitForPredicate(networkTypeTimeoutSeconds*time.Second, time.Second, func() bool {
+		_, err := kc.GetNetworkType()
+		return err == nil
+	})
+}
+
 func (i *installer) waitForControlPlane(ctx context.Context, kc k8s_client.K8SClient) error {
+	if err := waitForNetworkType(kc); err != nil {
+		i.log.Error("failed to get network type")
+		return err
+	}
+	nt, err := kc.GetNetworkType()
+	if err != nil {
+		i.log.Error("failed to get network type")
+		return err
+	}
+	if nt == ovnKubernetes {
+		if err = kc.PatchControlPlaneReplicas(); err != nil {
+			i.log.WithError(err).Error("Failed to patch control plane replicas")
+			return err
+		}
+	}
+
 	i.waitForMasterNodes(ctx, minMasterNodes, kc)
 
+	if nt == ovnKubernetes {
+		if err = kc.UnPatchControlPlaneReplicas(); err != nil {
+			i.log.WithError(err).Error("Failed to unpatch control plane replicas")
+			return err
+		}
+	}
 	patch, err := utils.EtcdPatchRequired(i.Config.OpenshiftVersion)
 	if err != nil {
 		i.log.Error(err)
