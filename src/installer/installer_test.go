@@ -540,6 +540,120 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			Expect(ret).Should(BeNil())
 		})
 	})
+	Context("None HA mode ", func() {
+
+		conf := config.Config{Role: string(models.HostRoleMaster),
+			ClusterID:            "cluster-id",
+			HostID:               "host-id",
+			Device:               "/dev/vda",
+			URL:                  "https://assisted-service.com:80",
+			OpenshiftVersion:     openShiftVersion,
+			MCOImage:             "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:dc1a34f55c712b2b9c5e5a14dd85e67cbdae11fd147046ac2fef9eaf179ab221",
+			HighAvailabilityMode: models.ClusterHighAvailabilityModeNone,
+		}
+		BeforeEach(func() {
+			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
+		})
+		mcoImage := conf.MCOImage
+		extractIgnitionToFS := func(out string, err error) {
+			mockops.EXPECT().ExecPrivilegeCommand(
+				gomock.Any(), "podman", "run", "--net", "host",
+				"--pid=host",
+				"--volume", "/:/rootfs:rw",
+				"--volume", "/usr/bin/rpm-ostree:/usr/bin/rpm-ostree",
+				"--privileged",
+				"--entrypoint", "/usr/bin/machine-config-daemon",
+				mcoImage,
+				"start", "--node-name", "localhost", "--root-mount", "/rootfs", "--once-from",
+				filepath.Join(InstallDir, bootstrapIgn), "--skip-reboot").Return(out, err)
+		}
+		daemonReload := func(err error) {
+			mockops.EXPECT().SystemctlAction("daemon-reload").Return(err).Times(1)
+		}
+		restartNetworkManager := func(err error) {
+			mockops.EXPECT().SystemctlAction("restart", "NetworkManager.service").Return(err).Times(1)
+		}
+		startServicesSuccess := func() {
+			services := []string{"bootkube.service", "progress.service", "approve-csr.service"}
+			for i := range services {
+				mockops.EXPECT().SystemctlAction("start", services[i]).Return(nil).Times(1)
+			}
+		}
+		prepareControllerSuccess := func() {
+			mockops.EXPECT().PrepareController().Return(nil).Times(1)
+		}
+		waitForBootkubeSuccess := func() {
+			mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "stat", "/opt/openshift/.bootkube.done").Return("OK", nil).Times(1)
+		}
+		bootkubeStatusSuccess := func() {
+			mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "systemctl", "status", "bootkube.service").Return("1", nil).Times(1)
+		}
+		extractSecretFromIgnitionSuccess := func() {
+			mockops.EXPECT().ExtractFromIgnition(filepath.Join(InstallDir, bootstrapIgn), dockerConfigFile).Return(nil).Times(1)
+		}
+		singleNodeBootstrapSetup := func() {
+			cleanInstallDevice()
+			mkdirSuccess(InstallDir)
+			downloadFileSuccess(bootstrapIgn)
+			extractSecretFromIgnitionSuccess()
+			extractIgnitionToFS("Success", nil)
+			daemonReload(nil)
+		}
+		verifySingleNodeMasterIgnitionSuccess := func() {
+			mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "stat", singleNodeMasterIgnitionPath).Return("", nil).Times(1)
+		}
+
+		It("single node happy flow", func() {
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+				{string(models.HostStageWritingImageToDisk)},
+				{string(models.HostStageRebooting)},
+			})
+			// single node bootstrap flow
+			singleNodeBootstrapSetup()
+			restartNetworkManager(nil)
+			prepareControllerSuccess()
+			startServicesSuccess()
+			waitForBootkubeSuccess()
+			bootkubeStatusSuccess()
+			//HostRoleMaster flow:
+			verifySingleNodeMasterIgnitionSuccess()
+			mockops.EXPECT().WriteImageToDisk(singleNodeMasterIgnitionPath, device, mockbmclient, nil).Return(nil).Times(1)
+			uploadLogsSuccess(true)
+			rebootSuccess()
+			ret := installerObj.InstallNode()
+			Expect(ret).Should(BeNil())
+		})
+		It("single node bootstrap fail", func() {
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+			})
+			// single node bootstrap flow
+			singleNodeBootstrapSetup()
+			err := fmt.Errorf("Failed to restart NetworkManager")
+			restartNetworkManager(err)
+			ret := installerObj.InstallNode()
+			Expect(ret).Should(Equal(err))
+		})
+		It("Failed to find master ignition", func() {
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+			})
+			// single node bootstrap flow
+			singleNodeBootstrapSetup()
+			restartNetworkManager(nil)
+			prepareControllerSuccess()
+			startServicesSuccess()
+			waitForBootkubeSuccess()
+			bootkubeStatusSuccess()
+			//HostRoleMaster flow:
+			err := fmt.Errorf("Failed to find master ignition")
+			mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "stat", singleNodeMasterIgnitionPath).Return("", err).Times(1)
+			ret := installerObj.InstallNode()
+			Expect(ret).Should(Equal(err))
+		})
+
+	})
 	AfterEach(func() {
 		ctrl.Finish()
 	})
