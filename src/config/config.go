@@ -83,4 +83,8 @@ func ProcessArgs() {
 			printHelpAndExit()
 		}
 	}
+	if ret.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone && ret.Role != string(models.HostRoleMaster) {
+		println("high-availability-mode is set to None, but host role is %s. should be 'master'", ret.Role)
+		printHelpAndExit()
+	}
 }

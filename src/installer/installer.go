@@ -23,17 +23,18 @@ import (
 )
 
 const (
-	InstallDir                  = "/opt/install-dir"
-	KubeconfigPathLoopBack      = "/opt/openshift/auth/kubeconfig-loopback"
-	KubeconfigPath              = "/opt/openshift/auth/kubeconfig"
-	minMasterNodes              = 2
-	dockerConfigFile            = "/root/.docker/config.json"
-	assistedControllerPrefix    = "assisted-installer-controller"
-	assistedControllerNamespace = "assisted-installer"
-	extractRetryCount           = 3
-	waitForeverTimeout          = time.Duration(1<<63 - 1) // wait forever ~ 292 years
-	ovnKubernetes               = "OVNKubernetes"
-	networkTypeTimeoutSeconds   = 300
+	InstallDir                   = "/opt/install-dir"
+	KubeconfigPathLoopBack       = "/opt/openshift/auth/kubeconfig-loopback"
+	KubeconfigPath               = "/opt/openshift/auth/kubeconfig"
+	minMasterNodes               = 2
+	dockerConfigFile             = "/root/.docker/config.json"
+	assistedControllerPrefix     = "assisted-installer-controller"
+	assistedControllerNamespace  = "assisted-installer"
+	extractRetryCount            = 3
+	waitForeverTimeout           = time.Duration(1<<63 - 1) // wait forever ~ 292 years
+	ovnKubernetes                = "OVNKubernetes"
+	networkTypeTimeoutSeconds    = 300
+	singleNodeMasterIgnitionPath = "/opt/openshift/master.ign"
 )
 
 var generalWaitTimeout = 30 * time.Second
@@ -93,21 +94,23 @@ func (i *installer) InstallNode() error {
 	}
 
 	i.UpdateHostInstallProgress(models.HostStageInstalling, i.Config.Role)
-	ignitionPath, err := i.downloadHostIgnition()
-	if err != nil {
-		return err
+	var ignitionPath string
+	if i.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone {
+		i.log.Info("Installing single node openshift")
+		ignitionPath, err = i.createSingleNodeMasterIgnition()
+		if err != nil {
+			return err
+		}
+	} else {
+		ignitionPath, err = i.downloadHostIgnition()
+		if err != nil {
+			return err
+		}
+
 	}
 
-	i.UpdateHostInstallProgress(models.HostStageWritingImageToDisk, "")
-
-	err = utils.Retry(3, time.Second, i.log, func() error {
-		return i.ops.WriteImageToDisk(ignitionPath, i.Device, i.inventoryClient, i.Config.InstallerArgs)
-	})
-	if err != nil {
-		i.log.Errorf("Failed to write image to disk %s", err)
+	if err = i.writeImageToDisk(ignitionPath); err != nil {
 		return err
-	} else {
-		i.log.Info("Done writing image to disk")
 	}
 	if isBootstrap {
 		i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, "")
@@ -116,7 +119,7 @@ func (i *installer) InstallNode() error {
 			return err
 		}
 	}
-	_, err = i.ops.UploadInstallationLogs(isBootstrap)
+	_, err = i.ops.UploadInstallationLogs(isBootstrap || i.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone)
 	if err != nil {
 		i.log.Errorf("upload installation logs %s", err)
 	}
@@ -124,6 +127,20 @@ func (i *installer) InstallNode() error {
 	if err = i.ops.Reboot(); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (i *installer) writeImageToDisk(ignitionPath string) error {
+	i.UpdateHostInstallProgress(models.HostStageWritingImageToDisk, "")
+	interval := time.Second
+	err := utils.Retry(3, interval, i.log, func() error {
+		return i.ops.WriteImageToDisk(ignitionPath, i.Device, i.inventoryClient, i.Config.InstallerArgs)
+	})
+	if err != nil {
+		i.log.Errorf("Failed to write image to disk %s", err)
+		return err
+	}
+	i.log.Info("Done writing image to disk")
 	return nil
 }
 
@@ -170,14 +187,15 @@ func (i *installer) startBootstrap() error {
 		return err
 	}
 
-	err = i.generateSshKeyPair()
-	if err != nil {
-		return err
-	}
-
-	err = i.ops.CreateOpenshiftSshManifest(assistedInstallerSshManifest, sshManifestTmpl, sshPubKeyPath)
-	if err != nil {
-		return err
+	if i.HighAvailabilityMode != models.ClusterHighAvailabilityModeNone {
+		err = i.generateSshKeyPair()
+		if err != nil {
+			return err
+		}
+		err = i.ops.CreateOpenshiftSshManifest(assistedInstallerSshManifest, sshManifestTmpl, sshPubKeyPath)
+		if err != nil {
+			return err
+		}
 	}
 
 	// reload systemd configurations from filesystem and regenerate dependency trees
@@ -553,4 +571,20 @@ func (i *installer) updateConfiguringStatus(ctx context.Context) {
 			}
 		}
 	}
+}
+
+// createSingleNodeMasterIgnition will start the bootstrap flow and wait for bootkube
+// when bootkube complete the single node master ignition will be under singleNodeMasterIgnitionPath
+func (i *installer) createSingleNodeMasterIgnition() (string, error) {
+	if err := i.startBootstrap(); err != nil {
+		i.log.Errorf("Bootstrap failed %s", err)
+		return "", err
+	}
+	i.waitForBootkube(context.Background())
+	_, err := i.ops.ExecPrivilegeCommand(utils.NewLogWriter(i.log), "stat", singleNodeMasterIgnitionPath)
+	if err != nil {
+		i.log.Errorf("Failed to find single node master ignition: %s", err)
+		return "", err
+	}
+	return singleNodeMasterIgnitionPath, nil
 }
