@@ -52,6 +52,7 @@ type ControllerConfig struct {
 	CACertPath           string `envconfig:"CA_CERT_PATH" required:"false" default:""`
 	Namespace            string `envconfig:"NAMESPACE" required:"false" default:"assisted-installer"`
 	OpenshiftVersion     string `envconfig:"OPENSHIFT_VERSION" required:"true"`
+	HighAvailabilityMode string `envconfig:"HIGH_AVAILABILITY_MODE" required:"false" default:"Full"`
 }
 type Controller interface {
 	WaitAndUpdateNodesStatus(status *ControllerStatus)
@@ -248,7 +249,7 @@ func (c controller) postInstallConfigs() error {
 	if err != nil {
 		return err
 	}
-	if unpatch {
+	if unpatch && c.HighAvailabilityMode != models.ClusterHighAvailabilityModeNone {
 		err = utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.unpatchEtcd)
 		if err != nil {
 			return errors.Errorf("Timeout while trying to unpatch etcd")

@@ -10,3 +10,4 @@ data:
   inventory-url: {{.InventoryUrl}}
   skip-cert-verification: '{{.SkipCertVerification}}'
   ca-cert-path: '{{.CACertPath}}'
+  high-availability-mode: {{.HaMode}}

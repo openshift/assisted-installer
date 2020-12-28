@@ -266,6 +266,7 @@ func (o *ops) renderControllerCm() error {
 		"ClusterId":            config.GlobalConfig.ClusterID,
 		"SkipCertVerification": strconv.FormatBool(config.GlobalConfig.SkipCertVerification),
 		"CACertPath":           config.GlobalConfig.CACertPath,
+		"HaMode":               config.GlobalConfig.HighAvailabilityMode,
 	}
 
 	return o.renderDeploymentFiles(filepath.Join(controllerDeployFolder, controllerDeployCmTemplate),

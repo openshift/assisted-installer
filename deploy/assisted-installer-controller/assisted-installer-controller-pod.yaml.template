@@ -51,6 +51,12 @@ spec:
                   optional: true
             - name: OPENSHIFT_VERSION
               value: "{{.OpenshiftVersion}}"
+            - name: HIGH_AVAILABILITY_MODE
+              valueFrom:
+                configMapKeyRef:
+                  name: assisted-installer-controller-config
+                  key: high-availability-mode
+                  optional: true
           {{if .CACertPath}}
           volumeMounts:
           - name: service-ca-cert-config
