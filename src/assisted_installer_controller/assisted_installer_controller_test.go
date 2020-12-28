@@ -512,7 +512,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().GetPods(conf.Namespace, gomock.Any(), fmt.Sprintf("status.phase=%s", v1.PodRunning)).Return(nil, fmt.Errorf("dummy")).MinTimes(2).MaxTimes(10)
 			ctx, cancel := context.WithCancel(context.Background())
 			wg.Add(1)
-			go c.UploadLogs(ctx, &wg, status)
+			go c.UploadLogs(ctx, cancel, &wg, status)
 			time.Sleep(1 * time.Second)
 			cancel()
 			wg.Wait()
@@ -522,7 +522,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().GetPodLogsAsBuffer(conf.Namespace, "test", gomock.Any()).Return(nil, fmt.Errorf("dummy")).MinTimes(1)
 			ctx, cancel := context.WithCancel(context.Background())
 			wg.Add(1)
-			go c.UploadLogs(ctx, &wg, status)
+			go c.UploadLogs(ctx, cancel, &wg, status)
 			time.Sleep(500 * time.Millisecond)
 			cancel()
 			wg.Wait()
@@ -558,7 +558,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 		callUploadLogs := func() {
 			wg.Add(1)
-			go c.UploadLogs(ctx, &wg, status)
+			go c.UploadLogs(ctx, cancel, &wg, status)
 			time.Sleep(150 * time.Millisecond)
 			cancel()
 			wg.Wait()
