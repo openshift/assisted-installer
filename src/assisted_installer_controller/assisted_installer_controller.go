@@ -38,7 +38,7 @@ const (
 var GeneralWaitInterval = generalWaitTimeoutInt * time.Second
 var generalProgressUpdateInt = 60 * time.Second
 var LogsUploadPeriod = 5 * time.Minute
-var WaitTimeout = 2 * time.Hour
+var WaitTimeout = 70 * time.Minute
 
 // assisted installer controller is added to control installation process after  bootstrap pivot
 // assisted installer will deploy it on installation process
@@ -577,6 +577,7 @@ func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup, status 
 	c.log.Infof("Start sending logs")
 	podName := ""
 	ticker := time.NewTicker(LogsUploadPeriod)
+	var errorDetected bool = false
 	for {
 		select {
 		case <-ctx.Done():
@@ -600,7 +601,23 @@ func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup, status 
 				}
 				podName = pods[0].Name
 			}
-			err := common.UploadPodLogs(c.kc, c.ic, c.ClusterID, podName, c.Namespace, controllerLogsSecondsAgo, c.log)
+			var err error
+			if errorDetected != status.HasError() {
+				//once error is detected in the flow, upload the full capacity of debugging logs
+				//this is required only once, upon the detection of a fatal error
+				errorDetected = status.HasError()
+				_ = c.uploadSummaryLogs(podName, c.Namespace, controllerLogsSecondsAgo, errorDetected)
+				c.log.Infof("Uploading controller and cluster logs on error ...")
+				return
+			} else if !errorDetected {
+				//on normal flow, keep updating the controller log output every 5 minutes
+				err = common.UploadPodLogs(c.kc, c.ic, c.ClusterID, podName, c.Namespace, controllerLogsSecondsAgo, c.log)
+			} else {
+				//when error state persists, do nothing.
+				//ultimately, the controller will wrap up and shut down all the flows
+				return
+			}
+
 			if err != nil {
 				c.log.WithError(err).Warnf("Failed to upload controller logs")
 				continue
