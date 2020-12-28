@@ -314,10 +314,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	Context("validating AddRouterCAToClusterCA", func() {
 		conf := ControllerConfig{
-			ClusterID:           "cluster-id",
-			URL:                 "https://assisted-service.com:80",
-			OpenshiftVersion:    "4.7",
-			CheckClusterVersion: true,
+			ClusterID:             "cluster-id",
+			URL:                   "https://assisted-service.com:80",
+			OpenshiftVersion:      "4.7",
+			WaitForClusterVersion: true,
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
@@ -414,10 +414,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	Context("PostInstallConfigs - not waiting for cluster version ", func() {
 		conf := ControllerConfig{
-			ClusterID:           "cluster-id",
-			URL:                 "https://assisted-service.com:80",
-			OpenshiftVersion:    "4.7",
-			CheckClusterVersion: false,
+			ClusterID:             "cluster-id",
+			URL:                   "https://assisted-service.com:80",
+			OpenshiftVersion:      "4.7",
+			WaitForClusterVersion: false,
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
