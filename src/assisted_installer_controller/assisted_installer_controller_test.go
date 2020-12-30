@@ -314,9 +314,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	Context("validating AddRouterCAToClusterCA", func() {
 		conf := ControllerConfig{
-			ClusterID:        "cluster-id",
-			URL:              "https://assisted-service.com:80",
-			OpenshiftVersion: "4.7",
+			ClusterID:             "cluster-id",
+			URL:                   "https://assisted-service.com:80",
+			OpenshiftVersion:      "4.7",
+			WaitForClusterVersion: true,
 		}
 		BeforeEach(func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
@@ -354,7 +355,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			res := c.addRouterCAToClusterCA()
 			Expect(res).Should(Equal(false))
 		})
-		It("Run PostInstallConfigs", func() {
+		It("Run PostInstallConfigs - wait for cluster version", func() {
 			cmName := "default-ingress-cert"
 			cmNamespace := "openshift-config-managed"
 			consoleNamespace := "openshift-console"
@@ -392,7 +393,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 			Expect(status.HasError()).Should(Equal(false))
 		})
-		It("Run PostInstallConfigs failed", func() {
+		It("Run PostInstallConfigs failed - wait for cluster version", func() {
 			WaitTimeout = 2 * time.Second
 			finalizing := models.ClusterStatusFinalizing
 			badClusterVersion := &configv1.ClusterVersion{}
@@ -403,6 +404,67 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 			mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", false, "Timeout while waiting for cluster "+
 				"version to be available").Return(nil).Times(1)
+
+			wg.Add(1)
+			go c.PostInstallConfigs(&wg, status)
+			wg.Wait()
+			Expect(status.HasError()).Should(Equal(true))
+		})
+	})
+
+	Context("PostInstallConfigs - not waiting for cluster version ", func() {
+		conf := ControllerConfig{
+			ClusterID:             "cluster-id",
+			URL:                   "https://assisted-service.com:80",
+			OpenshiftVersion:      "4.7",
+			WaitForClusterVersion: false,
+		}
+		BeforeEach(func() {
+			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
+			GeneralWaitInterval = 1 * time.Second
+			status = &ControllerStatus{}
+		})
+		It("Run PostInstallConfigs - not waiting for cluster version", func() {
+			cmName := "default-ingress-cert"
+			cmNamespace := "openshift-config-managed"
+			consoleNamespace := "openshift-console"
+			data := make(map[string]string)
+			data["ca-bundle.crt"] = "CA"
+			cm := v1.ConfigMap{Data: data}
+			finalizing := models.ClusterStatusFinalizing
+			installing := models.ClusterStatusInstalling
+			badClusterVersion := &configv1.ClusterVersion{}
+			badClusterVersion.Status.Conditions = []configv1.ClusterOperatorStatusCondition{{Type: configv1.OperatorAvailable,
+				Status: configv1.ConditionFalse}}
+			goodClusterVersion := &configv1.ClusterVersion{}
+			goodClusterVersion.Status.Conditions = []configv1.ClusterOperatorStatusCondition{{Type: configv1.OperatorAvailable,
+				Status: configv1.ConditionTrue}}
+			cluster := models.Cluster{Status: &finalizing}
+			mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(nil, fmt.Errorf("dummy")).Times(1)
+			mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(&models.Cluster{Status: &installing}, nil).Times(1)
+			mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(&cluster, nil).Times(1)
+			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(&cm, nil).Times(1)
+			mockbmclient.EXPECT().UploadIngressCa(gomock.Any(), data["ca-bundle.crt"], c.ClusterID).Return(nil).Times(1)
+			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any(), "").Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Running"}}}, nil).Times(1)
+			mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(fmt.Errorf("dummy")).Times(1)
+			mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
+
+			wg.Add(1)
+			c.PostInstallConfigs(&wg, status)
+			wg.Wait()
+			Expect(status.HasError()).Should(Equal(false))
+		})
+		It("Run PostInstallConfigs failed - not waiting for cluster version", func() {
+			WaitTimeout = 2 * time.Second
+			finalizing := models.ClusterStatusFinalizing
+			badClusterVersion := &configv1.ClusterVersion{}
+			badClusterVersion.Status.Conditions = []configv1.ClusterOperatorStatusCondition{{Type: configv1.OperatorAvailable,
+				Status: configv1.ConditionFalse}}
+			cluster := models.Cluster{Status: &finalizing}
+			mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(&cluster, nil).Times(1)
+			mockk8sclient.EXPECT().GetConfigMap(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("aaa")).MinTimes(1)
+			mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", false,
+				"Timeout while waiting router ca data").Return(nil).Times(1)
 
 			wg.Add(1)
 			go c.PostInstallConfigs(&wg, status)

@@ -45,14 +45,15 @@ var WaitTimeout = 2 * time.Hour
 // as a first step it will wait till nodes are added to cluster and update their status to Done
 
 type ControllerConfig struct {
-	ClusterID            string `envconfig:"CLUSTER_ID" required:"true" `
-	URL                  string `envconfig:"INVENTORY_URL" required:"true"`
-	PullSecretToken      string `envconfig:"PULL_SECRET_TOKEN" required:"true"`
-	SkipCertVerification bool   `envconfig:"SKIP_CERT_VERIFICATION" required:"false" default:"false"`
-	CACertPath           string `envconfig:"CA_CERT_PATH" required:"false" default:""`
-	Namespace            string `envconfig:"NAMESPACE" required:"false" default:"assisted-installer"`
-	OpenshiftVersion     string `envconfig:"OPENSHIFT_VERSION" required:"true"`
-	HighAvailabilityMode string `envconfig:"HIGH_AVAILABILITY_MODE" required:"false" default:"Full"`
+	ClusterID             string `envconfig:"CLUSTER_ID" required:"true" `
+	URL                   string `envconfig:"INVENTORY_URL" required:"true"`
+	PullSecretToken       string `envconfig:"PULL_SECRET_TOKEN" required:"true"`
+	SkipCertVerification  bool   `envconfig:"SKIP_CERT_VERIFICATION" required:"false" default:"false"`
+	CACertPath            string `envconfig:"CA_CERT_PATH" required:"false" default:""`
+	Namespace             string `envconfig:"NAMESPACE" required:"false" default:"assisted-installer"`
+	OpenshiftVersion      string `envconfig:"OPENSHIFT_VERSION" required:"true"`
+	HighAvailabilityMode  string `envconfig:"HIGH_AVAILABILITY_MODE" required:"false" default:"Full"`
+	WaitForClusterVersion bool   `envconfig:"CHECK_CLUSTER_VERSION" required:"false" default:"false"`
 }
 type Controller interface {
 	WaitAndUpdateNodesStatus(status *ControllerStatus)
@@ -234,10 +235,13 @@ func (c controller) PostInstallConfigs(wg *sync.WaitGroup, status *ControllerSta
 }
 
 func (c controller) postInstallConfigs() error {
+	var err error
 
-	err := c.waitForClusterVersion()
-	if err != nil {
-		return err
+	if c.WaitForClusterVersion {
+		err = c.waitingForClusterVersion()
+		if err != nil {
+			return err
+		}
 	}
 
 	err = utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.addRouterCAToClusterCA)
@@ -435,7 +439,7 @@ func (c controller) validateConsolePod() bool {
 	return false
 }
 
-func (c controller) waitForClusterVersion() error {
+func (c controller) waitingForClusterVersion() error {
 	isClusterVersionAvailable := func() bool {
 		available, msg := c.validateClusterVersion()
 		status := fmt.Sprintf("Cluster version is available: %t , message: %s", available, msg)
