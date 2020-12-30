@@ -70,7 +70,7 @@ func main() {
 	wg.Add(1)
 
 	ctxLogs, cancelLogs := context.WithCancel(context.Background())
-	go assistedController.UploadLogs(ctxLogs, &wgLogs, &status)
+	go assistedController.UploadLogs(ctxLogs, cancelLogs, &wgLogs, &status)
 	wgLogs.Add(1)
 
 	assistedController.WaitAndUpdateNodesStatus(&status)
@@ -81,6 +81,8 @@ func main() {
 	logger.Infof("Waiting for all go routines to finish")
 	wg.Wait()
 	logger.Infof("closing logs...")
-	cancelLogs()
+	if !status.HasError() { //with error the logs are canceled within UploadLogs
+		cancelLogs()
+	}
 	wgLogs.Wait()
 }

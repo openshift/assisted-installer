@@ -38,7 +38,7 @@ const (
 var GeneralWaitInterval = generalWaitTimeoutInt * time.Second
 var generalProgressUpdateInt = 60 * time.Second
 var LogsUploadPeriod = 5 * time.Minute
-var WaitTimeout = 2 * time.Hour
+var WaitTimeout = 70 * time.Minute
 
 // assisted installer controller is added to control installation process after  bootstrap pivot
 // assisted installer will deploy it on installation process
@@ -507,12 +507,6 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 	var tarentries = make([]utils.TarEntry, 0)
 	ctx := utils.GenerateRequestContext()
 
-	c.log.Infof("Uploading logs for %s in %s", podName, namespace)
-	if podLogs, err := c.kc.GetPodLogsAsBuffer(namespace, podName, sinceSeconds); err == nil {
-		tarentries = append(tarentries,
-			*utils.NewTarEntry(podLogs, nil, int64(podLogs.Len()), fmt.Sprintf("%s.logs", podName)))
-	}
-
 	if isMustGatherEnabled {
 		c.log.Infof("Uploading oc must-gather logs")
 		if tarfile, err := c.collectMustGatherLogs(ctx); err == nil {
@@ -520,6 +514,12 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 				tarentries = append(tarentries, *entry)
 			}
 		}
+	}
+
+	c.log.Infof("Uploading logs for %s in %s", podName, namespace)
+	if podLogs, err := c.kc.GetPodLogsAsBuffer(namespace, podName, sinceSeconds); err == nil {
+		tarentries = append(tarentries,
+			*utils.NewTarEntry(podLogs, nil, int64(podLogs.Len()), fmt.Sprintf("%s.logs", podName)))
 	}
 
 	if len(tarentries) == 0 {
@@ -538,8 +538,8 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 			c.log.WithError(err).Warnf("Failed to create tar.gz body of the log uplaod request")
 		}
 	}()
-	// if error will occur in goroutine above
-	//it will close writer and upload will fail
+	// if error will occur in goroutine above, the writer will be closed
+	// and as a result upload will fail
 	err := c.ic.UploadLogs(ctx, c.ClusterID, models.LogsTypeController, pr)
 	if err != nil {
 		utils.RequestIDLogger(ctx, c.log).WithError(err).Error("Failed to upload logs")
@@ -577,7 +577,7 @@ func (c controller) collectMustGatherLogs(ctx context.Context) (string, error) {
 // Uploading logs every 5 minutes
 // We will take logs of assisted controller and upload them to assisted-service
 // by creating tar gz of them.
-func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup, status *ControllerStatus) {
+func (c *controller) UploadLogs(ctx context.Context, cancellog context.CancelFunc, wg *sync.WaitGroup, status *ControllerStatus) {
 	defer wg.Done()
 	c.log.Infof("Start sending logs")
 	podName := ""
@@ -589,7 +589,6 @@ func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup, status 
 				c.log.Infof("Upload final controller and cluster logs before exit")
 				_ = c.uploadSummaryLogs(podName, c.Namespace, controllerLogsSecondsAgo, status.HasError())
 			}
-			c.log.Infof("Done uploading logs")
 			return
 		case <-ticker.C:
 			if podName == "" {
@@ -605,12 +604,24 @@ func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup, status 
 				}
 				podName = pods[0].Name
 			}
-			err := common.UploadPodLogs(c.kc, c.ic, c.ClusterID, podName, c.Namespace, controllerLogsSecondsAgo, c.log)
+			var err error
+			c.log.Info("Collecting Logs ....")
+			if status.HasError() {
+				//once error is detected in the flow, upload the full capacity of debugging logs
+				//and abort
+				c.log.Infof("Error detected... closing logs...")
+				cancellog()
+				continue
+			}
+
+			//on normal flow, keep updating the controller log output every 5 minutes
+			c.log.Infof("Start uploading controller logs (intermediate snapshot) ...")
+			err = common.UploadPodLogs(c.kc, c.ic, c.ClusterID, podName, c.Namespace, controllerLogsSecondsAgo, c.log)
 			if err != nil {
 				c.log.WithError(err).Warnf("Failed to upload controller logs")
 				continue
 			}
-			c.log.Infof("Successfully uploaded controller logs (intermediate snapshot) ...")
+			c.log.Infof("Done uploading controller logs")
 		}
 	}
 }
