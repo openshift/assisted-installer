@@ -43,6 +43,8 @@ type Ops interface {
 	ReloadHostFile(filepath string) error
 	CreateOpenshiftSshManifest(filePath, template, sshPubKeyPath string) error
 	GetMustGatherLogs(workDir string, kubeconfigPath string) (string, error)
+	CreateRandomHostname(hostname string) error
+	GetHostname() (string, error)
 }
 
 const (
@@ -502,4 +504,15 @@ func (o *ops) GetMustGatherLogs(workDir string, kubeconfigPath string) (string, 
 		return "", err
 	}
 	return path.Join(workDir, tarName), nil
+}
+
+func (o *ops) CreateRandomHostname(hostname string) error {
+	command := fmt.Sprintf("echo %s > /etc/hostname", hostname)
+	o.log.Infof("create random hostname with command %s", command)
+	_, err := o.ExecPrivilegeCommand(o.logWriter, "bash", "-c", command)
+	return err
+}
+
+func (o *ops) GetHostname() (string, error) {
+	return os.Hostname()
 }

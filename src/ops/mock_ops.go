@@ -307,3 +307,32 @@ func (mr *MockOpsMockRecorder) GetMustGatherLogs(workDir, kubeconfigPath interfa
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMustGatherLogs", reflect.TypeOf((*MockOps)(nil).GetMustGatherLogs), workDir, kubeconfigPath)
 }
+
+// CreateRandomHostname mocks base method
+func (m *MockOps) CreateRandomHostname(hostname string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateRandomHostname", hostname)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateRandomHostname indicates an expected call of CreateRandomHostname
+func (mr *MockOpsMockRecorder) CreateRandomHostname(hostname interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRandomHostname", reflect.TypeOf((*MockOps)(nil).CreateRandomHostname), hostname)
+}
+
+// GetHostname mocks base method
+func (m *MockOps) GetHostname() (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetHostname")
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetHostname indicates an expected call of GetHostname
+func (mr *MockOpsMockRecorder) GetHostname() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHostname", reflect.TypeOf((*MockOps)(nil).GetHostname))
+}
