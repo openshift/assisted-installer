@@ -65,6 +65,7 @@ type K8SClient interface {
 	SetProxyEnvVars() error
 	GetClusterVersion(name string) (*configv1.ClusterVersion, error)
 	GetNetworkType() (string, error)
+	GetControlPlaneReplicas() (int, error)
 }
 
 type K8SClientBuilder func(configPath string, logger *logrus.Logger) (K8SClient, error)
@@ -181,7 +182,7 @@ func (c *k8sClient) UnPatchEtcd() error {
 	return nil
 }
 
-func (c *k8sClient) GetNetworkType() (string, error) {
+func (c *k8sClient) getInstallConfig() (string, error) {
 	cm, err := c.GetConfigMap(KUBE_SYSTEM_NAMESPACE, CLUSTER_CONFIG_V1_NAME)
 	if err != nil {
 		return "", errors.Wrap(err, "Failed to get config map")
@@ -189,6 +190,14 @@ func (c *k8sClient) GetNetworkType() (string, error) {
 	installConfig, found := cm.Data["install-config"]
 	if !found {
 		return "", errors.New("Failed to get install config")
+	}
+	return installConfig, nil
+}
+
+func (c *k8sClient) GetNetworkType() (string, error) {
+	installConfig, err := c.getInstallConfig()
+	if err != nil {
+		return "", err
 	}
 	var networkingDecoder struct {
 		Networking struct {
@@ -200,6 +209,24 @@ func (c *k8sClient) GetNetworkType() (string, error) {
 		return "", errors.Wrapf(err, "Failed to unmarshal %s", installConfig)
 	}
 	return networkingDecoder.Networking.NetworkType, nil
+}
+
+func (c *k8sClient) GetControlPlaneReplicas() (int, error) {
+	installConfig, err := c.getInstallConfig()
+	if err != nil {
+		return 0, err
+	}
+
+	var controlPlaneDecoder struct {
+		ControlPlane struct {
+			Replicas int `yaml:"replicas"`
+		} `yaml:"controlPlane"`
+	}
+	err = yaml.Unmarshal([]byte(installConfig), &controlPlaneDecoder)
+	if err != nil {
+		return 0, errors.Wrapf(err, "Failed to unmarshal %s", installConfig)
+	}
+	return controlPlaneDecoder.ControlPlane.Replicas, nil
 }
 
 func updateItem(item *yaml.MapItem, path []string, value string) error {

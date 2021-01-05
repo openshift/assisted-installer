@@ -177,6 +177,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		getNetworkTypeSuccessOVNKubernetes := func() {
 			mockk8sclient.EXPECT().GetNetworkType().Return("OVNKubernetes", nil).Times(2)
 		}
+		getControlPlaneReplicasSuccess := func() {
+			mockk8sclient.EXPECT().GetControlPlaneReplicas().Return(3, nil).Times(1)
+		}
 		patchControlPlaneReplicasSuccess := func() {
 			mockk8sclient.EXPECT().PatchControlPlaneReplicas().Return(nil).Times(1)
 		}
@@ -254,6 +257,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			prepareControllerSuccess()
 			startServicesSuccess()
 			getNetworkTypeSuccessOVNKubernetes()
+			getControlPlaneReplicasSuccess()
 			patchControlPlaneReplicasSuccess()
 			unpatchControlPlaneReplicasSuccess()
 			WaitMasterNodesSucccess()
