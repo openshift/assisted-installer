@@ -5,6 +5,8 @@ import (
 	"flag"
 	"os"
 
+	"github.com/thoas/go-funk"
+
 	"github.com/openshift/assisted-installer/src/utils"
 
 	"github.com/openshift/assisted-service/models"
@@ -83,8 +85,11 @@ func ProcessArgs() {
 			printHelpAndExit()
 		}
 	}
-	if ret.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone && ret.Role != string(models.HostRoleMaster) {
-		println("high-availability-mode is set to None, but host role is %s. should be 'master'", ret.Role)
-		printHelpAndExit()
+	if ret.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone {
+		validRoles := []string{string(models.HostRoleMaster), string(models.HostRoleBootstrap)}
+		if !funk.ContainsString(validRoles, ret.Role) {
+			println("high-availability-mode is set to None, but host role is %s. should be one of: %s", ret.Role, validRoles)
+			printHelpAndExit()
+		}
 	}
 }

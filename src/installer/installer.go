@@ -86,7 +86,7 @@ func (i *installer) InstallNode() error {
 	//cancel the context in case this method ends
 	defer cancel()
 	isBootstrap := false
-	if i.Config.Role == string(models.HostRoleBootstrap) {
+	if i.Config.Role == string(models.HostRoleBootstrap) && i.HighAvailabilityMode != models.ClusterHighAvailabilityModeNone {
 		isBootstrap = true
 		errs.Go(func() error {
 			return i.runBootstrap(ctx)
@@ -102,6 +102,7 @@ func (i *installer) InstallNode() error {
 		if err != nil {
 			return err
 		}
+		i.Config.Role = string(models.HostRoleMaster)
 	} else {
 		ignitionPath, err = i.downloadHostIgnition()
 		if err != nil {
