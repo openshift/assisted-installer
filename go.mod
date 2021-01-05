@@ -10,6 +10,7 @@ require (
 	github.com/go-openapi/runtime v0.19.24
 	github.com/go-openapi/strfmt v0.19.11
 	github.com/golang/mock v1.4.4
+	github.com/google/uuid v1.1.1
 	github.com/hashicorp/go-version v1.2.1
 	github.com/jpillora/backoff v1.0.0
 	github.com/kelseyhightower/envconfig v1.4.0

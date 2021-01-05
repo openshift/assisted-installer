@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/thoas/go-funk"
@@ -201,6 +202,17 @@ func (i *installer) startBootstrap() error {
 	// reload systemd configurations from filesystem and regenerate dependency trees
 	err = i.ops.SystemctlAction("daemon-reload")
 	if err != nil {
+		return err
+	}
+
+	/* in case hostname is localhost, we need to set hostname to some random value, in order to
+	   disable network manager activating hostname service, which will in turn may reset /etc/resolv.conf and
+	   remove the work done by 30-local-dns-prepender. This will cause DNS issue in bootkube and it will fail to complete
+	   successfully
+	*/
+	err = i.checkLocalhostName()
+	if err != nil {
+		i.log.Error(err)
 		return err
 	}
 
@@ -587,4 +599,21 @@ func (i *installer) createSingleNodeMasterIgnition() (string, error) {
 		return "", err
 	}
 	return singleNodeMasterIgnitionPath, nil
+}
+
+func (i *installer) checkLocalhostName() error {
+	i.log.Infof("Start checking localhostname")
+	hostname, err := i.ops.GetHostname()
+	if err != nil {
+		i.log.Errorf("Failed to get hostname from kernel, err %s", err)
+		return err
+	}
+	if hostname != "localhost" {
+		i.log.Infof("hostname is not localhost, no need to do anything")
+		return nil
+	}
+
+	data := fmt.Sprintf("random-hostname-%s", uuid.New().String())
+	i.log.Infof("write data into /etc/hostname")
+	return i.ops.CreateRandomHostname(data)
 }
