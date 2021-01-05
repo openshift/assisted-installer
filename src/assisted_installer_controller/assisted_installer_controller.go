@@ -39,6 +39,7 @@ var GeneralWaitInterval = generalWaitTimeoutInt * time.Second
 var generalProgressUpdateInt = 60 * time.Second
 var LogsUploadPeriod = 5 * time.Minute
 var WaitTimeout = 70 * time.Minute
+var NumRetrySendingLogs = 6
 
 // assisted installer controller is added to control installation process after  bootstrap pivot
 // assisted installer will deploy it on installation process
@@ -505,6 +506,7 @@ func (c controller) sendCompleteInstallation(isSuccess bool, errorInfo string) {
  **/
 func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSeconds int64, isMustGatherEnabled bool) error {
 	var tarentries = make([]utils.TarEntry, 0)
+	var ok bool = true
 	ctx := utils.GenerateRequestContext()
 
 	if isMustGatherEnabled {
@@ -513,6 +515,8 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 			if entry, tarerr := utils.NewTarEntryFromFile(tarfile); tarerr == nil {
 				tarentries = append(tarentries, *entry)
 			}
+		} else {
+			ok = false
 		}
 	}
 
@@ -520,6 +524,8 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 	if podLogs, err := c.kc.GetPodLogsAsBuffer(namespace, podName, sinceSeconds); err == nil {
 		tarentries = append(tarentries,
 			*utils.NewTarEntry(podLogs, nil, int64(podLogs.Len()), fmt.Sprintf("%s.logs", podName)))
+	} else {
+		ok = false
 	}
 
 	if len(tarentries) == 0 {
@@ -543,9 +549,16 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 	err := c.ic.UploadLogs(ctx, c.ClusterID, models.LogsTypeController, pr)
 	if err != nil {
 		utils.RequestIDLogger(ctx, c.log).WithError(err).Error("Failed to upload logs")
+		return err
 	}
 
-	return err
+	if !ok {
+		msg := "Some Logs were not collected in summary"
+		c.log.Errorf(msg)
+		return errors.New(msg)
+	}
+
+	return nil
 }
 
 func (c controller) collectMustGatherLogs(ctx context.Context) (string, error) {
@@ -587,7 +600,13 @@ func (c *controller) UploadLogs(ctx context.Context, cancellog context.CancelFun
 		case <-ctx.Done():
 			if podName != "" {
 				c.log.Infof("Upload final controller and cluster logs before exit")
-				_ = c.uploadSummaryLogs(podName, c.Namespace, controllerLogsSecondsAgo, status.HasError())
+				_ = utils.WaitForPredicate(WaitTimeout, LogsUploadPeriod, func() bool {
+					err := c.uploadSummaryLogs(podName, c.Namespace, controllerLogsSecondsAgo, status.HasError())
+					if err != nil {
+						c.log.Infof("retry uploading logs in 5 minutes...")
+					}
+					return err == nil
+				})
 			}
 			return
 		case <-ticker.C:
@@ -604,24 +623,20 @@ func (c *controller) UploadLogs(ctx context.Context, cancellog context.CancelFun
 				}
 				podName = pods[0].Name
 			}
-			var err error
-			c.log.Info("Collecting Logs ....")
+
 			if status.HasError() {
-				//once error is detected in the flow, upload the full capacity of debugging logs
-				//and abort
-				c.log.Infof("Error detected... closing logs...")
+				c.log.Infof("Error detected. Closing logs and aborting...")
 				cancellog()
 				continue
 			}
 
 			//on normal flow, keep updating the controller log output every 5 minutes
-			c.log.Infof("Start uploading controller logs (intermediate snapshot) ...")
-			err = common.UploadPodLogs(c.kc, c.ic, c.ClusterID, podName, c.Namespace, controllerLogsSecondsAgo, c.log)
+			c.log.Infof("Start uploading controller logs (intermediate snapshot)")
+			err := common.UploadPodLogs(c.kc, c.ic, c.ClusterID, podName, c.Namespace, controllerLogsSecondsAgo, c.log)
 			if err != nil {
 				c.log.WithError(err).Warnf("Failed to upload controller logs")
 				continue
 			}
-			c.log.Infof("Done uploading controller logs")
 		}
 	}
 }

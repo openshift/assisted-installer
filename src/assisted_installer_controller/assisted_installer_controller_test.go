@@ -618,11 +618,13 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		var ctx context.Context
 		var cancel context.CancelFunc
 
-		callUploadLogs := func() {
+		callUploadLogs := func(waitTime time.Duration) {
 			wg.Add(1)
 			go c.UploadLogs(ctx, cancel, &wg, status)
-			time.Sleep(150 * time.Millisecond)
-			cancel()
+			time.Sleep(waitTime)
+			if !status.HasError() {
+				cancel()
+			}
 			wg.Wait()
 		}
 
@@ -647,13 +649,21 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any()).Return("../../test_files/tartest.tar.gz", nil).Times(1)
 			mockbmclient.EXPECT().DownloadFile(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
 			status.Error()
-			callUploadLogs()
+			callUploadLogs(150 * time.Millisecond)
 		})
 
 		It("Validate must-gather logs are not collected with no error", func() {
 			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any()).Times(0)
 			mockbmclient.EXPECT().DownloadFile(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-			callUploadLogs()
+			callUploadLogs(150 * time.Millisecond)
+		})
+
+		It("Validate must-gather logs are retried on error", func() {
+			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any()).Return("", fmt.Errorf("failed"))
+			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any()).Return("../../test_files/tartest.tar.gz", nil)
+			mockbmclient.EXPECT().DownloadFile(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
+			status.Error()
+			callUploadLogs(250 * time.Millisecond)
 		})
 	})
 })

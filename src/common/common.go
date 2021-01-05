@@ -110,6 +110,7 @@ func UploadPodLogs(kc k8s_client.K8SClient, ic inventory_client.InventoryClient,
 	//it will close writer and upload will fail
 	ctx := utils.GenerateRequestContext()
 	err = ic.UploadLogs(ctx, clusterId, models.LogsTypeController, pr)
+	log.Infof("Done uploading controller logs to the service")
 	if err != nil {
 		utils.RequestIDLogger(ctx, log).WithError(err).Error("Failed to upload logs")
 		return errors.Wrapf(err, "Failed to upload logs")
