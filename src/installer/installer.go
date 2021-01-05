@@ -35,6 +35,7 @@ const (
 	ovnKubernetes                = "OVNKubernetes"
 	networkTypeTimeoutSeconds    = 300
 	singleNodeMasterIgnitionPath = "/opt/openshift/master.ign"
+	numMasterNodes               = 3
 )
 
 var generalWaitTimeout = 30 * time.Second
@@ -298,30 +299,10 @@ func waitForNetworkType(kc k8s_client.K8SClient) error {
 }
 
 func (i *installer) waitForControlPlane(ctx context.Context, kc k8s_client.K8SClient) error {
-	if err := waitForNetworkType(kc); err != nil {
-		i.log.Error("failed to get network type")
+	if err := i.waitForMinMasterNodes(ctx, kc); err != nil {
 		return err
 	}
-	nt, err := kc.GetNetworkType()
-	if err != nil {
-		i.log.Error("failed to get network type")
-		return err
-	}
-	if nt == ovnKubernetes {
-		if err = kc.PatchControlPlaneReplicas(); err != nil {
-			i.log.WithError(err).Error("Failed to patch control plane replicas")
-			return err
-		}
-	}
 
-	i.waitForMasterNodes(ctx, minMasterNodes, kc)
-
-	if nt == ovnKubernetes {
-		if err = kc.UnPatchControlPlaneReplicas(); err != nil {
-			i.log.WithError(err).Error("Failed to unpatch control plane replicas")
-			return err
-		}
-	}
 	patch, err := utils.EtcdPatchRequired(i.Config.OpenshiftVersion)
 	if err != nil {
 		i.log.Error(err)
@@ -344,6 +325,47 @@ func (i *installer) waitForControlPlane(ctx context.Context, kc k8s_client.K8SCl
 		return err
 	}
 
+	return nil
+}
+
+func (i *installer) waitForMinMasterNodes(ctx context.Context, kc k8s_client.K8SClient) error {
+	if err := waitForNetworkType(kc); err != nil {
+		i.log.Error("failed to get network type")
+		return err
+	}
+	nt, err := kc.GetNetworkType()
+	if err != nil {
+		i.log.Error("failed to get network type")
+		return err
+	}
+	var origControlPlaneReplicas int
+	if nt == ovnKubernetes {
+		// OVNKubernetes waits the number that is defined in controlPlane.Replicas to be
+		// available before starting OVN.  Since assisted installer has a bootstrap node
+		// that later becomes a master, there is a need to patch the install-config to
+		// set the controlPlane.replicas to 2 until all masters which are not the
+		// bootstrap are ready.
+		// On single node this is not the case since bootstrap in place is used.
+		// Therefore, the patch is not relevant to single node.
+		if origControlPlaneReplicas, err = kc.GetControlPlaneReplicas(); err != nil {
+			i.log.WithError(err).Error("Failed to get control plane replicas")
+			return err
+		}
+		if origControlPlaneReplicas == numMasterNodes {
+			if err = kc.PatchControlPlaneReplicas(); err != nil {
+				i.log.WithError(err).Error("Failed to patch control plane replicas")
+				return err
+			}
+		}
+	}
+
+	i.waitForMasterNodes(ctx, minMasterNodes, kc)
+	if nt == ovnKubernetes && origControlPlaneReplicas == numMasterNodes {
+		if err = kc.UnPatchControlPlaneReplicas(); err != nil {
+			i.log.WithError(err).Error("Failed to unPatch control plane replicas")
+			return err
+		}
+	}
 	return nil
 }
 
