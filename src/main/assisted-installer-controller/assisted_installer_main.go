@@ -80,8 +80,9 @@ func main() {
 
 	logger.Infof("Waiting for all go routines to finish")
 	wg.Wait()
-	logger.Infof("closing logs...")
-	if !status.HasError() { //with error the logs are canceled within UploadLogs
+	if !status.HasError() {
+		//with error the logs are canceled within UploadLogs
+		logger.Infof("closing logs...")
 		cancelLogs()
 	}
 	wgLogs.Wait()
