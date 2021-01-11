@@ -14,8 +14,11 @@ import (
 	"golang.org/x/sync/errgroup"
 	v1 "k8s.io/api/core/v1"
 
+	config_31_types "github.com/coreos/ignition/v2/config/v3_1/types"
+
 	"github.com/openshift/assisted-installer/src/common"
 	"github.com/openshift/assisted-installer/src/config"
+	"github.com/openshift/assisted-installer/src/ignition"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/ops"
@@ -103,7 +106,6 @@ func (i *installer) InstallNode() error {
 		if err != nil {
 			return err
 		}
-		i.Config.Role = string(models.HostRoleMaster)
 	} else {
 		ignitionPath, err = i.downloadHostIgnition()
 		if err != nil {
@@ -128,6 +130,34 @@ func (i *installer) InstallNode() error {
 	}
 	i.UpdateHostInstallProgress(models.HostStageRebooting, "")
 	if err = i.ops.Reboot(); err != nil {
+		return err
+	}
+	return nil
+}
+
+//updateSingleNodeIgnition will download the host ignition config and add the files under storage
+func (i *installer) updateSingleNodeIgnition(singleNodeIgnitionPath string) error {
+	hostIgnitionPath, err := i.downloadHostIgnition()
+	if err != nil {
+		return err
+	}
+	singleNodeconfig, err := ignition.ParseIgnitionFile(singleNodeIgnitionPath)
+	if err != nil {
+		return err
+	}
+	hostConfig, err := ignition.ParseIgnitionFile(hostIgnitionPath)
+	if err != nil {
+		return err
+	}
+	// TODO: update this once we can get the full host specific overrides we have in the ignition
+	// Remove the Config part since we only want the rest of the overrides
+	hostConfig.Ignition.Config = config_31_types.IgnitionConfig{}
+	merged, mergeErr := ignition.MergeIgnitionConfig(singleNodeconfig, hostConfig)
+	if mergeErr != nil {
+		return errors.Wrapf(mergeErr, "failed to apply host ignition config overrides")
+	}
+	err = ignition.WriteIgnitionFile(singleNodeIgnitionPath, merged)
+	if err != nil {
 		return err
 	}
 	return nil
@@ -621,6 +651,12 @@ func (i *installer) createSingleNodeMasterIgnition() (string, error) {
 		i.log.Errorf("Failed to find single node master ignition: %s", err)
 		return "", err
 	}
+	i.Config.Role = string(models.HostRoleMaster)
+	err = i.updateSingleNodeIgnition(singleNodeMasterIgnitionPath)
+	if err != nil {
+		return "", err
+	}
+
 	return singleNodeMasterIgnitionPath, nil
 }
 
