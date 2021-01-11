@@ -7,7 +7,10 @@ lint:
 	golangci-lint run -v
 
 format:
-	goimports -w -l src/ || /bin/true
+	@goimports -w -l src/ || /bin/true
+
+format-check:
+	@test -z $(shell $(MAKE) format)
 
 generate:
 	go generate $(shell go list ./...)
