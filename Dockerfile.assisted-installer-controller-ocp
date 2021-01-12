@@ -1,7 +1,15 @@
-FROM quay.io/centos/centos:centos8
-copy build/assisted-installer-controller-ocp /
+FROM registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7 AS builder
+ENV GOFLAGS=-mod=mod
+WORKDIR /go/src/github.com/openshift/assisted-installer
+COPY . .
+RUN make controller-ocp
+
+FROM registry.svc.ci.openshift.org/ocp/4.7:base
 ARG GIT_REVISION
-LABEL "git_revision"=${GIT_REVISION}
 ARG QUAY_TAG_EXPIRATION
+
+COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/assisted-installer-controller-ocp /usr/bin/assisted-installer-controller-ocp
+
+LABEL "git_revision"=${GIT_REVISION}
 LABEL "quay.expires-after"=${QUAY_TAG_EXPIRATION}
-ENTRYPOINT ["/assisted-installer-controller-ocp"]
+ENTRYPOINT ["/usr/bin/assisted-installer-controller-ocp"]
