@@ -57,6 +57,12 @@ spec:
                   name: assisted-installer-controller-config
                   key: high-availability-mode
                   optional: true
+            - name: CHECK_CLUSTER_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: assisted-installer-controller-config
+                  key: check-cluster-version
+                  optional: true
           {{if .CACertPath}}
           volumeMounts:
           - name: service-ca-cert-config

@@ -269,6 +269,7 @@ func (o *ops) renderControllerCm() error {
 		"SkipCertVerification": strconv.FormatBool(config.GlobalConfig.SkipCertVerification),
 		"CACertPath":           config.GlobalConfig.CACertPath,
 		"HaMode":               config.GlobalConfig.HighAvailabilityMode,
+		"CheckCVO":             config.GlobalConfig.CheckClusterVersion,
 	}
 
 	return o.renderDeploymentFiles(filepath.Join(controllerDeployFolder, controllerDeployCmTemplate),

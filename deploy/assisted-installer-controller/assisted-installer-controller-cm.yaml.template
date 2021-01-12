@@ -10,4 +10,5 @@ data:
   inventory-url: {{.InventoryUrl}}
   skip-cert-verification: '{{.SkipCertVerification}}'
   ca-cert-path: '{{.CACertPath}}'
+  check-cluster-version: '{{.CheckCVO}}'
   high-availability-mode: {{.HaMode}}
