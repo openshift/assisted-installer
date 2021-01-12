@@ -10,7 +10,7 @@ NAMESPACE := $(or ${NAMESPACE},assisted-installer)
 GIT_REVISION := $(shell git rev-parse HEAD)
 PUBLISH_TAG := $(or ${GIT_REVISION})
 
-all: image image_controller image_controller_ocp unit-test
+all: build-images unit-test
 
 lint:
 	golangci-lint run -v
@@ -29,34 +29,35 @@ unit-test: $(REPORTS)
 	gotestsum --format=pkgname $(TEST_PUBLISH_FLAGS) -- -cover -coverprofile=$(REPORTS)/coverage.out $(or ${TEST},${TEST},$(shell go list ./...)) -ginkgo.focus=${FOCUS} -ginkgo.v
 	gocov convert $(REPORTS)/coverage.out | gocov-xml > $(REPORTS)/coverage.xml
 
-build/installer: lint format
-	mkdir -p build
+build: installer controller controller-ocp
+
+installer:
 	CGO_ENABLED=0 go build -o build/installer src/main/main.go
 
-build/controller: lint format
-	mkdir -p build
+controller:
 	CGO_ENABLED=0 go build -o build/assisted-installer-controller src/main/assisted-installer-controller/assisted_installer_main.go
 
-build/controller_ocp: lint format
-	mkdir -p build
+controller-ocp:
 	CGO_ENABLED=0 go build -o build/assisted-installer-controller-ocp src/main/assisted-installer-controller-ocp/main.go
 
-image: build/installer
+build-images: installer-image controller-image controller-ocp-image
+
+installer-image:
 	GIT_REVISION=${GIT_REVISION} $(CONTAINER_COMMAND) build --network=host --build-arg GIT_REVISION -f Dockerfile.assisted-installer . -t $(INSTALLER)
 
-push: image
-	$(CONTAINER_COMMAND) push $(INSTALLER)
-
-image_controller: build/controller
+controller-image:
 	GIT_REVISION=${GIT_REVISION} $(CONTAINER_COMMAND) build --network=host --build-arg GIT_REVISION -f Dockerfile.assisted-installer-controller . -t $(CONTROLLER)
 
-push_controller: image_controller
-	$(CONTAINER_COMMAND) push $(CONTROLLER)
-
-image_controller_ocp: build/controller_ocp
+controller-ocp-image:
 	GIT_REVISION=${GIT_REVISION} $(CONTAINER_COMMAND) build --build-arg GIT_REVISION -f Dockerfile.assisted-installer-controller-ocp . -t $(CONTROLLER_OCP)
 
-push_controller_ocp: image_controller_ocp
+push: installer-image
+	$(CONTAINER_COMMAND) push $(INSTALLER)
+
+push-controller: controller-image
+	$(CONTAINER_COMMAND) push $(CONTROLLER)
+
+push-controller-ocp: controller-ocp-image
 	$(CONTAINER_COMMAND) push $(CONTROLLER_OCP)
 
 deploy_controller_on_ocp_cluster:
