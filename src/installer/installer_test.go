@@ -10,6 +10,9 @@ import (
 	"testing"
 	"time"
 
+	config31types "github.com/coreos/ignition/v2/config/v3_1/types"
+	"github.com/openshift/assisted-installer/src/ignition"
+
 	"github.com/go-openapi/strfmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -41,6 +44,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockops            *ops.MockOps
 		mockbmclient       *inventory_client.MockInventoryClient
 		mockk8sclient      *k8s_client.MockK8SClient
+		mockIgnition       *ignition.MockIgnition
 		installerObj       *installer
 		hostId             = "host-id"
 		bootstrapIgn       = "bootstrap.ign"
@@ -59,6 +63,14 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	}
 	downloadHostIgnitionSuccess := func(hostID string, fileName string) {
 		mockbmclient.EXPECT().DownloadHostIgnition(gomock.Any(), hostID, filepath.Join(InstallDir, fileName)).Return(nil).Times(1)
+	}
+
+	singleNodeMergeIgnitionSuccess := func() {
+		conf := config31types.Config{}
+		mockIgnition.EXPECT().ParseIgnitionFile("/opt/install-dir/master-host-id.ign").Return(&conf, nil).Times(1)
+		mockIgnition.EXPECT().ParseIgnitionFile(singleNodeMasterIgnitionPath).Return(&conf, nil).Times(1)
+		mockIgnition.EXPECT().MergeIgnitionConfig(gomock.Any(), gomock.Any()).Return(&conf, nil).Times(1)
+		mockIgnition.EXPECT().WriteIgnitionFile(singleNodeMasterIgnitionPath, gomock.Any()).Return(nil).Times(1)
 	}
 
 	cleanInstallDevice := func() {
@@ -105,6 +117,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockops = ops.NewMockOps(ctrl)
 		mockbmclient = inventory_client.NewMockInventoryClient(ctrl)
 		mockk8sclient = k8s_client.NewMockK8SClient(ctrl)
+		mockIgnition = ignition.NewMockIgnition(ctrl)
 		node0Id := strfmt.UUID("7916fa89-ea7a-443e-a862-b3e930309f65")
 		node1Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f238")
 		node2Id := strfmt.UUID("b898d516-3e16-49d0-86a5-0ad5bd04e3ed")
@@ -127,7 +140,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			MCOImage:         "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:dc1a34f55c712b2b9c5e5a14dd85e67cbdae11fd147046ac2fef9eaf179ab221",
 		}
 		BeforeEach(func() {
-			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
+			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition)
 		})
 		mcoImage := conf.MCOImage
 		extractIgnitionToFS := func(out string, err error) {
@@ -435,7 +448,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			InstallerArgs:    installerArgs,
 		}
 		BeforeEach(func() {
-			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
+			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition)
 		})
 		It("master role happy flow", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
@@ -535,7 +548,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			OpenshiftVersion: openShiftVersion,
 		}
 		BeforeEach(func() {
-			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
+			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition)
 		})
 		It("worker role happy flow", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
@@ -566,7 +579,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			HighAvailabilityMode: models.ClusterHighAvailabilityModeNone,
 		}
 		BeforeEach(func() {
-			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder)
+			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition)
 		})
 		mcoImage := conf.MCOImage
 		extractIgnitionToFS := func(out string, err error) {
@@ -639,6 +652,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			bootkubeStatusSuccess()
 			//HostRoleMaster flow:
 			verifySingleNodeMasterIgnitionSuccess()
+			singleNodeMergeIgnitionSuccess()
+			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			mockops.EXPECT().WriteImageToDisk(singleNodeMasterIgnitionPath, device, mockbmclient, nil).Return(nil).Times(1)
 			uploadLogsSuccess(true)
 			rebootSuccess()

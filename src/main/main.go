@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/openshift/assisted-installer/src/ignition"
+
 	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/installer"
 	"github.com/openshift/assisted-installer/src/inventory_client"
@@ -34,6 +36,7 @@ func main() {
 		ops.NewOps(logger, true),
 		client,
 		k8s_client.NewK8SClient,
+		ignition.NewIgnition(),
 	)
 	if err := ai.InstallNode(); err != nil {
 		ai.UpdateHostInstallProgress(models.HostStageFailed, err.Error())

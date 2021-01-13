@@ -14,8 +14,11 @@ import (
 	"golang.org/x/sync/errgroup"
 	v1 "k8s.io/api/core/v1"
 
+	config31types "github.com/coreos/ignition/v2/config/v3_1/types"
+
 	"github.com/openshift/assisted-installer/src/common"
 	"github.com/openshift/assisted-installer/src/config"
+	"github.com/openshift/assisted-installer/src/ignition"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/ops"
@@ -35,8 +38,8 @@ const (
 	waitForeverTimeout           = time.Duration(1<<63 - 1) // wait forever ~ 292 years
 	ovnKubernetes                = "OVNKubernetes"
 	networkTypeTimeoutSeconds    = 300
-	singleNodeMasterIgnitionPath = "/opt/openshift/master.ign"
 	numMasterNodes               = 3
+	singleNodeMasterIgnitionPath = "/opt/openshift/master.ign"
 )
 
 var generalWaitTimeout = 30 * time.Second
@@ -53,15 +56,17 @@ type installer struct {
 	ops             ops.Ops
 	inventoryClient inventory_client.InventoryClient
 	kcBuilder       k8s_client.K8SClientBuilder
+	ign             ignition.Ignition
 }
 
-func NewAssistedInstaller(log *logrus.Logger, cfg config.Config, ops ops.Ops, ic inventory_client.InventoryClient, kcb k8s_client.K8SClientBuilder) *installer {
+func NewAssistedInstaller(log *logrus.Logger, cfg config.Config, ops ops.Ops, ic inventory_client.InventoryClient, kcb k8s_client.K8SClientBuilder, ign ignition.Ignition) *installer {
 	return &installer{
 		log:             log,
 		Config:          cfg,
 		ops:             ops,
 		inventoryClient: ic,
 		kcBuilder:       kcb,
+		ign:             ign,
 	}
 }
 
@@ -103,7 +108,6 @@ func (i *installer) InstallNode() error {
 		if err != nil {
 			return err
 		}
-		i.Config.Role = string(models.HostRoleMaster)
 	} else {
 		ignitionPath, err = i.downloadHostIgnition()
 		if err != nil {
@@ -128,6 +132,35 @@ func (i *installer) InstallNode() error {
 	}
 	i.UpdateHostInstallProgress(models.HostStageRebooting, "")
 	if err = i.ops.Reboot(); err != nil {
+		return err
+	}
+	return nil
+}
+
+//updateSingleNodeIgnition will download the host ignition config and add the files under storage
+func (i *installer) updateSingleNodeIgnition(singleNodeIgnitionPath string) error {
+	hostIgnitionPath, err := i.downloadHostIgnition()
+	if err != nil {
+		return err
+	}
+	fmt.Println(i.ign)
+	singleNodeconfig, err := i.ign.ParseIgnitionFile(singleNodeIgnitionPath)
+	if err != nil {
+		return err
+	}
+	hostConfig, err := i.ign.ParseIgnitionFile(hostIgnitionPath)
+	if err != nil {
+		return err
+	}
+	// TODO: update this once we can get the full host specific overrides we have in the ignition
+	// Remove the Config part since we only want the rest of the overrides
+	hostConfig.Ignition.Config = config31types.IgnitionConfig{}
+	merged, mergeErr := i.ign.MergeIgnitionConfig(singleNodeconfig, hostConfig)
+	if mergeErr != nil {
+		return errors.Wrapf(mergeErr, "failed to apply host ignition config overrides")
+	}
+	err = i.ign.WriteIgnitionFile(singleNodeIgnitionPath, merged)
+	if err != nil {
 		return err
 	}
 	return nil
@@ -621,6 +654,12 @@ func (i *installer) createSingleNodeMasterIgnition() (string, error) {
 		i.log.Errorf("Failed to find single node master ignition: %s", err)
 		return "", err
 	}
+	i.Config.Role = string(models.HostRoleMaster)
+	err = i.updateSingleNodeIgnition(singleNodeMasterIgnitionPath)
+	if err != nil {
+		return "", err
+	}
+
 	return singleNodeMasterIgnitionPath, nil
 }
 
@@ -628,7 +667,7 @@ func (i *installer) checkLocalhostName() error {
 	i.log.Infof("Start checking localhostname")
 	hostname, err := i.ops.GetHostname()
 	if err != nil {
-		i.log.Errorf("Failed to get hostname from kernel, err %s", err)
+		i.log.Errorf("Failed to get hostname from kernel, err %s157", err)
 		return err
 	}
 	if hostname != "localhost" {
