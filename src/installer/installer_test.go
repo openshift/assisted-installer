@@ -607,7 +607,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockops.EXPECT().SystemctlAction("restart", "NetworkManager.service").Return(err).Times(1)
 		}
 		startServicesSuccess := func() {
-			services := []string{"bootkube.service", "progress.service", "approve-csr.service"}
+			services := []string{"bootkube.service", "progress.service", "approve-csr.service", "patch.service"}
 			for i := range services {
 				mockops.EXPECT().SystemctlAction("start", services[i]).Return(nil).Times(1)
 			}
