@@ -33,6 +33,7 @@ type Config struct {
 	ServiceIPs           string
 	InstallerArgs        []string
 	HighAvailabilityMode string
+	CheckClusterVersion  bool
 }
 
 var GlobalConfig Config
@@ -65,6 +66,7 @@ func ProcessArgs() {
 	flag.StringVar(&ret.NoProxy, "no-proxy", "", "A comma-separated list of destination domain names, domains, IP addresses, or other network CIDRs to exclude proxying")
 	flag.StringVar(&ret.ServiceIPs, "service-ips", "", "All IPs of assisted service node")
 	flag.StringVar(&ret.HighAvailabilityMode, "high-availability-mode", "Full", "high-availability expectations. default is 'Full', which represents the behavior in a \"normal\" cluster. Use 'None' for single-node deployment")
+	flag.BoolVar(&ret.CheckClusterVersion, "check-cluster-version", false, "Do not monitor CVO")
 
 	var installerArgs string
 	flag.StringVar(&installerArgs, "installer-args", "", "JSON array of additional coreos-installer arguments")
