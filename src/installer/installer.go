@@ -337,9 +337,12 @@ func (i *installer) downloadHostIgnition() (string, error) {
 	return dest, err
 }
 
-func waitForNetworkType(kc k8s_client.K8SClient) error {
+func (i *installer) waitForNetworkType(kc k8s_client.K8SClient) error {
 	return utils.WaitForPredicate(networkTypeTimeoutSeconds*time.Second, time.Second, func() bool {
 		_, err := kc.GetNetworkType()
+		if err != nil {
+			i.log.WithError(err).Error("Failed to get network type")
+		}
 		return err == nil
 	})
 }
@@ -375,13 +378,13 @@ func (i *installer) waitForControlPlane(ctx context.Context, kc k8s_client.K8SCl
 }
 
 func (i *installer) waitForMinMasterNodes(ctx context.Context, kc k8s_client.K8SClient) error {
-	if err := waitForNetworkType(kc); err != nil {
-		i.log.Error("failed to get network type")
+	if err := i.waitForNetworkType(kc); err != nil {
+		i.log.WithError(err).Error("failed to wait for network type")
 		return err
 	}
 	nt, err := kc.GetNetworkType()
 	if err != nil {
-		i.log.Error("failed to get network type")
+		i.log.WithError(err).Error("failed to get network type")
 		return err
 	}
 	var origControlPlaneReplicas int
