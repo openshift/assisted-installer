@@ -1,19 +1,22 @@
 FROM registry.svc.ci.openshift.org/ocp/4.7:cli AS cli
 
-FROM registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7 AS builder
+FROM registry.svc.ci.openshift.org/openshift/release:golang-1.15 AS builder
 ENV GOFLAGS=-mod=mod
 WORKDIR /go/src/github.com/openshift/assisted-installer
+
+# Bring in the go dependencies before anything else so we can take
+# advantage of caching these layers in future builds.
+COPY go.mod go.mod
+COPY go.sum go.sum
+RUN go mod download
+
 COPY . .
 RUN make controller
 
 FROM registry.svc.ci.openshift.org/ocp/4.7:base
-ARG GIT_REVISION
-ARG QUAY_TAG_EXPIRATION
 
 RUN yum -y install make gcc unzip wget curl rsync && yum clean all
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/assisted-installer-controller /usr/bin/assisted-installer-controller
 COPY --from=cli /usr/bin/oc /usr/bin/oc
 
-LABEL "git_revision"=${GIT_REVISION}
-LABEL "quay.expires-after"=${QUAY_TAG_EXPIRATION}
 ENTRYPOINT ["/usr/bin/assisted-installer-controller"]

@@ -10,7 +10,9 @@ NAMESPACE := $(or ${NAMESPACE},assisted-installer)
 GIT_REVISION := $(shell git rev-parse HEAD)
 PUBLISH_TAG := $(or ${GIT_REVISION})
 
-all: build-images unit-test
+CONTAINER_BUILD_PARAMS = --network=host --label git_revision=${GIT_REVISION}
+
+all: lint format-check build-images unit-test
 
 lint:
 	golangci-lint run -v
@@ -43,15 +45,15 @@ controller-ocp:
 build-images: installer-image controller-image controller-ocp-image
 
 installer-image:
-	GIT_REVISION=${GIT_REVISION} $(CONTAINER_COMMAND) build --network=host --build-arg GIT_REVISION -f Dockerfile.assisted-installer . -t $(INSTALLER)
+	GIT_REVISION=${GIT_REVISION} $(CONTAINER_COMMAND) build $(CONTAINER_BUILD_PARAMS) -f Dockerfile.assisted-installer . -t $(INSTALLER)
 
 controller-image:
-	GIT_REVISION=${GIT_REVISION} $(CONTAINER_COMMAND) build --network=host --build-arg GIT_REVISION -f Dockerfile.assisted-installer-controller . -t $(CONTROLLER)
+	GIT_REVISION=${GIT_REVISION} $(CONTAINER_COMMAND) build $(CONTAINER_BUILD_PARAMS) -f Dockerfile.assisted-installer-controller . -t $(CONTROLLER)
 
 controller-ocp-image:
-	GIT_REVISION=${GIT_REVISION} $(CONTAINER_COMMAND) build --build-arg GIT_REVISION -f Dockerfile.assisted-installer-controller-ocp . -t $(CONTROLLER_OCP)
+	GIT_REVISION=${GIT_REVISION} $(CONTAINER_COMMAND) build $(CONTAINER_BUILD_PARAMS) -f Dockerfile.assisted-installer-controller-ocp . -t $(CONTROLLER_OCP)
 
-push: installer-image
+push-installer: installer-image
 	$(CONTAINER_COMMAND) push $(INSTALLER)
 
 push-controller: controller-image
