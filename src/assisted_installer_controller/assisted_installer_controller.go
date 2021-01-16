@@ -290,11 +290,15 @@ func (c controller) UpdateBMHs(wg *sync.WaitGroup) {
 			continue
 		}
 
+		c.log.Infof("Number of BMHs is %d", len(bmhs.Items))
+
 		machines, err := c.unallocatedMachines(bmhs)
 		if err != nil {
 			c.log.WithError(err).Errorf("Failed to get machines")
 			continue
 		}
+
+		c.log.Infof("Number of unallocated Machines is %d", len(machines.Items))
 
 		allUpdated := c.updateBMHs(bmhs, machines)
 		if allUpdated {
@@ -314,6 +318,9 @@ func (c controller) unallocatedMachines(bmhList metal3v1alpha1.BareMetalHostList
 
 	for _, machine := range machineList.Items {
 		role, ok := machine.Labels["machine.openshift.io/cluster-api-machine-role"]
+		if ok && role == "worker" {
+			c.log.Infof("Found worker machine %s", machine.Name)
+		}
 		unallocated := ok && role == "worker"
 		for _, bmh := range bmhList.Items {
 			if bmh.Spec.ConsumerRef != nil && bmh.Spec.ConsumerRef.Name == machine.Name {
@@ -342,6 +349,7 @@ func (c controller) updateBMHs(bmhList metal3v1alpha1.BareMetalHostList, machine
 		}
 		allUpdated = false
 		if annotations[metal3v1alpha1.StatusAnnotation] != "" {
+			c.log.Infof("Updating annotations for bmh %s", bmh.Name)
 			objStatus, err := c.unmarshalStatusAnnotation(content)
 			if err != nil {
 				c.log.WithError(err).Errorf("Failed to unmarshal status annotation of %s", bmh.Name)
@@ -362,7 +370,17 @@ func (c controller) updateBMHs(bmhList metal3v1alpha1.BareMetalHostList, machine
 			}
 			delete(annotations, metal3v1alpha1.StatusAnnotation)
 		}
+
 		if bmh.Spec.ConsumerRef == nil {
+			/*
+				update consumer ref for workers only in case machineset controller has already
+				created an unassigned Machine (base on machineset replica count)
+			*/
+			if len(machineList.Items) == 0 {
+				c.log.Infof("No available machine for bmh %s, need to wait for machineset controller to create one", bmh.Name)
+				continue
+			}
+			c.log.Infof("Updating consumer ref for bmh %s", bmh.Name)
 			machine := machineList.Items[0]
 			machineList.Items = machineList.Items[1:]
 			bmh.Spec.ConsumerRef = &v1.ObjectReference{
@@ -372,7 +390,6 @@ func (c controller) updateBMHs(bmhList metal3v1alpha1.BareMetalHostList, machine
 				Name:       machine.Name,
 			}
 		}
-
 		err := c.kc.UpdateBMH(&bmh)
 		if err != nil {
 			c.log.WithError(err).Errorf("Failed to update BMH %s", bmh.Name)
