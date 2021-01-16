@@ -362,7 +362,7 @@ func (c controller) updateBMHs(bmhList metal3v1alpha1.BareMetalHostList, machine
 			}
 			delete(annotations, metal3v1alpha1.StatusAnnotation)
 		}
-		if bmh.Spec.ConsumerRef == nil {
+		if bmh.Spec.ConsumerRef == nil && len(machineList.Items) > 0 {
 			machine := machineList.Items[0]
 			machineList.Items = machineList.Items[1:]
 			bmh.Spec.ConsumerRef = &v1.ObjectReference{
