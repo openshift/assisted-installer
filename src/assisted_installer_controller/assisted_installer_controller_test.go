@@ -527,6 +527,25 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			go c.UpdateBMHs(&wg)
 			wg.Wait()
 		})
+		It("worker machine does not exists", func() {
+			emptyMachineList := &machinev1beta1.MachineList{Items: machineList.Items[:0]}
+			expect1 := &metal3v1alpha1.BareMetalHost{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "openshift-worker-0",
+					Annotations: map[string]string{
+						metal3v1alpha1.StatusAnnotation: string(annBytes),
+					},
+				},
+				Status: bmhStatus,
+			}
+			mockk8sclient.EXPECT().UpdateBMHStatus(expect1).Return(nil)
+			bmhListTemp := metal3v1alpha1.BareMetalHostList{
+				Items: []metal3v1alpha1.BareMetalHost{
+					*(bmhList.Items[0].DeepCopy()),
+				},
+			}
+			c.updateBMHs(bmhListTemp, emptyMachineList)
+		})
 		It("normal path", func() {
 			expect1 := &metal3v1alpha1.BareMetalHost{
 				ObjectMeta: metav1.ObjectMeta{
