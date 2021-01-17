@@ -3,6 +3,7 @@ The OpenShift Assisted Installer provides for easy provisioning of new bare meta
 The Assisted Installer is meant to run on FCOS or RHCOS liveCD images.
 The Assisted Installer uses CoreOS Ignition as a configuration format. The ignition files are created and stored by [Assisted Installation Service](https://github.com/openshift/assisted-service).
 
+
 The Assisted Installer is executed by the Assisted Installation Service. Once the cluster installation begins (after host discovery), each host will get the relevant install command from the service. For example:
 ```bash
 sudo podman run -e CLUSTER_ID=<clusterID> -e BUCKET=<S3 bucket> -e S3_URL=<S3 url> -e DEVICE=<boot disk> -v /dev:/dev:rw --privileged --pid=host  quay.io/openshift/assisted-installer:latest -r <node role>
