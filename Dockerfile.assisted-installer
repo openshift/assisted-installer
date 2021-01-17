@@ -1,19 +1,8 @@
-FROM registry.svc.ci.openshift.org/openshift/release:golang-1.15 AS builder
-ENV GOFLAGS=-mod=mod
-WORKDIR /go/src/github.com/openshift/assisted-installer
-
-# Bring in the go dependencies before anything else so we can take
-# advantage of caching these layers in future builds.
-COPY go.mod go.mod
-COPY go.sum go.sum
-RUN go mod download
-
-COPY . .
-RUN make installer
-
-FROM registry.svc.ci.openshift.org/ocp/4.7:base
-
-COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/installer /usr/bin/installer
-COPY --from=builder /go/src/github.com/openshift/assisted-installer/deploy/assisted-installer-controller /assisted-installer-controller
-
-ENTRYPOINT ["/usr/bin/installer"]
+FROM quay.io/centos/centos:centos8
+copy build/installer /
+ARG GIT_REVISION
+LABEL "git_revision"=${GIT_REVISION}
+ARG QUAY_TAG_EXPIRATION
+LABEL "quay.expires-after"=${QUAY_TAG_EXPIRATION}
+add deploy/assisted-installer-controller /assisted-installer-controller/deploy
+ENTRYPOINT ["/installer"]
