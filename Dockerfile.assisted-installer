@@ -14,6 +14,6 @@ RUN make installer
 FROM registry.svc.ci.openshift.org/ocp/4.7:base
 
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/installer /usr/bin/installer
-COPY --from=builder /go/src/github.com/openshift/assisted-installer/deploy/assisted-installer-controller /assisted-installer-controller/deploy
+COPY --from=builder /go/src/github.com/openshift/assisted-installer/deploy/assisted-installer-controller /assisted-installer-controller
 
 ENTRYPOINT ["/usr/bin/installer"]
