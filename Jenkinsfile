@@ -4,11 +4,10 @@ pipeline {
   agent { label 'centos_worker' }
   triggers { cron(cron_string) }
   environment {
-
         // Credentials
         SLACK_TOKEN = credentials('slack-token')
         QUAY_IO_CREDS = credentials('ocpmetal_cred')
-
+        CI_OPENSHIFT_CREDS = credentials('ci_openshift_cred')
   }
   options {
     timeout(time: 1, unit: 'HOURS')
@@ -18,9 +17,14 @@ pipeline {
 
     stage('Init') {
         steps {
-            // Login to quay.io
-            sh "docker login quay.io -u ${QUAY_IO_CREDS_USR} -p ${QUAY_IO_CREDS_PSW}"
-            sh "podman login quay.io -u ${QUAY_IO_CREDS_USR} -p ${QUAY_IO_CREDS_PSW}"
+            script {
+                for (tool in ["docker", "podman"]) {
+                    for (repo_details in [["quay.io", "${QUAY_IO_CREDS_USR}", "${QUAY_IO_CREDS_PSW}"],["registry.svc.ci.openshift.org", "${CI_OPENSHIFT_CREDS_USR}", "${CI_OPENSHIFT_CREDS_PSW}"]]) {
+                        (repo, user, pass) = repo_details
+                        sh "${tool} login ${repo} -u ${user} -p ${pass}"
+                    }
+                }
+            }
         }
     }
 
