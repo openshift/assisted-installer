@@ -8,7 +8,7 @@ require (
 	github.com/benbjohnson/clock v1.0.3 // indirect
 	github.com/coreos/ignition/v2 v2.9.0
 	github.com/go-openapi/runtime v0.19.24
-	github.com/go-openapi/strfmt v0.19.11
+	github.com/go-openapi/strfmt v0.20.0
 	github.com/golang/mock v1.4.4
 	github.com/google/uuid v1.1.4
 	github.com/hashicorp/go-version v1.2.1
