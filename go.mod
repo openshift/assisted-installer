@@ -30,7 +30,7 @@ require (
 	golang.org/x/sync v0.0.0-20201008141435-b3e1573b7520
 	gopkg.in/yaml.v2 v2.3.0
 	k8s.io/api v0.19.4
-	k8s.io/apimachinery v0.20.1
+	k8s.io/apimachinery v0.20.2
 	k8s.io/client-go v12.0.0+incompatible
 	sigs.k8s.io/controller-runtime v0.7.0
 )
