@@ -37,7 +37,6 @@ const (
 	extractRetryCount            = 3
 	waitForeverTimeout           = time.Duration(1<<63 - 1) // wait forever ~ 292 years
 	ovnKubernetes                = "OVNKubernetes"
-	networkTypeTimeoutSeconds    = 300
 	numMasterNodes               = 3
 	singleNodeMasterIgnitionPath = "/opt/openshift/master.ign"
 )
@@ -341,7 +340,7 @@ func (i *installer) downloadHostIgnition() (string, error) {
 }
 
 func (i *installer) waitForNetworkType(kc k8s_client.K8SClient) error {
-	return utils.WaitForPredicate(networkTypeTimeoutSeconds*time.Second, time.Second, func() bool {
+	return utils.WaitForPredicate(waitForeverTimeout, 5*time.Second, func() bool {
 		_, err := kc.GetNetworkType()
 		if err != nil {
 			i.log.WithError(err).Error("Failed to get network type")
