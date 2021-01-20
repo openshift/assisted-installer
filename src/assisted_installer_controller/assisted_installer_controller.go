@@ -104,6 +104,13 @@ func (c *controller) WaitAndUpdateNodesStatus(status *ControllerStatus) {
 			log.WithError(err).Error("Failed to get node map from inventory")
 			continue
 		}
+
+		hostsStatus := make(map[string]string)
+		for hostname, hostData := range assistedInstallerNodesMap {
+			hostsStatus[hostname] = *hostData.Host.Status
+		}
+		log.Infof("Host status: %v", hostsStatus)
+
 		errNodesMap := common.FilterHostsByStatus(assistedInstallerNodesMap, []string{models.HostStatusError})
 		hostsInError = len(errNodesMap)
 
