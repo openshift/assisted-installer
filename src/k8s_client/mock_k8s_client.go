@@ -275,6 +275,21 @@ func (mr *MockK8SClientMockRecorder) ListBMHs() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListBMHs", reflect.TypeOf((*MockK8SClient)(nil).ListBMHs))
 }
 
+// GetBMH mocks base method
+func (m *MockK8SClient) GetBMH(name string) (*v1alpha1.BareMetalHost, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBMH", name)
+	ret0, _ := ret[0].(*v1alpha1.BareMetalHost)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBMH indicates an expected call of GetBMH
+func (mr *MockK8SClientMockRecorder) GetBMH(name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBMH", reflect.TypeOf((*MockK8SClient)(nil).GetBMH), name)
+}
+
 // UpdateBMHStatus mocks base method
 func (m *MockK8SClient) UpdateBMHStatus(bmh *v1alpha1.BareMetalHost) error {
 	m.ctrl.T.Helper()

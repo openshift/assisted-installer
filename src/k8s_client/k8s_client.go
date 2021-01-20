@@ -60,6 +60,7 @@ type K8SClient interface {
 	GetPods(namespace string, labelMatch map[string]string, fieldSelector string) ([]v1.Pod, error)
 	IsMetalProvisioningExists() (bool, error)
 	ListBMHs() (metal3v1alpha1.BareMetalHostList, error)
+	GetBMH(name string) (*metal3v1alpha1.BareMetalHost, error)
 	UpdateBMHStatus(bmh *metal3v1alpha1.BareMetalHost) error
 	UpdateBMH(bmh *metal3v1alpha1.BareMetalHost) error
 	SetProxyEnvVars() error
@@ -442,6 +443,18 @@ func (c *k8sClient) ListBMHs() (metal3v1alpha1.BareMetalHostList, error) {
 		return metal3v1alpha1.BareMetalHostList{}, err
 	}
 	return hosts, nil
+}
+
+func (c *k8sClient) GetBMH(name string) (*metal3v1alpha1.BareMetalHost, error) {
+	host := metal3v1alpha1.BareMetalHost{}
+	nn := types.NamespacedName{Namespace: "openshift-machine-api", Name: name}
+	err := c.runtimeClient.Get(context.Background(), nn, &host)
+	if err != nil {
+		c.log.Errorf("failed to Get BMH %s, error %s", name, err)
+		return &metal3v1alpha1.BareMetalHost{}, err
+	}
+	return &host, nil
+
 }
 
 func (c *k8sClient) UpdateBMHStatus(bmh *metal3v1alpha1.BareMetalHost) error {
