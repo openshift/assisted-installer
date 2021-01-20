@@ -205,7 +205,6 @@ func (i *installer) runBootstrap(ctx context.Context) error {
 
 func (i *installer) startBootstrap() error {
 	i.log.Infof("Running bootstrap")
-	servicesToStart := []string{"bootkube.service", "approve-csr.service", "progress.service"}
 	ignitionFileName := "bootstrap.ign"
 	ignitionPath, err := i.getFileFromService(ignitionFileName)
 	if err != nil {
@@ -232,9 +231,6 @@ func (i *installer) startBootstrap() error {
 		if err != nil {
 			return err
 		}
-	} else {
-		//TODO for removing this once SNO is supported
-		servicesToStart = append(servicesToStart, "patch.service")
 	}
 
 	// reload systemd configurations from filesystem and regenerate dependency trees
@@ -266,6 +262,7 @@ func (i *installer) startBootstrap() error {
 		return err
 	}
 
+	servicesToStart := []string{"bootkube.service", "approve-csr.service", "progress.service"}
 	for _, service := range servicesToStart {
 		err = i.ops.SystemctlAction("start", service)
 		if err != nil {
