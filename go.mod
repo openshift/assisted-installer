@@ -7,6 +7,7 @@ require (
 	github.com/aybabtme/iocontrol v0.0.0-20150809002002-ad15bcfc95a0 // indirect
 	github.com/benbjohnson/clock v1.0.3 // indirect
 	github.com/coreos/ignition/v2 v2.9.0
+	github.com/fsouza/go-dockerclient v1.6.6 // indirect
 	github.com/go-openapi/runtime v0.19.24
 	github.com/go-openapi/strfmt v0.20.0
 	github.com/golang/mock v1.4.4
@@ -19,7 +20,7 @@ require (
 	github.com/onsi/gomega v1.10.4
 	github.com/openshift/api v0.0.0-20200901182017-7ac89ba6b971
 	github.com/openshift/assisted-installer-agent v0.0.0-20200811180147-bc9c7b899b8a
-	github.com/openshift/assisted-service v1.0.10-0.20201228080422-f93cfaf76102
+	github.com/openshift/assisted-service v1.0.10-0.20210121095005-432f69c82c53
 	github.com/openshift/client-go v0.0.0-20200827190008-3062137373b5
 	github.com/openshift/machine-api-operator v0.2.1-0.20201002104344-6abfb5440597
 	github.com/pkg/errors v0.9.1
