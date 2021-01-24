@@ -42,6 +42,10 @@ const (
 )
 
 var generalWaitTimeout = 30 * time.Second
+var waitForControllerPodInterval = 5 * time.Second
+
+// retry sending logs for 5 minutes maximum
+var retryCounterUploadControllerLogs = (5 * time.Minute).Milliseconds() / waitForControllerPodInterval.Milliseconds()
 
 // Installer will run the install operations on the node
 type Installer interface {
@@ -465,6 +469,7 @@ func (i *installer) waitForController() error {
 		controllerPod := common.GetPodInStatus(kc, assistedControllerPrefix, assistedControllerNamespace,
 			map[string]string{"job-name": assistedControllerPrefix}, v1.PodRunning, i.log)
 		if controllerPod != nil {
+
 			// uploading logs here cause we will finish installing bootstrap in couple of seconds
 			// just didn't wanted to start handling this logic in other place
 			// controller must be running for at least couple of minutes before this code so it will cover 90% of the cases
@@ -472,16 +477,21 @@ func (i *installer) waitForController() error {
 			err = common.UploadPodLogs(kc, i.inventoryClient, i.ClusterID, controllerPod.Name, assistedControllerNamespace, common.ControllerLogsSecondsAgo, i.log)
 			// if failed to upload logs, log why and continue
 			if err != nil {
-				i.log.WithError(err).Warnf("Failed to upload controller logs")
+				if retryCounterUploadControllerLogs > 0 {
+					retryCounterUploadControllerLogs--
+					controllerPod = nil
+				}
+				i.log.WithError(err).Warnf("Failed to upload controller logs, %d retries left", retryCounterUploadControllerLogs)
 			}
 		}
 		return controllerPod != nil
 	}
 	// wait forever
-	err = utils.WaitForPredicate(waitForeverTimeout, 5*time.Second, predicate)
+	err = utils.WaitForPredicate(waitForeverTimeout, waitForControllerPodInterval, predicate)
 	if err != nil {
 		return errors.Errorf("Timeout while waiting for controller pod to be running")
 	}
+
 	return nil
 }
 
