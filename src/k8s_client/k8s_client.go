@@ -67,6 +67,7 @@ type K8SClient interface {
 	GetClusterVersion(name string) (*configv1.ClusterVersion, error)
 	GetNetworkType() (string, error)
 	GetControlPlaneReplicas() (int, error)
+	ListEvents(namespace string) (*v1.EventList, error)
 }
 
 type K8SClientBuilder func(configPath string, logger *logrus.Logger) (K8SClient, error)
@@ -378,6 +379,10 @@ func (c *k8sClient) GetPods(namespace string, labelMatch map[string]string, fiel
 	}
 
 	return pod.Items, nil
+}
+
+func (c *k8sClient) ListEvents(namespace string) (*v1.EventList, error) {
+	return c.client.CoreV1().Events(namespace).List(context.TODO(), metav1.ListOptions{})
 }
 
 func (c *k8sClient) GetPodLogs(namespace string, podName string, sinceSeconds int64) (string, error) {
