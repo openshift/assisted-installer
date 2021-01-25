@@ -53,6 +53,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		kubeNamesIds       map[string]string
 	)
 	generalWaitTimeout = 100 * time.Minute
+	waitForControllerPodInterval = 100 * time.Millisecond
 	device := "/dev/vda"
 	l.SetOutput(ioutil.Discard)
 	mkdirSuccess := func(filepath string) {
@@ -99,9 +100,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostId, models.HostStageWaitingForControlPlane, "waiting for controller pod").Return(nil).Times(1)
 		mockk8sclient.EXPECT().GetPods("assisted-installer", gomock.Any(), "").Return([]v1.Pod{{TypeMeta: metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{Name: assistedControllerPrefix + "aasdasd"},
-			Status:     v1.PodStatus{Phase: "Running"}}}, nil).Times(1)
+			Status:     v1.PodStatus{Phase: "Running"}}}, nil).Times(2)
 		r := bytes.NewBuffer([]byte("test"))
-		mockk8sclient.EXPECT().GetPodLogsAsBuffer(assistedControllerNamespace, assistedControllerPrefix+"aasdasd", gomock.Any()).Return(r, nil).Times(1)
+		mockk8sclient.EXPECT().GetPodLogsAsBuffer(assistedControllerNamespace, assistedControllerPrefix+"aasdasd", gomock.Any()).Return(r, nil).Times(2)
+		mockbmclient.EXPECT().UploadLogs(gomock.Any(), clusterId, models.LogsTypeController, gomock.Any()).Return(fmt.Errorf("dummy")).Times(1)
 		mockbmclient.EXPECT().UploadLogs(gomock.Any(), clusterId, models.LogsTypeController, gomock.Any()).Return(nil).Times(1)
 	}
 
