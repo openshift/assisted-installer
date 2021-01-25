@@ -376,3 +376,18 @@ func (mr *MockK8SClientMockRecorder) GetControlPlaneReplicas() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetControlPlaneReplicas", reflect.TypeOf((*MockK8SClient)(nil).GetControlPlaneReplicas))
 }
+
+// ListEvents mocks base method
+func (m *MockK8SClient) ListEvents(namespace string) (*v10.EventList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListEvents", namespace)
+	ret0, _ := ret[0].(*v10.EventList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListEvents indicates an expected call of ListEvents
+func (mr *MockK8SClientMockRecorder) ListEvents(namespace interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEvents", reflect.TypeOf((*MockK8SClient)(nil).ListEvents), namespace)
+}

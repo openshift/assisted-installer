@@ -460,11 +460,13 @@ func (i *installer) waitForController() error {
 		i.log.WithError(err).Error("Failed to reload resolv.conf")
 		return err
 	}
+
 	kc, err := i.kcBuilder(KubeconfigPath, i.log)
 	if err != nil {
 		i.log.WithError(err).Errorf("Failed to create kc client from %s", KubeconfigPath)
 		return err
 	}
+	events := map[string]string{}
 	predicate := func() bool {
 		controllerPod := common.GetPodInStatus(kc, assistedControllerPrefix, assistedControllerNamespace,
 			map[string]string{"job-name": assistedControllerPrefix}, v1.PodRunning, i.log)
@@ -484,6 +486,8 @@ func (i *installer) waitForController() error {
 				i.log.WithError(err).Warnf("Failed to upload controller logs, %d retries left", retryCounterUploadControllerLogs)
 			}
 		}
+		i.logControllerEvents(kc, events)
+
 		return controllerPod != nil
 	}
 	// wait forever
@@ -493,6 +497,21 @@ func (i *installer) waitForController() error {
 	}
 
 	return nil
+}
+
+func (i *installer) logControllerEvents(kc k8s_client.K8SClient, previousEvents map[string]string) {
+	newEvents, errEvents := kc.ListEvents(assistedControllerNamespace)
+	if errEvents != nil {
+		logrus.WithError(errEvents).Warnf("Failed to get controller events")
+		return
+	}
+
+	for _, event := range newEvents.Items {
+		if _, ok := previousEvents[string(event.UID)]; !ok {
+			i.log.Infof("Assisted controller new event: %s", event.Message)
+			previousEvents[string(event.UID)] = event.Message
+		}
+	}
 }
 
 // wait for minimum master nodes to be in ready status
