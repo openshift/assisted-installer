@@ -17,8 +17,6 @@ spec:
         - name: assisted-installer-controller
           image: REPLACE_CONTROLLER_OCP_IMAGE
           imagePullPolicy: Always
-          command:
-            - /assisted-installer-controller-ocp
           env:
             # Define the environment variable
             - name: INVENTORY_URL
