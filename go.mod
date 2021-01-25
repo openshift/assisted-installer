@@ -8,7 +8,7 @@ require (
 	github.com/benbjohnson/clock v1.0.3 // indirect
 	github.com/coreos/ignition/v2 v2.9.0
 	github.com/fsouza/go-dockerclient v1.6.6 // indirect
-	github.com/go-openapi/runtime v0.19.24
+	github.com/go-openapi/runtime v0.19.26
 	github.com/go-openapi/strfmt v0.20.0
 	github.com/golang/mock v1.4.4
 	github.com/google/uuid v1.2.0
