@@ -29,11 +29,11 @@ func NewIgnition() *ignition {
 func (i *ignition) ParseIgnitionFile(path string) (*config31types.Config, error) {
 	configBytes, err := ioutil.ReadFile(path)
 	if err != nil {
-		return nil, errors.Errorf("error reading file %s: %v", path, err)
+		return nil, errors.Wrapf(err, "error reading file %s", err)
 	}
 	config, _, err := config31.Parse(configBytes)
 	if err != nil {
-		return nil, errors.Errorf("error parsing ignition: %v", err)
+		return nil, errors.Wrap(err, "error parsing ignition")
 	}
 	return &config, nil
 }
