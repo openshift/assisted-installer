@@ -1,6 +1,5 @@
 CONTAINER_COMMAND = $(shell if [ -x "$(shell which docker)" ];then echo "docker" ; else echo "podman";fi)
 INSTALLER := $(or ${INSTALLER},quay.io/ocpmetal/assisted-installer:stable)
-GIT_REVISION := $(shell git rev-parse HEAD)
 CONTROLLER :=  $(or ${CONTROLLER}, quay.io/ocpmetal/assisted-installer-controller:stable)
 CONTROLLER_OCP :=  $(or ${CONTROLLER_OCP}, quay.io/ocpmetal/assisted-installer-controller-ocp:latest)
 ROOT_DIR = $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
@@ -45,13 +44,13 @@ controller-ocp:
 build-images: installer-image controller-image controller-ocp-image
 
 installer-image:
-	GIT_REVISION=${GIT_REVISION} $(CONTAINER_COMMAND) build $(CONTAINER_BUILD_PARAMS) -f Dockerfile.assisted-installer . -t $(INSTALLER)
+	$(CONTAINER_COMMAND) build $(CONTAINER_BUILD_PARAMS) -f Dockerfile.assisted-installer . -t $(INSTALLER)
 
 controller-image:
-	GIT_REVISION=${GIT_REVISION} $(CONTAINER_COMMAND) build $(CONTAINER_BUILD_PARAMS) -f Dockerfile.assisted-installer-controller . -t $(CONTROLLER)
+	$(CONTAINER_COMMAND) build $(CONTAINER_BUILD_PARAMS) -f Dockerfile.assisted-installer-controller . -t $(CONTROLLER)
 
 controller-ocp-image:
-	GIT_REVISION=${GIT_REVISION} $(CONTAINER_COMMAND) build $(CONTAINER_BUILD_PARAMS) -f Dockerfile.assisted-installer-controller-ocp . -t $(CONTROLLER_OCP)
+	$(CONTAINER_COMMAND) build $(CONTAINER_BUILD_PARAMS) -f Dockerfile.assisted-installer-controller-ocp . -t $(CONTROLLER_OCP)
 
 push-installer: installer-image
 	$(CONTAINER_COMMAND) push $(INSTALLER)
