@@ -11,7 +11,7 @@ RUN go mod download
 COPY . .
 RUN make installer
 
-FROM registry.svc.ci.openshift.org/ocp/4.7:base
+FROM quay.io/centos/centos:centos8
 
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/installer /usr/bin/installer
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/deploy/assisted-installer-controller /assisted-installer-controller
