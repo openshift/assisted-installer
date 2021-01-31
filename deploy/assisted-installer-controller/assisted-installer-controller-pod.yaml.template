@@ -17,8 +17,6 @@ spec:
         - name: assisted-installer-controller
           image: {{.ControllerImage}}
           imagePullPolicy: Always
-          command:
-            - /assisted-installer-controller
           env:
             # Define the environment variable
             - name: CLUSTER_ID
