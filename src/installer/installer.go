@@ -581,11 +581,11 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 		nodeNameAndCondition[node.Name] = node.Status.Conditions
 		for _, cond := range node.Status.Conditions {
 			if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue &&
-				!funk.ContainsString(*readyMasters, node.Status.NodeInfo.SystemUUID) {
+				!funk.ContainsString(*readyMasters, node.Name) {
 				ctx := utils.GenerateRequestContext()
 				log := utils.RequestIDLogger(ctx, i.log)
 				log.Infof("Found a new ready master node %s with id %s", node.Name, node.Status.NodeInfo.SystemUUID)
-				*readyMasters = append(*readyMasters, node.Status.NodeInfo.SystemUUID)
+				*readyMasters = append(*readyMasters, node.Name)
 				host, ok := inventoryHostsMap[strings.ToLower(node.Name)]
 				if !ok {
 					log.Warnf("Node %s is not in inventory hosts", node.Name)
