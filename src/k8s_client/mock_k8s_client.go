@@ -391,3 +391,18 @@ func (mr *MockK8SClientMockRecorder) ListEvents(namespace interface{}) *gomock.C
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEvents", reflect.TypeOf((*MockK8SClient)(nil).ListEvents), namespace)
 }
+
+// ListClusterOperators mocks base method
+func (m *MockK8SClient) ListClusterOperators() (*v1.ClusterOperatorList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListClusterOperators")
+	ret0, _ := ret[0].(*v1.ClusterOperatorList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListClusterOperators indicates an expected call of ListClusterOperators
+func (mr *MockK8SClientMockRecorder) ListClusterOperators() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListClusterOperators", reflect.TypeOf((*MockK8SClient)(nil).ListClusterOperators))
+}

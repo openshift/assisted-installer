@@ -68,6 +68,7 @@ type K8SClient interface {
 	GetNetworkType() (string, error)
 	GetControlPlaneReplicas() (int, error)
 	ListEvents(namespace string) (*v1.EventList, error)
+	ListClusterOperators() (*configv1.ClusterOperatorList, error)
 }
 
 type K8SClientBuilder func(configPath string, logger *logrus.Logger) (K8SClient, error)
@@ -78,8 +79,9 @@ type k8sClient struct {
 	ocClient      *operatorv1.Clientset
 	runtimeClient runtimeclient.Client
 	// CertificateSigningRequestInterface is interface
-	csrClient   certificatesv1beta1client.CertificateSigningRequestInterface
-	proxyClient configv1client.ProxyInterface
+	csrClient    certificatesv1beta1client.CertificateSigningRequestInterface
+	proxyClient  configv1client.ProxyInterface
+	configClient *configv1client.ConfigV1Client
 }
 
 const (
@@ -129,7 +131,7 @@ func NewK8SClient(configPath string, logger *logrus.Logger) (K8SClient, error) {
 	}
 
 	return &k8sClient{logger, client, ocClient, runtimeClient, csrClient,
-		configClient.Proxies()}, nil
+		configClient.Proxies(), configClient}, nil
 }
 
 func (c *k8sClient) ListMasterNodes() (*v1.NodeList, error) {
@@ -479,4 +481,8 @@ func (c *k8sClient) GetClusterVersion(name string) (*configv1.ClusterVersion, er
 		Do(context.Background()).
 		Into(result)
 	return result, err
+}
+
+func (c *k8sClient) ListClusterOperators() (*configv1.ClusterOperatorList, error) {
+	return c.configClient.ClusterOperators().List(context.TODO(), metav1.ListOptions{})
 }

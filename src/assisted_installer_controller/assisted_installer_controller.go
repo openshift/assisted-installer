@@ -598,6 +598,19 @@ func (c controller) sendCompleteInstallation(isSuccess bool, errorInfo string) {
 	c.log.Infof("Done complete installation step")
 }
 
+// logClusterOperatorsStatus logging cluster operators status
+func (c controller) logClusterOperatorsStatus() {
+	operators, err := c.kc.ListClusterOperators()
+	if err != nil {
+		c.log.WithError(err).Warning("Failed to list cluster operators")
+		return
+	}
+
+	for _, operator := range operators.Items {
+		c.log.Infof("Operator %s, statuses: %v", operator.Name, operator.Status.Conditions)
+	}
+}
+
 /**
  * This function upload the following logs at once to the service at the end of the installation process
  * It takes a linient approach so if some logs are not available it ignores them and moves on
@@ -609,6 +622,8 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 	var tarentries = make([]utils.TarEntry, 0)
 	var ok bool = true
 	ctx := utils.GenerateRequestContext()
+
+	c.logClusterOperatorsStatus()
 
 	if isMustGatherEnabled {
 		c.log.Infof("Uploading oc must-gather logs")
@@ -669,7 +684,7 @@ func (c controller) collectMustGatherLogs(ctx context.Context) (string, error) {
 		return "", ferr
 	}
 
-	//donwload kubeconfig file
+	//download kubeconfig file
 	kubeconfig_file_name := "kubeconfig-noingress"
 	kubeconfigPath := path.Join(tempDir, kubeconfig_file_name)
 	err := c.ic.DownloadFile(ctx, kubeconfig_file_name, kubeconfigPath)
