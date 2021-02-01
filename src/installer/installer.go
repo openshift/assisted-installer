@@ -32,7 +32,6 @@ const (
 	KubeconfigPath               = "/opt/openshift/auth/kubeconfig"
 	minMasterNodes               = 2
 	dockerConfigFile             = "/root/.docker/config.json"
-	assistedControllerPrefix     = "assisted-installer-controller"
 	assistedControllerNamespace  = "assisted-installer"
 	extractRetryCount            = 3
 	waitForeverTimeout           = time.Duration(1<<63 - 1) // wait forever ~ 292 years
@@ -43,9 +42,6 @@ const (
 
 var generalWaitTimeout = 30 * time.Second
 var waitForControllerPodInterval = 5 * time.Second
-
-// retry sending logs for 5 minutes maximum
-var retryCounterUploadControllerLogs = (5 * time.Minute).Milliseconds() / waitForControllerPodInterval.Milliseconds()
 
 // Installer will run the install operations on the node
 type Installer interface {
@@ -453,7 +449,7 @@ func (i *installer) waitForBootkube(ctx context.Context) {
 }
 
 func (i *installer) waitForController() error {
-	i.log.Infof("Waiting for controller pod to start running")
+	i.log.Infof("Waiting for controller to be ready")
 	i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, "waiting for controller pod")
 	err := i.ops.ReloadHostFile("/etc/resolv.conf")
 	if err != nil {
@@ -466,52 +462,55 @@ func (i *installer) waitForController() error {
 		i.log.WithError(err).Errorf("Failed to create kc client from %s", KubeconfigPath)
 		return err
 	}
+
 	events := map[string]string{}
-	predicate := func() bool {
-		controllerPod := common.GetPodInStatus(kc, assistedControllerPrefix, assistedControllerNamespace,
-			map[string]string{"job-name": assistedControllerPrefix}, v1.PodRunning, i.log)
-		if controllerPod != nil {
-
-			// uploading logs here cause we will finish installing bootstrap in couple of seconds
-			// just didn't wanted to start handling this logic in other place
-			// controller must be running for at least couple of minutes before this code so it will cover 90% of the cases
-			// if we will see that it is not enough, we will change the place.
-			err = common.UploadPodLogs(kc, i.inventoryClient, i.ClusterID, controllerPod.Name, assistedControllerNamespace, common.ControllerLogsSecondsAgo, i.log)
-			// if failed to upload logs, log why and continue
-			if err != nil {
-				if retryCounterUploadControllerLogs > 0 {
-					retryCounterUploadControllerLogs--
-					controllerPod = nil
-				}
-				i.log.WithError(err).Warnf("Failed to upload controller logs, %d retries left", retryCounterUploadControllerLogs)
+	tickerUploadLogs := time.NewTicker(5 * time.Minute)
+	tickerWaitForController := time.NewTicker(waitForControllerPodInterval)
+	for {
+		select {
+		case <-tickerWaitForController.C:
+			if i.wasControllerReadyEventSet(kc, events) {
+				i.log.Infof("Assisted controller is ready")
+				i.uploadControllerLogs(kc)
+				return nil
 			}
+		case <-tickerUploadLogs.C:
+			i.uploadControllerLogs(kc)
 		}
-		i.logControllerEvents(kc, events)
-
-		return controllerPod != nil
 	}
-	// wait forever
-	err = utils.WaitForPredicate(waitForeverTimeout, waitForControllerPodInterval, predicate)
-	if err != nil {
-		return errors.Errorf("Timeout while waiting for controller pod to be running")
-	}
-
-	return nil
 }
 
-func (i *installer) logControllerEvents(kc k8s_client.K8SClient, previousEvents map[string]string) {
+func (i *installer) uploadControllerLogs(kc k8s_client.K8SClient) {
+	controllerPod := common.GetPodInStatus(kc, common.AssistedControllerPrefix, assistedControllerNamespace,
+		map[string]string{"job-name": common.AssistedControllerPrefix}, v1.PodRunning, i.log)
+	if controllerPod != nil {
+		err := common.UploadPodLogs(kc, i.inventoryClient, i.ClusterID, controllerPod.Name, assistedControllerNamespace, common.ControllerLogsSecondsAgo, i.log)
+		// if failed to upload logs, log why and continue
+		if err != nil {
+			i.log.WithError(err).Warnf("Failed to upload controller logs")
+		}
+	}
+}
+
+func (i *installer) wasControllerReadyEventSet(kc k8s_client.K8SClient, previousEvents map[string]string) bool {
 	newEvents, errEvents := kc.ListEvents(assistedControllerNamespace)
 	if errEvents != nil {
 		logrus.WithError(errEvents).Warnf("Failed to get controller events")
-		return
+		return false
 	}
 
+	readyEventFound := false
 	for _, event := range newEvents.Items {
 		if _, ok := previousEvents[string(event.UID)]; !ok {
 			i.log.Infof("Assisted controller new event: %s", event.Message)
-			previousEvents[string(event.UID)] = event.Message
+			previousEvents[string(event.UID)] = event.Name
+		}
+		if event.Name == common.AssistedControllerIsReadyEvent {
+			readyEventFound = true
 		}
 	}
+
+	return readyEventFound
 }
 
 // wait for minimum master nodes to be in ready status

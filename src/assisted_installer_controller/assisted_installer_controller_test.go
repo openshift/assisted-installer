@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openshift/assisted-installer/src/common"
+
 	"github.com/go-openapi/strfmt"
 	"github.com/golang/mock/gomock"
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
@@ -127,6 +129,24 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			c = NewController(l, conf, mockops, mockbmclient, mockk8sclient)
 			status = &ControllerStatus{}
 		})
+
+		It("Set ready event", func() {
+			// fail to connect to assisted and then succeed
+			mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(nil, fmt.Errorf("dummy")).Times(1)
+			mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(nil, nil).Times(3)
+
+			// fail to connect to ocp and then succeed
+			mockk8sclient.EXPECT().ListNodes().Return(nil, fmt.Errorf("dummy")).Times(1)
+			mockk8sclient.EXPECT().ListNodes().Return(nil, nil).Times(2)
+
+			// fail to create event and then succeed
+			mockk8sclient.EXPECT().CreateEvent(c.Namespace, common.AssistedControllerIsReadyEvent, gomock.Any(), common.AssistedControllerPrefix).Return(nil, fmt.Errorf("dummy")).Times(1)
+			mockk8sclient.EXPECT().CreateEvent(c.Namespace, common.AssistedControllerIsReadyEvent, gomock.Any(), common.AssistedControllerPrefix).Return(nil, nil).Times(1)
+
+			c.SetReadyState()
+			Expect(status.HasError()).Should(Equal(false))
+		})
+
 		It("WaitAndUpdateNodesStatus happy flow", func() {
 			updateProgressSuccess(defaultStages, inventoryNamesIds)
 			getInventoryNodes(1)

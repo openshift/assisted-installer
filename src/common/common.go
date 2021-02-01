@@ -16,7 +16,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-const ControllerLogsSecondsAgo = 60 * 60
+const (
+	ControllerLogsSecondsAgo       = 60 * 60
+	AssistedControllerIsReadyEvent = "AssistedControllerIsReady"
+	AssistedControllerPrefix       = "assisted-installer-controller"
+)
 
 func FilterHostsByStatus(hosts map[string]inventory_client.HostData, status []string) map[string]inventory_client.HostData {
 	hostsbystatus := make(map[string]inventory_client.HostData)
