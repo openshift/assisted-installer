@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v2"
 
@@ -69,6 +70,7 @@ type K8SClient interface {
 	GetControlPlaneReplicas() (int, error)
 	ListEvents(namespace string) (*v1.EventList, error)
 	ListClusterOperators() (*configv1.ClusterOperatorList, error)
+	CreateEvent(namespace, name, message, component string) (*v1.Event, error)
 }
 
 type K8SClientBuilder func(configPath string, logger *logrus.Logger) (K8SClient, error)
@@ -485,4 +487,26 @@ func (c *k8sClient) GetClusterVersion(name string) (*configv1.ClusterVersion, er
 
 func (c *k8sClient) ListClusterOperators() (*configv1.ClusterOperatorList, error) {
 	return c.configClient.ClusterOperators().List(context.TODO(), metav1.ListOptions{})
+}
+
+func (c *k8sClient) CreateEvent(namespace, name, message, component string) (*v1.Event, error) {
+	currentTime := metav1.Time{Time: time.Now()}
+	event := &v1.Event{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		InvolvedObject: v1.ObjectReference{
+			Namespace: namespace,
+			Name:      component,
+		},
+		Message:        message,
+		Count:          1,
+		FirstTimestamp: currentTime,
+		LastTimestamp:  currentTime,
+		Type:           v1.EventTypeNormal,
+		Reason:         name,
+	}
+
+	return c.client.CoreV1().Events(namespace).Create(context.TODO(), event, metav1.CreateOptions{})
 }
