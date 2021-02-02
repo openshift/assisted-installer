@@ -12,6 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
 	configv1 "github.com/openshift/api/config/v1"
 	mapiv1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
@@ -39,7 +41,6 @@ var GeneralWaitInterval = generalWaitTimeoutInt * time.Second
 var generalProgressUpdateInt = 60 * time.Second
 var LogsUploadPeriod = 5 * time.Minute
 var WaitTimeout = 70 * time.Minute
-var NumRetrySendingLogs = 6
 
 // assisted installer controller is added to control installation process after  bootstrap pivot
 // assisted installer will deploy it on installation process
@@ -451,7 +452,7 @@ func (c controller) updateConsumerRef(bmh *metal3v1alpha1.BareMetalHost, machine
 	//	update consumer ref for workers only in case machineset controller has already
 	//	created an unassigned Machine (base on machineset replica count)
 	if len(machineList.Items) == 0 {
-		return fmt.Errorf("No available machine for bmh %s, need to wait for machineset controller to create one", bmh.Name)
+		return fmt.Errorf("no available machine for bmh %s, need to wait for machineset controller to create one", bmh.Name)
 	}
 	c.log.Infof("Updating consumer ref for bmh %s", bmh.Name)
 	machine := &machineList.Items[0]
@@ -685,9 +686,9 @@ func (c controller) collectMustGatherLogs(ctx context.Context) (string, error) {
 	}
 
 	//download kubeconfig file
-	kubeconfig_file_name := "kubeconfig-noingress"
-	kubeconfigPath := path.Join(tempDir, kubeconfig_file_name)
-	err := c.ic.DownloadFile(ctx, kubeconfig_file_name, kubeconfigPath)
+	kubeconfigFileName := "kubeconfig-noingress"
+	kubeconfigPath := path.Join(tempDir, kubeconfigFileName)
+	err := c.ic.DownloadFile(ctx, kubeconfigFileName, kubeconfigPath)
 	if err != nil {
 		c.log.Errorf("Failed to download noingress kubeconfig %v\n", err)
 		return "", err
@@ -755,4 +756,33 @@ func (c *controller) UploadLogs(ctx context.Context, cancellog context.CancelFun
 			}
 		}
 	}
+}
+
+func (c controller) SetReadyState() {
+	c.log.Infof("Start waiting to be ready")
+	_ = utils.WaitForPredicate(WaitTimeout, 1*time.Second, func() bool {
+		_, err := c.ic.GetCluster(context.TODO())
+		if err != nil {
+			c.log.WithError(err).Warningf("Failed to connect to assisted service")
+			return false
+		}
+		c.log.Infof("assisted-service is avilable")
+
+		_, err = c.kc.ListNodes()
+		if err != nil {
+			c.log.WithError(err).Warningf("Failed to connect to ocp cluster")
+			return false
+		}
+		c.log.Infof("kube-apiserver is available")
+
+		c.log.Infof("Sending ready event")
+		if _, err := c.kc.CreateEvent(c.Namespace, common.AssistedControllerIsReadyEvent,
+			"Assisted controller managed to connect to assisted service and kube-apiserver and is ready to start",
+			common.AssistedControllerPrefix); err != nil && !apierrors.IsAlreadyExists(err) {
+			c.log.WithError(err).Errorf("Failed to spawn event")
+			return false
+		}
+
+		return true
+	})
 }

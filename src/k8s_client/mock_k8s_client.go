@@ -406,3 +406,18 @@ func (mr *MockK8SClientMockRecorder) ListClusterOperators() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListClusterOperators", reflect.TypeOf((*MockK8SClient)(nil).ListClusterOperators))
 }
+
+// CreateEvent mocks base method
+func (m *MockK8SClient) CreateEvent(namespace, name, message, component string) (*v10.Event, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateEvent", namespace, name, message, component)
+	ret0, _ := ret[0].(*v10.Event)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateEvent indicates an expected call of CreateEvent
+func (mr *MockK8SClientMockRecorder) CreateEvent(namespace, name, message, component interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEvent", reflect.TypeOf((*MockK8SClient)(nil).CreateEvent), namespace, name, message, component)
+}

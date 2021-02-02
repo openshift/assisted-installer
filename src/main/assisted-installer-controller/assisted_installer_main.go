@@ -73,6 +73,7 @@ func main() {
 	go assistedController.UploadLogs(ctxLogs, cancelLogs, &wgLogs, &status)
 	wgLogs.Add(1)
 
+	assistedController.SetReadyState()
 	assistedController.WaitAndUpdateNodesStatus(&status)
 	logger.Infof("Sleeping for 10 minutes to give a chance to approve all csrs")
 	time.Sleep(10 * time.Minute)
