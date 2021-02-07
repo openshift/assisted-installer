@@ -238,62 +238,75 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			createOpenshiftSshManifestSuccess()
 			daemonReload(nil)
 		}
-
-		It("bootstrap role happy flow", func() {
-			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
-				{string(models.HostStageWaitingForControlPlane)},
-				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
-				{string(models.HostStageWritingImageToDisk)},
-				{string(models.HostStageRebooting)},
+		for _, version := range []string{"4.6", "4.7", "4.7.1", "4.8"} {
+			Context(version, func() {
+				BeforeEach(func() {
+					conf.OpenshiftVersion = version
+				})
+				AfterEach(func() {
+					conf.OpenshiftVersion = openShiftVersion
+				})
+				It("bootstrap role happy flow", func() {
+					updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+						{string(models.HostStageWaitingForControlPlane)},
+						{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+						{string(models.HostStageWritingImageToDisk)},
+						{string(models.HostStageRebooting)},
+					})
+					bootstrapSetup()
+					checkLocalHostname("not localhost", nil)
+					restartNetworkManager(nil)
+					prepareControllerSuccess()
+					startServicesSuccess()
+					if conf.OpenshiftVersion == "4.6" {
+						getNetworkTypeSuccessOpenshiftSDN()
+					}
+					WaitMasterNodesSucccess()
+					waitForBootkubeSuccess()
+					bootkubeStatusSuccess()
+					resolvConfSuccess()
+					waitForControllerSuccessfully(conf.ClusterID)
+					//HostRoleMaster flow:
+					downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
+					writeToDiskSuccess(gomock.Any())
+					uploadLogsSuccess(true)
+					rebootSuccess()
+					ret := installerObj.InstallNode()
+					Expect(ret).Should(BeNil())
+				})
+				It("bootstrap role happy flow ovn-kubernetes", func() {
+					updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+						{string(models.HostStageWaitingForControlPlane)},
+						{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+						{string(models.HostStageWritingImageToDisk)},
+						{string(models.HostStageRebooting)},
+					})
+					bootstrapSetup()
+					checkLocalHostname("localhost", nil)
+					restartNetworkManager(nil)
+					prepareControllerSuccess()
+					startServicesSuccess()
+					if conf.OpenshiftVersion == "4.6" {
+						getNetworkTypeSuccessOVNKubernetes()
+						getControlPlaneReplicasSuccess()
+						patchControlPlaneReplicasSuccess()
+						unpatchControlPlaneReplicasSuccess()
+					}
+					WaitMasterNodesSucccess()
+					waitForBootkubeSuccess()
+					bootkubeStatusSuccess()
+					resolvConfSuccess()
+					waitForControllerSuccessfully(conf.ClusterID)
+					//HostRoleMaster flow:
+					downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
+					writeToDiskSuccess(gomock.Any())
+					uploadLogsSuccess(true)
+					rebootSuccess()
+					ret := installerObj.InstallNode()
+					Expect(ret).Should(BeNil())
+				})
 			})
-			bootstrapSetup()
-			checkLocalHostname("not localhost", nil)
-			restartNetworkManager(nil)
-			prepareControllerSuccess()
-			startServicesSuccess()
-			getNetworkTypeSuccessOpenshiftSDN()
-			WaitMasterNodesSucccess()
-			waitForBootkubeSuccess()
-			bootkubeStatusSuccess()
-			resolvConfSuccess()
-			waitForControllerSuccessfully(conf.ClusterID)
-			//HostRoleMaster flow:
-			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
-			writeToDiskSuccess(gomock.Any())
-			uploadLogsSuccess(true)
-			rebootSuccess()
-			ret := installerObj.InstallNode()
-			Expect(ret).Should(BeNil())
-		})
-		It("bootstrap role happy flow ovn-kubernetes", func() {
-			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
-				{string(models.HostStageWaitingForControlPlane)},
-				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
-				{string(models.HostStageWritingImageToDisk)},
-				{string(models.HostStageRebooting)},
-			})
-			bootstrapSetup()
-			checkLocalHostname("localhost", nil)
-			restartNetworkManager(nil)
-			prepareControllerSuccess()
-			startServicesSuccess()
-			getNetworkTypeSuccessOVNKubernetes()
-			getControlPlaneReplicasSuccess()
-			patchControlPlaneReplicasSuccess()
-			unpatchControlPlaneReplicasSuccess()
-			WaitMasterNodesSucccess()
-			waitForBootkubeSuccess()
-			bootkubeStatusSuccess()
-			resolvConfSuccess()
-			waitForControllerSuccessfully(conf.ClusterID)
-			//HostRoleMaster flow:
-			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
-			writeToDiskSuccess(gomock.Any())
-			uploadLogsSuccess(true)
-			rebootSuccess()
-			ret := installerObj.InstallNode()
-			Expect(ret).Should(BeNil())
-		})
+		}
 		It("bootstrap role creating SSH manifest failed", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageWaitingForControlPlane)},
@@ -327,7 +340,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			restartNetworkManager(nil)
 			prepareControllerSuccess()
 			startServicesSuccess()
-			getNetworkTypeSuccessOpenshiftSDN()
 			WaitMasterNodesSucccess()
 			waitForBootkubeSuccess()
 			bootkubeStatusSuccess()

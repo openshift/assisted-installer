@@ -231,7 +231,7 @@ func RequestIDLogger(ctx context.Context, log *logrus.Logger) logrus.FieldLogger
 	return requestid.RequestIDLogger(log, requestid.FromContext(ctx))
 }
 
-func EtcdPatchRequired(openshiftVersion string) (bool, error) {
+func IsVersionLessThan47(openshiftVersion string) (bool, error) {
 	clusterVersion, err := version.NewVersion(openshiftVersion)
 	if err != nil {
 		return false, err
@@ -242,4 +242,8 @@ func EtcdPatchRequired(openshiftVersion string) (bool, error) {
 	}
 
 	return clusterVersion.LessThan(v47), nil
+}
+
+func EtcdPatchRequired(openshiftVersion string) (bool, error) {
+	return IsVersionLessThan47(openshiftVersion)
 }
