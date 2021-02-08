@@ -578,22 +578,19 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 	nodeNameAndCondition := map[string][]v1.NodeCondition{}
 	for _, node := range nodes.Items {
 		nodeNameAndCondition[node.Name] = node.Status.Conditions
-		for _, cond := range node.Status.Conditions {
-			if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue &&
-				!funk.ContainsString(*readyMasters, node.Name) {
-				ctx := utils.GenerateRequestContext()
-				log := utils.RequestIDLogger(ctx, i.log)
-				log.Infof("Found a new ready master node %s with id %s", node.Name, node.Status.NodeInfo.SystemUUID)
-				*readyMasters = append(*readyMasters, node.Name)
-				host, ok := inventoryHostsMap[strings.ToLower(node.Name)]
-				if !ok {
-					log.Warnf("Node %s is not in inventory hosts", node.Name)
-					break
-				}
-				ctx = utils.GenerateRequestContext()
-				if err := i.inventoryClient.UpdateHostInstallProgress(ctx, host.Host.ID.String(), models.HostStageJoined, ""); err != nil {
-					utils.RequestIDLogger(ctx, i.log).Errorf("Failed to update node installation status, %s", err)
-				}
+		if common.IsK8sNodeIsReady(node) && !funk.ContainsString(*readyMasters, node.Name) {
+			ctx := utils.GenerateRequestContext()
+			log := utils.RequestIDLogger(ctx, i.log)
+			log.Infof("Found a new ready master node %s with id %s", node.Name, node.Status.NodeInfo.SystemUUID)
+			*readyMasters = append(*readyMasters, node.Name)
+			host, ok := inventoryHostsMap[strings.ToLower(node.Name)]
+			if !ok {
+				log.Warnf("Node %s is not in inventory hosts", node.Name)
+				break
+			}
+			ctx = utils.GenerateRequestContext()
+			if err := i.inventoryClient.UpdateHostInstallProgress(ctx, host.Host.ID.String(), models.HostStageJoined, ""); err != nil {
+				utils.RequestIDLogger(ctx, i.log).Errorf("Failed to update node installation status, %s", err)
 			}
 		}
 	}

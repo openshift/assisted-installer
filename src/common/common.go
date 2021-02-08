@@ -121,3 +121,12 @@ func UploadPodLogs(kc k8s_client.K8SClient, ic inventory_client.InventoryClient,
 	}
 	return nil
 }
+
+func IsK8sNodeIsReady(node v1.Node) bool {
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}

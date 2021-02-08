@@ -135,14 +135,20 @@ func (c *controller) WaitAndUpdateNodesStatus(status *ControllerStatus) {
 			if !ok {
 				continue
 			}
-
-			ctx := utils.GenerateRequestContext()
-			log := utils.RequestIDLogger(ctx, c.log)
-			log.Infof("Found new joined node %s with inventory id %s, kubernetes id %s, updating its status to %s",
-				node.Name, host.Host.ID.String(), node.Status.NodeInfo.SystemUUID, models.HostStageDone)
-			if err := c.ic.UpdateHostInstallProgress(ctx, host.Host.ID.String(), models.HostStageDone, ""); err != nil {
-				log.Errorf("Failed to update node %s installation status, %s", node.Name, err)
-				continue
+			if common.IsK8sNodeIsReady(node) {
+				log.Infof("Found new ready node %s with inventory id %s, kubernetes id %s, updating its status to %s",
+					node.Name, host.Host.ID.String(), node.Status.NodeInfo.SystemUUID, models.HostStageDone)
+				if err := c.ic.UpdateHostInstallProgress(ctx, host.Host.ID.String(), models.HostStageDone, ""); err != nil {
+					log.WithError(err).Errorf("Failed to update node %s installation status", node.Name)
+					continue
+				}
+			} else if host.Host.Progress.CurrentStage == models.HostStageConfiguring {
+				log.Infof("Found new joined node %s with inventory id %s, kubernetes id %s, updating its status to %s",
+					node.Name, host.Host.ID.String(), node.Status.NodeInfo.SystemUUID, models.HostStageJoined)
+				if err := c.ic.UpdateHostInstallProgress(ctx, host.Host.ID.String(), models.HostStageJoined, ""); err != nil {
+					log.WithError(err).Errorf("Failed to update node %s installation status", node.Name)
+					continue
+				}
 			}
 		}
 		c.updateConfiguringStatusIfNeeded(assistedInstallerNodesMap)
