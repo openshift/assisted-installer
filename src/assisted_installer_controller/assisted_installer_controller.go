@@ -38,7 +38,7 @@ const (
 )
 
 var GeneralWaitInterval = generalWaitTimeoutInt * time.Second
-var generalProgressUpdateInt = 60 * time.Second
+var GeneralProgressUpdateInt = 60 * time.Second
 var LogsUploadPeriod = 5 * time.Minute
 var WaitTimeout = 70 * time.Minute
 
@@ -67,10 +67,16 @@ type ControllerStatus struct {
 
 type controller struct {
 	ControllerConfig
-	log *logrus.Logger
-	ops ops.Ops
-	ic  inventory_client.InventoryClient
-	kc  k8s_client.K8SClient
+	log       *logrus.Logger
+	ops       ops.Ops
+	ic        inventory_client.InventoryClient
+	kc        k8s_client.K8SClient
+	cvoStatus OperatorStatus
+}
+
+type OperatorStatus struct {
+	isAvailable bool
+	message     string
 }
 
 func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inventory_client.InventoryClient, kc k8s_client.K8SClient) *controller {
@@ -80,6 +86,7 @@ func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inv
 		ops:              ops,
 		ic:               ic,
 		kc:               kc,
+		cvoStatus:        OperatorStatus{isAvailable: false, message: ""},
 	}
 }
 
@@ -550,28 +557,33 @@ func (c controller) validateConsolePod() bool {
 
 func (c controller) waitingForClusterVersion() error {
 	isClusterVersionAvailable := func() bool {
-		available, msg := c.validateClusterVersion()
-		status := fmt.Sprintf("Cluster version is available: %t , message: %s", available, msg)
-		c.log.Infof(status)
-		if err := c.ic.UpdateClusterInstallProgress(utils.GenerateRequestContext(), c.ClusterID, status); err != nil {
-			c.log.Errorf("Failed to update cluster %s installation progress status: %s", c.ClusterID, err)
+		newCvoStatus := c.validateClusterVersion()
+		if c.cvoStatus.isAvailable != newCvoStatus.isAvailable || (c.cvoStatus.message != newCvoStatus.message && newCvoStatus.message != "") {
+			status := fmt.Sprintf("Cluster version is available: %t , message: %s", newCvoStatus.isAvailable, newCvoStatus.message)
+			c.log.Infof(status)
+
+			if err := c.ic.UpdateClusterInstallProgress(utils.GenerateRequestContext(), c.ClusterID, status); err != nil {
+				c.log.Errorf("Failed to update cluster %s installation progress status: %s", c.ClusterID, err)
+			}
 		}
-		return available
+
+		c.cvoStatus = newCvoStatus
+		return newCvoStatus.isAvailable
 	}
 
-	err := utils.WaitForPredicate(WaitTimeout, generalProgressUpdateInt, isClusterVersionAvailable)
+	err := utils.WaitForPredicate(WaitTimeout, GeneralProgressUpdateInt, isClusterVersionAvailable)
 	if err != nil {
 		return errors.Errorf("Timeout while waiting for cluster version to be available")
 	}
 	return nil
 }
 
-func (c controller) validateClusterVersion() (bool, string) {
+func (c controller) validateClusterVersion() OperatorStatus {
 	c.log.Infof("Waiting for cluster version to be available")
 	cv, err := c.kc.GetClusterVersion("version")
 	if err != nil {
 		c.log.WithError(err).Warnf("Failed to get cluster version")
-		return false, ""
+		return OperatorStatus{isAvailable: false, message: ""}
 	}
 	conditionsByType := map[configv1.ClusterStatusConditionType]configv1.ClusterOperatorStatusCondition{}
 	// condition type to dict
@@ -581,15 +593,15 @@ func (c controller) validateClusterVersion() (bool, string) {
 	// check if it cluster version is available
 	condition, ok := conditionsByType[configv1.OperatorAvailable]
 	if ok && condition.Status == configv1.ConditionTrue {
-		return true, condition.Message
+		return OperatorStatus{isAvailable: true, message: condition.Message}
 	}
 	// if not available return message from progressing
 	condition, ok = conditionsByType[configv1.OperatorProgressing]
 	if ok {
-		return false, condition.Message
+		return OperatorStatus{isAvailable: false, message: condition.Message}
 	}
 
-	return false, ""
+	return OperatorStatus{isAvailable: false, message: ""}
 }
 
 func (c controller) sendCompleteInstallation(isSuccess bool, errorInfo string) {
