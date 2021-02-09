@@ -21,7 +21,7 @@ func main() {
 	logger := utils.InitLogger(config.GlobalConfig.Verbose, true)
 	config.GlobalConfig.PullSecretToken = os.Getenv("PULL_SECRET_TOKEN")
 	if config.GlobalConfig.PullSecretToken == "" {
-		logger.Warnf("Missing Pull Secret Token environment variable")
+		logger.Warnf("Agent Authentication Token not set")
 	}
 
 	logger.Infof("Assisted installer started. Configuration is:\n %s", secretdump.DumpSecretStruct(config.GlobalConfig))
