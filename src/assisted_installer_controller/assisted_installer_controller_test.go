@@ -94,7 +94,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	}
 	configuringSuccess := func() {
 		mockk8sclient.EXPECT().GetPods(gomock.Any(), gomock.Any(), "").Return([]v1.Pod{}, nil).AnyTimes()
-		mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+		mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), gomock.Any(), models.HostStageConfiguring, gomock.Any()).AnyTimes()
 	}
 
 	updateProgressSuccess := func(stages []models.HostStage, inventoryNamesIds map[string]inventory_client.HostData) {
@@ -152,6 +152,32 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			getInventoryNodes(1)
 			configuringSuccess()
 			listNodes()
+			c.WaitAndUpdateNodesStatus(status)
+			Expect(status.HasError()).Should(Equal(false))
+		})
+
+		It("WaitAndUpdateNodesStatus including joined state", func() {
+			joined := []models.HostStage{models.HostStageJoined,
+				models.HostStageJoined,
+				models.HostStageJoined}
+
+			getInventoryNodes(2)
+			//updateProgressSuccess(defaultStages, inventoryNamesIds)
+			// not ready nodes
+			nodes := GetKubeNodes(kubeNamesIds)
+			for _, node := range nodes.Items {
+				for i, cond := range node.Status.Conditions {
+					if cond.Type == v1.NodeReady {
+						node.Status.Conditions[i].Status = v1.ConditionFalse
+					}
+				}
+			}
+			mockk8sclient.EXPECT().ListNodes().Return(nodes, nil).Times(1)
+			updateProgressSuccess(joined, inventoryNamesIds)
+			updateProgressSuccess(defaultStages, inventoryNamesIds)
+			configuringSuccess()
+			listNodes()
+
 			c.WaitAndUpdateNodesStatus(status)
 			Expect(status.HasError()).Should(Equal(false))
 		})
