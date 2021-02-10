@@ -12,6 +12,9 @@ updates:
     labels:
       - "approved"
       - "lgtm"
+      - "ok-to-test"
+      - "go"
+      - "dependencies"
 
   - package-ecosystem: "docker"
     directory: "/"
