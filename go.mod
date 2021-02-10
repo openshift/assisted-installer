@@ -3,11 +3,12 @@ module github.com/openshift/assisted-installer
 go 1.14
 
 require (
+	github.com/Microsoft/go-winio v0.4.15-0.20200113171025-3fe6c5262873 // indirect
 	github.com/PuerkitoBio/rehttp v1.0.0
 	github.com/aybabtme/iocontrol v0.0.0-20150809002002-ad15bcfc95a0 // indirect
 	github.com/benbjohnson/clock v1.0.3 // indirect
 	github.com/coreos/ignition/v2 v2.9.0
-	github.com/fsouza/go-dockerclient v1.6.6 // indirect
+	github.com/docker/docker v17.12.0-ce-rc1.0.20200505174321-1655290016ac+incompatible // indirect
 	github.com/go-openapi/runtime v0.19.26
 	github.com/go-openapi/strfmt v0.20.0
 	github.com/golang/mock v1.4.4
@@ -17,7 +18,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/metal3-io/baremetal-operator v0.0.0-20200828204955-fc35b7691a8e
 	github.com/onsi/ginkgo v1.15.0
-	github.com/onsi/gomega v1.10.4
+	github.com/onsi/gomega v1.10.5
 	github.com/openshift/api v0.0.0-20200901182017-7ac89ba6b971
 	github.com/openshift/assisted-installer-agent v0.0.0-20200811180147-bc9c7b899b8a
 	github.com/openshift/assisted-service v1.0.10-0.20210121095005-432f69c82c53
