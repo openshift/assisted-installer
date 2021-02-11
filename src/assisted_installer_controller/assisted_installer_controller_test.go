@@ -714,52 +714,52 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	Context("waitingForClusterVersion", func() {
 		tests := []struct {
-			name             string
-			currentCVOStatus OperatorStatus
-			newCVOStatus     OperatorStatus
-			shouldSendUpdate bool
+			name                string
+			currentCVOStatus    OperatorStatus
+			newCVOStatus        OperatorStatus
+			isSignificantChange bool
 		}{
 			{
-				name:             "(false, no message) -> (false, no message)",
-				currentCVOStatus: OperatorStatus{isAvailable: false, message: ""},
-				newCVOStatus:     OperatorStatus{isAvailable: false, message: ""},
-				shouldSendUpdate: false,
+				name:                "(false, no message) -> (false, no message)",
+				currentCVOStatus:    OperatorStatus{isAvailable: false, message: ""},
+				newCVOStatus:        OperatorStatus{isAvailable: false, message: ""},
+				isSignificantChange: false,
 			},
 			{
-				name:             "(false, no message) -> (false, with message)",
-				currentCVOStatus: OperatorStatus{isAvailable: false, message: ""},
-				newCVOStatus:     OperatorStatus{isAvailable: false, message: "message"},
-				shouldSendUpdate: true,
+				name:                "(false, no message) -> (false, with message)",
+				currentCVOStatus:    OperatorStatus{isAvailable: false, message: ""},
+				newCVOStatus:        OperatorStatus{isAvailable: false, message: "message"},
+				isSignificantChange: true,
 			},
 			{
-				name:             "(false, with message) -> (false, same message)",
-				currentCVOStatus: OperatorStatus{isAvailable: false, message: "message"},
-				newCVOStatus:     OperatorStatus{isAvailable: false, message: "message"},
-				shouldSendUpdate: false,
+				name:                "(false, with message) -> (false, same message)",
+				currentCVOStatus:    OperatorStatus{isAvailable: false, message: "message"},
+				newCVOStatus:        OperatorStatus{isAvailable: false, message: "message"},
+				isSignificantChange: false,
 			},
 			{
-				name:             "(false, with message) -> (false, new message)",
-				currentCVOStatus: OperatorStatus{isAvailable: false, message: "message"},
-				newCVOStatus:     OperatorStatus{isAvailable: false, message: "new"},
-				shouldSendUpdate: true,
+				name:                "(false, with message) -> (false, new message)",
+				currentCVOStatus:    OperatorStatus{isAvailable: false, message: "message"},
+				newCVOStatus:        OperatorStatus{isAvailable: false, message: "new"},
+				isSignificantChange: true,
 			},
 			{
-				name:             "(false, with message) -> (false, no message)",
-				currentCVOStatus: OperatorStatus{isAvailable: false, message: "message"},
-				newCVOStatus:     OperatorStatus{isAvailable: false, message: ""},
-				shouldSendUpdate: false,
+				name:                "(false, with message) -> (false, no message)",
+				currentCVOStatus:    OperatorStatus{isAvailable: false, message: "message"},
+				newCVOStatus:        OperatorStatus{isAvailable: false, message: ""},
+				isSignificantChange: false,
 			},
 			{
-				name:             "(false, no message) -> (true, no message)",
-				currentCVOStatus: OperatorStatus{isAvailable: false, message: ""},
-				newCVOStatus:     OperatorStatus{isAvailable: true, message: ""},
-				shouldSendUpdate: true,
+				name:                "(false, no message) -> (true, no message)",
+				currentCVOStatus:    OperatorStatus{isAvailable: false, message: ""},
+				newCVOStatus:        OperatorStatus{isAvailable: true, message: ""},
+				isSignificantChange: true,
 			},
 			{
-				name:             "(false, no message) -> (true, with message)",
-				currentCVOStatus: OperatorStatus{isAvailable: false, message: ""},
-				newCVOStatus:     OperatorStatus{isAvailable: true, message: "message"},
-				shouldSendUpdate: true,
+				name:                "(false, no message) -> (true, with message)",
+				currentCVOStatus:    OperatorStatus{isAvailable: false, message: ""},
+				newCVOStatus:        OperatorStatus{isAvailable: true, message: "message"},
+				isSignificantChange: true,
 			},
 		}
 
@@ -786,11 +786,19 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					clusterVersionReport.Status.Conditions[0].Status = configv1.ConditionFalse
 				}
 
-				mockk8sclient.EXPECT().GetClusterVersion("version").Return(clusterVersionReport, nil).Times(1)
+				amountOfSamples := 1
 
-				if t.shouldSendUpdate {
+				if t.isSignificantChange {
+					if !t.newCVOStatus.isAvailable {
+						// If a change occured and it is still false - we expect the timer to be resetted,
+						// hence another round would happen.
+						amountOfSamples += 1
+					}
+
 					mockbmclient.EXPECT().UpdateClusterInstallProgress(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 				}
+
+				mockk8sclient.EXPECT().GetClusterVersion("version").Return(clusterVersionReport, nil).Times(amountOfSamples)
 
 				if t.newCVOStatus.isAvailable {
 					Expect(assistedController.waitingForClusterVersion()).ShouldNot(HaveOccurred())

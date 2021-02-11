@@ -556,9 +556,14 @@ func (c controller) validateConsolePod() bool {
 }
 
 func (c controller) waitingForClusterVersion() error {
-	isClusterVersionAvailable := func() bool {
+	isClusterVersionAvailable := func(timer *time.Timer) bool {
 		newCvoStatus := c.validateClusterVersion()
 		if c.cvoStatus.isAvailable != newCvoStatus.isAvailable || (c.cvoStatus.message != newCvoStatus.message && newCvoStatus.message != "") {
+			if !timer.Stop() {
+				<-timer.C
+			}
+			timer.Reset(WaitTimeout)
+
 			status := fmt.Sprintf("Cluster version is available: %t , message: %s", newCvoStatus.isAvailable, newCvoStatus.message)
 			c.log.Infof(status)
 
@@ -571,7 +576,7 @@ func (c controller) waitingForClusterVersion() error {
 		return newCvoStatus.isAvailable
 	}
 
-	err := utils.WaitForPredicate(WaitTimeout, GeneralProgressUpdateInt, isClusterVersionAvailable)
+	err := utils.WaitForPredicateWithTimer(WaitTimeout, GeneralProgressUpdateInt, isClusterVersionAvailable)
 	if err != nil {
 		return errors.Errorf("Timeout while waiting for cluster version to be available")
 	}

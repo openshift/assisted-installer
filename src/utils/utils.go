@@ -180,6 +180,24 @@ func GetHostIpsFromInventory(inventory *models.Inventory) ([]string, error) {
 	return ips, nil
 }
 
+func WaitForPredicateWithTimer(timeout time.Duration, interval time.Duration, predicate func(timer *time.Timer) bool) error {
+	timeoutTimer := time.NewTimer(timeout)
+	ticker := time.NewTicker(interval)
+	// Keep trying until we're time out or get true
+	for {
+		select {
+		// Got a timeout! fail with a timeout error
+		case <-timeoutTimer.C:
+			return errors.New("timed out")
+		// Got a tick, we should check on checkSomething()
+		case <-ticker.C:
+			if predicate(timeoutTimer) {
+				return nil
+			}
+		}
+	}
+}
+
 func WaitForPredicate(timeout time.Duration, interval time.Duration, predicate func() bool) error {
 	timeoutAfter := time.After(timeout)
 	ticker := time.NewTicker(interval)
