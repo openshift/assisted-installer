@@ -407,6 +407,21 @@ func (mr *MockK8SClientMockRecorder) ListClusterOperators() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListClusterOperators", reflect.TypeOf((*MockK8SClient)(nil).ListClusterOperators))
 }
 
+// GetClusterOperator mocks base method
+func (m *MockK8SClient) GetClusterOperator(name string) (*v1.ClusterOperator, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetClusterOperator", name)
+	ret0, _ := ret[0].(*v1.ClusterOperator)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetClusterOperator indicates an expected call of GetClusterOperator
+func (mr *MockK8SClientMockRecorder) GetClusterOperator(name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClusterOperator", reflect.TypeOf((*MockK8SClient)(nil).GetClusterOperator), name)
+}
+
 // CreateEvent mocks base method
 func (m *MockK8SClient) CreateEvent(namespace, name, message, component string) (*v10.Event, error) {
 	m.ctrl.T.Helper()

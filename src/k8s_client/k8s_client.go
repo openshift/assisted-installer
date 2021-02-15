@@ -70,6 +70,7 @@ type K8SClient interface {
 	GetControlPlaneReplicas() (int, error)
 	ListEvents(namespace string) (*v1.EventList, error)
 	ListClusterOperators() (*configv1.ClusterOperatorList, error)
+	GetClusterOperator(name string) (*configv1.ClusterOperator, error)
 	CreateEvent(namespace, name, message, component string) (*v1.Event, error)
 }
 
@@ -487,6 +488,10 @@ func (c *k8sClient) GetClusterVersion(name string) (*configv1.ClusterVersion, er
 
 func (c *k8sClient) ListClusterOperators() (*configv1.ClusterOperatorList, error) {
 	return c.configClient.ClusterOperators().List(context.TODO(), metav1.ListOptions{})
+}
+
+func (c *k8sClient) GetClusterOperator(name string) (*configv1.ClusterOperator, error) {
+	return c.configClient.ClusterOperators().Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (c *k8sClient) CreateEvent(namespace, name, message, component string) (*v1.Event, error) {
