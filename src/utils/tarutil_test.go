@@ -34,12 +34,14 @@ var _ = Describe("tar_utils", func() {
 			var content bytes.Buffer
 			var tarcontent bytes.Buffer
 			zr, _ := gzip.NewReader(&outbuf)
+			// #nosec
 			_, _ = io.Copy(&tarcontent, zr)
 			tr := tar.NewReader(&tarcontent)
 
 			hdr, err := tr.Next()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(hdr.Name).To(Equal("f1.log"))
+			// #nosec
 			_, _ = io.Copy(&content, tr)
 			Expect(content.String()).To(Equal("This is a test string"))
 
@@ -49,11 +51,14 @@ var _ = Describe("tar_utils", func() {
 			hdr, err = tr.Next()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(hdr.Name).To(Equal("tartest.tar.gz"))
+			// #nosec
 			_, _ = io.Copy(&filezipcontent, tr)
 			filezr, _ := gzip.NewReader(&filezipcontent)
+			// #nosec
 			_, _ = io.Copy(&filetarcontent, filezr)
 			filetr := tar.NewReader(&filetarcontent)
 			_, _ = filetr.Next()
+			// #nosec
 			_, _ = io.Copy(&filecontent, filetr)
 			Expect(filecontent.String()).To(Equal("This is an example file for tar tests\n"))
 		})

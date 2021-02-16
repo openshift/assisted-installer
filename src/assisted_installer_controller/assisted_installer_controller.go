@@ -284,9 +284,9 @@ func (c controller) postInstallConfigs() error {
 		c.log.Infof("Skipping etcd unpatch for cluster version %s", c.ControllerConfig.OpenshiftVersion)
 	}
 
-	err = utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.validateConsolePod)
+	err = utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.validateConsoleAvailability)
 	if err != nil {
-		return errors.Errorf("Timeout while waiting for console pod to be running")
+		return errors.Errorf("Timeout while waiting for console to become available")
 	}
 
 	return nil
@@ -538,21 +538,22 @@ func (c controller) addRouterCAToClusterCA() bool {
 
 }
 
-func (c controller) validateConsolePod() bool {
-	c.log.Infof("Checking if console pod is running")
-	pods, err := c.kc.GetPods("openshift-console", map[string]string{"app": "console", "component": "ui"}, "")
+// validateConsoleAvailability checks if the console operator is available
+func (c controller) validateConsoleAvailability() bool {
+	c.log.Infof("Checking if console is available")
+	co, err := c.kc.GetClusterOperator("console")
 	if err != nil {
-		c.log.WithError(err).Warnf("Failed to get console pods")
+		c.log.WithError(err).Warn("Failed to get console operator")
 		return false
 	}
-	for _, pod := range pods {
-		if pod.Status.Phase == "Running" {
-			c.log.Infof("Found running console pod")
-			return true
-		}
-		c.log.Infof("Console pod is in status %s. Continue waiting for it", pod.Status.Phase)
+
+	if !c.checkOperatorStatusCondition(co, configv1.OperatorAvailable, configv1.ConditionTrue) ||
+		!c.checkOperatorStatusCondition(co, configv1.OperatorDegraded, configv1.ConditionFalse) {
+		return false
 	}
-	return false
+
+	c.log.Info("Console operator is available")
+	return true
 }
 
 func (c controller) waitingForClusterVersion() error {
@@ -803,4 +804,22 @@ func (c controller) SetReadyState() {
 
 		return true
 	})
+}
+
+// checkOperatorStatusCondition checks if given operator has a condition with an expected status.
+func (c controller) checkOperatorStatusCondition(co *configv1.ClusterOperator,
+	conditionType configv1.ClusterStatusConditionType,
+	status configv1.ConditionStatus) bool {
+	for _, condition := range co.Status.Conditions {
+		if condition.Type == conditionType {
+			if condition.Status == status {
+				return true
+			}
+			c.log.Warnf("Operator %s condition '%s' is not met due to '%s': %s",
+				co.Name, conditionType, condition.Reason, condition.Message)
+			return false
+		}
+	}
+	c.log.Warnf("Operator %s condition '%s' does not exist", co.Name, conditionType)
+	return false
 }

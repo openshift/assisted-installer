@@ -59,6 +59,8 @@ var (
 				Status: configv1.ConditionTrue}},
 		},
 	}
+
+	validConsoleOperator = getClusterOperatorWithConditionsStatus(configv1.ConditionTrue, configv1.ConditionFalse)
 )
 
 var _ = Describe("installer HostRoleMaster role", func() {
@@ -392,7 +394,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("Run PostInstallConfigs - wait for cluster version", func() {
 			cmName := "default-ingress-cert"
 			cmNamespace := "openshift-config-managed"
-			consoleNamespace := "openshift-console"
+			consoleOperatorName := "console"
 			data := make(map[string]string)
 			data["ca-bundle.crt"] = "CA"
 			cm := v1.ConfigMap{Data: data}
@@ -404,9 +406,43 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(&cluster, nil).Times(1)
 			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(&cm, nil).Times(1)
 			mockbmclient.EXPECT().UploadIngressCa(gomock.Any(), data["ca-bundle.crt"], assistedController.ClusterID).Return(nil).Times(1)
-			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any(), "").Return(nil, fmt.Errorf("dummy")).Times(1)
-			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any(), "").Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Pending"}}}, nil).Times(1)
-			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any(), "").Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Running"}}}, nil).Times(1)
+			mockk8sclient.EXPECT().GetClusterOperator(consoleOperatorName).Return(nil, fmt.Errorf("no-operator")).Times(1)
+			mockk8sclient.EXPECT().GetClusterOperator(consoleOperatorName).Return(
+				&configv1.ClusterOperator{
+					Status: configv1.ClusterOperatorStatus{
+						Conditions: []configv1.ClusterOperatorStatusCondition{},
+					},
+				}, fmt.Errorf("no-conditions")).Times(1)
+			mockk8sclient.EXPECT().GetClusterOperator(consoleOperatorName).Return(
+				getClusterOperatorWithCondition(configv1.OperatorDegraded, configv1.ConditionFalse),
+				fmt.Errorf("false-degraded-condition")).Times(1)
+			mockk8sclient.EXPECT().GetClusterOperator(consoleOperatorName).Return(
+				getClusterOperatorWithCondition(configv1.OperatorAvailable, configv1.ConditionTrue),
+				fmt.Errorf("missing-degraded-condition")).Times(1)
+			mockk8sclient.EXPECT().GetClusterOperator(consoleOperatorName).Return(
+				getClusterOperatorWithCondition(configv1.OperatorAvailable, configv1.ConditionFalse),
+				fmt.Errorf("false-available-condition")).Times(1)
+			mockk8sclient.EXPECT().GetClusterOperator(consoleOperatorName).Return(
+				getClusterOperatorWithCondition(configv1.OperatorAvailable, configv1.ConditionTrue),
+				fmt.Errorf("true-degraded-condition")).Times(1)
+			mockk8sclient.EXPECT().GetClusterOperator(consoleOperatorName).Return(
+				&configv1.ClusterOperator{
+					Status: configv1.ClusterOperatorStatus{
+						Conditions: []configv1.ClusterOperatorStatusCondition{
+							{Type: configv1.OperatorProgressing, Status: configv1.ConditionFalse},
+						},
+					},
+				}, fmt.Errorf("missing-conditions")).Times(1)
+			mockk8sclient.EXPECT().GetClusterOperator(consoleOperatorName).Return(
+				getClusterOperatorWithConditionsStatus(configv1.ConditionTrue, configv1.ConditionTrue),
+				fmt.Errorf("bad-conditions-status")).Times(1)
+			mockk8sclient.EXPECT().GetClusterOperator(consoleOperatorName).Return(
+				getClusterOperatorWithConditionsStatus(configv1.ConditionFalse, configv1.ConditionTrue),
+				fmt.Errorf("bad-conditions-status")).Times(1)
+			mockk8sclient.EXPECT().GetClusterOperator(consoleOperatorName).Return(
+				getClusterOperatorWithConditionsStatus(configv1.ConditionFalse, configv1.ConditionFalse),
+				fmt.Errorf("bad-conditions-status")).Times(1)
+			mockk8sclient.EXPECT().GetClusterOperator(consoleOperatorName).Return(validConsoleOperator, nil).Times(1)
 			mockk8sclient.EXPECT().GetClusterVersion("version").Return(nil, fmt.Errorf("dummy")).Times(1)
 			mockk8sclient.EXPECT().GetClusterVersion("version").Return(badClusterVersion, nil).Times(1)
 			mockk8sclient.EXPECT().GetClusterVersion("version").Return(goodClusterVersion, nil).Times(1)
@@ -446,7 +482,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("Run PostInstallConfigs - not waiting for cluster version", func() {
 			cmName := "default-ingress-cert"
 			cmNamespace := "openshift-config-managed"
-			consoleNamespace := "openshift-console"
+			consoleOperatorName := "console"
 			data := make(map[string]string)
 			data["ca-bundle.crt"] = "CA"
 			cm := v1.ConfigMap{Data: data}
@@ -458,7 +494,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(&cluster, nil).Times(1)
 			mockk8sclient.EXPECT().GetConfigMap(cmNamespace, cmName).Return(&cm, nil).Times(1)
 			mockbmclient.EXPECT().UploadIngressCa(gomock.Any(), data["ca-bundle.crt"], assistedController.ClusterID).Return(nil).Times(1)
-			mockk8sclient.EXPECT().GetPods(consoleNamespace, gomock.Any(), "").Return([]v1.Pod{{Status: v1.PodStatus{Phase: "Running"}}}, nil).Times(1)
+			mockk8sclient.EXPECT().GetClusterOperator(consoleOperatorName).Return(validConsoleOperator, nil).Times(1)
 			mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(fmt.Errorf("dummy")).Times(1)
 			mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
 
@@ -813,4 +849,25 @@ func GetKubeNodes(kubeNamesIds map[string]string) *v1.NodeList {
 		nodeList.Items = append(nodeList.Items, node)
 	}
 	return nodeList
+}
+
+func getClusterOperatorWithCondition(condition configv1.ClusterStatusConditionType, status configv1.ConditionStatus) *configv1.ClusterOperator {
+	return &configv1.ClusterOperator{
+		Status: configv1.ClusterOperatorStatus{
+			Conditions: []configv1.ClusterOperatorStatusCondition{
+				{Type: condition, Status: status},
+			},
+		},
+	}
+}
+
+func getClusterOperatorWithConditionsStatus(availableStatus, degradedStatus configv1.ConditionStatus) *configv1.ClusterOperator {
+	return &configv1.ClusterOperator{
+		Status: configv1.ClusterOperatorStatus{
+			Conditions: []configv1.ClusterOperatorStatusCondition{
+				{Type: configv1.OperatorAvailable, Status: availableStatus},
+				{Type: configv1.OperatorDegraded, Status: degradedStatus},
+			},
+		},
+	}
 }
