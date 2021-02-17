@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"path"
 	"strings"
 	"sync"
@@ -288,6 +289,12 @@ func (c controller) postInstallConfigs() error {
 		return errors.Errorf("Timeout while waiting for console to become available")
 	}
 
+	waitTimeout := c.getMaximumOLMTimeout()
+	err = utils.WaitForPredicate(waitTimeout, GeneralWaitInterval, c.waitForOLMOperators)
+	if err != nil {
+		c.log.Warnf("Timeout while waiting for OLM operators be installed")
+	}
+
 	return nil
 }
 
@@ -537,12 +544,82 @@ func (c controller) addRouterCAToClusterCA() bool {
 
 }
 
+func (c controller) getMaximumOLMTimeout() time.Duration {
+
+	operators, err := c.ic.GetClusterMonitoredOLMOperators(context.TODO(), c.ClusterID)
+	if err != nil {
+		c.log.WithError(err).Warningf("Failed to connect to assisted service")
+		return WaitTimeout
+	}
+
+	timeout := WaitTimeout.Seconds()
+	for _, operator := range operators {
+		timeout = math.Max(float64(operator.TimeoutSeconds), timeout)
+	}
+
+	return time.Duration(timeout * float64(time.Second))
+}
+
+func (c controller) getProgressingOLMOperators() ([]models.MonitoredOperator, error) {
+	ret := make([]models.MonitoredOperator, 0)
+	operators, err := c.ic.GetClusterMonitoredOLMOperators(context.TODO(), c.ClusterID)
+	if err != nil {
+		c.log.WithError(err).Warningf("Failed to connect to assisted service")
+		return ret, err
+	}
+	for _, operator := range operators {
+		if operator.Status != models.OperatorStatusAvailable && operator.Status != models.OperatorStatusFailed {
+			ret = append(ret, operator)
+		}
+	}
+	return ret, nil
+}
+
+// waitForOLMOperators wait until all OLM monitored operators are available or failed.
+func (c controller) waitForOLMOperators() bool {
+	c.log.Infof("Checking OLM operators")
+	operators, _ := c.getProgressingOLMOperators()
+	if len(operators) == 0 {
+		return true
+	}
+	for _, operator := range operators {
+		csvName, err := c.kc.GetCSVFromSubscription(operator.Namespace, operator.SubscriptionName)
+		if err != nil {
+			c.log.WithError(err).Warnf("Failed to get subscription of operator %s", operator.Name)
+			continue
+		}
+
+		csv, err := c.kc.GetCSV(operator.Namespace, csvName)
+		if err != nil {
+			c.log.WithError(err).Warnf("Failed to get %s", operator.Name)
+			continue
+		}
+
+		operatorStatus := utils.CsvStatusToOperatorStatus(string(csv.Status.Phase))
+		err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operator.Name, operatorStatus, csv.Status.Message)
+		if err != nil {
+			c.log.WithError(err).Warnf("Failed to update olm %s status", operator.Name)
+			continue
+		}
+
+		c.log.Infof("CSV %s is in status %s, message %s.", operator.Name, csv.Status.Phase, csv.Status.Message)
+	}
+	return false
+}
+
 // validateConsoleAvailability checks if the console operator is available
 func (c controller) validateConsoleAvailability() bool {
 	c.log.Infof("Checking if console is available")
 	co, err := c.kc.GetClusterOperator("console")
 	if err != nil {
 		c.log.WithError(err).Warn("Failed to get console operator")
+		return false
+	}
+
+	operatorStatus, operatorMessage := utils.ClusterOperatorConditionsToMonitoredOperatorStatus(co.Status.Conditions)
+	err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, "console", operatorStatus, operatorMessage)
+	if err != nil {
+		c.log.WithError(err).Warn("Failed to update console operator status")
 		return false
 	}
 
@@ -599,6 +676,14 @@ func (c controller) validateClusterVersion() OperatorStatus {
 	condition, ok = conditionsByType[configv1.OperatorProgressing]
 	if ok {
 		return OperatorStatus{isAvailable: false, message: condition.Message}
+	}
+
+	// Update built-in monitored operator cluster version status
+	operatorStatus, operatorMessage := utils.ClusterOperatorConditionsToMonitoredOperatorStatus(cv.Status.Conditions)
+	err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, "cvo", operatorStatus, operatorMessage)
+	if err != nil {
+		c.log.WithError(err).Warnf("Failed to update cvo status")
+		return OperatorStatus{isAvailable: false, message: ""}
 	}
 
 	return OperatorStatus{isAvailable: false, message: ""}

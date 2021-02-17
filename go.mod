@@ -21,9 +21,11 @@ require (
 	github.com/onsi/gomega v1.11.0
 	github.com/openshift/api v3.9.1-0.20191111211345-a27ff30ebf09+incompatible
 	github.com/openshift/assisted-installer-agent v0.0.0-20200811180147-bc9c7b899b8a
-	github.com/openshift/assisted-service v1.0.10-0.20210304073520-b307df44fbfe
+	github.com/openshift/assisted-service v1.0.10-0.20210310114450-f60ae14adc85
 	github.com/openshift/client-go v0.0.0-20201020074620-f8fd44879f7c
 	github.com/openshift/machine-api-operator v0.2.1-0.20201002104344-6abfb5440597
+	github.com/operator-framework/api v0.5.3
+	github.com/operator-framework/operator-lifecycle-manager v0.17.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.8.0
 	github.com/thoas/go-funk v0.7.0

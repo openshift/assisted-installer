@@ -18,6 +18,9 @@ import (
 	configv1client "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 	operatorv1 "github.com/openshift/client-go/operator/clientset/versioned"
 	machinev1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	olmv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	olmv1client "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/typed/operators/v1alpha1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -58,6 +61,8 @@ type K8SClient interface {
 	GetPodLogs(namespace string, podName string, sinceSeconds int64) (string, error)
 	GetPodLogsAsBuffer(namespace string, podName string, sinceSeconds int64) (*bytes.Buffer, error)
 	GetPods(namespace string, labelMatch map[string]string, fieldSelector string) ([]v1.Pod, error)
+	GetCSV(namespace string, name string) (*olmv1alpha1.ClusterServiceVersion, error)
+	GetCSVFromSubscription(namespace string, name string) (string, error)
 	IsMetalProvisioningExists() (bool, error)
 	ListBMHs() (metal3v1alpha1.BareMetalHostList, error)
 	GetBMH(name string) (*metal3v1alpha1.BareMetalHost, error)
@@ -79,6 +84,7 @@ type k8sClient struct {
 	log           *logrus.Logger
 	client        *kubernetes.Clientset
 	ocClient      *operatorv1.Clientset
+	olmClient     *olmv1client.OperatorsV1alpha1Client
 	runtimeClient runtimeclient.Client
 	// CertificateSigningRequestInterface is interface
 	csrClient    certificatesClient.CertificateSigningRequestInterface
@@ -101,6 +107,10 @@ func NewK8SClient(configPath string, logger *logrus.Logger) (K8SClient, error) {
 		return &k8sClient{}, errors.Wrap(err, "creating a Kubernetes client")
 	}
 	ocClient, err := operatorv1.NewForConfig(config)
+	if err != nil {
+		return &k8sClient{}, errors.Wrap(err, "creating a Kubernetes client")
+	}
+	csvClient, err := olmv1client.NewForConfig(config)
 	if err != nil {
 		return &k8sClient{}, errors.Wrap(err, "creating a Kubernetes client")
 	}
@@ -132,7 +142,7 @@ func NewK8SClient(configPath string, logger *logrus.Logger) (K8SClient, error) {
 		}
 	}
 
-	return &k8sClient{logger, client, ocClient, runtimeClient, csrClient,
+	return &k8sClient{logger, client, ocClient, csvClient, runtimeClient, csrClient,
 		configClient.Proxies(), configClient}, nil
 }
 
@@ -369,6 +379,14 @@ func (c *k8sClient) SetProxyEnvVars() error {
 	return nil
 }
 
+func (c *k8sClient) GetCSV(namespace string, name string) (*operatorsv1alpha1.ClusterServiceVersion, error) {
+	csv, err := c.olmClient.ClusterServiceVersions(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return csv, nil
+}
+
 func (c *k8sClient) GetPods(namespace string, labelMatch map[string]string, fieldSelector string) ([]v1.Pod, error) {
 	listOptions := metav1.ListOptions{}
 	if labelMatch != nil {
@@ -514,4 +532,12 @@ func (c *k8sClient) CreateEvent(namespace, name, message, component string) (*v1
 	}
 
 	return c.client.CoreV1().Events(namespace).Create(context.TODO(), event, metav1.CreateOptions{})
+}
+
+func (c *k8sClient) GetCSVFromSubscription(namespace string, name string) (string, error) {
+	result, err := c.olmClient.Subscriptions(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	return result.Status.CurrentCSV, nil
 }

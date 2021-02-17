@@ -13,6 +13,7 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 	ops "github.com/openshift/assisted-installer/src/ops"
 	v1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	v10 "k8s.io/api/certificates/v1"
 	v11 "k8s.io/api/core/v1"
 )
@@ -243,6 +244,36 @@ func (m *MockK8SClient) GetPods(namespace string, labelMatch map[string]string, 
 func (mr *MockK8SClientMockRecorder) GetPods(namespace, labelMatch, fieldSelector interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPods", reflect.TypeOf((*MockK8SClient)(nil).GetPods), namespace, labelMatch, fieldSelector)
+}
+
+// GetCSV indicates an expected call of GetCSV
+func (m *MockK8SClient) GetCSV(namespace string, name string) (*operatorsv1alpha1.ClusterServiceVersion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCSV", namespace, name)
+	ret0, _ := ret[0].(*operatorsv1alpha1.ClusterServiceVersion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCSV indicates an expected call of GetCSV
+func (mr *MockK8SClientMockRecorder) GetCSV(namespace, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCSV", reflect.TypeOf((*MockK8SClient)(nil).GetCSV), namespace, name)
+}
+
+// GetCSVFromSubscription indicates an expected call of GetCSVFromSubscription
+func (m *MockK8SClient) GetCSVFromSubscription(namespace string, name string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCSVFromSubscription", namespace, name)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCSVFromSubscription indicates an expected call of GetCSVFromSubscription
+func (mr *MockK8SClientMockRecorder) GetCSVFromSubscription(namespace, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCSVFromSubscription", reflect.TypeOf((*MockK8SClient)(nil).GetCSVFromSubscription), namespace, name)
 }
 
 // IsMetalProvisioningExists mocks base method

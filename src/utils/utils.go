@@ -14,15 +14,16 @@ import (
 
 	"github.com/openshift/assisted-service/pkg/requestid"
 
-	"github.com/pkg/errors"
-
 	"github.com/openshift/assisted-installer-agent/pkg/journalLogger"
+	"github.com/pkg/errors"
 	"golang.org/x/net/http/httpproxy"
 
 	ignition "github.com/coreos/ignition/v2/config"
 	"github.com/openshift/assisted-service/models"
 
 	"github.com/hashicorp/go-version"
+	configv1 "github.com/openshift/api/config/v1"
+	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/sirupsen/logrus"
 	"github.com/vincent-petithory/dataurl"
 )
@@ -246,4 +247,30 @@ func IsVersionLessThan47(openshiftVersion string) (bool, error) {
 
 func EtcdPatchRequired(openshiftVersion string) (bool, error) {
 	return IsVersionLessThan47(openshiftVersion)
+}
+
+func CsvStatusToOperatorStatus(csvStatus string) models.OperatorStatus {
+	switch csvStatus {
+	case string(operatorsv1alpha1.CSVPhaseSucceeded):
+		return models.OperatorStatusAvailable
+	case string(operatorsv1alpha1.CSVPhaseFailed):
+		return models.OperatorStatusFailed
+	default:
+		return models.OperatorStatusProgressing
+	}
+}
+
+func ClusterOperatorConditionsToMonitoredOperatorStatus(conditions []configv1.ClusterOperatorStatusCondition) (models.OperatorStatus, string) {
+	for _, condition := range conditions {
+		if condition.Type == configv1.OperatorAvailable && condition.Status == configv1.ConditionTrue {
+			return models.OperatorStatusAvailable, condition.Message
+		}
+		if condition.Type == configv1.OperatorProgressing && condition.Status == configv1.ConditionTrue {
+			return models.OperatorStatusProgressing, condition.Message
+		}
+		if condition.Type == configv1.OperatorDegraded && condition.Status == configv1.ConditionTrue {
+			return models.OperatorStatusFailed, condition.Message
+		}
+	}
+	return models.OperatorStatusProgressing, ""
 }

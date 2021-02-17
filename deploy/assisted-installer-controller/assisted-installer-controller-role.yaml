@@ -127,3 +127,11 @@ rules:
     verbs:
       - get
       - list
+  - apiGroups:
+      - operators.coreos.com
+    resources:
+      - subscriptions
+      - clusterserviceversions
+    verbs:
+      - get
+      - list
