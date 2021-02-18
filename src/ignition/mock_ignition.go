@@ -7,7 +7,7 @@ package ignition
 import (
 	reflect "reflect"
 
-	types "github.com/coreos/ignition/v2/config/v3_1/types"
+	types "github.com/coreos/ignition/v2/config/v3_2/types"
 	gomock "github.com/golang/mock/gomock"
 )
 

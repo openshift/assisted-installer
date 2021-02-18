@@ -14,8 +14,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	v1 "k8s.io/api/core/v1"
 
-	config31types "github.com/coreos/ignition/v2/config/v3_1/types"
-
 	"github.com/openshift/assisted-installer/src/common"
 	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/ignition"
@@ -153,7 +151,7 @@ func (i *installer) updateSingleNodeIgnition(singleNodeIgnitionPath string) erro
 	}
 	// TODO: update this once we can get the full host specific overrides we have in the ignition
 	// Remove the Config part since we only want the rest of the overrides
-	hostConfig.Ignition.Config = config31types.IgnitionConfig{}
+	hostConfig.Ignition.Config = ignition.EmptyIgnitionConfig
 	merged, mergeErr := i.ign.MergeIgnitionConfig(singleNodeconfig, hostConfig)
 	if mergeErr != nil {
 		return errors.Wrapf(mergeErr, "failed to apply host ignition config overrides")
