@@ -19,8 +19,7 @@ import (
 	mapiv1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/certificates/v1beta1"
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -209,7 +208,7 @@ func (c *controller) ApproveCsrs(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
-func (c controller) approveCsrs(csrs *v1beta1.CertificateSigningRequestList) {
+func (c controller) approveCsrs(csrs *certificatesv1.CertificateSigningRequestList) {
 	for i := range csrs.Items {
 		csr := csrs.Items[i]
 		if !isCsrApproved(&csr) {
@@ -220,9 +219,9 @@ func (c controller) approveCsrs(csrs *v1beta1.CertificateSigningRequestList) {
 	}
 }
 
-func isCsrApproved(csr *certificatesv1beta1.CertificateSigningRequest) bool {
+func isCsrApproved(csr *certificatesv1.CertificateSigningRequest) bool {
 	for _, condition := range csr.Status.Conditions {
-		if condition.Type == certificatesv1beta1.CertificateApproved {
+		if condition.Type == certificatesv1.CertificateApproved {
 			return true
 		}
 	}

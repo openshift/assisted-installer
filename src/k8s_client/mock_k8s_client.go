@@ -13,8 +13,8 @@ import (
 	v1 "github.com/openshift/api/config/v1"
 	ops "github.com/openshift/assisted-installer/src/ops"
 	v1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
-	v1beta10 "k8s.io/api/certificates/v1beta1"
-	v10 "k8s.io/api/core/v1"
+	v10 "k8s.io/api/certificates/v1"
+	v11 "k8s.io/api/core/v1"
 )
 
 // MockK8SClient is a mock of K8SClient interface
@@ -41,10 +41,10 @@ func (m *MockK8SClient) EXPECT() *MockK8SClientMockRecorder {
 }
 
 // ListMasterNodes mocks base method
-func (m *MockK8SClient) ListMasterNodes() (*v10.NodeList, error) {
+func (m *MockK8SClient) ListMasterNodes() (*v11.NodeList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListMasterNodes")
-	ret0, _ := ret[0].(*v10.NodeList)
+	ret0, _ := ret[0].(*v11.NodeList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -112,10 +112,10 @@ func (mr *MockK8SClientMockRecorder) UnPatchControlPlaneReplicas() *gomock.Call 
 }
 
 // ListNodes mocks base method
-func (m *MockK8SClient) ListNodes() (*v10.NodeList, error) {
+func (m *MockK8SClient) ListNodes() (*v11.NodeList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListNodes")
-	ret0, _ := ret[0].(*v10.NodeList)
+	ret0, _ := ret[0].(*v11.NodeList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -157,7 +157,7 @@ func (mr *MockK8SClientMockRecorder) RunOCctlCommand(args, kubeconfigPath, o int
 }
 
 // ApproveCsr mocks base method
-func (m *MockK8SClient) ApproveCsr(csr *v1beta10.CertificateSigningRequest) error {
+func (m *MockK8SClient) ApproveCsr(csr *v10.CertificateSigningRequest) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ApproveCsr", csr)
 	ret0, _ := ret[0].(error)
@@ -171,10 +171,10 @@ func (mr *MockK8SClientMockRecorder) ApproveCsr(csr interface{}) *gomock.Call {
 }
 
 // ListCsrs mocks base method
-func (m *MockK8SClient) ListCsrs() (*v1beta10.CertificateSigningRequestList, error) {
+func (m *MockK8SClient) ListCsrs() (*v10.CertificateSigningRequestList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListCsrs")
-	ret0, _ := ret[0].(*v1beta10.CertificateSigningRequestList)
+	ret0, _ := ret[0].(*v10.CertificateSigningRequestList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -186,10 +186,10 @@ func (mr *MockK8SClientMockRecorder) ListCsrs() *gomock.Call {
 }
 
 // GetConfigMap mocks base method
-func (m *MockK8SClient) GetConfigMap(namespace, name string) (*v10.ConfigMap, error) {
+func (m *MockK8SClient) GetConfigMap(namespace, name string) (*v11.ConfigMap, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetConfigMap", namespace, name)
-	ret0, _ := ret[0].(*v10.ConfigMap)
+	ret0, _ := ret[0].(*v11.ConfigMap)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -231,10 +231,10 @@ func (mr *MockK8SClientMockRecorder) GetPodLogsAsBuffer(namespace, podName, sinc
 }
 
 // GetPods mocks base method
-func (m *MockK8SClient) GetPods(namespace string, labelMatch map[string]string, fieldSelector string) ([]v10.Pod, error) {
+func (m *MockK8SClient) GetPods(namespace string, labelMatch map[string]string, fieldSelector string) ([]v11.Pod, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPods", namespace, labelMatch, fieldSelector)
-	ret0, _ := ret[0].([]v10.Pod)
+	ret0, _ := ret[0].([]v11.Pod)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -378,10 +378,10 @@ func (mr *MockK8SClientMockRecorder) GetControlPlaneReplicas() *gomock.Call {
 }
 
 // ListEvents mocks base method
-func (m *MockK8SClient) ListEvents(namespace string) (*v10.EventList, error) {
+func (m *MockK8SClient) ListEvents(namespace string) (*v11.EventList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListEvents", namespace)
-	ret0, _ := ret[0].(*v10.EventList)
+	ret0, _ := ret[0].(*v11.EventList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -423,10 +423,10 @@ func (mr *MockK8SClientMockRecorder) GetClusterOperator(name interface{}) *gomoc
 }
 
 // CreateEvent mocks base method
-func (m *MockK8SClient) CreateEvent(namespace, name, message, component string) (*v10.Event, error) {
+func (m *MockK8SClient) CreateEvent(namespace, name, message, component string) (*v11.Event, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateEvent", namespace, name, message, component)
-	ret0, _ := ret[0].(*v10.Event)
+	ret0, _ := ret[0].(*v11.Event)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

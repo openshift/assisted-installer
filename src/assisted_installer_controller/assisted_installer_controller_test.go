@@ -19,8 +19,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/certificates/v1beta1"
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -309,7 +308,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			GeneralWaitInterval = 1 * time.Second
 		})
 		It("Run ApproveCsrs and validate it exists on channel set", func() {
-			testList := v1beta1.CertificateSigningRequestList{}
+			testList := certificatesv1.CertificateSigningRequestList{}
 			mockk8sclient.EXPECT().ListCsrs().Return(&testList, nil).MinTimes(2).MaxTimes(5)
 			ctx, cancel := context.WithCancel(context.Background())
 			wg.Add(1)
@@ -328,22 +327,22 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			wg.Wait()
 		})
 		It("Run ApproveCsrs with csrs list", func() {
-			csr := v1beta1.CertificateSigningRequest{}
-			csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
-				Type:           certificatesv1beta1.CertificateDenied,
+			csr := certificatesv1.CertificateSigningRequest{}
+			csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
+				Type:           certificatesv1.CertificateDenied,
 				Reason:         "dummy",
 				Message:        "dummy",
 				LastUpdateTime: metav1.Now(),
 			})
-			csrApproved := v1beta1.CertificateSigningRequest{}
-			csrApproved.Status.Conditions = append(csrApproved.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
-				Type:           certificatesv1beta1.CertificateApproved,
+			csrApproved := certificatesv1.CertificateSigningRequest{}
+			csrApproved.Status.Conditions = append(csrApproved.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
+				Type:           certificatesv1.CertificateApproved,
 				Reason:         "dummy",
 				Message:        "dummy",
 				LastUpdateTime: metav1.Now(),
 			})
-			testList := v1beta1.CertificateSigningRequestList{}
-			testList.Items = []v1beta1.CertificateSigningRequest{csr, csrApproved}
+			testList := certificatesv1.CertificateSigningRequestList{}
+			testList.Items = []certificatesv1.CertificateSigningRequest{csr, csrApproved}
 			mockk8sclient.EXPECT().ListCsrs().Return(&testList, nil).MinTimes(1)
 			mockk8sclient.EXPECT().ApproveCsr(&csr).Return(nil).MinTimes(1)
 			mockk8sclient.EXPECT().ApproveCsr(&csrApproved).Return(nil).Times(0)

@@ -20,8 +20,7 @@ import (
 	machinev1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/certificates/v1beta1"
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	certificatesv1beta1client "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
+	certificatesClient "k8s.io/client-go/kubernetes/typed/certificates/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	runtimeconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -53,8 +52,8 @@ type K8SClient interface {
 	ListNodes() (*v1.NodeList, error)
 	ListMachines() (*machinev1beta1.MachineList, error)
 	RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error)
-	ApproveCsr(csr *v1beta1.CertificateSigningRequest) error
-	ListCsrs() (*v1beta1.CertificateSigningRequestList, error)
+	ApproveCsr(csr *certificatesv1.CertificateSigningRequest) error
+	ListCsrs() (*certificatesv1.CertificateSigningRequestList, error)
 	GetConfigMap(namespace string, name string) (*v1.ConfigMap, error)
 	GetPodLogs(namespace string, podName string, sinceSeconds int64) (string, error)
 	GetPodLogsAsBuffer(namespace string, podName string, sinceSeconds int64) (*bytes.Buffer, error)
@@ -82,7 +81,7 @@ type k8sClient struct {
 	ocClient      *operatorv1.Clientset
 	runtimeClient runtimeclient.Client
 	// CertificateSigningRequestInterface is interface
-	csrClient    certificatesv1beta1client.CertificateSigningRequestInterface
+	csrClient    certificatesClient.CertificateSigningRequestInterface
 	proxyClient  configv1client.ProxyInterface
 	configClient *configv1client.ConfigV1Client
 }
@@ -105,7 +104,7 @@ func NewK8SClient(configPath string, logger *logrus.Logger) (K8SClient, error) {
 	if err != nil {
 		return &k8sClient{}, errors.Wrap(err, "creating a Kubernetes client")
 	}
-	csrClient := client.CertificatesV1beta1().CertificateSigningRequests()
+	csrClient := client.CertificatesV1().CertificateSigningRequests()
 	configClient, err := configv1client.NewForConfig(config)
 	if err != nil {
 		return &k8sClient{}, errors.Wrap(err, "creating openshift config client")
@@ -318,25 +317,26 @@ func (c *k8sClient) RunOCctlCommand(args []string, kubeconfigPath string, o ops.
 	return outPut, nil
 }
 
-func (c k8sClient) ListCsrs() (*v1beta1.CertificateSigningRequestList, error) {
+func (c k8sClient) ListCsrs() (*certificatesv1.CertificateSigningRequestList, error) {
 	csrs, err := c.csrClient.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		c.log.Errorf("Failed to get list of CSRs. err : %e", err)
+		c.log.WithError(err).Errorf("Failed to get list of CSRs.")
 		return nil, err
 	}
 	return csrs, nil
 }
 
-func (c k8sClient) ApproveCsr(csr *v1beta1.CertificateSigningRequest) error {
+func (c k8sClient) ApproveCsr(csr *certificatesv1.CertificateSigningRequest) error {
 
-	csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
-		Type:           certificatesv1beta1.CertificateApproved,
+	csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
+		Type:           certificatesv1.CertificateApproved,
 		Reason:         "NodeCSRApprove",
 		Message:        "This CSR was approved by the assisted-installer-controller",
+		Status:         v1.ConditionTrue,
 		LastUpdateTime: metav1.Now(),
 	})
-	if _, err := c.csrClient.UpdateApproval(context.TODO(), csr, metav1.UpdateOptions{}); err != nil {
-		c.log.Errorf("Failed to approve CSR %v, err %e", csr, err)
+	if _, err := c.csrClient.UpdateApproval(context.TODO(), csr.Name, csr, metav1.UpdateOptions{}); err != nil {
+		c.log.WithError(err).Errorf("Failed to approve CSR %v", csr)
 		return err
 	}
 	return nil
