@@ -10,22 +10,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openshift/assisted-installer/src/common"
-
-	config31types "github.com/coreos/ignition/v2/config/v3_1/types"
-	"github.com/openshift/assisted-installer/src/ignition"
-
 	"github.com/go-openapi/strfmt"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/pkg/errors"
-
-	v1 "k8s.io/api/core/v1"
-
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/openshift/assisted-installer/src/common"
+	"github.com/openshift/assisted-installer/src/ignition"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/inventory_client"
@@ -72,7 +66,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	}
 
 	singleNodeMergeIgnitionSuccess := func() {
-		conf := config31types.Config{}
+		conf := ignition.EmptyIgnition
 		mockIgnition.EXPECT().ParseIgnitionFile("/opt/install-dir/master-host-id.ign").Return(&conf, nil).Times(1)
 		mockIgnition.EXPECT().ParseIgnitionFile(singleNodeMasterIgnitionPath).Return(&conf, nil).Times(1)
 		mockIgnition.EXPECT().MergeIgnitionConfig(gomock.Any(), gomock.Any()).Return(&conf, nil).Times(1)
