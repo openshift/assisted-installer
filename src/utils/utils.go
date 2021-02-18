@@ -19,7 +19,7 @@ import (
 	"github.com/openshift/assisted-installer-agent/pkg/journalLogger"
 	"golang.org/x/net/http/httpproxy"
 
-	ignition "github.com/coreos/ignition/v2/config/v3_1"
+	ignition "github.com/coreos/ignition/v2/config"
 	"github.com/openshift/assisted-service/models"
 
 	"github.com/hashicorp/go-version"
