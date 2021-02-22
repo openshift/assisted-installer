@@ -25,7 +25,7 @@ require (
 	github.com/openshift/client-go v0.0.0-20200827190008-3062137373b5
 	github.com/openshift/machine-api-operator v0.2.1-0.20201002104344-6abfb5440597
 	github.com/pkg/errors v0.9.1
-	github.com/sirupsen/logrus v1.7.0
+	github.com/sirupsen/logrus v1.8.0
 	github.com/thoas/go-funk v0.7.0
 	github.com/vincent-petithory/dataurl v0.0.0-20191104211930-d1553a71de50
 	golang.org/x/net v0.0.0-20201202161906-c7110b5ffcbb
