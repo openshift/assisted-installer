@@ -9,3 +9,6 @@ filters:
   ^Dockerfile\..*:
     labels:
       - downstream-change-needed
+
+# Bugzilla Information
+component: assisted-installer
