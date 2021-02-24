@@ -232,7 +232,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			createOpenshiftSshManifestSuccess()
 			daemonReload(nil)
 		}
-		for _, version := range []string{"4.6", "4.7", "4.7.1", "4.8"} {
+		for _, version := range []string{"4.6", "4.6.16", "4.7", "4.7.1", "4.7-pre-release", "4.8"} {
 			Context(version, func() {
 				BeforeEach(func() {
 					conf.OpenshiftVersion = version
