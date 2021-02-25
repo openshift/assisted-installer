@@ -65,6 +65,11 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockbmclient.EXPECT().DownloadHostIgnition(gomock.Any(), hostID, filepath.Join(InstallDir, fileName)).Return(nil).Times(1)
 	}
 
+	reportLogProgressSuccess := func() {
+		mockbmclient.EXPECT().HostLogProgressReport(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+		mockbmclient.EXPECT().ClusterLogProgressReport(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	}
+
 	singleNodeMergeIgnitionSuccess := func() {
 		conf := ignition.EmptyIgnition
 		mockIgnition.EXPECT().ParseIgnitionFile("/opt/install-dir/master-host-id.ign").Return(&conf, nil).Times(1)
@@ -263,6 +268,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					//HostRoleMaster flow:
 					downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 					writeToDiskSuccess(gomock.Any())
+					reportLogProgressSuccess()
 					uploadLogsSuccess(true)
 					rebootSuccess()
 					ret := installerObj.InstallNode()
@@ -295,6 +301,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 					writeToDiskSuccess(gomock.Any())
 					uploadLogsSuccess(true)
+					reportLogProgressSuccess()
 					rebootSuccess()
 					ret := installerObj.InstallNode()
 					Expect(ret).Should(BeNil())
@@ -343,6 +350,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			writeToDiskSuccess(gomock.Any())
 			uploadLogsSuccess(true)
+			reportLogProgressSuccess()
 			rebootSuccess()
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(BeNil())
@@ -391,6 +399,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 		It("waitForController reload get pods fails then succeeds", func() {
 			resolvConfSuccess()
+			reportLogProgressSuccess()
 			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostId, models.HostStageWaitingForControlPlane, "waiting for controller pod").Return(nil).Times(1)
 			mockk8sclient.EXPECT().GetPods("assisted-installer", gomock.Any(), "").Return(nil, fmt.Errorf("dummy")).Times(1)
 			mockk8sclient.EXPECT().ListEvents(assistedControllerNamespace).Return(&events, nil).Times(1)
@@ -476,6 +485,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			writeToDiskSuccess(installerArgs)
 			uploadLogsSuccess(false)
+			reportLogProgressSuccess()
 			rebootSuccess()
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(BeNil())
@@ -547,6 +557,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mkdirSuccess(InstallDir)
 			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			uploadLogsSuccess(false)
+			reportLogProgressSuccess()
 			writeToDiskSuccess(installerArgs)
 			err := fmt.Errorf("failed to reboot")
 			mockops.EXPECT().Reboot().Return(err).Times(1)
@@ -576,6 +587,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			downloadHostIgnitionSuccess(hostId, "worker-host-id.ign")
 			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, "worker-host-id.ign"), device, mockbmclient, nil).Return(nil).Times(1)
 			// failure must do nothing
+			reportLogProgressSuccess()
 			mockops.EXPECT().UploadInstallationLogs(false).Return("", errors.Errorf("Dummy")).Times(1)
 			rebootSuccess()
 			ret := installerObj.InstallNode()
@@ -671,6 +683,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			mockops.EXPECT().WriteImageToDisk(singleNodeMasterIgnitionPath, device, mockbmclient, nil).Return(nil).Times(1)
 			uploadLogsSuccess(true)
+			reportLogProgressSuccess()
 			rebootSuccess()
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(BeNil())

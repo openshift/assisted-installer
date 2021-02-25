@@ -727,14 +727,16 @@ func (c controller) collectMustGatherLogs(ctx context.Context) (string, error) {
 // by creating tar gz of them.
 func (c *controller) UploadLogs(ctx context.Context, cancellog context.CancelFunc, wg *sync.WaitGroup, status *ControllerStatus) {
 	defer wg.Done()
-	c.log.Infof("Start sending logs")
 	podName := ""
 	ticker := time.NewTicker(LogsUploadPeriod)
+	progress_ctx := utils.GenerateRequestContext()
+	c.log.Infof("Start sending logs")
 	for {
 		select {
 		case <-ctx.Done():
 			if podName != "" {
 				c.log.Infof("Upload final controller and cluster logs before exit")
+				c.ic.ClusterLogProgressReport(progress_ctx, c.ClusterID, models.LogsStateRequested)
 				_ = utils.WaitForPredicate(WaitTimeout, LogsUploadPeriod, func() bool {
 					err := c.uploadSummaryLogs(podName, c.Namespace, controllerLogsSecondsAgo, status.HasError())
 					if err != nil {
@@ -743,6 +745,7 @@ func (c *controller) UploadLogs(ctx context.Context, cancellog context.CancelFun
 					return err == nil
 				})
 			}
+			c.ic.ClusterLogProgressReport(progress_ctx, c.ClusterID, models.LogsStateCompleted)
 			return
 		case <-ticker.C:
 			if podName == "" {

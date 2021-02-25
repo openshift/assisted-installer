@@ -148,6 +148,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockk8sclient.EXPECT().ListClusterOperators().Return(&operators, nil).AnyTimes()
 	}
 
+	reportLogProgressSuccess := func() {
+		mockbmclient.EXPECT().ClusterLogProgressReport(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	}
+
 	Context("Waiting for 3 nodes", func() {
 		It("Set ready event", func() {
 			// fail to connect to assisted and then succeed
@@ -645,6 +649,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 		It("Validate upload logs, get pod fails", func() {
 			logClusterOperatorsSuccess()
+			reportLogProgressSuccess()
 			mockk8sclient.EXPECT().GetPods(assistedController.Namespace, gomock.Any(), fmt.Sprintf("status.phase=%s", v1.PodRunning)).Return(nil, fmt.Errorf("dummy")).MinTimes(2).MaxTimes(10)
 			ctx, cancel := context.WithCancel(context.Background())
 			wg.Add(1)
@@ -655,6 +660,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 		It("Validate upload logs, Get pods logs failed", func() {
 			logClusterOperatorsSuccess()
+			reportLogProgressSuccess()
 			mockk8sclient.EXPECT().GetPods(assistedController.Namespace, gomock.Any(), fmt.Sprintf("status.phase=%s", v1.PodRunning)).Return([]v1.Pod{pod}, nil).MinTimes(1)
 			mockk8sclient.EXPECT().GetPodLogsAsBuffer(assistedController.Namespace, "test", gomock.Any()).Return(nil, fmt.Errorf("dummy")).MinTimes(1)
 			ctx, cancel := context.WithCancel(context.Background())
@@ -669,6 +675,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().GetPodLogsAsBuffer(assistedController.Namespace, "test", gomock.Any()).Return(r, nil).Times(1)
 			mockbmclient.EXPECT().UploadLogs(gomock.Any(), assistedController.ClusterID, models.LogsTypeController, gomock.Any()).Return(fmt.Errorf("dummy")).Times(1)
 			logClusterOperatorsSuccess()
+			reportLogProgressSuccess()
 			err := assistedController.uploadSummaryLogs("test", assistedController.Namespace, controllerLogsSecondsAgo, false)
 			Expect(err).To(HaveOccurred())
 		})
@@ -677,11 +684,13 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().GetPodLogsAsBuffer(assistedController.Namespace, "test", gomock.Any()).Return(r, nil).Times(1)
 			mockbmclient.EXPECT().UploadLogs(gomock.Any(), assistedController.ClusterID, models.LogsTypeController, gomock.Any()).Return(nil).Times(1)
 			logClusterOperatorsSuccess()
+			reportLogProgressSuccess()
 			err := assistedController.uploadSummaryLogs("test", assistedController.Namespace, controllerLogsSecondsAgo, false)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("Validateupload logs happy flow (controllers logs only) and list operators failed ", func() {
+			reportLogProgressSuccess()
 			mockk8sclient.EXPECT().ListClusterOperators().Return(nil, fmt.Errorf("dummy"))
 			r := bytes.NewBuffer([]byte("test"))
 			mockk8sclient.EXPECT().GetPodLogsAsBuffer(assistedController.Namespace, "test", gomock.Any()).Return(r, nil).Times(1)
@@ -721,6 +730,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					_, _ = new(bytes.Buffer).ReadFrom(reader)
 					return nil
 				}).AnyTimes()
+			reportLogProgressSuccess()
 		})
 		It("Validate upload logs (with must-gather logs)", func() {
 			logClusterOperatorsSuccess()

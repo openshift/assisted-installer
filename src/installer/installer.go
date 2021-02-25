@@ -123,11 +123,15 @@ func (i *installer) InstallNode() error {
 			return err
 		}
 	}
+	//upload host logs and report log status before reboot
+	i.inventoryClient.HostLogProgressReport(ctx, i.Config.ClusterID, i.Config.HostID, models.LogsStateRequested)
 	_, err = i.ops.UploadInstallationLogs(isBootstrap || i.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone)
 	if err != nil {
 		i.log.Errorf("upload installation logs %s", err)
 	}
+	//update installation progress
 	i.UpdateHostInstallProgress(models.HostStageRebooting, "")
+	//reboot
 	if err = i.ops.Reboot(); err != nil {
 		return err
 	}
@@ -492,6 +496,7 @@ func (i *installer) waitForController() error {
 		case <-tickerWaitForController.C:
 			if i.wasControllerReadyEventSet(kc, events) {
 				i.log.Infof("Assisted controller is ready")
+				i.inventoryClient.ClusterLogProgressReport(utils.GenerateRequestContext(), i.ClusterID, models.LogsStateRequested)
 				i.uploadControllerLogs(kc)
 				return nil
 			}
@@ -505,6 +510,10 @@ func (i *installer) uploadControllerLogs(kc k8s_client.K8SClient) {
 	controllerPod := common.GetPodInStatus(kc, common.AssistedControllerPrefix, assistedControllerNamespace,
 		map[string]string{"job-name": common.AssistedControllerPrefix}, v1.PodRunning, i.log)
 	if controllerPod != nil {
+		//do not report the progress of this pre-fetching of controller logs to the service
+		//since controller may not be ready at all and we'll end up waiting for a timeout to expire
+		//in the service with no good reason before giving up on the logs
+		//when controller is ready - it will report its log progress by itself
 		err := common.UploadPodLogs(kc, i.inventoryClient, i.ClusterID, controllerPod.Name, assistedControllerNamespace, common.ControllerLogsSecondsAgo, i.log)
 		// if failed to upload logs, log why and continue
 		if err != nil {
