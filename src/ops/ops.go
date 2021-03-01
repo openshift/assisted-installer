@@ -30,6 +30,7 @@ type Ops interface {
 	Mkdir(dirName string) error
 	WriteImageToDisk(ignitionPath string, device string, progressReporter inventory_client.InventoryClient, extra []string) error
 	Reboot() error
+	SetBootOrder(device string) error
 	ExtractFromIgnition(ignitionPath string, fileToExtract string) error
 	SystemctlAction(action string, args ...string) error
 	PrepareController() error
@@ -190,6 +191,28 @@ func (o *ops) Reboot() error {
 	_, err := o.ExecPrivilegeCommand(o.logWriter, "shutdown", "-r", "+1", "'Installation completed, server is going to reboot.'")
 	if err != nil {
 		o.log.Errorf("Failed to reboot node, err: %s", err)
+		return err
+	}
+	return nil
+}
+
+func (o *ops) SetBootOrder(device string) error {
+	_, err := o.ExecPrivilegeCommand(o.logWriter, "test", "-d", "/sys/firmware/efi")
+	if err != nil {
+		o.log.Info("efi not supported")
+		return nil
+	}
+
+	o.log.Info("Setting efibootmgr to boot from disk")
+	_, err = o.ExecPrivilegeCommand(o.logWriter, "mount", device+"2", "/mnt")
+	if err != nil {
+		o.log.Errorf("Failed to mount device %s, err: %s", device+"2", err)
+		return err
+	}
+	// efi-system is installed onto partition 2
+	_, err = o.ExecPrivilegeCommand(o.logWriter, "efibootmgr", "-d", device, "-p", "2", "-c", "-L", "RHCOS", "-l", "\\EFI\\BOOT\\BOOTX64.EFI")
+	if err != nil {
+		o.log.Errorf("Failed to set efibootmgr to boot from disk %s, err: %s", device, err)
 		return err
 	}
 	return nil

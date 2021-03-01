@@ -96,6 +96,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, "master-host-id.ign"), device, mockbmclient, extra).Return(nil).Times(1)
 	}
 
+	setBootOrderSuccess := func(extra interface{}) {
+		mockops.EXPECT().SetBootOrder(device).Return(nil).Times(1)
+	}
+
 	uploadLogsSuccess := func(bootstrap bool) {
 		mockops.EXPECT().UploadInstallationLogs(bootstrap).Return("dummy", nil).Times(1)
 	}
@@ -269,6 +273,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 					writeToDiskSuccess(gomock.Any())
 					reportLogProgressSuccess()
+					setBootOrderSuccess(gomock.Any())
 					uploadLogsSuccess(true)
 					rebootSuccess()
 					ret := installerObj.InstallNode()
@@ -300,6 +305,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					//HostRoleMaster flow:
 					downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 					writeToDiskSuccess(gomock.Any())
+					setBootOrderSuccess(gomock.Any())
 					uploadLogsSuccess(true)
 					reportLogProgressSuccess()
 					rebootSuccess()
@@ -325,6 +331,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			//HostRoleMaster flow:
 			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			writeToDiskSuccess(gomock.Any())
+			setBootOrderSuccess(gomock.Any())
 			ret := installerObj.InstallNode()
 			Expect(ret).To(HaveOccurred())
 		})
@@ -349,6 +356,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			//HostRoleMaster flow:
 			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			writeToDiskSuccess(gomock.Any())
+			setBootOrderSuccess(gomock.Any())
 			uploadLogsSuccess(true)
 			reportLogProgressSuccess()
 			rebootSuccess()
@@ -366,6 +374,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			downloadFileSuccess(bootstrapIgn)
 			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			writeToDiskSuccess(gomock.Any())
+			setBootOrderSuccess(gomock.Any())
 			extractSecretFromIgnitionSuccess()
 			extractIgnitionToFS("extract failure", fmt.Errorf("extract failed"))
 			extractIgnitionToFS("extract failure", fmt.Errorf("extract failed"))
@@ -387,6 +396,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			//HostRoleMaster flow:
 			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			writeToDiskSuccess(gomock.Any())
+			setBootOrderSuccess(gomock.Any())
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
@@ -484,6 +494,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mkdirSuccess(InstallDir)
 			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			writeToDiskSuccess(installerArgs)
+			setBootOrderSuccess(gomock.Any())
 			uploadLogsSuccess(false)
 			reportLogProgressSuccess()
 			rebootSuccess()
@@ -559,6 +570,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			uploadLogsSuccess(false)
 			reportLogProgressSuccess()
 			writeToDiskSuccess(installerArgs)
+			setBootOrderSuccess(gomock.Any())
 			err := fmt.Errorf("failed to reboot")
 			mockops.EXPECT().Reboot().Return(err).Times(1)
 			ret := installerObj.InstallNode()
@@ -586,6 +598,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mkdirSuccess(InstallDir)
 			downloadHostIgnitionSuccess(hostId, "worker-host-id.ign")
 			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, "worker-host-id.ign"), device, mockbmclient, nil).Return(nil).Times(1)
+			setBootOrderSuccess(gomock.Any())
 			// failure must do nothing
 			reportLogProgressSuccess()
 			mockops.EXPECT().UploadInstallationLogs(false).Return("", errors.Errorf("Dummy")).Times(1)
@@ -682,6 +695,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			singleNodeMergeIgnitionSuccess()
 			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			mockops.EXPECT().WriteImageToDisk(singleNodeMasterIgnitionPath, device, mockbmclient, nil).Return(nil).Times(1)
+			setBootOrderSuccess(gomock.Any())
 			uploadLogsSuccess(true)
 			reportLogProgressSuccess()
 			rebootSuccess()

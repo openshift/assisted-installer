@@ -116,6 +116,13 @@ func (i *installer) InstallNode() error {
 	if err = i.writeImageToDisk(ignitionPath); err != nil {
 		return err
 	}
+
+	if err = i.ops.SetBootOrder(i.Device); err != nil {
+		i.log.WithError(err).Warnf("Failed to set boot order")
+		// Ignore the error for now so it doesn't fail the installation in case it fails
+		//return err
+	}
+
 	if isBootstrap {
 		i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, "")
 		if err = errs.Wait(); err != nil {
