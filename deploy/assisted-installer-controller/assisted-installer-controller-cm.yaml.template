@@ -12,3 +12,4 @@ data:
   ca-cert-path: '{{.CACertPath}}'
   check-cluster-version: '{{.CheckCVO}}'
   high-availability-mode: {{.HaMode}}
+  must-gather-image: {{.MustGatherImage}}
