@@ -739,6 +739,8 @@ func (c *controller) UploadLogs(ctx context.Context, cancellog context.CancelFun
 					err := c.uploadSummaryLogs(podName, c.Namespace, controllerLogsSecondsAgo, status.HasError())
 					if err != nil {
 						c.log.Infof("retry uploading logs in 5 minutes...")
+					} else {
+						c.log.Info("successfully uploaded final controller and cluster logs")
 					}
 					return err == nil
 				})
@@ -771,6 +773,8 @@ func (c *controller) UploadLogs(ctx context.Context, cancellog context.CancelFun
 			if err != nil {
 				c.log.WithError(err).Warnf("Failed to upload controller logs")
 				continue
+			} else {
+				c.log.Info("Successfully uploaded controller logs (intermediate snapshot)")
 			}
 		}
 	}
