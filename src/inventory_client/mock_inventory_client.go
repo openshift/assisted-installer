@@ -166,6 +166,30 @@ func (mr *MockInventoryClientMockRecorder) UploadLogs(ctx, clusterId, logsType, 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadLogs", reflect.TypeOf((*MockInventoryClient)(nil).UploadLogs), ctx, clusterId, logsType, upfile)
 }
 
+// ClusterLogProgressReport mocks base method
+func (m *MockInventoryClient) ClusterLogProgressReport(ctx context.Context, clusterId string, progress models.LogsState) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "ClusterLogProgressReport", ctx, clusterId, progress)
+}
+
+// ClusterLogProgressReport indicates an expected call of ClusterLogProgressReport
+func (mr *MockInventoryClientMockRecorder) ClusterLogProgressReport(ctx, clusterId, progress interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClusterLogProgressReport", reflect.TypeOf((*MockInventoryClient)(nil).ClusterLogProgressReport), ctx, clusterId, progress)
+}
+
+// HostLogProgressReport mocks base method
+func (m *MockInventoryClient) HostLogProgressReport(ctx context.Context, clusterId, hostId string, progress models.LogsState) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "HostLogProgressReport", ctx, clusterId, hostId, progress)
+}
+
+// HostLogProgressReport indicates an expected call of HostLogProgressReport
+func (mr *MockInventoryClientMockRecorder) HostLogProgressReport(ctx, clusterId, hostId, progress interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HostLogProgressReport", reflect.TypeOf((*MockInventoryClient)(nil).HostLogProgressReport), ctx, clusterId, hostId, progress)
+}
+
 // UpdateClusterInstallProgress mocks base method
 func (m *MockInventoryClient) UpdateClusterInstallProgress(ctx context.Context, clusterId, progress string) error {
 	m.ctrl.T.Helper()

@@ -16,13 +16,13 @@ require (
 	github.com/hashicorp/go-version v1.2.1
 	github.com/jpillora/backoff v1.0.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/metal3-io/baremetal-operator v0.0.0-20200828204955-fc35b7691a8e
+	github.com/metal3-io/baremetal-operator v0.0.0
 	github.com/onsi/ginkgo v1.15.0
 	github.com/onsi/gomega v1.10.5
-	github.com/openshift/api v0.0.0-20200901182017-7ac89ba6b971
+	github.com/openshift/api v3.9.1-0.20191111211345-a27ff30ebf09+incompatible
 	github.com/openshift/assisted-installer-agent v0.0.0-20200811180147-bc9c7b899b8a
-	github.com/openshift/assisted-service v1.0.10-0.20210121095005-432f69c82c53
-	github.com/openshift/client-go v0.0.0-20200827190008-3062137373b5
+	github.com/openshift/assisted-service v1.0.10-0.20210304073520-b307df44fbfe
+	github.com/openshift/client-go v0.0.0-20201020074620-f8fd44879f7c
 	github.com/openshift/machine-api-operator v0.2.1-0.20201002104344-6abfb5440597
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.8.0
@@ -30,7 +30,7 @@ require (
 	github.com/vincent-petithory/dataurl v0.0.0-20191104211930-d1553a71de50
 	golang.org/x/net v0.0.0-20201202161906-c7110b5ffcbb
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
-	gopkg.in/yaml.v2 v2.3.0
+	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.20.4
 	k8s.io/apimachinery v0.20.4
 	k8s.io/client-go v12.0.0+incompatible
@@ -39,6 +39,8 @@ require (
 
 replace (
 	github.com/metal3-io/baremetal-operator => github.com/openshift/baremetal-operator v0.0.0-20200715132148-0f91f62a41fe // Use OpenShift fork
+	github.com/openshift/api => github.com/openshift/api v0.0.0-20200901182017-7ac89ba6b971
+	github.com/openshift/hive/pkg/apis => github.com/carbonin/hive/pkg/apis v0.0.0-20210209195732-57e8c3ae12d1
 	github.com/openshift/machine-api-operator => github.com/openshift/machine-api-operator v0.2.1-0.20201026110925-50ea569da51b
 	k8s.io/api => k8s.io/api v0.19.2
 	k8s.io/apimachinery => k8s.io/apimachinery v0.19.2

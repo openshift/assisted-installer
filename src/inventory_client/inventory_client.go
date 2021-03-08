@@ -49,12 +49,15 @@ type InventoryClient interface {
 	CompleteInstallation(ctx context.Context, clusterId string, isSuccess bool, errorInfo string) error
 	GetHosts(ctx context.Context, log logrus.FieldLogger, skippedStatuses []string) (map[string]HostData, error)
 	UploadLogs(ctx context.Context, clusterId string, logsType models.LogsType, upfile io.Reader) error
+	ClusterLogProgressReport(ctx context.Context, clusterId string, progress models.LogsState)
+	HostLogProgressReport(ctx context.Context, clusterId string, hostId string, progress models.LogsState)
 	UpdateClusterInstallProgress(ctx context.Context, clusterId string, progress string) error
 }
 
 type inventoryClient struct {
 	ai        *client.AssistedInstall
 	clusterId strfmt.UUID
+	logger    *logrus.Logger
 }
 
 type HostData struct {
@@ -129,7 +132,7 @@ func CreateInventoryClientWithDelay(clusterId string, inventoryURL string, pullS
 
 	clientConfig.AuthInfo = auth.AgentAuthHeaderWriter(pullSecret)
 	assistedInstallClient := client.New(clientConfig)
-	return &inventoryClient{assistedInstallClient, strfmt.UUID(clusterId)}, nil
+	return &inventoryClient{assistedInstallClient, strfmt.UUID(clusterId), logger}, nil
 }
 
 func RetryConnectionRefusedErr() rehttp.RetryFn {
@@ -301,6 +304,31 @@ func (c *inventoryClient) UploadLogs(ctx context.Context, clusterId string, logs
 		&installer.UploadLogsParams{ClusterID: strfmt.UUID(clusterId), LogsType: string(logsType),
 			Upfile: runtime.NamedReader(fileName, upfile)})
 	return aserror.GetAssistedError(err)
+}
+
+func (c *inventoryClient) ClusterLogProgressReport(ctx context.Context, clusterId string, progress models.LogsState) {
+	_, err := c.ai.Installer.UpdateClusterLogsProgress(ctx, &installer.UpdateClusterLogsProgressParams{
+		ClusterID: strfmt.UUID(clusterId),
+		LogsProgressParams: &models.LogsProgressParams{
+			LogsState: progress,
+		},
+	})
+	if err != nil {
+		c.logger.WithError(err).Errorf("failed to report log progress %s on cluster", progress)
+	}
+}
+
+func (c *inventoryClient) HostLogProgressReport(ctx context.Context, clusterId string, hostId string, progress models.LogsState) {
+	_, err := c.ai.Installer.UpdateHostLogsProgress(ctx, &installer.UpdateHostLogsProgressParams{
+		ClusterID: strfmt.UUID(clusterId),
+		HostID:    strfmt.UUID(hostId),
+		LogsProgressParams: &models.LogsProgressParams{
+			LogsState: progress,
+		},
+	})
+	if err != nil {
+		c.logger.WithError(err).Errorf("failed to report log progress %s on host %s", progress, hostId)
+	}
 }
 
 func (c *inventoryClient) UpdateClusterInstallProgress(ctx context.Context, clusterId string, progress string) error {
