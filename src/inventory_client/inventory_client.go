@@ -25,6 +25,7 @@ import (
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/client"
 	"github.com/openshift/assisted-service/client/installer"
+	"github.com/openshift/assisted-service/client/operators"
 	"github.com/openshift/assisted-service/models"
 	"github.com/openshift/assisted-service/pkg/auth"
 	aserror "github.com/openshift/assisted-service/pkg/error"
@@ -46,12 +47,14 @@ type InventoryClient interface {
 	GetEnabledHostsNamesHosts(ctx context.Context, log logrus.FieldLogger) (map[string]HostData, error)
 	UploadIngressCa(ctx context.Context, ingressCA string, clusterId string) error
 	GetCluster(ctx context.Context) (*models.Cluster, error)
+	GetClusterMonitoredOLMOperators(ctx context.Context, clusterId string) ([]models.MonitoredOperator, error)
 	CompleteInstallation(ctx context.Context, clusterId string, isSuccess bool, errorInfo string) error
 	GetHosts(ctx context.Context, log logrus.FieldLogger, skippedStatuses []string) (map[string]HostData, error)
 	UploadLogs(ctx context.Context, clusterId string, logsType models.LogsType, upfile io.Reader) error
 	ClusterLogProgressReport(ctx context.Context, clusterId string, progress models.LogsState)
 	HostLogProgressReport(ctx context.Context, clusterId string, hostId string, progress models.LogsState)
 	UpdateClusterInstallProgress(ctx context.Context, clusterId string, progress string) error
+	UpdateClusterOperator(ctx context.Context, clusterId string, operatorName string, operatorStatus models.OperatorStatus, operatorStatusInfo string) error
 }
 
 type inventoryClient struct {
@@ -215,12 +218,28 @@ func (c *inventoryClient) UploadIngressCa(ctx context.Context, ingressCA string,
 }
 
 func (c *inventoryClient) GetCluster(ctx context.Context) (*models.Cluster, error) {
-	cluster, err := c.ai.Installer.GetCluster(ctx, &installer.GetClusterParams{ClusterID: c.clusterId})
+	cluster, err := c.ai.Installer.GetCluster(ctx, &installer.GetClusterParams{ClusterID: strfmt.UUID(c.clusterId)})
 	if err != nil {
 		return nil, aserror.GetAssistedError(err)
 	}
 
 	return cluster.Payload, nil
+}
+
+func (c *inventoryClient) GetClusterMonitoredOLMOperators(ctx context.Context, clusterId string) ([]models.MonitoredOperator, error) {
+	monitoredOperators, err := c.ai.Operators.ListOfClusterOperators(ctx, &operators.ListOfClusterOperatorsParams{ClusterID: strfmt.UUID(clusterId)})
+	if err != nil {
+		return nil, aserror.GetAssistedError(err)
+	}
+
+	olmOperators := make([]models.MonitoredOperator, 0)
+	for _, operator := range monitoredOperators.Payload {
+		if operator.OperatorType == models.OperatorTypeOlm {
+			olmOperators = append(olmOperators, *operator)
+		}
+	}
+
+	return olmOperators, nil
 }
 
 func (c *inventoryClient) GetEnabledHostsNamesHosts(ctx context.Context, log logrus.FieldLogger) (map[string]HostData, error) {
@@ -335,6 +354,18 @@ func (c *inventoryClient) UpdateClusterInstallProgress(ctx context.Context, clus
 	_, err := c.ai.Installer.UpdateClusterInstallProgress(ctx, &installer.UpdateClusterInstallProgressParams{
 		ClusterID:       strfmt.UUID(clusterId),
 		ClusterProgress: progress,
+	})
+	return aserror.GetAssistedError(err)
+}
+
+func (c *inventoryClient) UpdateClusterOperator(ctx context.Context, clusterId string, operatorName string, operatorStatus models.OperatorStatus, operatorStatusInfo string) error {
+	_, err := c.ai.Operators.ReportMonitoredOperatorStatus(ctx, &operators.ReportMonitoredOperatorStatusParams{
+		ClusterID: strfmt.UUID(c.clusterId),
+		ReportParams: &models.OperatorMonitorReport{
+			Name:       operatorName,
+			Status:     operatorStatus,
+			StatusInfo: operatorStatusInfo,
+		},
 	})
 	return aserror.GetAssistedError(err)
 }

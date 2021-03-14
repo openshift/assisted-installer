@@ -203,3 +203,32 @@ func (mr *MockInventoryClientMockRecorder) UpdateClusterInstallProgress(ctx, clu
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateClusterInstallProgress", reflect.TypeOf((*MockInventoryClient)(nil).UpdateClusterInstallProgress), ctx, clusterId, progress)
 }
+
+// UpdateClusterOperator mocks base method
+func (m *MockInventoryClient) UpdateClusterOperator(ctx context.Context, clusterId string, operatorName string, operatorStatus models.OperatorStatus, operatorStatusInfo string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateClusterOperator", ctx, clusterId, operatorName, operatorStatus, operatorStatusInfo)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateClusterOperator indicates an expected call of UpdateClusterOperator
+func (mr *MockInventoryClientMockRecorder) UpdateClusterOperator(ctx, clusterId, operatorName, operatorStatus, operatorStatusInfo interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateClusterOperator", reflect.TypeOf((*MockInventoryClient)(nil).UpdateClusterOperator), ctx, clusterId, operatorName, operatorStatus, operatorStatusInfo)
+}
+
+// GetClusterMonitoredOLMOperators mocks base method
+func (m *MockInventoryClient) GetClusterMonitoredOLMOperators(ctx context.Context, clusterId string) ([]models.MonitoredOperator, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetClusterMonitoredOLMOperators", ctx, clusterId)
+	ret0, _ := ret[0].([]models.MonitoredOperator)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetClusterMonitoredOLMOperators indicates an expected call of GetClusterMonitoredOLMOperators
+func (mr *MockInventoryClientMockRecorder) GetClusterMonitoredOLMOperators(ctx, clusterId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClusterMonitoredOLMOperators", reflect.TypeOf((*MockInventoryClient)(nil).GetClusterMonitoredOLMOperators), ctx, clusterId)
+}
