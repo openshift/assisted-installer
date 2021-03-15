@@ -260,10 +260,13 @@ func (c controller) postInstallConfigs() error {
 	var err error
 
 	if c.WaitForClusterVersion {
+		c.log.Infof("Waiting for cluster version operator")
 		err = c.waitingForClusterVersion()
 		if err != nil {
 			return err
 		}
+	} else {
+		c.log.Infof("Skipping waiting for cluster version operator")
 	}
 
 	err = utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.addRouterCAToClusterCA)

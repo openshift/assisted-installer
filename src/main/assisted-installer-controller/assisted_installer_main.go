@@ -13,6 +13,7 @@ import (
 	assistedinstallercontroller "github.com/openshift/assisted-installer/src/assisted_installer_controller"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/ops"
+	"github.com/openshift/assisted-service/pkg/secretdump"
 	"github.com/sirupsen/logrus"
 )
 
@@ -28,13 +29,12 @@ func main() {
 		log.Fatal(err.Error())
 	}
 
+	logger.Infof("Start running Assisted-Controller. Configuration is:\n %s", secretdump.DumpSecretStruct(Options.ControllerConfig))
+
 	kc, err := k8s_client.NewK8SClient("", logger)
 	if err != nil {
 		log.Fatalf("Failed to create k8 client %v", err)
 	}
-
-	logger.Infof("Start running assisted-controller with cluster-id %s, url %s",
-		Options.ControllerConfig.ClusterID, Options.ControllerConfig.URL)
 
 	err = kc.SetProxyEnvVars()
 	if err != nil {
