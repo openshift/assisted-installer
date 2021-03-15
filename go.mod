@@ -24,7 +24,7 @@ require (
 	github.com/openshift/assisted-service v1.0.10-0.20210310114450-f60ae14adc85
 	github.com/openshift/client-go v0.0.0-20201020074620-f8fd44879f7c
 	github.com/openshift/machine-api-operator v0.2.1-0.20201002104344-6abfb5440597
-	github.com/operator-framework/api v0.5.3
+	github.com/operator-framework/api v0.6.1
 	github.com/operator-framework/operator-lifecycle-manager v0.17.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.8.1
@@ -32,7 +32,7 @@ require (
 	github.com/vincent-petithory/dataurl v0.0.0-20191104211930-d1553a71de50
 	golang.org/x/net v0.0.0-20201202161906-c7110b5ffcbb
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
-	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.20.4
 	k8s.io/apimachinery v0.20.4
 	k8s.io/client-go v12.0.0+incompatible
