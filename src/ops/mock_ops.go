@@ -294,18 +294,18 @@ func (mr *MockOpsMockRecorder) CreateOpenshiftSshManifest(filePath, template, ss
 }
 
 // GetMustGatherLogs mocks base method
-func (m *MockOps) GetMustGatherLogs(workDir, kubeconfigPath string) (string, error) {
+func (m *MockOps) GetMustGatherLogs(workDir, kubeconfigPath, mustGatherImg string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetMustGatherLogs", workDir, kubeconfigPath)
+	ret := m.ctrl.Call(m, "GetMustGatherLogs", workDir, kubeconfigPath, mustGatherImg)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetMustGatherLogs indicates an expected call of GetMustGatherLogs
-func (mr *MockOpsMockRecorder) GetMustGatherLogs(workDir, kubeconfigPath interface{}) *gomock.Call {
+func (mr *MockOpsMockRecorder) GetMustGatherLogs(workDir, kubeconfigPath, mustGatherImg interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMustGatherLogs", reflect.TypeOf((*MockOps)(nil).GetMustGatherLogs), workDir, kubeconfigPath)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMustGatherLogs", reflect.TypeOf((*MockOps)(nil).GetMustGatherLogs), workDir, kubeconfigPath, mustGatherImg)
 }
 
 // CreateRandomHostname mocks base method

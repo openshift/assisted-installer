@@ -61,6 +61,12 @@ spec:
                   name: assisted-installer-controller-config
                   key: check-cluster-version
                   optional: true
+            - name: MUST_GATHER_IMAGE
+              valueFrom:
+                configMapKeyRef:
+                  name: assisted-installer-controller-config
+                  key: must-gather-image
+                  optional: true
           {{if .CACertPath}}
           volumeMounts:
           - name: service-ca-cert-config

@@ -56,6 +56,7 @@ type ControllerConfig struct {
 	OpenshiftVersion      string `envconfig:"OPENSHIFT_VERSION" required:"true"`
 	HighAvailabilityMode  string `envconfig:"HIGH_AVAILABILITY_MODE" required:"false" default:"Full"`
 	WaitForClusterVersion bool   `envconfig:"CHECK_CLUSTER_VERSION" required:"false" default:"false"`
+	MustGatherImage       string `envconfig:"MUST_GATHER_IMAGE" required:"false" default:""`
 }
 type Controller interface {
 	WaitAndUpdateNodesStatus(status *ControllerStatus)
@@ -725,7 +726,7 @@ func (c controller) logClusterOperatorsStatus() {
  * - controller logs
  * - oc must-gather logs
  **/
-func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSeconds int64, isMustGatherEnabled bool) error {
+func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSeconds int64, isMustGatherEnabled bool, mustGatherImg string) error {
 	var tarentries = make([]utils.TarEntry, 0)
 	var ok bool = true
 	ctx := utils.GenerateRequestContext()
@@ -734,7 +735,7 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 
 	if isMustGatherEnabled {
 		c.log.Infof("Uploading oc must-gather logs")
-		if tarfile, err := c.collectMustGatherLogs(ctx); err == nil {
+		if tarfile, err := c.collectMustGatherLogs(ctx, mustGatherImg); err == nil {
 			if entry, tarerr := utils.NewTarEntryFromFile(tarfile); tarerr == nil {
 				tarentries = append(tarentries, *entry)
 			}
@@ -784,7 +785,7 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 	return nil
 }
 
-func (c controller) collectMustGatherLogs(ctx context.Context) (string, error) {
+func (c controller) collectMustGatherLogs(ctx context.Context, mustGatherImg string) (string, error) {
 	tempDir, ferr := ioutil.TempDir("", "controller-must-gather-logs-")
 	if ferr != nil {
 		c.log.Errorf("Failed to create temp directory for must-gather-logs %v\n", ferr)
@@ -801,7 +802,7 @@ func (c controller) collectMustGatherLogs(ctx context.Context) (string, error) {
 	}
 
 	//collect must gather logs
-	logtar, err := c.ops.GetMustGatherLogs(tempDir, kubeconfigPath)
+	logtar, err := c.ops.GetMustGatherLogs(tempDir, kubeconfigPath, mustGatherImg)
 	if err != nil {
 		c.log.Errorf("Failed to collect must-gather logs %v\n", err)
 		return "", err
@@ -826,7 +827,7 @@ func (c *controller) UploadLogs(ctx context.Context, cancellog context.CancelFun
 				c.log.Infof("Upload final controller and cluster logs before exit")
 				c.ic.ClusterLogProgressReport(progress_ctx, c.ClusterID, models.LogsStateRequested)
 				_ = utils.WaitForPredicate(WaitTimeout, LogsUploadPeriod, func() bool {
-					err := c.uploadSummaryLogs(podName, c.Namespace, controllerLogsSecondsAgo, status.HasError())
+					err := c.uploadSummaryLogs(podName, c.Namespace, controllerLogsSecondsAgo, status.HasError(), c.MustGatherImage)
 					if err != nil {
 						c.log.Infof("retry uploading logs in 5 minutes...")
 					}

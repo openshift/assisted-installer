@@ -34,6 +34,7 @@ type Config struct {
 	InstallerArgs        []string
 	HighAvailabilityMode string
 	CheckClusterVersion  bool
+	MustGatherImage      string
 }
 
 var GlobalConfig Config
@@ -67,6 +68,7 @@ func ProcessArgs() {
 	flag.StringVar(&ret.ServiceIPs, "service-ips", "", "All IPs of assisted service node")
 	flag.StringVar(&ret.HighAvailabilityMode, "high-availability-mode", "Full", "high-availability expectations. default is 'Full', which represents the behavior in a \"normal\" cluster. Use 'None' for single-node deployment")
 	flag.BoolVar(&ret.CheckClusterVersion, "check-cluster-version", false, "Do not monitor CVO")
+	flag.StringVar(&ret.MustGatherImage, "must-gather-image", "", "Custom must-gather image")
 
 	var installerArgs string
 	flag.StringVar(&installerArgs, "installer-args", "", "JSON array of additional coreos-installer arguments")
