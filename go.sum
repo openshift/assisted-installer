@@ -1121,6 +1121,8 @@ github.com/operator-framework/api v0.3.7-0.20200602203552-431198de9fc2/go.mod h1
 github.com/operator-framework/api v0.3.20/go.mod h1:Xbje9x0SHmh0nihE21kpesB38vk3cyxnE6JdDS8Jo1Q=
 github.com/operator-framework/api v0.5.3 h1:1RDw2FbuEDtSC7ONKLKgAxtq+iRsV7rRTumD4RLQfSI=
 github.com/operator-framework/api v0.5.3/go.mod h1:L7IvLd/ckxJEJg/t4oTTlnHKAJIP/p51AvEslW3wYdY=
+github.com/operator-framework/api v0.6.1 h1:bTOj1GseGV5oZc5iNQL5ZMqzP430sefNMkPbG6e84Gw=
+github.com/operator-framework/api v0.6.1/go.mod h1:L7IvLd/ckxJEJg/t4oTTlnHKAJIP/p51AvEslW3wYdY=
 github.com/operator-framework/operator-lifecycle-manager v0.0.0-20200321030439-57b580e57e88 h1:ByKBik0i2aTEr7iKdSCmUGULydHwr6hA0h4INv9LkSA=
 github.com/operator-framework/operator-lifecycle-manager v0.0.0-20200321030439-57b580e57e88/go.mod h1:7Ut8p9jJ8C6RZyyhZfZypmlibCIJwK5Wcc+WZDgLkOA=
 github.com/operator-framework/operator-lifecycle-manager v0.17.0 h1:WMgmZCOiYsq503A9F6/XRl3FDMS6bK03JIrQSyiSTO4=
@@ -1288,6 +1290,7 @@ github.com/sirupsen/logrus v1.7.0 h1:ShrD1U9pZB12TX0cVy0DtePoCH97K8EtX+mg7ZARUtM
 github.com/sirupsen/logrus v1.7.0/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
 github.com/sirupsen/logrus v1.8.0 h1:nfhvjKcUMhBMVqbKHJlk5RPrrfYr/NMo3692g0dwfWU=
 github.com/sirupsen/logrus v1.8.0/go.mod h1:4GuYW9TZmE769R5STWrRakJc4UqQ3+QQ95fyz7ENv1A=
+github.com/sirupsen/logrus v1.8.1 h1:dJKuHgqk1NNQlqoA6BTlM1Wf9DOH3NBjQyu0h9+AZZE=
 github.com/sirupsen/logrus v1.8.1/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
 github.com/slok/go-http-metrics v0.8.0 h1:rsIKW30MzLjbWRBkCQoe/Oxh/F283MKT6afdH3mXTaA=
 github.com/slok/go-http-metrics v0.8.0/go.mod h1:f22ekj0Ht4taz2clntVmLRSK4D+feX33zkdDW0Eytvk=
