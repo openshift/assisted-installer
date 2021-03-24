@@ -638,13 +638,19 @@ func (c controller) validateConsoleAvailability() bool {
 
 func (c controller) waitingForClusterVersion() error {
 	isClusterVersionAvailable := func() bool {
-		newCvoStatus := c.validateClusterVersion()
+		newCvoStatus, conditions := c.validateClusterVersion()
 		if c.cvoStatus.isAvailable != newCvoStatus.isAvailable || (c.cvoStatus.message != newCvoStatus.message && newCvoStatus.message != "") {
 			status := fmt.Sprintf("Cluster version is available: %t , message: %s", newCvoStatus.isAvailable, newCvoStatus.message)
 			c.log.Infof(status)
 
+			// Update built-in monitored operator cluster version status
+			operatorStatus, operatorMessage := utils.ClusterOperatorConditionsToMonitoredOperatorStatus(conditions)
+			if err := c.ic.UpdateClusterOperator(utils.GenerateRequestContext(), c.ClusterID, "cvo", operatorStatus, operatorMessage); err != nil {
+				c.log.WithError(err).Errorf("Failed to update cluster %s cvo status", c.ClusterID)
+			}
+
 			if err := c.ic.UpdateClusterInstallProgress(utils.GenerateRequestContext(), c.ClusterID, status); err != nil {
-				c.log.Errorf("Failed to update cluster %s installation progress status: %s", c.ClusterID, err)
+				c.log.WithError(err).Errorf("Failed to update cluster %s installation progress status", c.ClusterID)
 			}
 		}
 
@@ -659,12 +665,12 @@ func (c controller) waitingForClusterVersion() error {
 	return nil
 }
 
-func (c controller) validateClusterVersion() OperatorStatus {
+func (c controller) validateClusterVersion() (OperatorStatus, []configv1.ClusterOperatorStatusCondition) {
 	c.log.Infof("Waiting for cluster version to be available")
 	cv, err := c.kc.GetClusterVersion("version")
 	if err != nil {
 		c.log.WithError(err).Warnf("Failed to get cluster version")
-		return OperatorStatus{isAvailable: false, message: ""}
+		return OperatorStatus{isAvailable: false, message: ""}, []configv1.ClusterOperatorStatusCondition{}
 	}
 	conditionsByType := map[configv1.ClusterStatusConditionType]configv1.ClusterOperatorStatusCondition{}
 	// condition type to dict
@@ -674,23 +680,15 @@ func (c controller) validateClusterVersion() OperatorStatus {
 	// check if it cluster version is available
 	condition, ok := conditionsByType[configv1.OperatorAvailable]
 	if ok && condition.Status == configv1.ConditionTrue {
-		return OperatorStatus{isAvailable: true, message: condition.Message}
+		return OperatorStatus{isAvailable: true, message: condition.Message}, cv.Status.Conditions
 	}
 	// if not available return message from progressing
 	condition, ok = conditionsByType[configv1.OperatorProgressing]
 	if ok {
-		return OperatorStatus{isAvailable: false, message: condition.Message}
+		return OperatorStatus{isAvailable: false, message: condition.Message}, cv.Status.Conditions
 	}
 
-	// Update built-in monitored operator cluster version status
-	operatorStatus, operatorMessage := utils.ClusterOperatorConditionsToMonitoredOperatorStatus(cv.Status.Conditions)
-	err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, "cvo", operatorStatus, operatorMessage)
-	if err != nil {
-		c.log.WithError(err).Warnf("Failed to update cvo status")
-		return OperatorStatus{isAvailable: false, message: ""}
-	}
-
-	return OperatorStatus{isAvailable: false, message: ""}
+	return OperatorStatus{isAvailable: false, message: ""}, cv.Status.Conditions
 }
 
 func (c controller) sendCompleteInstallation(isSuccess bool, errorInfo string) {
