@@ -117,6 +117,20 @@ func (mr *MockOpsMockRecorder) Reboot() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reboot", reflect.TypeOf((*MockOps)(nil).Reboot))
 }
 
+// SetBootOrder mocks base method
+func (m *MockOps) SetBootOrder(device string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetBootOrder", device)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetBootOrder indicates an expected call of SetBootOrder
+func (mr *MockOpsMockRecorder) SetBootOrder(device interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBootOrder", reflect.TypeOf((*MockOps)(nil).SetBootOrder), device)
+}
+
 // ExtractFromIgnition mocks base method
 func (m *MockOps) ExtractFromIgnition(ignitionPath, fileToExtract string) error {
 	m.ctrl.T.Helper()
