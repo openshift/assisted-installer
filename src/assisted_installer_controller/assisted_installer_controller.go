@@ -13,23 +13,22 @@ import (
 	"sync/atomic"
 	"time"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
-	configv1 "github.com/openshift/api/config/v1"
-	mapiv1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/assisted-installer/src/common"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/models"
+	mapiv1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 )
 
 const (
@@ -874,7 +873,7 @@ func (c controller) SetReadyState() {
 			c.log.WithError(err).Warningf("Failed to connect to assisted service")
 			return false
 		}
-		c.log.Infof("assisted-service is avilable")
+		c.log.Infof("assisted-service is available")
 
 		_, err = c.kc.ListNodes()
 		if err != nil {
