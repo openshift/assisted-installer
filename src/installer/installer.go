@@ -567,7 +567,10 @@ func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, 
 			i.log.Warnf("Still waiting for master nodes: %v", err)
 			return false
 		}
-		i.updateReadyMasters(nodes, &readyMasters, inventoryHostsMap)
+		if err = i.updateReadyMasters(nodes, &readyMasters, inventoryHostsMap); err != nil {
+			i.log.WithError(err).Warnf("Failed to update ready with masters")
+			return false
+		}
 		i.log.Infof("Found %d ready master nodes", len(readyMasters))
 		if len(readyMasters) >= minMasterNodes {
 			i.log.Infof("Waiting for master nodes - Done")
@@ -611,7 +614,7 @@ func (i *installer) getInventoryHostsMap(hostsMap map[string]inventory_client.Ho
 	return hostsMap, nil
 }
 
-func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]string, inventoryHostsMap map[string]inventory_client.HostData) {
+func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]string, inventoryHostsMap map[string]inventory_client.HostData) error {
 	nodeNameAndCondition := map[string][]v1.NodeCondition{}
 	for _, node := range nodes.Items {
 		nodeNameAndCondition[node.Name] = node.Status.Conditions
@@ -622,8 +625,7 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 			*readyMasters = append(*readyMasters, node.Name)
 			host, ok := inventoryHostsMap[strings.ToLower(node.Name)]
 			if !ok {
-				log.Warnf("Node %s is not in inventory hosts", node.Name)
-				break
+				return fmt.Errorf("Node %s is not in inventory hosts", node.Name)
 			}
 			ctx = utils.GenerateRequestContext()
 			if err := i.inventoryClient.UpdateHostInstallProgress(ctx, host.Host.ID.String(), models.HostStageJoined, ""); err != nil {
@@ -631,7 +633,9 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 			}
 		}
 	}
+
 	i.log.Infof("Found %d master nodes: %+v", len(nodes.Items), nodeNameAndCondition)
+	return nil
 }
 
 func (i *installer) cleanupInstallDevice() error {

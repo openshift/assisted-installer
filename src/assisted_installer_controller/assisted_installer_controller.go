@@ -98,48 +98,61 @@ func (status *ControllerStatus) HasError() bool {
 	return atomic.LoadUint32(&status.errCounter) > 0
 }
 
+func logHostsStatus(log logrus.FieldLogger, hosts map[string]inventory_client.HostData) {
+	hostsStatus := make(map[string][]string)
+	for hostname, hostData := range hosts {
+		hostsStatus[hostname] = []string{
+			*hostData.Host.Status,
+			string(hostData.Host.Progress.CurrentStage),
+			hostData.Host.Progress.ProgressInfo}
+	}
+	log.Infof("Hosts status: %v", hostsStatus)
+}
+
 func (c *controller) WaitAndUpdateNodesStatus(status *ControllerStatus) {
 	c.log.Infof("Waiting till all nodes will join and update status to assisted installer")
-	ignoreStatuses := []string{models.HostStatusDisabled, models.HostStatusInstalled}
+	ignoreStatuses := []string{models.HostStatusDisabled}
 	var hostsInError int
 	for {
 		time.Sleep(GeneralWaitInterval)
 		ctx := utils.GenerateRequestContext()
 		log := utils.RequestIDLogger(ctx, c.log)
 
-		assistedInstallerNodesMap, err := c.ic.GetHosts(ctx, log, ignoreStatuses)
+		assistedNodesMap, err := c.ic.GetHosts(ctx, log, ignoreStatuses)
 		if err != nil {
-			log.WithError(err).Error("Failed to get node map from inventory")
+			log.WithError(err).Error("Failed to get node map from the assisted service")
 			continue
 		}
 
-		hostsStatus := make(map[string]string)
-		for hostname, hostData := range assistedInstallerNodesMap {
-			hostsStatus[hostname] = *hostData.Host.Status
-		}
-		log.Infof("Host status: %v", hostsStatus)
+		logHostsStatus(log, assistedNodesMap)
 
-		errNodesMap := common.FilterHostsByStatus(assistedInstallerNodesMap, []string{models.HostStatusError})
+		hostsInProgressMap := common.GetHostsInStatus(assistedNodesMap, []string{models.ClusterStatusInstalled}, false)
+		errNodesMap := common.GetHostsInStatus(hostsInProgressMap, []string{models.HostStatusError}, true)
 		hostsInError = len(errNodesMap)
 
 		//if all hosts are in error, mark the failure and finish
-		if hostsInError > 0 && hostsInError == len(assistedInstallerNodesMap) {
+		if hostsInError > 0 && hostsInError == len(hostsInProgressMap) {
 			status.Error()
 			break
 		}
 		//if all hosts are successfully installed, finish
-		if len(assistedInstallerNodesMap) == 0 {
+		if len(hostsInProgressMap) == 0 {
 			break
 		}
 		//otherwise, update the progress status and keep waiting
-		log.Infof("Searching for host to change status, number to find %d", len(assistedInstallerNodesMap))
+		log.Infof("Checking if cluster nodes are ready. %d nodes remaining", len(hostsInProgressMap))
 		nodes, err := c.kc.ListNodes()
 		if err != nil {
+			log.WithError(err).Error("Failed to get list of nodes from k8s client")
 			continue
 		}
 		for _, node := range nodes.Items {
-			host, ok := assistedInstallerNodesMap[strings.ToLower(node.Name)]
+			host, ok := hostsInProgressMap[strings.ToLower(node.Name)]
 			if !ok {
+				if _, ok := assistedNodesMap[strings.ToLower(node.Name)]; !ok {
+					log.Warnf("Node %s is not in inventory hosts", strings.ToLower(node.Name))
+				}
+
 				continue
 			}
 			if common.IsK8sNodeIsReady(node) {
@@ -158,7 +171,7 @@ func (c *controller) WaitAndUpdateNodesStatus(status *ControllerStatus) {
 				}
 			}
 		}
-		c.updateConfiguringStatusIfNeeded(assistedInstallerNodesMap)
+		c.updateConfiguringStatusIfNeeded(assistedNodesMap)
 	}
 	c.log.Infof("Done waiting for all the nodes. Nodes in error status: %d\n", hostsInError)
 }
