@@ -148,7 +148,10 @@ func (o *ops) ExecCommand(liveLogger io.Writer, command string, args ...string) 
 				execErr.WaitStatus = status.ExitStatus()
 			}
 		}
-		o.log.Info(execErr.DetailedError())
+		if liveLogger != nil {
+			//If the caller didn't provide liveLogger the log isn't interesting and might spam
+			o.log.Info(execErr.DetailedError())
+		}
 		return output, execErr
 	}
 	o.log.Debug("Command executed:", " command", command, " arguments", args, "env vars", cmd.Env, "output", output)
