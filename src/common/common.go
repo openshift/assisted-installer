@@ -22,10 +22,10 @@ const (
 	AssistedControllerPrefix       = "assisted-installer-controller"
 )
 
-func FilterHostsByStatus(hosts map[string]inventory_client.HostData, status []string) map[string]inventory_client.HostData {
+func GetHostsInStatus(hosts map[string]inventory_client.HostData, status []string, isMatch bool) map[string]inventory_client.HostData {
 	hostsbystatus := make(map[string]inventory_client.HostData)
 	for hostname, hostData := range hosts {
-		if funk.ContainsString(status, *hostData.Host.Status) {
+		if isMatch == funk.ContainsString(status, *hostData.Host.Status) {
 			hostsbystatus[hostname] = hostData
 		}
 	}
@@ -38,16 +38,16 @@ func SetConfiguringStatusForHosts(client inventory_client.InventoryClient, inven
 	if fromBootstrap {
 		notValidStates[models.HostStageWaitingForIgnition] = struct{}{}
 	}
-	for key, host := range inventoryHostsMapWithIp {
+	for hostName, host := range inventoryHostsMapWithIp {
 		_, ok := notValidStates[host.Host.Progress.CurrentStage]
 		if ok {
 			continue
 		}
-		log.Infof("Verifying if host %s pulled ignition", key)
+		log.Infof("Verifying if host %s pulled ignition", hostName)
 		pat := fmt.Sprintf("(%s).{1,20}(Ignition)", strings.Join(host.IPs, "|"))
 		pattern, err := regexp.Compile(pat)
 		if err != nil {
-			log.WithError(err).Errorf("Failed to compile regex from host %s ips list", host.Host.ID.String())
+			log.WithError(err).Errorf("Failed to compile regex from host %s ips list", hostName)
 			return
 		}
 		if pattern.MatchString(mcsLogs) {
@@ -57,12 +57,12 @@ func SetConfiguringStatusForHosts(client inventory_client.InventoryClient, inven
 			}
 			ctx := utils.GenerateRequestContext()
 			requestLog := utils.RequestIDLogger(ctx, log)
-			requestLog.Infof("Host %s found in mcs logs, moving it to %s state", host.Host.ID.String(), status)
+			requestLog.Infof("Host %s %q found in mcs logs, moving it to %s state", hostName, host.Host.ID.String(), status)
 			if err := client.UpdateHostInstallProgress(ctx, host.Host.ID.String(), status, ""); err != nil {
 				requestLog.Errorf("Failed to update node installation status, %s", err)
 				continue
 			}
-			inventoryHostsMapWithIp[key].Host.Progress.CurrentStage = status
+			inventoryHostsMapWithIp[hostName].Host.Progress.CurrentStage = status
 		}
 	}
 }

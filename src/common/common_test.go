@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-openapi/strfmt"
 	"github.com/golang/mock/gomock"
+	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/openshift/assisted-installer/src/inventory_client"
@@ -56,4 +57,67 @@ var _ = Describe("verify common", func() {
 		})
 	})
 
+	Context("GetHostsInStatus", func() {
+		var (
+			testID     = strfmt.UUID(uuid.New().String())
+			testStatus = models.HostStatusError
+		)
+
+		tests := []struct {
+			name          string
+			isMatch       bool
+			originalHosts map[string]inventory_client.HostData
+			status        []string
+			expectedHosts map[string]inventory_client.HostData
+		}{
+			{
+				name:    "ask for match - match found -> keep",
+				isMatch: true,
+				originalHosts: map[string]inventory_client.HostData{
+					"node0": {Host: &models.Host{ID: &testID, Status: &testStatus}},
+				},
+				status: []string{testStatus},
+				expectedHosts: map[string]inventory_client.HostData{
+					"node0": {Host: &models.Host{ID: &testID, Status: &testStatus}},
+				},
+			},
+			{
+				name:    "ask for match - match not found -> remove",
+				isMatch: true,
+				originalHosts: map[string]inventory_client.HostData{
+					"node0": {Host: &models.Host{ID: &testID, Status: &testStatus}},
+				},
+				status:        []string{models.HostStatusInstalled},
+				expectedHosts: map[string]inventory_client.HostData{},
+			},
+			{
+				name:    "ask for no match - match found -> remove",
+				isMatch: false,
+				originalHosts: map[string]inventory_client.HostData{
+					"node0": {Host: &models.Host{ID: &testID, Status: &testStatus}},
+				},
+				status:        []string{testStatus},
+				expectedHosts: map[string]inventory_client.HostData{},
+			},
+			{
+				name:    "ask for no match - match not found -> keep",
+				isMatch: false,
+				originalHosts: map[string]inventory_client.HostData{
+					"node0": {Host: &models.Host{ID: &testID, Status: &testStatus}},
+				},
+				status: []string{models.HostStatusInstalled},
+				expectedHosts: map[string]inventory_client.HostData{
+					"node0": {Host: &models.Host{ID: &testID, Status: &testStatus}},
+				},
+			},
+		}
+
+		for i := range tests {
+			test := tests[i]
+			It(test.name, func() {
+				res := GetHostsInStatus(test.originalHosts, test.status, test.isMatch)
+				Expect(test.expectedHosts).To(Equal(res))
+			})
+		}
+	})
 })
