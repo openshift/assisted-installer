@@ -308,6 +308,11 @@ func (c controller) postInstallConfigs() error {
 	waitTimeout := c.getMaximumOLMTimeout()
 	err = utils.WaitForPredicate(waitTimeout, GeneralWaitInterval, c.waitForOLMOperators)
 	if err != nil {
+		// In case the timeout occur, we have to update the pending OLM operators to failed state,
+		// so the assisted-service can update the cluster state to completed.
+		if err = c.updatePendingOLMOperators(); err != nil {
+			return errors.Errorf("Timeout while waiting for some of the operators and not able to update its state")
+		}
 		c.log.Warnf("Timeout while waiting for OLM operators be installed")
 	}
 
@@ -589,6 +594,19 @@ func (c controller) getProgressingOLMOperators() ([]models.MonitoredOperator, er
 		}
 	}
 	return ret, nil
+}
+
+func (c controller) updatePendingOLMOperators() error {
+	c.log.Infof("Updating pending OLM operators")
+	operators, _ := c.getProgressingOLMOperators()
+	for _, operator := range operators {
+		err := c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operator.Name, models.OperatorStatusFailed, "Waiting for operator timed out")
+		if err != nil {
+			c.log.WithError(err).Warnf("Failed to update olm %s status", operator.Name)
+			return err
+		}
+	}
+	return nil
 }
 
 // waitForOLMOperators wait until all OLM monitored operators are available or failed.
