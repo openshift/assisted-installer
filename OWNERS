@@ -6,6 +6,7 @@ filters:
       - code-reviewers
     reviewers:
       - code-reviewers
+      - reviewers-only
   ^Dockerfile\..*:
     labels:
       - downstream-change-needed
