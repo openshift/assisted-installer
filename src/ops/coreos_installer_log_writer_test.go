@@ -123,7 +123,51 @@ var _ = Describe("Verify CoreosInstallerLogger", func() {
 				Expect(err).Should(BeNil())
 			}
 			Expect(len(hook.Entries)).Should(Equal(10))
+		})
 
+		It("test multiple lines with 100%", func() {
+			updateProgressSuccess([][]string{{string(models.HostStageWritingImageToDisk), "55%"},
+				{string(models.HostStageWritingImageToDisk), "60%"},
+				{string(models.HostStageWritingImageToDisk), "98%"},
+				{string(models.HostStageWritingImageToDisk), "100%"},
+			})
+			testLogs := []string{"> Read disk 471.2 MiB/844.7 MiB (55%)   \r",
+				"> Read disk 472.6 MiB/844.7 MiB (55%)   \r",
+				"> Read disk 472.8 MiB/844.7 MiB (55%)   \r",
+				"> Read disk 472.9 MiB/844.7 MiB (55%)   \r",
+				"> Read disk 473.0 MiB/844.7 MiB (60%)   \r",
+				"> Read disk 473.3 MiB/844.7 MiB (62%)   \r",
+				"> Read disk 473.8 MiB/844.7 MiB (98%)   \r",
+				"> Read disk 473.8 MiB/844.7 MiB (100%)   \r"}
+			for i := range testLogs {
+				_, err := cilogger.Write([]byte(testLogs[i]))
+				Expect(err).Should(BeNil())
+			}
+			Expect(len(hook.Entries)).Should(Equal(8))
+
+		})
+		It("test multiple lines with multiple 100%", func() {
+			updateProgressSuccess([][]string{{string(models.HostStageWritingImageToDisk), "55%"},
+				{string(models.HostStageWritingImageToDisk), "60%"},
+				{string(models.HostStageWritingImageToDisk), "66%"},
+				{string(models.HostStageWritingImageToDisk), "98%"},
+				{string(models.HostStageWritingImageToDisk), "100%"},
+			})
+			testLogs := []string{"> Read disk 471.2 MiB/844.7 MiB (55%)   \r",
+				"> Read disk 472.6 MiB/844.7 MiB (55%)   \r",
+				"> Read disk 472.8 MiB/844.7 MiB (55%)   \r",
+				"> Read disk 472.9 MiB/844.7 MiB (55%)   \r",
+				"> Read disk 473.0 MiB/844.7 MiB (60%)   \r",
+				"> Read disk 473.3 MiB/844.7 MiB (62%)   \r",
+				"> Read disk 473.8 MiB/844.7 MiB (98%)   \r",
+				"> Read disk 473.8 MiB/844.7 MiB (99%)   \r",
+				"> Read disk 473.8 MiB/844.7 MiB (100%)   \r",
+				"> Read disk 473.8 MiB/844.7 MiB (100%)   \r"}
+			for i := range testLogs {
+				_, err := cilogger.Write([]byte(testLogs[i]))
+				Expect(err).Should(BeNil())
+			}
+			Expect(len(hook.Entries)).Should(Equal(10))
 		})
 	})
 })

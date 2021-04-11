@@ -14,6 +14,7 @@ import (
 )
 
 const MinProgressDelta = 5
+const completed = 100
 
 type CoreosInstallerLogWriter struct {
 	log              *logrus.Logger
@@ -56,7 +57,7 @@ func (l *CoreosInstallerLogWriter) reportProgress() {
 	if err != nil {
 		return
 	}
-	if currentPercent >= l.lastProgress+MinProgressDelta {
+	if currentPercent >= l.lastProgress+MinProgressDelta || (currentPercent == completed && l.lastProgress != completed) {
 		// If the progress is more than 5% report it
 		ctx := utils.GenerateRequestContext()
 		if err := l.progressReporter.UpdateHostInstallProgress(ctx, l.hostID, models.HostStageWritingImageToDisk, match[2]); err == nil {
