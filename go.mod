@@ -24,7 +24,7 @@ require (
 	github.com/openshift/assisted-service v1.0.10-0.20210310114450-f60ae14adc85
 	github.com/openshift/client-go v0.0.0-20201020074620-f8fd44879f7c
 	github.com/openshift/machine-api-operator v0.2.1-0.20201002104344-6abfb5440597
-	github.com/operator-framework/api v0.7.1
+	github.com/operator-framework/api v0.8.0
 	github.com/operator-framework/operator-lifecycle-manager v0.17.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.8.1
