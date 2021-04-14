@@ -174,6 +174,15 @@ func (o *ops) SystemctlAction(action string, args ...string) error {
 }
 
 func (o *ops) WriteImageToDisk(ignitionPath string, device string, progressReporter inventory_client.InventoryClient, extraArgs []string) error {
+	device = o.getTargetDevice(device)
+	allArgs := installerArgs(ignitionPath, device, extraArgs)
+	o.log.Infof("Writing image and ignition to disk with arguments: %v", allArgs)
+	_, err := o.ExecPrivilegeCommand(NewCoreosInstallerLogWriter(o.log, progressReporter, config.GlobalConfig.HostID),
+		"coreos-installer", allArgs...)
+	return err
+}
+
+func (o *ops) getTargetDevice(device string) string {
 	// Overcome https://github.com/coreos/coreos-installer/issues/512 bug.
 	// coreos-installer has a bug where when a disk has busy partitions, it will
 	// print a confusing error message if that disk doesn't have a `/dev/*` style path.
@@ -188,12 +197,7 @@ func (o *ops) WriteImageToDisk(ignitionPath string, device string, progressRepor
 		o.log.Infof("Resolving %s symlink to %s for coreos-installer", device, linkTarget)
 		device = linkTarget
 	}
-
-	allArgs := installerArgs(ignitionPath, device, extraArgs)
-	o.log.Infof("Writing image and ignition to disk with arguments: %v", allArgs)
-	_, err = o.ExecPrivilegeCommand(NewCoreosInstallerLogWriter(o.log, progressReporter, config.GlobalConfig.HostID),
-		"coreos-installer", allArgs...)
-	return err
+	return device
 }
 
 func installerArgs(ignitionPath string, device string, extra []string) []string {
