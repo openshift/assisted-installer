@@ -272,5 +272,6 @@ func ClusterOperatorConditionsToMonitoredOperatorStatus(conditions []configv1.Cl
 			return models.OperatorStatusFailed, condition.Message
 		}
 	}
+
 	return models.OperatorStatusProgressing, ""
 }
