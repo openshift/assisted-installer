@@ -719,12 +719,6 @@ func (c controller) waitingForClusterVersion() error {
 			if err := c.ic.UpdateClusterOperator(utils.GenerateRequestContext(), c.ClusterID, cvoOperatorName, operatorStatus, operatorMessage); err != nil {
 				c.log.WithError(err).Errorf("Failed to update cluster %s cvo status", c.ClusterID)
 			}
-
-			// TODO: MGMT-5188
-			// Old CVO progress API. Should be deprecated
-			if err := c.ic.UpdateClusterInstallProgress(utils.GenerateRequestContext(), c.ClusterID, status); err != nil {
-				c.log.WithError(err).Errorf("Failed to update cluster %s installation progress status", c.ClusterID)
-			}
 		}
 
 		return false

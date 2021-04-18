@@ -474,7 +474,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 				// CVO
 				mockk8sclient.EXPECT().GetClusterVersion("version").Return(nil, fmt.Errorf("dummy")).Times(1)
-				mockbmclient.EXPECT().UpdateClusterInstallProgress(gomock.Any(), gomock.Any(), gomock.Any()).MinTimes(1)
 
 				mockk8sclient.EXPECT().GetClusterVersion("version").Return(progressClusterVersionCondition, nil).Times(1)
 				mockbmclient.EXPECT().GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), cvoOperatorName).
@@ -973,7 +972,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 				if t.shouldSendUpdate {
 					mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), gomock.Any(), cvoOperatorName, gomock.Any(), gomock.Any()).Times(1)
-					mockbmclient.EXPECT().UpdateClusterInstallProgress(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 				}
 
 				if t.currentCVOStatus.Status == models.OperatorStatusAvailable {
