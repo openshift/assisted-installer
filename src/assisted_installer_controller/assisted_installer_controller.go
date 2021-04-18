@@ -32,14 +32,20 @@ import (
 )
 
 const (
-	generalWaitTimeoutInt    = 30
-	controllerLogsSecondsAgo = 120 * 60
+	generalWaitTimeoutInt     = 30
+	controllerLogsSecondsAgo  = 120 * 60
+	consoleOperatorName       = "console"
+	cvoOperatorName           = "cvo"
+	ingressConfigMapName      = "default-ingress-cert"
+	ingressConfigMapNamespace = "openshift-config-managed"
 )
 
-var GeneralWaitInterval = generalWaitTimeoutInt * time.Second
-var GeneralProgressUpdateInt = 60 * time.Second
-var LogsUploadPeriod = 5 * time.Minute
-var WaitTimeout = 70 * time.Minute
+var (
+	GeneralWaitInterval      = generalWaitTimeoutInt * time.Second
+	GeneralProgressUpdateInt = 60 * time.Second
+	LogsUploadPeriod         = 5 * time.Minute
+	WaitTimeout              = 70 * time.Minute
+)
 
 // assisted installer controller is added to control installation process after  bootstrap pivot
 // assisted installer will deploy it on installation process
@@ -67,16 +73,10 @@ type ControllerStatus struct {
 
 type controller struct {
 	ControllerConfig
-	log       *logrus.Logger
-	ops       ops.Ops
-	ic        inventory_client.InventoryClient
-	kc        k8s_client.K8SClient
-	cvoStatus OperatorStatus
-}
-
-type OperatorStatus struct {
-	isAvailable bool
-	message     string
+	log *logrus.Logger
+	ops ops.Ops
+	ic  inventory_client.InventoryClient
+	kc  k8s_client.K8SClient
 }
 
 func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inventory_client.InventoryClient, kc k8s_client.K8SClient) *controller {
@@ -86,7 +86,6 @@ func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inv
 		ops:              ops,
 		ic:               ic,
 		kc:               kc,
-		cvoStatus:        OperatorStatus{isAvailable: false, message: ""},
 	}
 }
 
@@ -272,14 +271,13 @@ func (c controller) PostInstallConfigs(wg *sync.WaitGroup, status *ControllerSta
 func (c controller) postInstallConfigs() error {
 	var err error
 
+	c.log.Infof("Waiting for cluster version operator: %t", c.WaitForClusterVersion)
+
 	if c.WaitForClusterVersion {
-		c.log.Infof("Waiting for cluster version operator")
 		err = c.waitingForClusterVersion()
 		if err != nil {
 			return err
 		}
-	} else {
-		c.log.Infof("Skipping waiting for cluster version operator")
 	}
 
 	err = utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.addRouterCAToClusterCA)
@@ -543,15 +541,13 @@ func (c controller) unpatchEtcd() bool {
 
 // AddRouterCAToClusterCA adds router CA to cluster CA in kubeconfig
 func (c controller) addRouterCAToClusterCA() bool {
-	cmName := "default-ingress-cert"
-	cmNamespace := "openshift-config-managed"
 	ctx := utils.GenerateRequestContext()
 	log := utils.RequestIDLogger(ctx, c.log)
 	log.Infof("Start adding ingress ca to cluster")
-	caConfigMap, err := c.kc.GetConfigMap(cmNamespace, cmName)
+	caConfigMap, err := c.kc.GetConfigMap(ingressConfigMapNamespace, ingressConfigMapName)
 
 	if err != nil {
-		log.WithError(err).Errorf("fetching %s configmap from %s namespace", cmName, cmNamespace)
+		log.WithError(err).Errorf("fetching %s configmap from %s namespace", ingressConfigMapName, ingressConfigMapNamespace)
 		return false
 	}
 	log.Infof("Sending ingress certificate to inventory service. Certificate data %s", caConfigMap.Data["ca-bundle.crt"])
@@ -641,19 +637,18 @@ func (c controller) waitForOLMOperators() bool {
 	return false
 }
 
-// validateConsoleAvailability checks if the console operator is available
-func (c controller) validateConsoleAvailability() bool {
-	c.log.Infof("Checking if console is available")
-	co, err := c.kc.GetClusterOperator("console")
+func (c controller) isOperatorAvailableInCluster(operatorName string) bool {
+	c.log.Infof("Checking %s operator availability status", operatorName)
+	co, err := c.kc.GetClusterOperator(operatorName)
 	if err != nil {
-		c.log.WithError(err).Warn("Failed to get console operator")
+		c.log.WithError(err).Warnf("Failed to get %s operator", operatorName)
 		return false
 	}
 
 	operatorStatus, operatorMessage := utils.ClusterOperatorConditionsToMonitoredOperatorStatus(co.Status.Conditions)
-	err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, "console", operatorStatus, operatorMessage)
+	err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operatorName, operatorStatus, operatorMessage)
 	if err != nil {
-		c.log.WithError(err).Warn("Failed to update console operator status")
+		c.log.WithError(err).Warnf("Failed to update %s operator status %s with message %s", operatorName, operatorStatus, operatorMessage)
 		return false
 	}
 
@@ -662,30 +657,77 @@ func (c controller) validateConsoleAvailability() bool {
 		return false
 	}
 
-	c.log.Info("Console operator is available")
+	c.log.Infof("%s operator is available in cluster", operatorName)
+
 	return true
 }
 
+func (c controller) isOperatorAvailableInService(operatorName string) bool {
+	operatorStatusInService, err := c.ic.GetClusterMonitoredOperator(utils.GenerateRequestContext(), c.ClusterID, operatorName)
+	if err != nil {
+		c.log.WithError(err).Errorf("Failed to get cluster %s %s operator status", c.ClusterID, operatorName)
+		return false
+	}
+
+	if operatorStatusInService.Status == models.OperatorStatusAvailable {
+		c.log.Infof("Service acknowledged %s operator is available for cluster %s", operatorName, c.ClusterID)
+		return true
+	}
+
+	return false
+}
+
+// validateConsoleAvailability checks if the console operator is available
+func (c controller) validateConsoleAvailability() bool {
+	return c.isOperatorAvailableInCluster(consoleOperatorName) &&
+		c.isOperatorAvailableInService(consoleOperatorName)
+}
+
+// waitingForClusterVersion checks the Cluster Version Operator availability in the
+// new OCP cluster. A success would be announced only when the service acknowledges
+// the CVO availability, in order to avoid unsycned scenarios.
+//
+// This function would be aligned with the console operator reporting workflow
+// as part of the deprecation of the old API in MGMT-5188.
 func (c controller) waitingForClusterVersion() error {
 	isClusterVersionAvailable := func() bool {
-		newCvoStatus, conditions := c.validateClusterVersion()
-		if c.cvoStatus.isAvailable != newCvoStatus.isAvailable || (c.cvoStatus.message != newCvoStatus.message && newCvoStatus.message != "") {
-			status := fmt.Sprintf("Cluster version is available: %t , message: %s", newCvoStatus.isAvailable, newCvoStatus.message)
+		c.log.Infof("Checking cluster version operator availability status")
+		co, err := c.kc.GetClusterVersion("version")
+		if err != nil {
+			c.log.WithError(err).Warn("Failed to get cluster version operator")
+			return false
+		}
+
+		cvoStatusInService, err := c.ic.GetClusterMonitoredOperator(utils.GenerateRequestContext(), c.ClusterID, cvoOperatorName)
+		if err != nil {
+			c.log.WithError(err).Errorf("Failed to get cluster %s cvo status", c.ClusterID)
+			return false
+		}
+
+		if cvoStatusInService.Status == models.OperatorStatusAvailable {
+			c.log.Infof("Service acknowledged CVO is available for cluster %s", c.ClusterID)
+			return true
+		}
+
+		operatorStatus, operatorMessage := utils.ClusterOperatorConditionsToMonitoredOperatorStatus(co.Status.Conditions)
+
+		if cvoStatusInService.Status != operatorStatus || (cvoStatusInService.StatusInfo != operatorMessage && operatorMessage != "") {
+			status := fmt.Sprintf("Cluster version status: %s message: %s", operatorStatus, operatorMessage)
 			c.log.Infof(status)
 
 			// Update built-in monitored operator cluster version status
-			operatorStatus, operatorMessage := utils.ClusterOperatorConditionsToMonitoredOperatorStatus(conditions)
-			if err := c.ic.UpdateClusterOperator(utils.GenerateRequestContext(), c.ClusterID, "cvo", operatorStatus, operatorMessage); err != nil {
+			if err := c.ic.UpdateClusterOperator(utils.GenerateRequestContext(), c.ClusterID, cvoOperatorName, operatorStatus, operatorMessage); err != nil {
 				c.log.WithError(err).Errorf("Failed to update cluster %s cvo status", c.ClusterID)
 			}
 
+			// TODO: MGMT-5188
+			// Old CVO progress API. Should be deprecated
 			if err := c.ic.UpdateClusterInstallProgress(utils.GenerateRequestContext(), c.ClusterID, status); err != nil {
 				c.log.WithError(err).Errorf("Failed to update cluster %s installation progress status", c.ClusterID)
 			}
 		}
 
-		c.cvoStatus = newCvoStatus
-		return newCvoStatus.isAvailable
+		return false
 	}
 
 	err := utils.WaitForPredicate(WaitTimeout, GeneralProgressUpdateInt, isClusterVersionAvailable)
@@ -693,32 +735,6 @@ func (c controller) waitingForClusterVersion() error {
 		return errors.Errorf("Timeout while waiting for cluster version to be available")
 	}
 	return nil
-}
-
-func (c controller) validateClusterVersion() (OperatorStatus, []configv1.ClusterOperatorStatusCondition) {
-	c.log.Infof("Waiting for cluster version to be available")
-	cv, err := c.kc.GetClusterVersion("version")
-	if err != nil {
-		c.log.WithError(err).Warnf("Failed to get cluster version")
-		return OperatorStatus{isAvailable: false, message: ""}, []configv1.ClusterOperatorStatusCondition{}
-	}
-	conditionsByType := map[configv1.ClusterStatusConditionType]configv1.ClusterOperatorStatusCondition{}
-	// condition type to dict
-	for _, condition := range cv.Status.Conditions {
-		conditionsByType[condition.Type] = condition
-	}
-	// check if it cluster version is available
-	condition, ok := conditionsByType[configv1.OperatorAvailable]
-	if ok && condition.Status == configv1.ConditionTrue {
-		return OperatorStatus{isAvailable: true, message: condition.Message}, cv.Status.Conditions
-	}
-	// if not available return message from progressing
-	condition, ok = conditionsByType[configv1.OperatorProgressing]
-	if ok {
-		return OperatorStatus{isAvailable: false, message: condition.Message}, cv.Status.Conditions
-	}
-
-	return OperatorStatus{isAvailable: false, message: ""}, cv.Status.Conditions
 }
 
 func (c controller) sendCompleteInstallation(isSuccess bool, errorInfo string) {

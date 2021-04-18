@@ -47,6 +47,7 @@ type InventoryClient interface {
 	GetEnabledHostsNamesHosts(ctx context.Context, log logrus.FieldLogger) (map[string]HostData, error)
 	UploadIngressCa(ctx context.Context, ingressCA string, clusterId string) error
 	GetCluster(ctx context.Context) (*models.Cluster, error)
+	GetClusterMonitoredOperator(ctx context.Context, clusterId, operatorName string) (*models.MonitoredOperator, error)
 	GetClusterMonitoredOLMOperators(ctx context.Context, clusterId string) ([]models.MonitoredOperator, error)
 	CompleteInstallation(ctx context.Context, clusterId string, isSuccess bool, errorInfo string) error
 	GetHosts(ctx context.Context, log logrus.FieldLogger, skippedStatuses []string) (map[string]HostData, error)
@@ -218,12 +219,24 @@ func (c *inventoryClient) UploadIngressCa(ctx context.Context, ingressCA string,
 }
 
 func (c *inventoryClient) GetCluster(ctx context.Context) (*models.Cluster, error) {
-	cluster, err := c.ai.Installer.GetCluster(ctx, &installer.GetClusterParams{ClusterID: strfmt.UUID(c.clusterId)})
+	cluster, err := c.ai.Installer.GetCluster(ctx, &installer.GetClusterParams{ClusterID: c.clusterId})
 	if err != nil {
 		return nil, aserror.GetAssistedError(err)
 	}
 
 	return cluster.Payload, nil
+}
+
+func (c *inventoryClient) GetClusterMonitoredOperator(ctx context.Context, clusterId, operatorName string) (*models.MonitoredOperator, error) {
+	monitoredOperators, err := c.ai.Operators.ListOfClusterOperators(ctx, &operators.ListOfClusterOperatorsParams{
+		ClusterID:    strfmt.UUID(clusterId),
+		OperatorName: &operatorName,
+	})
+	if err != nil {
+		return nil, aserror.GetAssistedError(err)
+	}
+
+	return monitoredOperators.Payload[0], nil
 }
 
 func (c *inventoryClient) GetClusterMonitoredOLMOperators(ctx context.Context, clusterId string) ([]models.MonitoredOperator, error) {
@@ -360,7 +373,7 @@ func (c *inventoryClient) UpdateClusterInstallProgress(ctx context.Context, clus
 
 func (c *inventoryClient) UpdateClusterOperator(ctx context.Context, clusterId string, operatorName string, operatorStatus models.OperatorStatus, operatorStatusInfo string) error {
 	_, err := c.ai.Operators.ReportMonitoredOperatorStatus(ctx, &operators.ReportMonitoredOperatorStatusParams{
-		ClusterID: strfmt.UUID(c.clusterId),
+		ClusterID: c.clusterId,
 		ReportParams: &models.OperatorMonitorReport{
 			Name:       operatorName,
 			Status:     operatorStatus,
