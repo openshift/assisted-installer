@@ -54,7 +54,6 @@ type InventoryClient interface {
 	UploadLogs(ctx context.Context, clusterId string, logsType models.LogsType, upfile io.Reader) error
 	ClusterLogProgressReport(ctx context.Context, clusterId string, progress models.LogsState)
 	HostLogProgressReport(ctx context.Context, clusterId string, hostId string, progress models.LogsState)
-	UpdateClusterInstallProgress(ctx context.Context, clusterId string, progress string) error
 	UpdateClusterOperator(ctx context.Context, clusterId string, operatorName string, operatorStatus models.OperatorStatus, operatorStatusInfo string) error
 }
 
@@ -361,14 +360,6 @@ func (c *inventoryClient) HostLogProgressReport(ctx context.Context, clusterId s
 	if err != nil {
 		c.logger.WithError(err).Errorf("failed to report log progress %s on host %s", progress, hostId)
 	}
-}
-
-func (c *inventoryClient) UpdateClusterInstallProgress(ctx context.Context, clusterId string, progress string) error {
-	_, err := c.ai.Installer.UpdateClusterInstallProgress(ctx, &installer.UpdateClusterInstallProgressParams{
-		ClusterID:       strfmt.UUID(clusterId),
-		ClusterProgress: progress,
-	})
-	return aserror.GetAssistedError(err)
 }
 
 func (c *inventoryClient) UpdateClusterOperator(ctx context.Context, clusterId string, operatorName string, operatorStatus models.OperatorStatus, operatorStatusInfo string) error {
