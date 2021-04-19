@@ -71,7 +71,7 @@ func (i *installer) InstallNode() error {
 	i.log.Infof("Installing node with role: %s", i.Config.Role)
 
 	i.UpdateHostInstallProgress(models.HostStageStartingInstallation, i.Config.Role)
-
+	i.Config.Device = i.ops.EvaluateDiskSymlink(i.Config.Device)
 	i.log.Infof("Start cleaning up device %s", i.Device)
 	err := i.cleanupInstallDevice()
 	if err != nil {

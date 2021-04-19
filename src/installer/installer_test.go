@@ -55,6 +55,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	events = v1.EventList{TypeMeta: metav1.TypeMeta{},
 		ListMeta: metav1.ListMeta{}, Items: []v1.Event{{TypeMeta: metav1.TypeMeta{}, ObjectMeta: metav1.ObjectMeta{UID: "7916fa89-ea7a-443e-a862-b3e930309f65", Name: common.AssistedControllerIsReadyEvent}, Message: "aaaa"}}}
 	l.SetOutput(ioutil.Discard)
+	evaluateDiskSymlinkSuccess := func() {
+		mockops.EXPECT().EvaluateDiskSymlink(device).Return(device).Times(1)
+	}
+
 	mkdirSuccess := func(filepath string) {
 		mockops.EXPECT().Mkdir(filepath).Return(nil).Times(1)
 	}
@@ -152,6 +156,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		}
 		BeforeEach(func() {
 			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition)
+			evaluateDiskSymlinkSuccess()
 		})
 		mcoImage := conf.MCOImage
 		extractIgnitionToFS := func(out string, err error) {
@@ -400,6 +405,21 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
+	})
+	Context("Bootstrap role waiting for controller", func() {
+
+		conf := config.Config{Role: string(models.HostRoleBootstrap),
+			ClusterID:        "cluster-id",
+			HostID:           "host-id",
+			Device:           "/dev/vda",
+			URL:              "https://assisted-service.com:80",
+			OpenshiftVersion: openShiftVersion,
+			MCOImage:         "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:dc1a34f55c712b2b9c5e5a14dd85e67cbdae11fd147046ac2fef9eaf179ab221",
+		}
+		BeforeEach(func() {
+			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition)
+		})
+
 		It("waitForController reload resolv.conf failed", func() {
 			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostId, models.HostStageWaitingForControlPlane, "waiting for controller pod").Return(nil).Times(1)
 			mockops.EXPECT().ReloadHostFile("/etc/resolv.conf").Return(fmt.Errorf("dummy")).Times(1)
@@ -483,6 +503,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		}
 		BeforeEach(func() {
 			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition)
+			evaluateDiskSymlinkSuccess()
+
 		})
 		It("master role happy flow", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
@@ -587,6 +609,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		}
 		BeforeEach(func() {
 			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition)
+			evaluateDiskSymlinkSuccess()
 		})
 		It("worker role happy flow", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
@@ -620,6 +643,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		}
 		BeforeEach(func() {
 			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition)
+			evaluateDiskSymlinkSuccess()
 		})
 		mcoImage := conf.MCOImage
 		extractIgnitionToFS := func(out string, err error) {
