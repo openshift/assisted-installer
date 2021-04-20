@@ -350,3 +350,17 @@ func (mr *MockOpsMockRecorder) GetHostname() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHostname", reflect.TypeOf((*MockOps)(nil).GetHostname))
 }
+
+// EvaluateDiskSymlink mocks base method
+func (m *MockOps) EvaluateDiskSymlink(arg0 string) string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EvaluateDiskSymlink", arg0)
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// EvaluateDiskSymlink indicates an expected call of EvaluateDiskSymlink
+func (mr *MockOpsMockRecorder) EvaluateDiskSymlink(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EvaluateDiskSymlink", reflect.TypeOf((*MockOps)(nil).EvaluateDiskSymlink), arg0)
+}
