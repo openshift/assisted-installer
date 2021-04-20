@@ -39,7 +39,7 @@ const (
 )
 
 var generalWaitTimeout = 30 * time.Second
-var waitForControllerPodInterval = 5 * time.Second
+var generalWaitInterval = 5 * time.Second
 
 // Installer will run the install operations on the node
 type Installer interface {
@@ -467,7 +467,7 @@ func (i *installer) waitForBootkube(ctx context.Context) {
 		case <-ctx.Done():
 			i.log.Info("Context cancelled, terminating wait for bootkube\n")
 			return
-		case <-time.After(time.Second * time.Duration(5)):
+		case <-time.After(generalWaitInterval):
 			// check if bootkube is done every 5 seconds
 			if _, err := i.ops.ExecPrivilegeCommand(nil, "stat", "/opt/openshift/.bootkube.done"); err == nil {
 				// in case bootkube is done log the status and return
@@ -497,7 +497,7 @@ func (i *installer) waitForController() error {
 
 	events := map[string]string{}
 	tickerUploadLogs := time.NewTicker(5 * time.Minute)
-	tickerWaitForController := time.NewTicker(waitForControllerPodInterval)
+	tickerWaitForController := time.NewTicker(generalWaitInterval)
 	for {
 		select {
 		case <-tickerWaitForController.C:
@@ -584,7 +584,7 @@ func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, 
 		case <-ctx.Done():
 			i.log.Info("Context cancelled, terminating wait for master nodes\n")
 			return
-		case <-time.After(time.Second * time.Duration(5)):
+		case <-time.After(generalWaitInterval):
 			// check if we have sufficient master nodes is done every 5 seconds
 			if sufficientMasterNodes() {
 				return
