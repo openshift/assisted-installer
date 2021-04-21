@@ -34,7 +34,7 @@ import (
 
 func TestValidator(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "installer_test")
+	RunSpecs(t, "controller_test")
 }
 
 var (
@@ -106,8 +106,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		kubeNamesIds = map[string]string{"node0": "6d6f00e8-70dd-48a5-859a-0f1459485ad9",
 			"node1": "2834ff2e-8965-48a5-859a-0f1459485a77",
 			"node2": "57df89ee-3546-48a5-859a-0f1459485a66"}
-		GeneralWaitInterval = 100 * time.Millisecond
-		GeneralProgressUpdateInt = 100 * time.Millisecond
+		GeneralWaitInterval = 10 * time.Millisecond
+		GeneralProgressUpdateInt = 10 * time.Millisecond
 
 		defaultStages = []models.HostStage{models.HostStageDone,
 			models.HostStageDone,
@@ -346,7 +346,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	Context("validating ApproveCsrs", func() {
 		BeforeEach(func() {
-			GeneralWaitInterval = 1 * time.Second
+			GeneralWaitInterval = 10 * time.Millisecond
 		})
 		It("Run ApproveCsrs and validate it exists on channel set", func() {
 			testList := certificatesv1.CertificateSigningRequestList{}
@@ -354,7 +354,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ctx, cancel := context.WithCancel(context.Background())
 			wg.Add(1)
 			go assistedController.ApproveCsrs(ctx, &wg)
-			time.Sleep(3 * time.Second)
+			time.Sleep(30 * time.Millisecond)
 			cancel()
 			wg.Wait()
 		})
@@ -363,7 +363,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ctx, cancel := context.WithCancel(context.Background())
 			wg.Add(1)
 			go assistedController.ApproveCsrs(ctx, &wg)
-			time.Sleep(3 * time.Second)
+			time.Sleep(30 * time.Millisecond)
 			cancel()
 			wg.Wait()
 		})
@@ -390,7 +390,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ctx, cancel := context.WithCancel(context.Background())
 			wg.Add(1)
 			go assistedController.ApproveCsrs(ctx, &wg)
-			time.Sleep(2 * time.Second)
+			time.Sleep(20 * time.Millisecond)
 			cancel()
 		})
 	})
@@ -398,7 +398,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	Context("validating AddRouterCAToClusterCA", func() {
 		BeforeEach(func() {
 			assistedController.WaitForClusterVersion = true
-			GeneralWaitInterval = 1 * time.Second
+			GeneralWaitInterval = 1 * time.Millisecond
 		})
 		It("happy flow", func() {
 			uploadIngressCert(assistedController.ClusterID)
@@ -423,7 +423,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		Context("waiting for cluster version", func() {
 			BeforeEach(func() {
 				assistedController.WaitForClusterVersion = true
-				GeneralWaitInterval = 1 * time.Second
+				GeneralWaitInterval = 1 * time.Millisecond
 			})
 
 			It("success", func() {
@@ -499,8 +499,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				Expect(status.HasError()).Should(Equal(false))
 			})
 			It("failure", func() {
-				WaitTimeout = 2 * time.Second
-				GeneralProgressUpdateInt = 3 * time.Second
+				WaitTimeout = 20 * time.Millisecond
+				GeneralProgressUpdateInt = 30 * time.Millisecond
 				setClusterAsFinalizing()
 
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", false, "Timeout while waiting for cluster "+
@@ -516,7 +516,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		Context("not waiting for cluster version", func() {
 			BeforeEach(func() {
 				assistedController.WaitForClusterVersion = false
-				GeneralWaitInterval = 1 * time.Second
+				GeneralWaitInterval = 10 * time.Millisecond
 			})
 			It("success", func() {
 				installing := models.ClusterStatusInstalling
@@ -535,7 +535,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				Expect(status.HasError()).Should(Equal(false))
 			})
 			It("failure", func() {
-				WaitTimeout = 2 * time.Second
+				WaitTimeout = 20 * time.Millisecond
 				setClusterAsFinalizing()
 				mockk8sclient.EXPECT().GetConfigMap(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("aaa")).MinTimes(1)
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", false,
@@ -551,7 +551,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		Context("waiting for OLM", func() {
 			BeforeEach(func() {
 				assistedController.WaitForClusterVersion = false
-				GeneralWaitInterval = 1 * time.Second
+				GeneralWaitInterval = 10 * time.Millisecond
 			})
 
 			It("waiting for single OLM operator", func() {

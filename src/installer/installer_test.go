@@ -49,8 +49,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		kubeNamesIds       map[string]string
 		events             v1.EventList
 	)
-	generalWaitTimeout = 100 * time.Minute
-	waitForControllerPodInterval = 100 * time.Millisecond
+	generalWaitTimeout = 100 * time.Millisecond
+	generalWaitInterval = 5 * time.Millisecond
 	device := "/dev/vda"
 	events = v1.EventList{TypeMeta: metav1.TypeMeta{},
 		ListMeta: metav1.ListMeta{}, Items: []v1.Event{{TypeMeta: metav1.TypeMeta{}, ObjectMeta: metav1.ObjectMeta{UID: "7916fa89-ea7a-443e-a862-b3e930309f65", Name: common.AssistedControllerIsReadyEvent}, Message: "aaaa"}}}
@@ -438,7 +438,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 		It("Configuring state", func() {
 			var logs string
-			generalWaitTimeout = 100 * time.Millisecond
 			logsInBytes, _ := ioutil.ReadFile("../../test_files/mcs_logs.txt")
 			logs = string(logsInBytes)
 			node0Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f238")
@@ -467,7 +466,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 		It("Configuring state, all hosts were set", func() {
 			var logs string
-			generalWaitTimeout = 100 * time.Millisecond
 			logsInBytes, _ := ioutil.ReadFile("../../test_files/mcs_logs.txt")
 			logs = string(logsInBytes)
 			node1Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f239")

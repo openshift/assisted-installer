@@ -27,7 +27,7 @@ generate:
 	$(MAKE) format
 
 unit-test: $(REPORTS)
-	gotestsum --format=pkgname $(TEST_PUBLISH_FLAGS) -- -cover -coverprofile=$(REPORTS)/coverage.out $(or ${TEST},${TEST},$(shell go list ./...)) -ginkgo.focus=${FOCUS} -ginkgo.v
+	gotestsum --format=pkgname $(TEST_PUBLISH_FLAGS) -- -cover -coverprofile=$(REPORTS)/coverage.out $(or ${TEST},$(shell go list ./...)) -ginkgo.focus=${FOCUS} -ginkgo.v
 	gocov convert $(REPORTS)/coverage.out | gocov-xml > $(REPORTS)/coverage.xml
 
 build: installer controller controller-ocp
