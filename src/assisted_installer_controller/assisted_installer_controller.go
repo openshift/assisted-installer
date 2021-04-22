@@ -258,14 +258,11 @@ func (c controller) PostInstallConfigs(wg *sync.WaitGroup, status *ControllerSta
 		break
 	}
 
-	errMessage := ""
 	err := c.postInstallConfigs()
 	if err != nil {
-		errMessage = err.Error()
 		status.Error()
+		c.log.WithError(err).Error("Failed to finish post install configurations")
 	}
-	success := err == nil
-	c.sendCompleteInstallation(success, errMessage)
 }
 
 func (c controller) postInstallConfigs() error {
@@ -729,19 +726,6 @@ func (c controller) waitingForClusterVersion() error {
 		return errors.Errorf("Timeout while waiting for cluster version to be available")
 	}
 	return nil
-}
-
-func (c controller) sendCompleteInstallation(isSuccess bool, errorInfo string) {
-	c.log.Infof("Start complete installation step, with params success:%t, error info %s", isSuccess, errorInfo)
-	for {
-		ctx := utils.GenerateRequestContext()
-		if err := c.ic.CompleteInstallation(ctx, c.ClusterID, isSuccess, errorInfo); err != nil {
-			utils.RequestIDLogger(ctx, c.log).Error(err)
-			continue
-		}
-		break
-	}
-	c.log.Infof("Done complete installation step")
 }
 
 // logClusterOperatorsStatus logging cluster operators status

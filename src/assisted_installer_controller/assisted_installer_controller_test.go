@@ -489,9 +489,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 				// Completion
 				mockbmclient.EXPECT().GetClusterMonitoredOLMOperators(gomock.Any(), gomock.Any()).Return([]models.MonitoredOperator{}, nil).Times(2)
-				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(fmt.Errorf("dummy")).Times(1)
-				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
-
 				wg.Add(1)
 				go assistedController.PostInstallConfigs(&wg, status)
 				wg.Wait()
@@ -502,9 +499,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				WaitTimeout = 20 * time.Millisecond
 				GeneralProgressUpdateInt = 30 * time.Millisecond
 				setClusterAsFinalizing()
-
-				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", false, "Timeout while waiting for cluster "+
-					"version to be available").Return(nil).Times(1)
 
 				wg.Add(1)
 				go assistedController.PostInstallConfigs(&wg, status)
@@ -526,8 +520,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				uploadIngressCert(assistedController.ClusterID)
 				setConsoleAsAvailable("cluster-id")
 				mockbmclient.EXPECT().GetClusterMonitoredOLMOperators(gomock.Any(), gomock.Any()).Return([]models.MonitoredOperator{}, nil).AnyTimes()
-				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(fmt.Errorf("dummy")).Times(1)
-				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
 
 				wg.Add(1)
 				assistedController.PostInstallConfigs(&wg, status)
@@ -538,8 +530,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				WaitTimeout = 20 * time.Millisecond
 				setClusterAsFinalizing()
 				mockk8sclient.EXPECT().GetConfigMap(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("aaa")).MinTimes(1)
-				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", false,
-					"Timeout while waiting router ca data").Return(nil).Times(1)
 
 				wg.Add(1)
 				go assistedController.PostInstallConfigs(&wg, status)
@@ -569,8 +559,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-local-storage", "local-storage-operator").Return("lso-1.1", nil).Times(1)
 				mockk8sclient.EXPECT().GetCSV("openshift-local-storage", "lso-1.1").Return(&olmv1alpha1.ClusterServiceVersion{}, nil).Times(1)
 				mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), "cluster-id", "lso", gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(fmt.Errorf("dummy")).Times(1)
-				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
 
 				wg.Add(1)
 				assistedController.PostInstallConfigs(&wg, status)
@@ -587,7 +575,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockk8sclient.EXPECT().GetCSV("openshift-local-storage", "lso-1.1").Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseInstalling}}, nil).AnyTimes()
 				mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), "cluster-id", "lso", models.OperatorStatusProgressing, gomock.Any()).Return(nil).AnyTimes()
 				mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), "cluster-id", "lso", models.OperatorStatusFailed, "Waiting for operator timed out").Return(nil).Times(1)
-				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
 
 				wg.Add(1)
 				assistedController.PostInstallConfigs(&wg, status)
