@@ -472,7 +472,7 @@ func (i *installer) waitForBootkube(ctx context.Context) {
 			if _, err := i.ops.ExecPrivilegeCommand(nil, "stat", "/opt/openshift/.bootkube.done"); err == nil {
 				// in case bootkube is done log the status and return
 				i.log.Info("bootkube service completed")
-				out, _ := i.ops.ExecPrivilegeCommand(utils.NewLogWriter(i.log), "systemctl", "status", "bootkube.service")
+				out, _ := i.ops.ExecPrivilegeCommand(nil, "systemctl", "status", "bootkube.service")
 				i.log.Info(out)
 				return
 			}
