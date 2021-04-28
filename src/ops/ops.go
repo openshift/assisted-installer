@@ -47,6 +47,7 @@ type Ops interface {
 	CreateRandomHostname(hostname string) error
 	GetHostname() (string, error)
 	EvaluateDiskSymlink(string) string
+	CreateManifests(string, string) error
 }
 
 const (
@@ -565,4 +566,15 @@ func (o *ops) CreateRandomHostname(hostname string) error {
 
 func (o *ops) GetHostname() (string, error) {
 	return os.Hostname()
+}
+
+func (o *ops) CreateManifests(kubeconfig string, manifestFilePath string) error {
+	command := fmt.Sprintf("oc --kubeconfig=%s apply -f %s", kubeconfig, manifestFilePath)
+	output, err := o.ExecCommand(o.logWriter, "bash", "-c", command)
+	if err != nil {
+		return err
+	}
+	o.log.Info(output)
+
+	return nil
 }
