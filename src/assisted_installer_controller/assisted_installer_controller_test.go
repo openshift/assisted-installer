@@ -545,6 +545,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					Return(&models.MonitoredOperator{Status: models.OperatorStatusAvailable, StatusInfo: availableClusterVersionCondition.Status.Conditions[0].Message}, nil).Times(1)
 
 				// Completion
+				mockbmclient.EXPECT().DownloadFile(gomock.Any(), "custom_manifests.yaml", gomock.Any()).Return(nil).Times(1)
+				mockbmclient.EXPECT().DownloadFile(gomock.Any(), "kubeconfig-noingress", gomock.Any()).Return(nil).Times(1)
+				mockops.EXPECT().CreateManifests(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 				mockbmclient.EXPECT().GetClusterMonitoredOLMOperators(gomock.Any(), gomock.Any()).Return([]models.MonitoredOperator{}, nil).Times(2)
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(fmt.Errorf("dummy")).Times(1)
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
@@ -576,6 +579,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			})
 			It("success", func() {
 				installing := models.ClusterStatusInstalling
+				mockbmclient.EXPECT().DownloadFile(gomock.Any(), "custom_manifests.yaml", gomock.Any()).Return(nil).Times(1)
+				mockbmclient.EXPECT().DownloadFile(gomock.Any(), "kubeconfig-noingress", gomock.Any()).Return(nil).Times(1)
+				mockops.EXPECT().CreateManifests(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 				mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(nil, fmt.Errorf("dummy")).Times(1)
 				mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(&models.Cluster{Status: &installing}, nil).Times(1)
 				setClusterAsFinalizing()
@@ -613,6 +619,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			It("waiting for single OLM operator", func() {
 				setControllerWaitForOLMOperators(assistedController.ClusterID)
 
+				mockbmclient.EXPECT().DownloadFile(gomock.Any(), "custom_manifests.yaml", gomock.Any()).Return(nil).Times(1)
+				mockbmclient.EXPECT().DownloadFile(gomock.Any(), "kubeconfig-noingress", gomock.Any()).Return(nil).Times(1)
+				mockops.EXPECT().CreateManifests(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 				mockbmclient.EXPECT().GetClusterMonitoredOLMOperators(gomock.Any(), gomock.Any()).Return(
 					[]models.MonitoredOperator{{SubscriptionName: "local-storage-operator", Namespace: "openshift-local-storage", OperatorType: models.OperatorTypeOlm, Name: "lso", Status: "", TimeoutSeconds: 120 * 60}}, nil,
 				).Times(1)
@@ -636,6 +645,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			It("waiting for single OLM operator which timeouts", func() {
 				setControllerWaitForOLMOperators(assistedController.ClusterID)
 
+				mockbmclient.EXPECT().DownloadFile(gomock.Any(), "custom_manifests.yaml", gomock.Any()).Return(nil).Times(1)
+				mockbmclient.EXPECT().DownloadFile(gomock.Any(), "kubeconfig-noingress", gomock.Any()).Return(nil).Times(1)
+				mockops.EXPECT().CreateManifests(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 				mockbmclient.EXPECT().GetClusterMonitoredOLMOperators(gomock.Any(), gomock.Any()).Return(
 					[]models.MonitoredOperator{{SubscriptionName: "local-storage-operator", Namespace: "openshift-local-storage", OperatorType: models.OperatorTypeOlm, Name: "lso", Status: models.OperatorStatusProgressing, TimeoutSeconds: 1}}, nil,
 				).AnyTimes()

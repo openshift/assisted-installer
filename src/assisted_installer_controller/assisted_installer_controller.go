@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"math"
 	"net"
+	"os"
 	"path"
 	"strings"
 	"sync"
@@ -46,9 +47,11 @@ const (
 	maxDNSServiceIPAttempts   = 45
 	KeepWaiting               = false
 	ExitWaiting               = true
+	customManifestsFile       = "custom_manifests.yaml"
 )
 
 var (
+	retryPostManifestTimeout = 10 * time.Minute
 	GeneralWaitInterval      = generalWaitTimeoutInt * time.Second
 	GeneralProgressUpdateInt = 60 * time.Second
 	LogsUploadPeriod         = 5 * time.Minute
@@ -406,6 +409,13 @@ func (c controller) postInstallConfigs(ctx context.Context) error {
 		return errors.Errorf("Timeout while waiting for console to become available")
 	}
 
+	// Apply post install manifests
+	err = utils.WaitForPredicateWithContext(ctx, retryPostManifestTimeout, GeneralWaitInterval, c.applyPostInstallManifests)
+	if err != nil {
+		c.log.WithError(err).Warnf("Failed to apply post manifests.")
+		return err
+	}
+
 	waitTimeout := c.getMaximumOLMTimeout()
 	err = utils.WaitForPredicateWithContext(ctx, waitTimeout, GeneralWaitInterval, c.waitForOLMOperators)
 	if err != nil {
@@ -414,10 +424,38 @@ func (c controller) postInstallConfigs(ctx context.Context) error {
 		if err = c.updatePendingOLMOperators(); err != nil {
 			return errors.Errorf("Timeout while waiting for some of the operators and not able to update its state")
 		}
-		c.log.Warnf("Timeout while waiting for OLM operators be installed")
+		c.log.WithError(err).Warnf("Timeout while waiting for OLM operators be installed")
+		return err
 	}
 
 	return nil
+}
+
+func (c controller) applyPostInstallManifests() bool {
+	ctx := utils.GenerateRequestContext()
+	tempDir, err := ioutil.TempDir("", "controller-custom-manifests-")
+	if err != nil {
+		return false
+	}
+	defer os.RemoveAll(tempDir)
+
+	customManifestPath := path.Join(tempDir, customManifestsFile)
+	if err := c.ic.DownloadFile(ctx, customManifestsFile, customManifestPath); err != nil {
+		return false
+	}
+
+	kubeconfigName, err := c.downloadKubeconfigNoingress(ctx, tempDir)
+	if err != nil {
+		return false
+	}
+
+	err = c.ops.CreateManifests(kubeconfigName, customManifestPath)
+	if err != nil {
+		c.log.WithError(err).Error("Failed to apply manifest file.")
+		return false
+	}
+
+	return true
 }
 
 func (c controller) UpdateBMHs(ctx context.Context, wg *sync.WaitGroup) {
@@ -935,6 +973,19 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 	return nil
 }
 
+func (c controller) downloadKubeconfigNoingress(ctx context.Context, dir string) (string, error) {
+	// Download kubeconfig file
+	kubeconfigFileName := "kubeconfig-noingress"
+	kubeconfigPath := path.Join(dir, kubeconfigFileName)
+	err := c.ic.DownloadFile(ctx, kubeconfigFileName, kubeconfigPath)
+	if err != nil {
+		c.log.Errorf("Failed to download noingress kubeconfig %v\n", err)
+		return "", err
+	}
+
+	return kubeconfigPath, nil
+}
+
 func (c controller) collectMustGatherLogs(ctx context.Context, mustGatherImg string) (string, error) {
 	tempDir, ferr := ioutil.TempDir("", "controller-must-gather-logs-")
 	if ferr != nil {
@@ -942,12 +993,8 @@ func (c controller) collectMustGatherLogs(ctx context.Context, mustGatherImg str
 		return "", ferr
 	}
 
-	//download kubeconfig file
-	kubeconfigFileName := "kubeconfig-noingress"
-	kubeconfigPath := path.Join(tempDir, kubeconfigFileName)
-	err := c.ic.DownloadFile(ctx, kubeconfigFileName, kubeconfigPath)
+	kubeconfigPath, err := c.downloadKubeconfigNoingress(ctx, tempDir)
 	if err != nil {
-		c.log.Errorf("Failed to download noingress kubeconfig %v\n", err)
 		return "", err
 	}
 
