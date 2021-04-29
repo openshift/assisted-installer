@@ -156,13 +156,18 @@ func FindAndRemoveElementFromStringList(s []string, r string) []string {
 }
 
 func Retry(attempts int, sleep time.Duration, log *logrus.Logger, f func() error) (err error) {
-	for i := 0; i < attempts; i++ {
+	for i := 0; i < attempts-1; i++ {
 		err = f()
 		if err == nil {
 			return
 		}
 		time.Sleep(sleep)
 		log.Warnf("Retrying after error: %s", err)
+	}
+	// Don't wait after the last retry
+	err = f()
+	if err == nil {
+		return
 	}
 	return fmt.Errorf("failed after %d attempts, last error: %s", attempts, err)
 }

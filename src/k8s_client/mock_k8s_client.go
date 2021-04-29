@@ -393,6 +393,21 @@ func (mr *MockK8SClientMockRecorder) GetNetworkType() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNetworkType", reflect.TypeOf((*MockK8SClient)(nil).GetNetworkType))
 }
 
+// GetServiceNetworks mocks base method
+func (m *MockK8SClient) GetServiceNetworks() ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetServiceNetworks")
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetServiceNetworks indicates an expected call of GetServiceNetworks
+func (mr *MockK8SClientMockRecorder) GetServiceNetworks() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServiceNetworks", reflect.TypeOf((*MockK8SClient)(nil).GetServiceNetworks))
+}
+
 // GetControlPlaneReplicas mocks base method
 func (m *MockK8SClient) GetControlPlaneReplicas() (int, error) {
 	m.ctrl.T.Helper()
@@ -406,6 +421,21 @@ func (m *MockK8SClient) GetControlPlaneReplicas() (int, error) {
 func (mr *MockK8SClientMockRecorder) GetControlPlaneReplicas() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetControlPlaneReplicas", reflect.TypeOf((*MockK8SClient)(nil).GetControlPlaneReplicas))
+}
+
+// ListServices mocks base method
+func (m *MockK8SClient) ListServices(namespace string) (*v11.ServiceList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListServices", namespace)
+	ret0, _ := ret[0].(*v11.ServiceList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListServices indicates an expected call of ListServices
+func (mr *MockK8SClientMockRecorder) ListServices(namespace interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListServices", reflect.TypeOf((*MockK8SClient)(nil).ListServices), namespace)
 }
 
 // ListEvents mocks base method
@@ -466,4 +496,32 @@ func (m *MockK8SClient) CreateEvent(namespace, name, message, component string) 
 func (mr *MockK8SClientMockRecorder) CreateEvent(namespace, name, message, component interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEvent", reflect.TypeOf((*MockK8SClient)(nil).CreateEvent), namespace, name, message, component)
+}
+
+// DeleteService mocks base method
+func (m *MockK8SClient) DeleteService(namespace, name string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteService", namespace, name)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteService indicates an expected call of DeleteService
+func (mr *MockK8SClientMockRecorder) DeleteService(namespace, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteService", reflect.TypeOf((*MockK8SClient)(nil).DeleteService), namespace, name)
+}
+
+// DeletePods mocks base method
+func (m *MockK8SClient) DeletePods(namespace string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeletePods", namespace)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeletePods indicates an expected call of DeletePods
+func (mr *MockK8SClientMockRecorder) DeletePods(namespace interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePods", reflect.TypeOf((*MockK8SClient)(nil).DeletePods), namespace)
 }

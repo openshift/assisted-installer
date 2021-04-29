@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -185,6 +186,26 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		setConsoleAsAvailable(clusterID)
 	}
 
+	returnServiceWithDot10Address := func(name, namespace string) *gomock.Call {
+		return mockk8sclient.EXPECT().ListServices("").Return(&v1.ServiceList{
+			Items: []v1.Service{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      name,
+						Namespace: namespace,
+					},
+					Spec: v1.ServiceSpec{
+						ClusterIP: "10.56.20.10",
+					},
+				},
+			},
+		}, nil)
+	}
+
+	returnServiceNetwork := func() {
+		mockk8sclient.EXPECT().GetServiceNetworks().Return([]string{"10.56.20.0/24"}, nil)
+	}
+
 	Context("Waiting for 3 nodes", func() {
 		It("Set ready event", func() {
 			// fail to connect to assisted and then succeed
@@ -208,6 +229,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			getInventoryNodes(1)
 			configuringSuccess()
 			listNodes()
+
 			assistedController.WaitAndUpdateNodesStatus(status)
 			Expect(status.HasError()).Should(Equal(false))
 		})
@@ -261,6 +283,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					Return(inventoryNamesIds, nil).Times(1)
 			}
 			getInventoryNodesInError()
+
 			assistedController.WaitAndUpdateNodesStatus(status)
 			Expect(status.HasError()).Should(Equal(true))
 		})
@@ -282,7 +305,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				"node2": "57df89ee-3546-48a5-859a-0f1459485a66"}
 		})
 		It("WaitAndUpdateNodesStatus one by one", func() {
-			listNodes := func() {
+			listNodesOneByOne := func() {
 				kubeNameIdsToReturn := make(map[string]string)
 				for name, id := range kubeNamesIds {
 					kubeNameIdsToReturn[name] = id
@@ -301,8 +324,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			}
 
 			updateProgressSuccess(defaultStages, inventoryNamesIds)
-			listNodes()
+			listNodesOneByOne()
 			configuringSuccess()
+
 			assistedController.WaitAndUpdateNodesStatus(status)
 			Expect(status.HasError()).Should(Equal(false))
 		})
@@ -324,6 +348,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			updateProgressSuccessFailureTest(defaultStages, inventoryNamesIds)
 			getInventoryNodes(2)
 			configuringSuccess()
+
 			assistedController.WaitAndUpdateNodesStatus(status)
 			Expect(status.HasError()).Should(Equal(false))
 		})
@@ -331,14 +356,15 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	Context("ListNodes fails and then succeeds", func() {
 		It("ListNodes fails and then succeeds", func() {
-			listNodes := func() {
+			listNodesOneFailure := func() {
 				mockk8sclient.EXPECT().ListNodes().Return(nil, fmt.Errorf("dummy")).Times(1)
 				mockk8sclient.EXPECT().ListNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
 			}
 			updateProgressSuccess(defaultStages, inventoryNamesIds)
 			getInventoryNodes(2)
-			listNodes()
+			listNodesOneFailure()
 			configuringSuccess()
+
 			assistedController.WaitAndUpdateNodesStatus(status)
 			Expect(status.HasError()).Should(Equal(false))
 		})
@@ -981,6 +1007,89 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				}
 			})
 		}
+	})
+
+	Context("Hack deleting service that conflicts with DNS IP address", func() {
+
+		const (
+			conflictServiceName      = "conflict"
+			conflictServiceNamespace = "testing"
+		)
+
+		BeforeEach(func() {
+			DNSAddressRetryInterval = 1 * time.Microsecond
+			DeletionRetryInterval = 1 * time.Microsecond
+		})
+
+		hackConflict := func() {
+			wg.Add(1)
+			assistedController.HackDNSAddressConflict(&wg)
+			wg.Wait()
+		}
+
+		It("Exit if getting service network fails", func() {
+			mockk8sclient.EXPECT().GetServiceNetworks().Return(nil, errors.New("get service network failed"))
+			hackConflict()
+		})
+		It("Exit if service network is IPv6", func() {
+			mockk8sclient.EXPECT().GetServiceNetworks().Return([]string{"2002:db8::/64"}, nil)
+			hackConflict()
+		})
+		It("Retry if list services fails", func() {
+			returnServiceNetwork()
+			mockk8sclient.EXPECT().ListServices("").Return(nil, errors.New("list services failed"))
+			returnServiceWithDot10Address(dnsServiceName, dnsServiceNamespace)
+			hackConflict()
+		})
+		It("Kill service and DNS pods if DNS service IP is taken", func() {
+			returnServiceNetwork()
+			returnServiceWithDot10Address(conflictServiceName, conflictServiceNamespace)
+			mockk8sclient.EXPECT().DeleteService(conflictServiceName, conflictServiceNamespace).Return(nil)
+			mockk8sclient.EXPECT().DeletePods(dnsOperatorNamespace).Return(nil)
+			returnServiceWithDot10Address(dnsServiceName, dnsServiceNamespace)
+			hackConflict()
+		})
+		It("Retry service deletion if deleting conflicting service fails", func() {
+			returnServiceNetwork()
+			returnServiceWithDot10Address(conflictServiceName, conflictServiceNamespace)
+			mockk8sclient.EXPECT().DeleteService(conflictServiceName, conflictServiceNamespace).Return(errors.New("service deletion failed")).Times(4)
+			mockk8sclient.EXPECT().DeleteService(conflictServiceName, conflictServiceNamespace).Return(nil)
+			mockk8sclient.EXPECT().DeletePods(dnsOperatorNamespace).Return(nil)
+			returnServiceWithDot10Address(dnsServiceName, dnsServiceNamespace)
+			hackConflict()
+		})
+		It("Retry pod deletion if deleting DNS operator pods fails", func() {
+			returnServiceNetwork()
+			returnServiceWithDot10Address(conflictServiceName, conflictServiceNamespace)
+			mockk8sclient.EXPECT().DeleteService(conflictServiceName, conflictServiceNamespace).Return(nil)
+			mockk8sclient.EXPECT().DeletePods(dnsOperatorNamespace).Return(errors.New("pod deletion failed")).Times(4)
+			mockk8sclient.EXPECT().DeletePods(dnsOperatorNamespace).Return(nil)
+			returnServiceWithDot10Address(dnsServiceName, dnsServiceNamespace)
+			hackConflict()
+		})
+		It("Retry until timed out if listing services keeps failing", func() {
+			returnServiceNetwork()
+			mockk8sclient.EXPECT().ListServices("").Return(nil, errors.New("list services failed")).Times(maxDNSServiceIPAttempts)
+			hackConflict()
+		})
+		It("Retry until timed out if no service with requested IP cannot be found", func() {
+			returnServiceNetwork()
+			mockk8sclient.EXPECT().ListServices("").Return(&v1.ServiceList{Items: []v1.Service{}}, nil).Times(maxDNSServiceIPAttempts)
+			hackConflict()
+		})
+		It("Retry until timed out if deleting conflicting service fails", func() {
+			returnServiceNetwork()
+			returnServiceWithDot10Address(conflictServiceName, conflictServiceNamespace).Times(maxDNSServiceIPAttempts)
+			mockk8sclient.EXPECT().DeleteService(conflictServiceName, conflictServiceNamespace).Return(errors.New("service deletion failed")).Times(maxDeletionAttempts * maxDNSServiceIPAttempts)
+			hackConflict()
+		})
+		It("Retry until timed out if deleting DNS operator pods fails", func() {
+			returnServiceNetwork()
+			returnServiceWithDot10Address(conflictServiceName, conflictServiceNamespace).Times(maxDNSServiceIPAttempts)
+			mockk8sclient.EXPECT().DeleteService(conflictServiceName, conflictServiceNamespace).Return(nil).Times(maxDNSServiceIPAttempts)
+			mockk8sclient.EXPECT().DeletePods(dnsOperatorNamespace).Return(errors.New("pod deletion failed")).Times(maxDeletionAttempts * maxDNSServiceIPAttempts)
+			hackConflict()
+		})
 	})
 })
 

@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math"
+	"net"
 	"path"
 	"strings"
 	"sync"
@@ -38,6 +39,11 @@ const (
 	cvoOperatorName           = "cvo"
 	ingressConfigMapName      = "default-ingress-cert"
 	ingressConfigMapNamespace = "openshift-config-managed"
+	dnsServiceName            = "dns-default"
+	dnsServiceNamespace       = "openshift-dns"
+	dnsOperatorNamespace      = "openshift-dns-operator"
+	maxDeletionAttempts       = 5
+	maxDNSServiceIPAttempts   = 45
 )
 
 var (
@@ -45,6 +51,8 @@ var (
 	GeneralProgressUpdateInt = 60 * time.Second
 	LogsUploadPeriod         = 5 * time.Minute
 	WaitTimeout              = 70 * time.Minute
+	DNSAddressRetryInterval  = 20 * time.Second
+	DeletionRetryInterval    = 10 * time.Second
 )
 
 // assisted installer controller is added to control installation process after  bootstrap pivot
@@ -109,6 +117,7 @@ func logHostsStatus(log logrus.FieldLogger, hosts map[string]inventory_client.Ho
 }
 
 func (c *controller) WaitAndUpdateNodesStatus(status *ControllerStatus) {
+
 	c.log.Infof("Waiting till all nodes will join and update status to assisted installer")
 	ignoreStatuses := []string{models.HostStatusDisabled}
 	var hostsInError int
@@ -173,6 +182,74 @@ func (c *controller) WaitAndUpdateNodesStatus(status *ControllerStatus) {
 		c.updateConfiguringStatusIfNeeded(assistedNodesMap)
 	}
 	c.log.Infof("Done waiting for all the nodes. Nodes in error status: %d\n", hostsInError)
+}
+
+func (c *controller) HackDNSAddressConflict(wg *sync.WaitGroup) {
+
+	c.log.Infof("Making sure service %s can reserve the .10 address", dnsServiceName)
+
+	defer wg.Done()
+	networks, err := c.kc.GetServiceNetworks()
+	if err != nil || len(networks) == 0 {
+		c.log.Errorf("Failed to get service networks: %s", err)
+		return
+	}
+
+	ip, _, _ := net.ParseCIDR(networks[0])
+	ip4 := ip.To4()
+	if ip4 == nil {
+		c.log.Infof("Service network is IPv6: %s, skipping the .10 address hack", ip)
+		return
+	}
+	ip4[3] = 10 // .10 is the conflicting address
+
+	for i := 0; i < maxDNSServiceIPAttempts; i++ {
+		svs, err := c.kc.ListServices("")
+		if err != nil {
+			c.log.WithError(err).Warnf("Failed to list running services, attempt %d/%d", i+1, maxDNSServiceIPAttempts)
+			time.Sleep(DNSAddressRetryInterval)
+			continue
+		}
+		s := c.findServiceByIP(ip4.String(), &svs.Items)
+		if s == nil {
+			c.log.Infof("No service found with IP %s, attempt %d/%d", ip4, i+1, maxDNSServiceIPAttempts)
+			time.Sleep(DNSAddressRetryInterval)
+			continue
+		}
+		if s.Name == dnsServiceName && s.Namespace == dnsServiceNamespace {
+			c.log.Infof("Service %s has successfully taken IP %s", dnsServiceName, ip4)
+			break
+		}
+		c.log.Warnf("Deleting service %s in namespace %s whose IP %s conflicts with %s", s.Name, s.Namespace, ip4, dnsServiceName)
+		if err := c.killConflictingService(s); err != nil {
+			c.log.WithError(err).Warnf("Failed to delete service %s in namespace %s", s.Name, s.Namespace)
+			continue
+		}
+		if err := c.deleteDNSOperatorPods(); err != nil {
+			c.log.WithError(err).Warn("Failed to delete DNS operator pods")
+		}
+	}
+}
+
+func (c *controller) findServiceByIP(ip string, services *[]v1.Service) *v1.Service {
+	for _, s := range *services {
+		if s.Spec.ClusterIP == ip {
+			return &s
+		}
+	}
+	return nil
+}
+
+func (c *controller) killConflictingService(s *v1.Service) error {
+	return utils.Retry(maxDeletionAttempts, DeletionRetryInterval, c.log, func() error {
+		return c.kc.DeleteService(s.Name, s.Namespace)
+	})
+}
+
+func (c *controller) deleteDNSOperatorPods() error {
+	return utils.Retry(maxDeletionAttempts, DeletionRetryInterval, c.log, func() error {
+		return c.kc.DeletePods(dnsOperatorNamespace)
+	})
 }
 
 func (c *controller) getMCSLogs() (string, error) {

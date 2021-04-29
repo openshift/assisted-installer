@@ -71,11 +71,15 @@ type K8SClient interface {
 	SetProxyEnvVars() error
 	GetClusterVersion(name string) (*configv1.ClusterVersion, error)
 	GetNetworkType() (string, error)
+	GetServiceNetworks() ([]string, error)
 	GetControlPlaneReplicas() (int, error)
+	ListServices(namespace string) (*v1.ServiceList, error)
 	ListEvents(namespace string) (*v1.EventList, error)
 	ListClusterOperators() (*configv1.ClusterOperatorList, error)
 	GetClusterOperator(name string) (*configv1.ClusterOperator, error)
 	CreateEvent(namespace, name, message, component string) (*v1.Event, error)
+	DeleteService(namespace, name string) error
+	DeletePods(namespace string) error
 }
 
 type K8SClientBuilder func(configPath string, logger *logrus.Logger) (K8SClient, error)
@@ -162,6 +166,22 @@ func (c *k8sClient) ListNodes() (*v1.NodeList, error) {
 	return nodes, nil
 }
 
+func (c *k8sClient) ListServices(namespace string) (*v1.ServiceList, error) {
+	services, err := c.client.CoreV1().Services(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return &v1.ServiceList{}, err
+	}
+	return services, nil
+}
+
+func (c *k8sClient) DeleteService(name, namespace string) error {
+	return c.client.CoreV1().Services(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+}
+
+func (c *k8sClient) DeletePods(namespace string) error {
+	return c.client.CoreV1().Pods(namespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+}
+
 func (c *k8sClient) ListMachines() (*machinev1beta1.MachineList, error) {
 	machines := machinev1beta1.MachineList{}
 	opts := &runtimeclient.ListOptions{
@@ -225,6 +245,23 @@ func (c *k8sClient) GetNetworkType() (string, error) {
 		return "", errors.Wrapf(err, "Failed to unmarshal %s", installConfig)
 	}
 	return networkingDecoder.Networking.NetworkType, nil
+}
+
+func (c *k8sClient) GetServiceNetworks() ([]string, error) {
+	installConfig, err := c.getInstallConfig()
+	if err != nil {
+		return nil, err
+	}
+	var networkingDecoder struct {
+		Networking struct {
+			ServiceNetwork []string `yaml:"serviceNetwork"`
+		} `yaml:"networking"`
+	}
+	err = yaml.Unmarshal([]byte(installConfig), &networkingDecoder)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to unmarshal %s", installConfig)
+	}
+	return networkingDecoder.Networking.ServiceNetwork, nil
 }
 
 func (c *k8sClient) GetControlPlaneReplicas() (int, error) {
