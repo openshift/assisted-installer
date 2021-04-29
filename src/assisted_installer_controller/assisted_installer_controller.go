@@ -733,13 +733,19 @@ func (c controller) waitingForClusterVersion() error {
 
 func (c controller) sendCompleteInstallation(isSuccess bool, errorInfo string) {
 	c.log.Infof("Start complete installation step, with params success:%t, error info %s", isSuccess, errorInfo)
-	for {
-		ctx := utils.GenerateRequestContext()
-		if err := c.ic.CompleteInstallation(ctx, c.ClusterID, isSuccess, errorInfo); err != nil {
+	ctx := utils.GenerateRequestContext()
+	err := utils.WaitForPredicate(WaitTimeout, GeneralProgressUpdateInt, func() bool {
+		err := c.ic.CompleteInstallation(ctx, c.ClusterID, isSuccess, errorInfo)
+		if err != nil {
 			utils.RequestIDLogger(ctx, c.log).Error(err)
-			continue
 		}
-		break
+		// there is no need to resend complete installation in case of success
+		// service is dealing with it by itself
+		return err == nil || isSuccess
+	})
+	if err != nil {
+		c.log.Infof("Timeout while waiting to send complete installation")
+		return
 	}
 	c.log.Infof("Done complete installation step")
 }
@@ -869,7 +875,9 @@ func (c *controller) UploadLogs(ctx context.Context, cancellog context.CancelFun
 					if err != nil {
 						c.log.Infof("retry uploading logs in 5 minutes...")
 					}
-					return err == nil
+					// if cluster was successfully installed
+					// there is no need to retry on summary logs
+					return err == nil || !status.HasError()
 				})
 			}
 			c.ic.ClusterLogProgressReport(progress_ctx, c.ClusterID, models.LogsStateCompleted)
