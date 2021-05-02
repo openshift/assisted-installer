@@ -21,6 +21,7 @@ import (
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-installer/src/utils"
+	. "github.com/openshift/assisted-installer/src/utils/waiting"
 	"github.com/openshift/assisted-service/models"
 )
 
@@ -32,7 +33,6 @@ const (
 	dockerConfigFile             = "/root/.docker/config.json"
 	assistedControllerNamespace  = "assisted-installer"
 	extractRetryCount            = 3
-	waitForeverTimeout           = time.Duration(1<<63 - 1) // wait forever ~ 292 years
 	ovnKubernetes                = "OVNKubernetes"
 	numMasterNodes               = 3
 	singleNodeMasterIgnitionPath = "/opt/openshift/master.ign"
@@ -346,13 +346,14 @@ func (i *installer) downloadHostIgnition() (string, error) {
 }
 
 func (i *installer) waitForNetworkType(kc k8s_client.K8SClient) error {
-	return utils.WaitForPredicate(waitForeverTimeout, 5*time.Second, func() bool {
+	err, _, _ := Wait().WithNoTimeout().WithInterval(5 * time.Second).WithPredicate(func() bool {
 		_, err := kc.GetNetworkType()
 		if err != nil {
 			i.log.WithError(err).Error("Failed to get network type")
 		}
 		return err == nil
-	})
+	}).Start()
+	return err
 }
 
 func (i *installer) waitForControlPlane(ctx context.Context, kc k8s_client.K8SClient) error {
