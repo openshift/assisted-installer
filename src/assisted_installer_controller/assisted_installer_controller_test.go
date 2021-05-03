@@ -28,6 +28,7 @@ import (
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/ops"
+	. "github.com/openshift/assisted-installer/src/utils/waiting"
 	"github.com/openshift/assisted-service/models"
 	machinev1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 )
@@ -493,7 +494,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
 
 				wg.Add(1)
-				go assistedController.PostInstallConfigs(&wg, status)
+				go assistedController.PostInstallConfigs(context.TODO(), &wg, status)
 				wg.Wait()
 
 				Expect(status.HasError()).Should(Equal(false))
@@ -503,11 +504,11 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				GeneralProgressUpdateInt = 30 * time.Millisecond
 				setClusterAsFinalizing()
 
-				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", false, "Timeout while waiting for cluster "+
-					"version to be available").Return(nil).Times(1)
+				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", false,
+					"wait for cluster version to be available timed out").Return(nil).Times(1)
 
 				wg.Add(1)
-				go assistedController.PostInstallConfigs(&wg, status)
+				go assistedController.PostInstallConfigs(context.TODO(), &wg, status)
 				wg.Wait()
 				Expect(status.HasError()).Should(Equal(true))
 			})
@@ -519,6 +520,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				GeneralWaitInterval = 10 * time.Millisecond
 			})
 			It("success", func() {
+				WaitTimeout = 60 * time.Millisecond
 				installing := models.ClusterStatusInstalling
 				mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(nil, fmt.Errorf("dummy")).Times(1)
 				mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(&models.Cluster{Status: &installing}, nil).Times(1)
@@ -530,7 +532,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
 
 				wg.Add(1)
-				assistedController.PostInstallConfigs(&wg, status)
+				assistedController.PostInstallConfigs(context.TODO(), &wg, status)
 				wg.Wait()
 				Expect(status.HasError()).Should(Equal(false))
 			})
@@ -539,10 +541,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				setClusterAsFinalizing()
 				mockk8sclient.EXPECT().GetConfigMap(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("aaa")).MinTimes(1)
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", false,
-					"Timeout while waiting router ca data").Return(nil).Times(1)
+					"setting router ca data timed out").Return(nil).Times(1)
 
 				wg.Add(1)
-				go assistedController.PostInstallConfigs(&wg, status)
+				go assistedController.PostInstallConfigs(context.TODO(), &wg, status)
 				wg.Wait()
 				Expect(status.HasError()).Should(Equal(true))
 			})
@@ -573,7 +575,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
 
 				wg.Add(1)
-				assistedController.PostInstallConfigs(&wg, status)
+				assistedController.PostInstallConfigs(context.TODO(), &wg, status)
 				wg.Wait()
 				Expect(status.HasError()).Should(Equal(false))
 			})
@@ -590,7 +592,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
 
 				wg.Add(1)
-				assistedController.PostInstallConfigs(&wg, status)
+				assistedController.PostInstallConfigs(context.TODO(), &wg, status)
 				wg.Wait()
 				Expect(status.HasError()).Should(Equal(false))
 			})
@@ -728,7 +730,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().GetPods(assistedController.Namespace, gomock.Any(), fmt.Sprintf("status.phase=%s", v1.PodRunning)).Return(nil, fmt.Errorf("dummy")).MinTimes(2).MaxTimes(10)
 			ctx, cancel := context.WithCancel(context.Background())
 			wg.Add(1)
-			go assistedController.UploadLogs(ctx, cancel, &wg, status)
+			go assistedController.UploadLogs(ctx, &wg, status)
 			time.Sleep(1 * time.Second)
 			cancel()
 			wg.Wait()
@@ -740,7 +742,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().GetPodLogsAsBuffer(assistedController.Namespace, "test", gomock.Any()).Return(nil, fmt.Errorf("dummy")).MinTimes(1)
 			ctx, cancel := context.WithCancel(context.Background())
 			wg.Add(1)
-			go assistedController.UploadLogs(ctx, cancel, &wg, status)
+			go assistedController.UploadLogs(ctx, &wg, status)
 			time.Sleep(500 * time.Millisecond)
 			cancel()
 			wg.Wait()
@@ -776,14 +778,14 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	})
 
-	Context("Upload logs with oc must-gather", func() {
+	FContext("Upload logs with oc must-gather", func() {
 		var pod v1.Pod
 		var ctx context.Context
 		var cancel context.CancelFunc
 
 		callUploadLogs := func(waitTime time.Duration) {
 			wg.Add(1)
-			go assistedController.UploadLogs(ctx, cancel, &wg, status)
+			go assistedController.UploadLogs(ctx, &wg, status)
 			time.Sleep(waitTime)
 			if !status.HasError() {
 				cancel()
@@ -797,6 +799,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				ObjectMeta: metav1.ObjectMeta{Name: "test"}, Spec: v1.PodSpec{}, Status: v1.PodStatus{Phase: "Pending"}}
 
 			ctx, cancel = context.WithCancel(context.Background())
+			status.AddWatch(cancel)
 			r := bytes.NewBuffer([]byte("test"))
 			mockk8sclient.EXPECT().GetPods(assistedController.Namespace, gomock.Any(), fmt.Sprintf("status.phase=%s", v1.PodRunning)).Return([]v1.Pod{pod}, nil).AnyTimes()
 			mockk8sclient.EXPECT().GetPodLogsAsBuffer(assistedController.Namespace, "test", gomock.Any()).Return(r, nil).AnyTimes()
@@ -807,7 +810,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				}).AnyTimes()
 			reportLogProgressSuccess()
 		})
-		It("Validate upload logs (with must-gather logs)", func() {
+		FIt("Validate upload logs (with must-gather logs)", func() {
 			logClusterOperatorsSuccess()
 			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any(), assistedController.MustGatherImage).Return("../../test_files/tartest.tar.gz", nil).Times(1)
 			mockbmclient.EXPECT().DownloadFile(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
@@ -974,11 +977,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), gomock.Any(), cvoOperatorName, gomock.Any(), gomock.Any()).Times(1)
 				}
 
-				if t.currentCVOStatus.Status == models.OperatorStatusAvailable {
-					Expect(assistedController.waitingForClusterVersion()).ShouldNot(HaveOccurred())
-				} else {
-					Expect(assistedController.waitingForClusterVersion()).Should(HaveOccurred())
-				}
+				isAvailable := t.currentCVOStatus.Status == models.OperatorStatusAvailable
+				Expect(assistedController.isClusterVersionAvailable()).To(Equal(isAvailable))
 			})
 		}
 	})

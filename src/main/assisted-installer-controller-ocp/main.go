@@ -8,6 +8,7 @@ import (
 
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/utils"
+	"github.com/openshift/assisted-installer/src/utils/waiting"
 
 	"github.com/kelseyhightower/envconfig"
 	assistedinstallercontroller "github.com/openshift/assisted-installer/src/assisted_installer_controller"
@@ -72,7 +73,7 @@ func main() {
 func waitAndUpdateNodesStatus(waitAndUpdateNodesStatusFunc func()) {
 	for {
 		waitAndUpdateNodesStatusFunc()
-		time.Sleep(assistedinstallercontroller.GeneralWaitInterval)
+		time.Sleep(waiting.GeneralWaitInterval)
 	}
 }
 

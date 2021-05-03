@@ -27,12 +27,12 @@ import (
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-installer/src/utils"
+	. "github.com/openshift/assisted-installer/src/utils/waiting"
 	"github.com/openshift/assisted-service/models"
 	mapiv1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 )
 
 const (
-	generalWaitTimeoutInt     = 30
 	controllerLogsSecondsAgo  = 120 * 60
 	consoleOperatorName       = "console"
 	cvoOperatorName           = "cvo"
@@ -41,10 +41,8 @@ const (
 )
 
 var (
-	GeneralWaitInterval      = generalWaitTimeoutInt * time.Second
 	GeneralProgressUpdateInt = 60 * time.Second
 	LogsUploadPeriod         = 5 * time.Minute
-	WaitTimeout              = 70 * time.Minute
 )
 
 // assisted installer controller is added to control installation process after  bootstrap pivot
@@ -69,6 +67,8 @@ type Controller interface {
 
 type ControllerStatus struct {
 	errCounter uint32
+	mutex      *sync.Mutex
+	cancels    []context.CancelFunc
 }
 
 type controller struct {
@@ -89,12 +89,32 @@ func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inv
 	}
 }
 
+func NewControllerStatus() *ControllerStatus {
+	return &ControllerStatus{
+		mutex:   &sync.Mutex{},
+		cancels: make([]context.CancelFunc, 0),
+	}
+}
+
 func (status *ControllerStatus) Error() {
 	atomic.AddUint32(&status.errCounter, 1)
+	status.Abort()
 }
 
 func (status *ControllerStatus) HasError() bool {
 	return atomic.LoadUint32(&status.errCounter) > 0
+}
+
+func (status *ControllerStatus) Abort() {
+	for _, cancelFunc := range status.cancels {
+		cancelFunc()
+	}
+}
+
+func (status *ControllerStatus) AddWatch(cancelFunc context.CancelFunc) {
+	status.mutex.Lock()
+	status.cancels = append(status.cancels, cancelFunc)
+	status.mutex.Unlock()
 }
 
 func logHostsStatus(log logrus.FieldLogger, hosts map[string]inventory_client.HostData) {
@@ -184,7 +204,7 @@ func (c *controller) getMCSLogs() (string, error) {
 		return "", nil
 	}
 	for _, pod := range pods {
-		podLogs, err := c.kc.GetPodLogs(namespace, pod.Name, generalWaitTimeoutInt*10)
+		podLogs, err := c.kc.GetPodLogs(namespace, pod.Name, int64(GeneralWaitTimeoutInt)*10)
 		if err != nil {
 			c.log.WithError(err).Warnf("Failed to get logs of pod %s", pod.Name)
 			return "", nil
@@ -241,90 +261,111 @@ func isCsrApproved(csr *certificatesv1.CertificateSigningRequest) bool {
 	return false
 }
 
-func (c controller) PostInstallConfigs(wg *sync.WaitGroup, status *ControllerStatus) {
+func (c controller) PostInstallConfigs(ctx context.Context, wg *sync.WaitGroup, status *ControllerStatus) {
 	defer wg.Done()
-	for {
-		time.Sleep(GeneralWaitInterval)
-		ctx := utils.GenerateRequestContext()
-		cluster, err := c.ic.GetCluster(ctx)
+	_, _, ok := Wait().WithCancel(ctx).WithPredicate(func() bool {
+		reqctx := utils.GenerateRequestContext()
+		cluster, err := c.ic.GetCluster(reqctx)
 		if err != nil {
-			utils.RequestIDLogger(ctx, c.log).WithError(err).Errorf("Failed to get cluster %s from assisted-service", c.ClusterID)
-			continue
+			utils.RequestIDLogger(reqctx, c.log).WithError(err).Errorf("Failed to get cluster %s from assisted-service", c.ClusterID)
+			return false
 		}
-		// waiting till cluster will be installed(3 masters must be installed)
-		if *cluster.Status != models.ClusterStatusFinalizing {
-			continue
-		}
-		break
+		// waiting till 3 masters are installed
+		return *cluster.Status == models.ClusterStatusFinalizing
+	}).Start()
+
+	//if the condition for post install steps is not met within the timeout
+	//or the operation is canceled, return without configuring
+	if !ok {
+		return
 	}
 
-	errMessage := ""
-	err := c.postInstallConfigs()
+	var errMessage string
+	err, canceled := c.postInstallConfigs(ctx)
 	if err != nil {
+		c.log.Warnf("Post install config aborted: %s", errMessage)
 		errMessage = err.Error()
 		status.Error()
 	}
-	success := err == nil
-	c.sendCompleteInstallation(success, errMessage)
+
+	//complete installation should be sent if post installation has not been canceled
+	if canceled == nil {
+		c.sendCompleteInstallation(err == nil, errMessage)
+	} else {
+		c.log.Warnf("Post install config canceled: %s", canceled.Error())
+	}
 }
 
-func (c controller) postInstallConfigs() error {
-	var err error
+func (c controller) postInstallConfigs(ctx context.Context) (error, error) {
+	var err, canceled error
+	var ok bool
 
 	c.log.Infof("Waiting for cluster version operator: %t", c.WaitForClusterVersion)
-
 	if c.WaitForClusterVersion {
-		err = c.waitingForClusterVersion()
-		if err != nil {
-			return err
+		err, canceled, ok = Wait().WithPredicate(c.isClusterVersionAvailable).
+			WithInterval(GeneralProgressUpdateInt).WithCancel(ctx).
+			WithMessage("wait for cluster version to be available").Start()
+		if !ok {
+			return err, canceled
 		}
 	}
 
-	err = utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.addRouterCAToClusterCA)
-	if err != nil {
-		return errors.Errorf("Timeout while waiting router ca data")
+	c.log.Infof("Setting cluster router CA")
+	err, canceled, ok = Wait().WithPredicate(c.addRouterCAToClusterCA).WithCancel(ctx).
+		WithMessage("setting router ca data").Start()
+	if !ok {
+		return err, canceled
 	}
 
 	unpatch, err := utils.EtcdPatchRequired(c.ControllerConfig.OpenshiftVersion)
 	if err != nil {
-		return err
+		return err, nil
 	}
+
 	if unpatch && c.HighAvailabilityMode != models.ClusterHighAvailabilityModeNone {
-		err = utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.unpatchEtcd)
-		if err != nil {
-			return errors.Errorf("Timeout while trying to unpatch etcd")
+		c.log.Infof("Unpatch etcd")
+		err, canceled, ok = Wait().WithPredicate(c.unpatchEtcd).WithCancel(ctx).
+			WithMessage("unpatching etcd").Start()
+		if !ok {
+			return err, canceled
 		}
 	} else {
 		c.log.Infof("Skipping etcd unpatch for cluster version %s", c.ControllerConfig.OpenshiftVersion)
 	}
 
-	err = utils.WaitForPredicate(WaitTimeout, GeneralWaitInterval, c.validateConsoleAvailability)
-	if err != nil {
-		return errors.Errorf("Timeout while waiting for console to become available")
+	c.log.Infof("waiting for console to become available")
+	err, canceled, ok = Wait().WithPredicate(c.validateConsoleAvailability).WithCancel(ctx).WithMessage("waiting for console to become available").Start()
+	if !ok {
+		return err, canceled
 	}
 
-	waitTimeout := c.getMaximumOLMTimeout()
-	err = utils.WaitForPredicate(waitTimeout, GeneralWaitInterval, c.waitForOLMOperators)
+	c.log.Infof("waiting for OLM operators to become available")
+	err, canceled, _ = Wait().WithPredicate(c.waitForOLMOperators).
+		WithTimeout(c.getMaximumOLMTimeout()).
+		WithCancel(ctx).Start()
+	fmt.Printf("===> waiting for OLM Operators finish with %v %v", err, canceled)
 	if err != nil {
+		c.log.Warnf("Updating pending OLM operators to fail state after waiting too long for them to become ready")
 		// In case the timeout occur, we have to update the pending OLM operators to failed state,
 		// so the assisted-service can update the cluster state to completed.
-		if err = c.updatePendingOLMOperators(); err != nil {
-			return errors.Errorf("Timeout while waiting for some of the operators and not able to update its state")
+		if err := c.updatePendingOLMOperators(); err != nil {
+			return err, canceled
 		}
-		c.log.Warnf("Timeout while waiting for OLM operators be installed")
 	}
 
-	return nil
+	//since OLM isn't mandatory for the installation to succeed, we do not return an
+	//error here to allow the controller to send a successful completion indication
+	//to the service
+	return nil, canceled
 }
 
-func (c controller) UpdateBMHs(wg *sync.WaitGroup) {
+func (c controller) UpdateBMHs(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
-	for {
-		time.Sleep(GeneralWaitInterval)
+	_, _, _ = Wait().WithCancel(ctx).WithPredicate(func() bool {
 		bmhs, err := c.kc.ListBMHs()
 		if err != nil {
 			c.log.WithError(err).Errorf("Failed to list BMH hosts")
-			continue
+			return false
 		}
 
 		c.log.Infof("Number of BMHs is %d", len(bmhs.Items))
@@ -332,7 +373,7 @@ func (c controller) UpdateBMHs(wg *sync.WaitGroup) {
 		machines, err := c.unallocatedMachines(bmhs)
 		if err != nil {
 			c.log.WithError(err).Errorf("Failed to find unallocated machines")
-			continue
+			return false
 		}
 
 		c.log.Infof("Number of unallocated Machines is %d", len(machines.Items))
@@ -340,9 +381,10 @@ func (c controller) UpdateBMHs(wg *sync.WaitGroup) {
 		allUpdated := c.updateBMHs(&bmhs, machines)
 		if allUpdated {
 			c.log.Infof("Updated all the BMH CRs, finished successfully")
-			return
+			return true
 		}
-	}
+		return false
+	}).Start()
 }
 
 func (c controller) unallocatedMachines(bmhList metal3v1alpha1.BareMetalHostList) (*mapiv1beta1.MachineList, error) {
@@ -683,56 +725,49 @@ func (c controller) validateConsoleAvailability() bool {
 		c.isOperatorAvailableInService(consoleOperatorName)
 }
 
-// waitingForClusterVersion checks the Cluster Version Operator availability in the
+// isClusterVersionAvailable checks the Cluster Version Operator availability in the
 // new OCP cluster. A success would be announced only when the service acknowledges
 // the CVO availability, in order to avoid unsycned scenarios.
 //
 // This function would be aligned with the console operator reporting workflow
 // as part of the deprecation of the old API in MGMT-5188.
-func (c controller) waitingForClusterVersion() error {
-	isClusterVersionAvailable := func() bool {
-		c.log.Infof("Checking cluster version operator availability status")
-		co, err := c.kc.GetClusterVersion("version")
-		if err != nil {
-			c.log.WithError(err).Warn("Failed to get cluster version operator")
-			return false
-		}
-
-		cvoStatusInService, err := c.ic.GetClusterMonitoredOperator(utils.GenerateRequestContext(), c.ClusterID, cvoOperatorName)
-		if err != nil {
-			c.log.WithError(err).Errorf("Failed to get cluster %s cvo status", c.ClusterID)
-			return false
-		}
-
-		if cvoStatusInService.Status == models.OperatorStatusAvailable {
-			c.log.Infof("Service acknowledged CVO is available for cluster %s", c.ClusterID)
-			return true
-		}
-
-		operatorStatus, operatorMessage := utils.ClusterOperatorConditionsToMonitoredOperatorStatus(co.Status.Conditions)
-
-		if cvoStatusInService.Status != operatorStatus || (cvoStatusInService.StatusInfo != operatorMessage && operatorMessage != "") {
-			status := fmt.Sprintf("Cluster version status: %s message: %s", operatorStatus, operatorMessage)
-			c.log.Infof(status)
-
-			// Update built-in monitored operator cluster version status
-			if err := c.ic.UpdateClusterOperator(utils.GenerateRequestContext(), c.ClusterID, cvoOperatorName, operatorStatus, operatorMessage); err != nil {
-				c.log.WithError(err).Errorf("Failed to update cluster %s cvo status", c.ClusterID)
-			}
-		}
-
+func (c controller) isClusterVersionAvailable() bool {
+	c.log.Infof("Checking cluster version operator availability status")
+	co, err := c.kc.GetClusterVersion("version")
+	if err != nil {
+		c.log.WithError(err).Warn("Failed to get cluster version operator")
 		return false
 	}
 
-	err := utils.WaitForPredicate(WaitTimeout, GeneralProgressUpdateInt, isClusterVersionAvailable)
+	cvoStatusInService, err := c.ic.GetClusterMonitoredOperator(utils.GenerateRequestContext(), c.ClusterID, cvoOperatorName)
 	if err != nil {
-		return errors.Errorf("Timeout while waiting for cluster version to be available")
+		c.log.WithError(err).Errorf("Failed to get cluster %s cvo status", c.ClusterID)
+		return false
 	}
-	return nil
+
+	if cvoStatusInService.Status == models.OperatorStatusAvailable {
+		c.log.Infof("Service acknowledged CVO is available for cluster %s", c.ClusterID)
+		return true
+	}
+
+	operatorStatus, operatorMessage := utils.ClusterOperatorConditionsToMonitoredOperatorStatus(co.Status.Conditions)
+
+	if cvoStatusInService.Status != operatorStatus || (cvoStatusInService.StatusInfo != operatorMessage && operatorMessage != "") {
+		status := fmt.Sprintf("Cluster version status: %s message: %s", operatorStatus, operatorMessage)
+		c.log.Infof(status)
+
+		// Update built-in monitored operator cluster version status
+		if err := c.ic.UpdateClusterOperator(utils.GenerateRequestContext(), c.ClusterID, cvoOperatorName, operatorStatus, operatorMessage); err != nil {
+			c.log.WithError(err).Errorf("Failed to update cluster %s cvo status", c.ClusterID)
+		}
+	}
+
+	return false
 }
 
 func (c controller) sendCompleteInstallation(isSuccess bool, errorInfo string) {
 	c.log.Infof("Start complete installation step, with params success:%t, error info %s", isSuccess, errorInfo)
+	fmt.Printf("===> PostComplete %s\n", errorInfo)
 	for {
 		ctx := utils.GenerateRequestContext()
 		if err := c.ic.CompleteInstallation(ctx, c.ClusterID, isSuccess, errorInfo); err != nil {
@@ -852,7 +887,7 @@ func (c controller) collectMustGatherLogs(ctx context.Context, mustGatherImg str
 // Uploading logs every 5 minutes
 // We will take logs of assisted controller and upload them to assisted-service
 // by creating tar gz of them.
-func (c *controller) UploadLogs(ctx context.Context, cancellog context.CancelFunc, wg *sync.WaitGroup, status *ControllerStatus) {
+func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup, status *ControllerStatus) {
 	defer wg.Done()
 	podName := ""
 	ticker := time.NewTicker(LogsUploadPeriod)
@@ -861,20 +896,22 @@ func (c *controller) UploadLogs(ctx context.Context, cancellog context.CancelFun
 	for {
 		select {
 		case <-ctx.Done():
+			fmt.Println("==> Done...")
 			if podName != "" {
 				c.log.Infof("Upload final controller and cluster logs before exit")
 				c.ic.ClusterLogProgressReport(progress_ctx, c.ClusterID, models.LogsStateRequested)
-				_ = utils.WaitForPredicate(WaitTimeout, LogsUploadPeriod, func() bool {
+				_, _, _ = Wait().WithInterval(LogsUploadPeriod).WithPredicate(func() bool {
 					err := c.uploadSummaryLogs(podName, c.Namespace, controllerLogsSecondsAgo, status.HasError(), c.MustGatherImage)
 					if err != nil {
 						c.log.Infof("retry uploading logs in 5 minutes...")
 					}
 					return err == nil
-				})
+				}).Start()
 			}
 			c.ic.ClusterLogProgressReport(progress_ctx, c.ClusterID, models.LogsStateCompleted)
 			return
 		case <-ticker.C:
+			fmt.Println("ticking...")
 			if podName == "" {
 				pods, err := c.kc.GetPods(c.Namespace, map[string]string{"job-name": "assisted-installer-controller"},
 					fmt.Sprintf("status.phase=%s", v1.PodRunning))
@@ -889,12 +926,6 @@ func (c *controller) UploadLogs(ctx context.Context, cancellog context.CancelFun
 				podName = pods[0].Name
 			}
 
-			if status.HasError() {
-				c.log.Infof("Error detected. Closing logs and aborting...")
-				cancellog()
-				continue
-			}
-
 			//on normal flow, keep updating the controller log output every 5 minutes
 			c.log.Infof("Start uploading controller logs (intermediate snapshot)")
 			err := common.UploadPodLogs(c.kc, c.ic, c.ClusterID, podName, c.Namespace, controllerLogsSecondsAgo, c.log)
@@ -907,8 +938,9 @@ func (c *controller) UploadLogs(ctx context.Context, cancellog context.CancelFun
 }
 
 func (c controller) SetReadyState() {
-	c.log.Infof("Start waiting to be ready")
-	_ = utils.WaitForPredicate(WaitTimeout, 1*time.Second, func() bool {
+	//no cancel here because cancel is detected only within the next routine (WaitAndUpdateNodesStatus)
+	c.log.Infof("Wait for controller to connect to assisted-service and kubeapi")
+	_, _, _ = Wait().WithInterval(1 * time.Second).WithPredicate(func() bool {
 		_, err := c.ic.GetCluster(context.TODO())
 		if err != nil {
 			c.log.WithError(err).Warningf("Failed to connect to assisted service")
@@ -932,7 +964,7 @@ func (c controller) SetReadyState() {
 		}
 
 		return true
-	})
+	}).Start()
 }
 
 // checkOperatorStatusCondition checks if given operator has a condition with an expected status.

@@ -55,36 +55,48 @@ func main() {
 		kc,
 	)
 
+	status := assistedinstallercontroller.NewControllerStatus()
+
 	// While adding new routine don't miss to add wg.add(1)
 	// without adding it will panic
 	var wg sync.WaitGroup
 	var wgLogs sync.WaitGroup
-	var status assistedinstallercontroller.ControllerStatus
 
-	ctxApprove, cancelApprove := context.WithCancel(context.Background())
+	//every context should be added to the watch list before calling
+	//the routines because they may be canceled within those routines
+	//espceially, they should be called before WaitAndUpdateNodesStatus()
+	//that listen to the user's abort command
+
+	ctxApprove, cancelApprove := context.WithTimeout(context.Background(), 10*time.Minute)
+	status.AddWatch(cancelApprove)
+	bmhconfig, bmhcancel := context.WithCancel(context.Background())
+	status.AddWatch(bmhcancel)
+	ctxLogs, cancelLogs := context.WithCancel(context.Background())
+	status.AddWatch(cancelLogs)
+	ctxConfig, cancelConfig := context.WithCancel(context.Background())
+	status.AddWatch(cancelConfig)
+
 	go assistedController.ApproveCsrs(ctxApprove, &wg)
 	wg.Add(1)
-	go assistedController.PostInstallConfigs(&wg, &status)
-	wg.Add(1)
-	go assistedController.UpdateBMHs(&wg)
+
+	go assistedController.UpdateBMHs(bmhconfig, &wg)
 	wg.Add(1)
 
-	ctxLogs, cancelLogs := context.WithCancel(context.Background())
-	go assistedController.UploadLogs(ctxLogs, cancelLogs, &wgLogs, &status)
+	go assistedController.UploadLogs(ctxLogs, &wgLogs, status)
 	wgLogs.Add(1)
 
 	assistedController.SetReadyState()
-	assistedController.WaitAndUpdateNodesStatus(&status)
-	logger.Infof("Sleeping for 10 minutes to give a chance to approve all csrs")
-	time.Sleep(10 * time.Minute)
-	cancelApprove()
+	assistedController.WaitAndUpdateNodesStatus(status)
+
+	go assistedController.PostInstallConfigs(ctxConfig, &wg, status)
+	wg.Add(1)
 
 	logger.Infof("Waiting for all go routines to finish")
 	wg.Wait()
-	if !status.HasError() {
-		//with error the logs are canceled within UploadLogs
-		logger.Infof("closing logs...")
-		cancelLogs()
-	}
+	// if !status.HasError() {
+	// 	//with error the logs are canceled within UploadLogs
+	// 	logger.Infof("closing logs...")
+	// 	cancelLogs()
+	// }
 	wgLogs.Wait()
 }

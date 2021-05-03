@@ -15,7 +15,6 @@ import (
 	"github.com/openshift/assisted-service/pkg/requestid"
 
 	"github.com/openshift/assisted-installer-agent/pkg/journalLogger"
-	"github.com/pkg/errors"
 	"golang.org/x/net/http/httpproxy"
 
 	ignition "github.com/coreos/ignition/v2/config"
@@ -179,24 +178,6 @@ func GetHostIpsFromInventory(inventory *models.Inventory) ([]string, error) {
 		}
 	}
 	return ips, nil
-}
-
-func WaitForPredicate(timeout time.Duration, interval time.Duration, predicate func() bool) error {
-	timeoutAfter := time.After(timeout)
-	ticker := time.NewTicker(interval)
-	// Keep trying until we're time out or get true
-	for {
-		select {
-		// Got a timeout! fail with a timeout error
-		case <-timeoutAfter:
-			return errors.New("timed out")
-		// Got a tick, we should check on checkSomething()
-		case <-ticker.C:
-			if predicate() {
-				return nil
-			}
-		}
-	}
 }
 
 // ProxyFromEnvVars provides an alternative to http.ProxyFromEnvironment since it is being initialized only
