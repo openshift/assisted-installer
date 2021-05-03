@@ -98,7 +98,7 @@ func GetFileContentFromIgnition(ignitionData []byte, fileName string) ([]byte, e
 			return pullSecret.Data, nil
 		}
 	}
-	return nil, fmt.Errorf("path %s found in ignition", fileName)
+	return nil, fmt.Errorf("path %s not found in ignition", fileName)
 }
 
 func FindFiles(root string, mode WalkMode, pattern string) ([]string, error) {
