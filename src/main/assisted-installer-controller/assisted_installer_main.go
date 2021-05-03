@@ -68,6 +68,8 @@ func main() {
 	wg.Add(1)
 	go assistedController.UpdateBMHs(&wg)
 	wg.Add(1)
+	go assistedController.HackDNSAddressConflict(&wg)
+	wg.Add(1)
 
 	ctxLogs, cancelLogs := context.WithCancel(context.Background())
 	go assistedController.UploadLogs(ctxLogs, cancelLogs, &wgLogs, &status)
