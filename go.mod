@@ -7,14 +7,12 @@ require (
 	github.com/PuerkitoBio/rehttp v1.0.0
 	github.com/aybabtme/iocontrol v0.0.0-20150809002002-ad15bcfc95a0 // indirect
 	github.com/benbjohnson/clock v1.0.3 // indirect
-	github.com/coreos/ignition/v2 v2.9.0
-	github.com/docker/docker v17.12.0-ce-rc1.0.20200505174321-1655290016ac+incompatible // indirect
+	github.com/coreos/ignition/v2 v2.10.1
 	github.com/go-openapi/runtime v0.19.28
 	github.com/go-openapi/strfmt v0.20.1
 	github.com/golang/mock v1.5.0
 	github.com/google/uuid v1.2.0
 	github.com/hashicorp/go-version v1.3.0
-	github.com/jpillora/backoff v1.0.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/metal3-io/baremetal-operator v0.0.0
 	github.com/onsi/ginkgo v1.16.1
