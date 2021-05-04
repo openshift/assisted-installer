@@ -114,7 +114,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			models.HostStageDone}
 
 		assistedController = NewController(l, defaultTestControllerConf, mockops, mockbmclient, mockk8sclient)
-		status = &ControllerStatus{}
+		status = NewControllerStatus()
 	})
 	AfterEach(func() {
 		ctrl.Finish()
@@ -728,7 +728,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().GetPods(assistedController.Namespace, gomock.Any(), fmt.Sprintf("status.phase=%s", v1.PodRunning)).Return(nil, fmt.Errorf("dummy")).MinTimes(2).MaxTimes(10)
 			ctx, cancel := context.WithCancel(context.Background())
 			wg.Add(1)
-			go assistedController.UploadLogs(ctx, cancel, &wg, status)
+			go assistedController.UploadLogs(ctx, status)
 			time.Sleep(1 * time.Second)
 			cancel()
 			wg.Wait()
@@ -740,7 +740,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().GetPodLogsAsBuffer(assistedController.Namespace, "test", gomock.Any()).Return(nil, fmt.Errorf("dummy")).MinTimes(1)
 			ctx, cancel := context.WithCancel(context.Background())
 			wg.Add(1)
-			go assistedController.UploadLogs(ctx, cancel, &wg, status)
+			go assistedController.UploadLogs(ctx, status)
 			time.Sleep(500 * time.Millisecond)
 			cancel()
 			wg.Wait()
@@ -783,7 +783,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 		callUploadLogs := func(waitTime time.Duration) {
 			wg.Add(1)
-			go assistedController.UploadLogs(ctx, cancel, &wg, status)
+			go assistedController.UploadLogs(ctx, status)
 			time.Sleep(waitTime)
 			if !status.HasError() {
 				cancel()

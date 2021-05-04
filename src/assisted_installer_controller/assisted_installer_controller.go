@@ -69,6 +69,8 @@ type Controller interface {
 
 type ControllerStatus struct {
 	errCounter uint32
+	mutex      *sync.Mutex
+	cancels    []context.CancelFunc
 }
 
 type controller struct {
@@ -89,8 +91,30 @@ func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inv
 	}
 }
 
+func NewControllerStatus() *ControllerStatus {
+	return &ControllerStatus{
+		mutex:   &sync.Mutex{},
+		cancels: make([]context.CancelFunc, 0),
+	}
+}
+
 func (status *ControllerStatus) Error() {
 	atomic.AddUint32(&status.errCounter, 1)
+	status.Abort()
+}
+
+func (status *ControllerStatus) Abort() {
+	status.mutex.Lock()
+	for _, cancelFunc := range status.cancels {
+		cancelFunc()
+	}
+	status.mutex.Unlock()
+}
+
+func (status *ControllerStatus) AddWatch(cancelFunc context.CancelFunc) {
+	status.mutex.Lock()
+	status.cancels = append(status.cancels, cancelFunc)
+	status.mutex.Unlock()
 }
 
 func (status *ControllerStatus) HasError() bool {
@@ -106,6 +130,27 @@ func logHostsStatus(log logrus.FieldLogger, hosts map[string]inventory_client.Ho
 			hostData.Host.Progress.ProgressInfo}
 	}
 	log.Infof("Hosts status: %v", hostsStatus)
+}
+
+func (c *controller) WaitForCancel(ctx context.Context, status *ControllerStatus) {
+	c.log.Infof("monitor cluster installation status and wait for abort signal")
+	ticker := time.NewTicker(GeneralProgressUpdateInt)
+	reqctx := utils.GenerateRequestContext()
+	for {
+		select {
+		case <-ctx.Done():
+			c.log.Infof("Done waiting for cluster installation status")
+			return
+		case <-ticker.C:
+			if cluster, err := c.ic.GetCluster(reqctx); err != nil {
+				if *cluster.Status == models.ClusterStatusCancelled {
+					c.log.Infof("Cluster installation aborted. Signal the status")
+					status.Abort()
+					return
+				}
+			}
+		}
+	}
 }
 
 func (c *controller) WaitAndUpdateNodesStatus(status *ControllerStatus) {
@@ -852,8 +897,7 @@ func (c controller) collectMustGatherLogs(ctx context.Context, mustGatherImg str
 // Uploading logs every 5 minutes
 // We will take logs of assisted controller and upload them to assisted-service
 // by creating tar gz of them.
-func (c *controller) UploadLogs(ctx context.Context, cancellog context.CancelFunc, wg *sync.WaitGroup, status *ControllerStatus) {
-	defer wg.Done()
+func (c *controller) UploadLogs(ctx context.Context, status *ControllerStatus) {
 	podName := ""
 	ticker := time.NewTicker(LogsUploadPeriod)
 	progress_ctx := utils.GenerateRequestContext()
@@ -887,12 +931,6 @@ func (c *controller) UploadLogs(ctx context.Context, cancellog context.CancelFun
 					continue
 				}
 				podName = pods[0].Name
-			}
-
-			if status.HasError() {
-				c.log.Infof("Error detected. Closing logs and aborting...")
-				cancellog()
-				continue
 			}
 
 			//on normal flow, keep updating the controller log output every 5 minutes

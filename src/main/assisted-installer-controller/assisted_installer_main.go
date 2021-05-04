@@ -58,33 +58,31 @@ func main() {
 	// While adding new routine don't miss to add wg.add(1)
 	// without adding it will panic
 	var wg sync.WaitGroup
-	var wgLogs sync.WaitGroup
-	var status assistedinstallercontroller.ControllerStatus
+	status := assistedinstallercontroller.NewControllerStatus()
 
 	ctxApprove, cancelApprove := context.WithCancel(context.Background())
 	go assistedController.ApproveCsrs(ctxApprove, &wg)
 	wg.Add(1)
-	go assistedController.PostInstallConfigs(&wg, &status)
+	go assistedController.PostInstallConfigs(&wg, status)
 	wg.Add(1)
 	go assistedController.UpdateBMHs(&wg)
 	wg.Add(1)
 
+	ctxInstallationListener, cancelListener := context.WithCancel(context.Background())
+	go assistedController.WaitForCancel(ctxInstallationListener, status)
+
 	ctxLogs, cancelLogs := context.WithCancel(context.Background())
-	go assistedController.UploadLogs(ctxLogs, cancelLogs, &wgLogs, &status)
-	wgLogs.Add(1)
+	status.AddWatch(cancelLogs)
+	go assistedController.UploadLogs(ctxLogs, status)
 
 	assistedController.SetReadyState()
-	assistedController.WaitAndUpdateNodesStatus(&status)
+	assistedController.WaitAndUpdateNodesStatus(status)
 	logger.Infof("Sleeping for 10 minutes to give a chance to approve all csrs")
 	time.Sleep(10 * time.Minute)
 	cancelApprove()
 
 	logger.Infof("Waiting for all go routines to finish")
 	wg.Wait()
-	if !status.HasError() {
-		//with error the logs are canceled within UploadLogs
-		logger.Infof("closing logs...")
-		cancelLogs()
-	}
-	wgLogs.Wait()
+	cancelListener()
+	cancelLogs()
 }
