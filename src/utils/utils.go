@@ -187,11 +187,17 @@ func GetHostIpsFromInventory(inventory *models.Inventory) ([]string, error) {
 }
 
 func WaitForPredicate(timeout time.Duration, interval time.Duration, predicate func() bool) error {
+	return WaitForPredicateWithContext(context.TODO(), timeout, interval, predicate)
+}
+
+func WaitForPredicateWithContext(ctx context.Context, timeout time.Duration, interval time.Duration, predicate func() bool) error {
 	timeoutAfter := time.After(timeout)
 	ticker := time.NewTicker(interval)
 	// Keep trying until we're time out or get true
 	for {
 		select {
+		case <-ctx.Done():
+			return ctx.Err()
 		// Got a timeout! fail with a timeout error
 		case <-timeoutAfter:
 			return errors.New("timed out")

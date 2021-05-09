@@ -58,12 +58,9 @@ func main() {
 	logger.Infof("Controller deployed on OCP cluster")
 
 	var wg sync.WaitGroup
-	var status assistedinstallercontroller.ControllerStatus
 	var waitAndUpdateFunc = func() {
-		assistedController.WaitAndUpdateNodesStatus(&status)
+		assistedController.WaitAndUpdateNodesStatus(context.TODO(), &wg)
 	}
-	go approveCsrs(assistedController.ApproveCsrs, &wg)
-	wg.Add(1)
 	go waitAndUpdateNodesStatus(waitAndUpdateFunc)
 	wg.Add(1)
 	wg.Wait()
@@ -74,11 +71,4 @@ func waitAndUpdateNodesStatus(waitAndUpdateNodesStatusFunc func()) {
 		waitAndUpdateNodesStatusFunc()
 		time.Sleep(assistedinstallercontroller.GeneralWaitInterval)
 	}
-}
-
-// Note: BMHs for day2 are currently not provided. Once added, CSRs approval can be skipped.
-func approveCsrs(approveCsrsFunc func(context.Context, *sync.WaitGroup), wg *sync.WaitGroup) {
-	// not cancelling approve to keep routine alive
-	ctx := context.Background()
-	approveCsrsFunc(ctx, wg)
 }
