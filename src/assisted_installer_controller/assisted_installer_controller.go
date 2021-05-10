@@ -44,6 +44,8 @@ const (
 	dnsOperatorNamespace      = "openshift-dns-operator"
 	maxDeletionAttempts       = 5
 	maxDNSServiceIPAttempts   = 45
+	KeepWaiting               = false
+	ExitWaiting               = true
 )
 
 var (
@@ -145,7 +147,7 @@ func (c *controller) waitAndUpdateNodesStatus() bool {
 	assistedNodesMap, err := c.ic.GetHosts(ctxReq, log, ignoreStatuses)
 	if err != nil {
 		log.WithError(err).Error("Failed to get node map from the assisted service")
-		return false
+		return KeepWaiting
 	}
 
 	logHostsStatus(log, assistedNodesMap)
@@ -157,19 +159,19 @@ func (c *controller) waitAndUpdateNodesStatus() bool {
 	//if all hosts are in error, mark the failure and finish
 	if hostsInError > 0 && hostsInError == len(hostsInProgressMap) {
 		c.log.Infof("Done waiting for all the nodes. Nodes in error status: %d\n", hostsInError)
-		return true
+		return ExitWaiting
 	}
 	//if all hosts are successfully installed, finish
 	if len(hostsInProgressMap) == 0 {
 		c.log.Infof("All nodes were successfully installed")
-		return true
+		return ExitWaiting
 	}
 	//otherwise, update the progress status and keep waiting
 	log.Infof("Checking if cluster nodes are ready. %d nodes remaining", len(hostsInProgressMap))
 	nodes, err := c.kc.ListNodes()
 	if err != nil {
 		log.WithError(err).Error("Failed to get list of nodes from k8s client")
-		return false
+		return KeepWaiting
 	}
 	for _, node := range nodes.Items {
 		host, ok := hostsInProgressMap[strings.ToLower(node.Name)]
@@ -197,7 +199,7 @@ func (c *controller) waitAndUpdateNodesStatus() bool {
 		}
 	}
 	c.updateConfiguringStatusIfNeeded(assistedNodesMap)
-	return false
+	return KeepWaiting
 }
 
 func (c *controller) HackDNSAddressConflict(wg *sync.WaitGroup) {

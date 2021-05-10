@@ -71,35 +71,36 @@ func main() {
 	// without adding it will panic
 	var wg sync.WaitGroup
 	var status assistedinstallercontroller.ControllerStatus
+	mainContext, mainContextCancel := context.WithCancel(context.Background())
 
-	ctxRoutines, cancelRoutines := context.WithCancel(context.Background())
-	go assistedController.WaitAndUpdateNodesStatus(ctxRoutines, &wg)
+	defer func() {
+		// stop all go routines
+		mainContextCancel()
+		logger.Infof("Waiting for all go routines to finish")
+		wg.Wait()
+		logger.Infof("Finished all")
+	}()
+
+	go assistedController.WaitAndUpdateNodesStatus(mainContext, &wg)
 	wg.Add(1)
-	go assistedController.PostInstallConfigs(ctxRoutines, &wg, &status)
+	go assistedController.PostInstallConfigs(mainContext, &wg, &status)
 	wg.Add(1)
-	go assistedController.UpdateBMHs(ctxRoutines, &wg)
+	go assistedController.UpdateBMHs(mainContext, &wg)
 	wg.Add(1)
 
 	// No need to cancel with context, will finish quickly
 	go assistedController.HackDNSAddressConflict(&wg)
 	wg.Add(1)
 
-	go assistedController.UploadLogs(ctxRoutines, &wg, &status)
+	go assistedController.UploadLogs(mainContext, &wg, &status)
 	wg.Add(1)
 
-	// monitoring cluster status
-	// after it will finish we will stop all go routines
+	// monitoring installation by cluster status
 	waitForInstallation(client, logger, &status)
-	// stop all go routines
-	cancelRoutines()
-
-	logger.Infof("Waiting for all go routines to finish")
-	wg.Wait()
-	logger.Infof("Finished all")
 }
 
 // waitForInstallation monitor cluster status and is blocking main from cancelling all go routine s
-// if cluster cancelled,installed there is no need to continue and we will exit.
+// if cluster status is (cancelled,installed) there is no need to continue and we will exit.
 // if cluster is in error, in addition to stop waiting we need to set error status to tell upload logs to send must-gather.
 // if we have maximumErrorsBeforeExit GetClusterNotFound/GetClusterUnauthorized errors in a row we force exiting controller
 func waitForInstallation(client inventory_client.InventoryClient, log logrus.FieldLogger, status *assistedinstallercontroller.ControllerStatus) {
@@ -124,26 +125,35 @@ func waitForInstallation(client inventory_client.InventoryClient, log logrus.Fie
 
 			// if we get maximumErrorsBeforeExit errors in a row
 			// there is no point to try to reach assisted service
-			// exit all
+			// we should exit with 0 cause in case of another exit status
+			// job will restart assisted-controller.
 			if errCounter >= maximumErrorsBeforeExit {
 				log.Infof("Got more than %d errors from assisted service in a row, exiting", maximumErrorsBeforeExit)
 				exit(0)
 			}
 			continue
 		}
-		// zero error counter in case no error occured
+		// reset error counter in case no error occurred
 		errCounter = 0
-		switch *cluster.Status {
-		case models.ClusterStatusError:
-			log.Infof("Cluster installation failed.")
-			status.Error()
-			return
-		case models.ClusterStatusCancelled:
-			log.Infof("Cluster installation aborted. Signal the status")
-			return
-		case models.ClusterStatusInstalled:
-			log.Infof("Cluster installation successfully finished.")
+		finished := handleClusterStatus(*cluster.Status, log, status)
+		if finished {
 			return
 		}
 	}
+}
+
+func handleClusterStatus(clusterStatus string, log logrus.FieldLogger, status *assistedinstallercontroller.ControllerStatus) bool {
+	switch clusterStatus {
+	case models.ClusterStatusError:
+		log.Infof("Cluster installation failed.")
+		status.Error()
+		return true
+	case models.ClusterStatusCancelled:
+		log.Infof("Cluster installation aborted. Signal the status")
+		return true
+	case models.ClusterStatusInstalled:
+		log.Infof("Cluster installation successfully finished.")
+		return true
+	}
+	return false
 }
