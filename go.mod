@@ -17,7 +17,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/metal3-io/baremetal-operator v0.0.0
 	github.com/onsi/ginkgo v1.16.2
-	github.com/onsi/gomega v1.11.0
+	github.com/onsi/gomega v1.12.0
 	github.com/openshift/api v3.9.1-0.20191111211345-a27ff30ebf09+incompatible
 	github.com/openshift/assisted-installer-agent v0.0.0-20200811180147-bc9c7b899b8a
 	github.com/openshift/assisted-service v1.0.10-0.20210310114450-f60ae14adc85
@@ -29,7 +29,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/thoas/go-funk v0.8.0
 	github.com/vincent-petithory/dataurl v0.0.0-20191104211930-d1553a71de50
-	golang.org/x/net v0.0.0-20201202161906-c7110b5ffcbb
+	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.21.0
