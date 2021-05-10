@@ -220,7 +220,7 @@ func (c *inventoryClient) UploadIngressCa(ctx context.Context, ingressCA string,
 func (c *inventoryClient) GetCluster(ctx context.Context) (*models.Cluster, error) {
 	cluster, err := c.ai.Installer.GetCluster(ctx, &installer.GetClusterParams{ClusterID: c.clusterId})
 	if err != nil {
-		return nil, aserror.GetAssistedError(err)
+		return nil, err
 	}
 
 	return cluster.Payload, nil

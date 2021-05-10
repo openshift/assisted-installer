@@ -3,23 +3,33 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"sync"
 	"time"
-
-	"github.com/openshift/assisted-installer/src/k8s_client"
-	"github.com/openshift/assisted-installer/src/utils"
 
 	"github.com/kelseyhightower/envconfig"
 	assistedinstallercontroller "github.com/openshift/assisted-installer/src/assisted_installer_controller"
 	"github.com/openshift/assisted-installer/src/inventory_client"
+	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/ops"
+	"github.com/openshift/assisted-installer/src/utils"
+	"github.com/openshift/assisted-service/client/installer"
+	"github.com/openshift/assisted-service/models"
 	"github.com/openshift/assisted-service/pkg/secretdump"
 	"github.com/sirupsen/logrus"
+)
+
+// Added this way to be able to test it
+var (
+	exit                        = os.Exit
+	waitForInstallationInterval = 1 * time.Minute
 )
 
 var Options struct {
 	ControllerConfig assistedinstallercontroller.ControllerConfig
 }
+
+const maximumErrorsBeforeExit = 10
 
 func main() {
 	logger := logrus.New()
@@ -55,38 +65,95 @@ func main() {
 		kc,
 	)
 
+	assistedController.SetReadyState()
+
 	// While adding new routine don't miss to add wg.add(1)
 	// without adding it will panic
 	var wg sync.WaitGroup
-	var wgLogs sync.WaitGroup
 	var status assistedinstallercontroller.ControllerStatus
+	mainContext, mainContextCancel := context.WithCancel(context.Background())
 
-	ctxApprove, cancelApprove := context.WithCancel(context.Background())
-	go assistedController.ApproveCsrs(ctxApprove, &wg)
+	defer func() {
+		// stop all go routines
+		mainContextCancel()
+		logger.Infof("Waiting for all go routines to finish")
+		wg.Wait()
+		logger.Infof("Finished all")
+	}()
+
+	go assistedController.WaitAndUpdateNodesStatus(mainContext, &wg)
 	wg.Add(1)
-	go assistedController.PostInstallConfigs(&wg, &status)
+	go assistedController.PostInstallConfigs(mainContext, &wg, &status)
 	wg.Add(1)
-	go assistedController.UpdateBMHs(&wg)
+	go assistedController.UpdateBMHs(mainContext, &wg)
 	wg.Add(1)
+
+	// No need to cancel with context, will finish quickly
 	go assistedController.HackDNSAddressConflict(&wg)
 	wg.Add(1)
 
-	ctxLogs, cancelLogs := context.WithCancel(context.Background())
-	go assistedController.UploadLogs(ctxLogs, cancelLogs, &wgLogs, &status)
-	wgLogs.Add(1)
+	go assistedController.UploadLogs(mainContext, &wg, &status)
+	wg.Add(1)
 
-	assistedController.SetReadyState()
-	assistedController.WaitAndUpdateNodesStatus(&status)
-	logger.Infof("Sleeping for 10 minutes to give a chance to approve all csrs")
-	time.Sleep(10 * time.Minute)
-	cancelApprove()
+	// monitoring installation by cluster status
+	waitForInstallation(client, logger, &status)
+}
 
-	logger.Infof("Waiting for all go routines to finish")
-	wg.Wait()
-	if !status.HasError() {
-		//with error the logs are canceled within UploadLogs
-		logger.Infof("closing logs...")
-		cancelLogs()
+// waitForInstallation monitor cluster status and is blocking main from cancelling all go routine s
+// if cluster status is (cancelled,installed) there is no need to continue and we will exit.
+// if cluster is in error, in addition to stop waiting we need to set error status to tell upload logs to send must-gather.
+// if we have maximumErrorsBeforeExit GetClusterNotFound/GetClusterUnauthorized errors in a row we force exiting controller
+func waitForInstallation(client inventory_client.InventoryClient, log logrus.FieldLogger, status *assistedinstallercontroller.ControllerStatus) {
+	log.Infof("monitor cluster installation status")
+	reqCtx := utils.GenerateRequestContext()
+	errCounter := 0
+
+	for {
+		time.Sleep(waitForInstallationInterval)
+		cluster, err := client.GetCluster(reqCtx)
+		if err != nil {
+			// In case cluster was deleted or controller is not authorised
+			// we should exit controller after maximumErrorsBeforeExit errors
+			switch err.(type) {
+			case *installer.GetClusterNotFound:
+				errCounter++
+				log.WithError(err).Errorf("Cluster was not found in inventory or user is not authorized")
+			case *installer.GetClusterUnauthorized:
+				errCounter++
+				log.WithError(err).Errorf("User is not authenticated to perform the operation")
+			}
+
+			// if we get maximumErrorsBeforeExit errors in a row
+			// there is no point to try to reach assisted service
+			// we should exit with 0 cause in case of another exit status
+			// job will restart assisted-controller.
+			if errCounter >= maximumErrorsBeforeExit {
+				log.Infof("Got more than %d errors from assisted service in a row, exiting", maximumErrorsBeforeExit)
+				exit(0)
+			}
+			continue
+		}
+		// reset error counter in case no error occurred
+		errCounter = 0
+		finished := handleClusterStatus(*cluster.Status, log, status)
+		if finished {
+			return
+		}
 	}
-	wgLogs.Wait()
+}
+
+func handleClusterStatus(clusterStatus string, log logrus.FieldLogger, status *assistedinstallercontroller.ControllerStatus) bool {
+	switch clusterStatus {
+	case models.ClusterStatusError:
+		log.Infof("Cluster installation failed.")
+		status.Error()
+		return true
+	case models.ClusterStatusCancelled:
+		log.Infof("Cluster installation aborted. Signal the status")
+		return true
+	case models.ClusterStatusInstalled:
+		log.Infof("Cluster installation successfully finished.")
+		return true
+	}
+	return false
 }
