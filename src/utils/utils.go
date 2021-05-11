@@ -186,28 +186,40 @@ func GetHostIpsFromInventory(inventory *models.Inventory) ([]string, error) {
 	return ips, nil
 }
 
-func WaitForPredicate(timeout time.Duration, interval time.Duration, predicate func() bool) error {
-	return WaitForPredicateWithContext(context.TODO(), timeout, interval, predicate)
-}
-
-func WaitForPredicateWithContext(ctx context.Context, timeout time.Duration, interval time.Duration, predicate func() bool) error {
-	timeoutAfter := time.After(timeout)
+func WaitForPredicateWithTimer(ctx context.Context, timeout time.Duration, interval time.Duration, predicate func(timer *time.Timer) bool) error {
+	timeoutTimer := time.NewTimer(timeout)
 	ticker := time.NewTicker(interval)
+
+	defer func() {
+		timeoutTimer.Stop()
+		ticker.Stop()
+	}()
+
 	// Keep trying until we're time out or get true
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		// Got a timeout! fail with a timeout error
-		case <-timeoutAfter:
+		case <-timeoutTimer.C:
 			return errors.New("timed out")
 		// Got a tick, we should check on checkSomething()
 		case <-ticker.C:
-			if predicate() {
+			if predicate(timeoutTimer) {
 				return nil
 			}
 		}
 	}
+}
+
+func WaitForPredicate(timeout time.Duration, interval time.Duration, predicate func() bool) error {
+	return WaitForPredicateWithContext(context.TODO(), timeout, interval, predicate)
+}
+
+func WaitForPredicateWithContext(ctx context.Context, timeout time.Duration, interval time.Duration, predicate func() bool) error {
+	return WaitForPredicateWithTimer(ctx, timeout, interval, func(timer *time.Timer) bool {
+		return predicate()
+	})
 }
 
 // ProxyFromEnvVars provides an alternative to http.ProxyFromEnvironment since it is being initialized only

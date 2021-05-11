@@ -800,7 +800,7 @@ func (c controller) validateConsoleAvailability() bool {
 // This function would be aligned with the console operator reporting workflow
 // as part of the deprecation of the old API in MGMT-5188.
 func (c controller) waitingForClusterVersion(ctx context.Context) error {
-	isClusterVersionAvailable := func() bool {
+	isClusterVersionAvailable := func(timer *time.Timer) bool {
 		c.log.Infof("Checking cluster version operator availability status")
 		co, err := c.kc.GetClusterVersion("version")
 		if err != nil {
@@ -822,6 +822,13 @@ func (c controller) waitingForClusterVersion(ctx context.Context) error {
 		operatorStatus, operatorMessage := utils.ClusterOperatorConditionsToMonitoredOperatorStatus(co.Status.Conditions)
 
 		if cvoStatusInService.Status != operatorStatus || (cvoStatusInService.StatusInfo != operatorMessage && operatorMessage != "") {
+			// This is a common pattern to ensure the channel is empty after a stop has been called
+			// More info on time/sleep.go documentation
+			if !timer.Stop() {
+				<-timer.C
+			}
+			timer.Reset(WaitTimeout)
+
 			status := fmt.Sprintf("Cluster version status: %s message: %s", operatorStatus, operatorMessage)
 			c.log.Infof(status)
 
@@ -834,9 +841,9 @@ func (c controller) waitingForClusterVersion(ctx context.Context) error {
 		return false
 	}
 
-	err := utils.WaitForPredicateWithContext(ctx, WaitTimeout, GeneralProgressUpdateInt, isClusterVersionAvailable)
+	err := utils.WaitForPredicateWithTimer(ctx, WaitTimeout, GeneralProgressUpdateInt, isClusterVersionAvailable)
 	if err != nil {
-		return errors.Errorf("Timeout while waiting for cluster version to be available")
+		return errors.Wrapf(err, "Timeout while waiting for cluster version to be available")
 	}
 	return nil
 }

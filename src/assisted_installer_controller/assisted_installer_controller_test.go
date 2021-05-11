@@ -560,8 +560,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				GeneralProgressUpdateInt = 30 * time.Millisecond
 				setClusterAsFinalizing()
 
-				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", false, "Timeout while waiting for cluster "+
-					"version to be available").Return(nil).Times(1)
+				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", false, gomock.Any()).Return(nil).Times(1)
 
 				wg.Add(1)
 				go assistedController.PostInstallConfigs(context.TODO(), &wg, status)
@@ -969,59 +968,70 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	Context("waitingForClusterVersion", func() {
 		ctx := context.TODO()
 		tests := []struct {
-			name             string
-			currentCVOStatus *models.MonitoredOperator
-			newCVOCondition  configv1.ClusterOperatorStatusCondition
-			shouldSendUpdate bool
+			name                    string
+			currentServiceCVOStatus *models.MonitoredOperator
+			newCVOCondition         configv1.ClusterOperatorStatusCondition
+			shouldSendUpdate        bool
 		}{
 			{
-				name:             "(false, no message) -> (false, no message)",
-				currentCVOStatus: &models.MonitoredOperator{Status: models.OperatorStatusProgressing, StatusInfo: ""},
-				newCVOCondition:  configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorProgressing, Status: configv1.ConditionTrue, Message: ""},
-				shouldSendUpdate: false,
+				name:                    "(false, no message) -> (false, no message)",
+				currentServiceCVOStatus: &models.MonitoredOperator{Status: models.OperatorStatusProgressing, StatusInfo: ""},
+				newCVOCondition:         configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorProgressing, Status: configv1.ConditionTrue, Message: ""},
+				shouldSendUpdate:        false,
 			},
 			{
-				name:             "(false, no message) -> (false, with message)",
-				currentCVOStatus: &models.MonitoredOperator{Status: models.OperatorStatusProgressing, StatusInfo: ""},
-				newCVOCondition:  configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorProgressing, Status: configv1.ConditionTrue, Message: "message"},
-				shouldSendUpdate: true,
+				name:                    "(false, no message) -> (false, with message)",
+				currentServiceCVOStatus: &models.MonitoredOperator{Status: models.OperatorStatusProgressing, StatusInfo: ""},
+				newCVOCondition:         configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorProgressing, Status: configv1.ConditionTrue, Message: "message"},
+				shouldSendUpdate:        true,
 			},
 			{
-				name:             "(false, with message) -> (false, same message)",
-				currentCVOStatus: &models.MonitoredOperator{Status: models.OperatorStatusProgressing, StatusInfo: "message"},
-				newCVOCondition:  configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorProgressing, Status: configv1.ConditionTrue, Message: "message"},
-				shouldSendUpdate: false,
+				name:                    "(false, with message) -> (false, same message)",
+				currentServiceCVOStatus: &models.MonitoredOperator{Status: models.OperatorStatusProgressing, StatusInfo: "message"},
+				newCVOCondition:         configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorProgressing, Status: configv1.ConditionTrue, Message: "message"},
+				shouldSendUpdate:        false,
 			},
 			{
-				name:             "(false, with message) -> (false, new message)",
-				currentCVOStatus: &models.MonitoredOperator{Status: models.OperatorStatusProgressing, StatusInfo: "message"},
-				newCVOCondition:  configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorProgressing, Status: configv1.ConditionTrue, Message: "new"},
-				shouldSendUpdate: true,
+				name:                    "(false, with message) -> (false, new message)",
+				currentServiceCVOStatus: &models.MonitoredOperator{Status: models.OperatorStatusProgressing, StatusInfo: "message"},
+				newCVOCondition:         configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorProgressing, Status: configv1.ConditionTrue, Message: "new"},
+				shouldSendUpdate:        true,
 			},
 			{
-				name:             "(false, with message) -> (false, no message)",
-				currentCVOStatus: &models.MonitoredOperator{Status: models.OperatorStatusProgressing, StatusInfo: "message"},
-				newCVOCondition:  configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorProgressing, Status: configv1.ConditionTrue, Message: ""},
-				shouldSendUpdate: false,
+				name:                    "(false, with message) -> (false, no message)",
+				currentServiceCVOStatus: &models.MonitoredOperator{Status: models.OperatorStatusProgressing, StatusInfo: "message"},
+				newCVOCondition:         configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorProgressing, Status: configv1.ConditionTrue, Message: ""},
+				shouldSendUpdate:        false,
 			},
 			{
-				name:             "(false, no message) -> (true, no message)",
-				currentCVOStatus: &models.MonitoredOperator{Status: models.OperatorStatusProgressing, StatusInfo: ""},
-				newCVOCondition:  configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorAvailable, Status: configv1.ConditionTrue, Message: ""},
-				shouldSendUpdate: true,
+				name:                    "(false, no message) -> (true, no message)",
+				currentServiceCVOStatus: &models.MonitoredOperator{Status: models.OperatorStatusProgressing, StatusInfo: ""},
+				newCVOCondition:         configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorAvailable, Status: configv1.ConditionTrue, Message: ""},
+				shouldSendUpdate:        true,
 			},
 			{
-				name:             "(false, no message) -> (true, with message)",
-				currentCVOStatus: &models.MonitoredOperator{Status: models.OperatorStatusProgressing, StatusInfo: ""},
-				newCVOCondition:  configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorAvailable, Status: configv1.ConditionTrue, Message: "message"},
-				shouldSendUpdate: true,
+				name:                    "(false, no message) -> (true, with message)",
+				currentServiceCVOStatus: &models.MonitoredOperator{Status: models.OperatorStatusProgressing, StatusInfo: ""},
+				newCVOCondition:         configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorAvailable, Status: configv1.ConditionTrue, Message: "message"},
+				shouldSendUpdate:        true,
 			},
 			{
-				name:             "(true) -> exit with success",
-				currentCVOStatus: &models.MonitoredOperator{Status: models.OperatorStatusAvailable, StatusInfo: ""},
-				newCVOCondition:  configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorAvailable, Status: configv1.ConditionTrue, Message: ""},
-				shouldSendUpdate: false,
+				name:                    "(true) -> exit with success",
+				currentServiceCVOStatus: &models.MonitoredOperator{Status: models.OperatorStatusAvailable, StatusInfo: ""},
+				newCVOCondition:         configv1.ClusterOperatorStatusCondition{Type: configv1.OperatorAvailable, Status: configv1.ConditionTrue, Message: ""},
+				shouldSendUpdate:        false,
 			},
+		}
+
+		operatorTypeToOperatorStatus := func(conditionType configv1.ClusterStatusConditionType) models.OperatorStatus {
+			switch conditionType {
+			case configv1.OperatorAvailable:
+				return models.OperatorStatusAvailable
+			case configv1.OperatorProgressing:
+				return models.OperatorStatusProgressing
+			default:
+				return models.OperatorStatusFailed
+			}
 		}
 
 		BeforeEach(func() {
@@ -1037,21 +1047,81 @@ var _ = Describe("installer HostRoleMaster role", func() {
 						Conditions: []configv1.ClusterOperatorStatusCondition{t.newCVOCondition},
 					},
 				}
+				newServiceCVOStatus := &models.MonitoredOperator{
+					Status:     operatorTypeToOperatorStatus(t.newCVOCondition.Type),
+					StatusInfo: t.newCVOCondition.Message,
+				}
 
-				mockk8sclient.EXPECT().GetClusterVersion("version").Return(clusterVersionReport, nil).Times(1)
-				mockbmclient.EXPECT().GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), cvoOperatorName).Return(t.currentCVOStatus, nil).Times(1)
+				amountOfSamples := 1
+
+				mockbmclient.EXPECT().GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), cvoOperatorName).Return(t.currentServiceCVOStatus, nil).Times(1)
 
 				if t.shouldSendUpdate {
+					if t.currentServiceCVOStatus.Status != models.OperatorStatusAvailable {
+						// If a change occured and it is still false - we expect the timer to be resetted,
+						// hence another round would happen.
+						amountOfSamples += 1
+
+						mockbmclient.EXPECT().GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), cvoOperatorName).Return(newServiceCVOStatus, nil).Times(1)
+					}
+
 					mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), gomock.Any(), cvoOperatorName, gomock.Any(), gomock.Any()).Times(1)
 				}
 
-				if t.currentCVOStatus.Status == models.OperatorStatusAvailable {
+				mockk8sclient.EXPECT().GetClusterVersion("version").Return(clusterVersionReport, nil).Times(amountOfSamples)
+
+				if newServiceCVOStatus.Status == models.OperatorStatusAvailable {
 					Expect(assistedController.waitingForClusterVersion(ctx)).ShouldNot(HaveOccurred())
 				} else {
 					Expect(assistedController.waitingForClusterVersion(ctx)).Should(HaveOccurred())
 				}
 			})
 		}
+
+		It("service fail to sync - context cancel", func() {
+			currentServiceCVOStatus := &models.MonitoredOperator{Status: models.OperatorStatusProgressing, StatusInfo: ""}
+			clusterVersionReport := &configv1.ClusterVersion{
+				Status: configv1.ClusterVersionStatus{
+					Conditions: []configv1.ClusterOperatorStatusCondition{
+						{Type: configv1.OperatorAvailable, Status: configv1.ConditionTrue, Message: ""},
+					},
+				},
+			}
+
+			mockk8sclient.EXPECT().GetClusterVersion("version").Return(clusterVersionReport, nil).AnyTimes()
+			mockbmclient.EXPECT().GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), cvoOperatorName).Return(currentServiceCVOStatus, nil).AnyTimes()
+			mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), gomock.Any(), cvoOperatorName, gomock.Any(), gomock.Any()).AnyTimes()
+
+			err := func() error {
+				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+				defer cancel()
+				return assistedController.waitingForClusterVersion(ctx)
+			}()
+
+			Expect(errors.Is(err, context.DeadlineExceeded)).To(BeTrue())
+		})
+
+		It("service fail to sync - finally succeed", func() {
+			currentServiceCVOStatus := &models.MonitoredOperator{Status: models.OperatorStatusProgressing, StatusInfo: ""}
+			newServiceCVOStatus := &models.MonitoredOperator{Status: models.OperatorStatusAvailable, StatusInfo: ""}
+			clusterVersionReport := &configv1.ClusterVersion{
+				Status: configv1.ClusterVersionStatus{
+					Conditions: []configv1.ClusterOperatorStatusCondition{
+						{Type: configv1.OperatorAvailable, Status: configv1.ConditionTrue, Message: ""},
+					},
+				},
+			}
+
+			// Fail twice
+			mockk8sclient.EXPECT().GetClusterVersion("version").Return(clusterVersionReport, nil).Times(3)
+			mockbmclient.EXPECT().GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), cvoOperatorName).Return(currentServiceCVOStatus, nil).Times(2)
+			mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), gomock.Any(), cvoOperatorName, gomock.Any(), gomock.Any()).Times(2)
+
+			// Service succeed
+			mockbmclient.EXPECT().GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), cvoOperatorName).Return(newServiceCVOStatus, nil).Times(1)
+
+			Expect(assistedController.waitingForClusterVersion(context.TODO())).ShouldNot(HaveOccurred())
+		})
 	})
 
 	Context("Hack deleting service that conflicts with DNS IP address", func() {
