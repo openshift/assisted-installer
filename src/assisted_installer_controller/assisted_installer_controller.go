@@ -706,7 +706,7 @@ func (c controller) updatePendingOLMOperators() error {
 	c.log.Infof("Updating pending OLM operators")
 	operators, _ := c.getProgressingOLMOperators()
 	for _, operator := range operators {
-		err := c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operator.Name, models.OperatorStatusFailed, "Waiting for operator timed out")
+		err := c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operator.Name, models.OperatorStatusFailed, "Waiting for operator timed out", operator.Version)
 		if err != nil {
 			c.log.WithError(err).Warnf("Failed to update olm %s status", operator.Name)
 			return err
@@ -736,7 +736,7 @@ func (c controller) waitForOLMOperators() bool {
 		}
 
 		operatorStatus := utils.CsvStatusToOperatorStatus(string(csv.Status.Phase))
-		err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operator.Name, operatorStatus, csv.Status.Message)
+		err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operator.Name, operatorStatus, csv.Status.Message, csv.Spec.Version.String())
 		if err != nil {
 			c.log.WithError(err).Warnf("Failed to update olm %s status", operator.Name)
 			continue
@@ -747,6 +747,16 @@ func (c controller) waitForOLMOperators() bool {
 	return false
 }
 
+func getClusterOperatorVersion(versions []configv1.OperandVersion) string {
+	for _, version := range versions {
+		if version.Name == "operator" {
+			return version.Version
+		}
+	}
+
+	return ""
+}
+
 func (c controller) isOperatorAvailableInCluster(operatorName string) bool {
 	c.log.Infof("Checking %s operator availability status", operatorName)
 	co, err := c.kc.GetClusterOperator(operatorName)
@@ -755,8 +765,9 @@ func (c controller) isOperatorAvailableInCluster(operatorName string) bool {
 		return false
 	}
 
+	operatorVersion := getClusterOperatorVersion(co.Status.Versions)
 	operatorStatus, operatorMessage := utils.ClusterOperatorConditionsToMonitoredOperatorStatus(co.Status.Conditions)
-	err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operatorName, operatorStatus, operatorMessage)
+	err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operatorName, operatorStatus, operatorMessage, operatorVersion)
 	if err != nil {
 		c.log.WithError(err).Warnf("Failed to update %s operator status %s with message %s", operatorName, operatorStatus, operatorMessage)
 		return false
@@ -819,6 +830,7 @@ func (c controller) waitingForClusterVersion(ctx context.Context) error {
 			return true
 		}
 
+		operatorVersion := co.Status.Desired.Version
 		operatorStatus, operatorMessage := utils.ClusterOperatorConditionsToMonitoredOperatorStatus(co.Status.Conditions)
 
 		if cvoStatusInService.Status != operatorStatus || (cvoStatusInService.StatusInfo != operatorMessage && operatorMessage != "") {
@@ -833,7 +845,7 @@ func (c controller) waitingForClusterVersion(ctx context.Context) error {
 			c.log.Infof(status)
 
 			// Update built-in monitored operator cluster version status
-			if err := c.ic.UpdateClusterOperator(utils.GenerateRequestContext(), c.ClusterID, cvoOperatorName, operatorStatus, operatorMessage); err != nil {
+			if err := c.ic.UpdateClusterOperator(utils.GenerateRequestContext(), c.ClusterID, cvoOperatorName, operatorStatus, operatorMessage, operatorVersion); err != nil {
 				c.log.WithError(err).Errorf("Failed to update cluster %s cvo status", c.ClusterID)
 			}
 		}

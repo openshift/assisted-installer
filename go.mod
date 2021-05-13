@@ -41,6 +41,7 @@ require (
 replace (
 	github.com/metal3-io/baremetal-operator => github.com/openshift/baremetal-operator v0.0.0-20200715132148-0f91f62a41fe // Use OpenShift fork
 	github.com/openshift/api => github.com/openshift/api v0.0.0-20200901182017-7ac89ba6b971
+	github.com/openshift/assisted-service => github.com/machacekondra/assisted-service v1.0.10-0.20210512195854-22ec9d037cc5
 	github.com/openshift/hive/pkg/apis => github.com/carbonin/hive/pkg/apis v0.0.0-20210209195732-57e8c3ae12d1
 	github.com/openshift/machine-api-operator => github.com/openshift/machine-api-operator v0.2.1-0.20201026110925-50ea569da51b
 	k8s.io/api => k8s.io/api v0.19.2

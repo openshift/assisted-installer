@@ -54,7 +54,7 @@ type InventoryClient interface {
 	UploadLogs(ctx context.Context, clusterId string, logsType models.LogsType, upfile io.Reader) error
 	ClusterLogProgressReport(ctx context.Context, clusterId string, progress models.LogsState)
 	HostLogProgressReport(ctx context.Context, clusterId string, hostId string, progress models.LogsState)
-	UpdateClusterOperator(ctx context.Context, clusterId string, operatorName string, operatorStatus models.OperatorStatus, operatorStatusInfo string) error
+	UpdateClusterOperator(ctx context.Context, clusterId string, operatorName string, operatorStatus models.OperatorStatus, operatorStatusInfo string, operatorVersion string) error
 }
 
 type inventoryClient struct {
@@ -362,13 +362,14 @@ func (c *inventoryClient) HostLogProgressReport(ctx context.Context, clusterId s
 	}
 }
 
-func (c *inventoryClient) UpdateClusterOperator(ctx context.Context, clusterId string, operatorName string, operatorStatus models.OperatorStatus, operatorStatusInfo string) error {
+func (c *inventoryClient) UpdateClusterOperator(ctx context.Context, clusterId string, operatorName string, operatorStatus models.OperatorStatus, operatorStatusInfo string, operatorVersion string) error {
 	_, err := c.ai.Operators.ReportMonitoredOperatorStatus(ctx, &operators.ReportMonitoredOperatorStatusParams{
 		ClusterID: c.clusterId,
 		ReportParams: &models.OperatorMonitorReport{
 			Name:       operatorName,
 			Status:     operatorStatus,
 			StatusInfo: operatorStatusInfo,
+			Version:    operatorVersion,
 		},
 	})
 	return aserror.GetAssistedError(err)
