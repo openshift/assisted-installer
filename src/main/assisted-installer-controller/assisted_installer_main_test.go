@@ -94,13 +94,26 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		Expect(exitCode).Should(Equal(0))
 	})
 
-	It("Waiting for cluster Not found/Unauthorized  - should exit 0 ", func() {
+	It("Waiting for cluster Not found  - should exit 0 ", func() {
 		exitCode := 1
 		exit = func(code int) {
 			exitCode = code
 		}
-		mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(nil, installer.NewGetClusterNotFound()).Times(maximumErrorsBeforeExit - 2)
-		mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(nil, installer.NewGetClusterUnauthorized()).Times(2)
+		mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(nil, installer.NewGetClusterNotFound()).Times(1)
+		// added to make waitForInstallation exit
+		mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(&models.Cluster{Status: swag.String(models.ClusterStatusInstalled)}, nil).Times(1)
+
+		waitForInstallation(mockbmclient, l, status)
+		Expect(status.HasError()).Should(Equal(false))
+		Expect(exitCode).Should(Equal(0))
+	})
+
+	It("Waiting for cluster Unauthorized  - should exit 0 ", func() {
+		exitCode := 1
+		exit = func(code int) {
+			exitCode = code
+		}
+		mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(nil, installer.NewGetClusterUnauthorized()).Times(maximumErrorsBeforeExit)
 		// added to make waitForInstallation exit
 		mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(&models.Cluster{Status: swag.String(models.ClusterStatusInstalled)}, nil).Times(1)
 
@@ -114,7 +127,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		exit = func(code int) {
 			exitCode = code
 		}
-		mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(nil, installer.NewGetClusterNotFound()).Times(maximumErrorsBeforeExit - 2)
+		mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(nil, installer.NewGetClusterUnauthorized()).Times(maximumErrorsBeforeExit - 2)
 		// added to make waitForInstallation exit
 		mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(&models.Cluster{Status: swag.String(models.ClusterStatusInstalled)}, nil).Times(1)
 

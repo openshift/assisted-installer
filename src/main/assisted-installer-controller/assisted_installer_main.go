@@ -29,7 +29,7 @@ var Options struct {
 	ControllerConfig assistedinstallercontroller.ControllerConfig
 }
 
-const maximumErrorsBeforeExit = 10
+const maximumErrorsBeforeExit = 3
 
 func main() {
 	logger := logrus.New()
@@ -114,9 +114,10 @@ func waitForInstallation(client inventory_client.InventoryClient, log logrus.Fie
 		if err != nil {
 			// In case cluster was deleted or controller is not authorised
 			// we should exit controller after maximumErrorsBeforeExit errors
+			// in case cluster was deleted we should exit immediately
 			switch err.(type) {
 			case *installer.GetClusterNotFound:
-				errCounter++
+				errCounter = errCounter + maximumErrorsBeforeExit
 				log.WithError(err).Errorf("Cluster was not found in inventory or user is not authorized")
 			case *installer.GetClusterUnauthorized:
 				errCounter++
