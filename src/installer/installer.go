@@ -85,15 +85,16 @@ func (i *installer) InstallNode() error {
 		return err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	errs, _ := errgroup.WithContext(ctx)
+	bootstrapErrGroup, _ := errgroup.WithContext(ctx)
 	//cancel the context in case this method ends
 	defer cancel()
 	isBootstrap := false
 	if i.Config.Role == string(models.HostRoleBootstrap) && i.HighAvailabilityMode != models.ClusterHighAvailabilityModeNone {
 		isBootstrap = true
-		errs.Go(func() error {
-			return i.runBootstrap(ctx)
+		bootstrapErrGroup.Go(func() error {
+			return i.startBootstrap()
 		})
+		go i.updateConfiguringStatus(ctx)
 		i.Config.Role = string(models.HostRoleMaster)
 	}
 
@@ -124,11 +125,15 @@ func (i *installer) InstallNode() error {
 	}
 
 	if isBootstrap {
-		i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, "")
-		if err = errs.Wait(); err != nil {
-			i.log.Error(err)
+		if err = bootstrapErrGroup.Wait(); err != nil {
+			i.log.Errorf("Bootstrap failed %s", err)
 			return err
 		}
+		if err = i.waitForControlPlane(ctx); err != nil {
+			return err
+		}
+		i.log.Info("Setting bootstrap node new role to master")
+
 	}
 	//upload host logs and report log status before reboot
 	i.inventoryClient.HostLogProgressReport(ctx, i.Config.ClusterID, i.Config.HostID, models.LogsStateRequested)
@@ -185,30 +190,6 @@ func (i *installer) writeImageToDisk(ignitionPath string) error {
 		return err
 	}
 	i.log.Info("Done writing image to disk")
-	return nil
-}
-
-func (i *installer) runBootstrap(ctx context.Context) error {
-	ctxLocal, cancel := context.WithCancel(ctx)
-	defer func() {
-		cancel()
-	}()
-	go i.updateConfiguringStatus(ctxLocal)
-
-	err := i.startBootstrap()
-	if err != nil {
-		i.log.Errorf("Bootstrap failed %s", err)
-		return err
-	}
-	kc, err := i.kcBuilder(KubeconfigPathLoopBack, i.log)
-	if err != nil {
-		i.log.Error(err)
-		return err
-	}
-	if err = i.waitForControlPlane(ctx, kc); err != nil {
-		return err
-	}
-	i.log.Info("Setting bootstrap node new role to master")
 	return nil
 }
 
@@ -355,8 +336,14 @@ func (i *installer) waitForNetworkType(kc k8s_client.K8SClient) error {
 	})
 }
 
-func (i *installer) waitForControlPlane(ctx context.Context, kc k8s_client.K8SClient) error {
-	if err := i.waitForMinMasterNodes(ctx, kc); err != nil {
+func (i *installer) waitForControlPlane(ctx context.Context) error {
+	kc, err := i.kcBuilder(KubeconfigPathLoopBack, i.log)
+	if err != nil {
+		i.log.Error(err)
+		return err
+	}
+	i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, "")
+	if err = i.waitForMinMasterNodes(ctx, kc); err != nil {
 		return err
 	}
 
@@ -462,6 +449,8 @@ func (i *installer) UpdateHostInstallProgress(newStage models.HostStage, info st
 
 func (i *installer) waitForBootkube(ctx context.Context) {
 	i.log.Infof("Waiting for bootkube to complete")
+	i.UpdateHostInstallProgress(models.HostStageWaitingForBootkube, "")
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -482,7 +471,7 @@ func (i *installer) waitForBootkube(ctx context.Context) {
 
 func (i *installer) waitForController() error {
 	i.log.Infof("Waiting for controller to be ready")
-	i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, "waiting for controller pod")
+	i.UpdateHostInstallProgress(models.HostStageWaitingForController, "waiting for controller pod ready event")
 	err := i.ops.ReloadHostFile("/etc/resolv.conf")
 	if err != nil {
 		i.log.WithError(err).Error("Failed to reload resolv.conf")

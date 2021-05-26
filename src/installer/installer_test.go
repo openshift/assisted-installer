@@ -109,7 +109,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	}
 
 	waitForControllerSuccessfully := func(clusterId string) {
-		mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostId, models.HostStageWaitingForControlPlane, "waiting for controller pod").Return(nil).Times(1)
+		mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostId, models.HostStageWaitingForController, "waiting for controller pod ready event").Return(nil).Times(1)
 		mockk8sclient.EXPECT().GetPods("assisted-installer", gomock.Any(), "").Return([]v1.Pod{{TypeMeta: metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{Name: common.AssistedControllerPrefix + "aasdasd"},
 			Status:     v1.PodStatus{Phase: "Running"}}}, nil).Times(1)
@@ -219,6 +219,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockops.EXPECT().PrepareController().Return(nil).Times(1)
 		}
 		waitForBootkubeSuccess := func() {
+			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostId, models.HostStageWaitingForBootkube, "").Return(nil).Times(1)
 			mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "stat", "/opt/openshift/.bootkube.done").Return("OK", nil).Times(1)
 		}
 		bootkubeStatusSuccess := func() {
@@ -321,7 +322,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		}
 		It("bootstrap role creating SSH manifest failed", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
-				{string(models.HostStageWaitingForControlPlane)},
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
 				{string(models.HostStageWritingImageToDisk)},
 			})
@@ -372,7 +372,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
 				{string(models.HostStageWritingImageToDisk)},
-				{string(models.HostStageWaitingForControlPlane)},
 			})
 			cleanInstallDevice()
 			mkdirSuccess(InstallDir)
@@ -392,7 +391,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
 				{string(models.HostStageWritingImageToDisk)},
-				{string(models.HostStageWaitingForControlPlane)},
 			})
 			bootstrapSetup()
 			checkLocalHostname("not localhost", nil)
@@ -421,7 +419,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 
 		It("waitForController reload resolv.conf failed", func() {
-			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostId, models.HostStageWaitingForControlPlane, "waiting for controller pod").Return(nil).Times(1)
+			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostId, models.HostStageWaitingForController, "waiting for controller pod ready event").Return(nil).Times(1)
 			mockops.EXPECT().ReloadHostFile("/etc/resolv.conf").Return(fmt.Errorf("dummy")).Times(1)
 
 			err := installerObj.waitForController()
@@ -430,7 +428,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("waitForController reload get pods fails then succeeds", func() {
 			resolvConfSuccess()
 			reportLogProgressSuccess()
-			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostId, models.HostStageWaitingForControlPlane, "waiting for controller pod").Return(nil).Times(1)
+			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostId, models.HostStageWaitingForController, "waiting for controller pod ready event").Return(nil).Times(1)
 			mockk8sclient.EXPECT().GetPods("assisted-installer", gomock.Any(), "").Return(nil, fmt.Errorf("dummy")).Times(1)
 			mockk8sclient.EXPECT().ListEvents(assistedControllerNamespace).Return(&events, nil).Times(1)
 			err := installerObj.waitForController()
@@ -678,6 +676,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockops.EXPECT().PrepareController().Return(nil).Times(1)
 		}
 		waitForBootkubeSuccess := func() {
+			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostId, models.HostStageWaitingForBootkube, "").Return(nil).Times(1)
 			mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "stat", "/opt/openshift/.bootkube.done").Return("OK", nil).Times(1)
 		}
 		bootkubeStatusSuccess := func() {
