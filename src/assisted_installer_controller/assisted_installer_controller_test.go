@@ -170,7 +170,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	}
 
 	setControllerWaitForOLMOperators := func(clusterID string) {
-		WaitTimeout = 5 * time.Second
+		WaitTimeout = 100 * time.Millisecond
 
 		setClusterAsFinalizing()
 		uploadIngressCert(clusterID)
@@ -855,7 +855,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		}
 
 		BeforeEach(func() {
-			LogsUploadPeriod = 100 * time.Millisecond
+			LogsUploadPeriod = 10 * time.Millisecond
 			pod = v1.Pod{TypeMeta: metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{Name: "test"}, Spec: v1.PodSpec{}, Status: v1.PodStatus{Phase: "Pending"}}
 
@@ -879,7 +879,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			logClusterOperatorsSuccess()
 			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			mockbmclient.EXPECT().DownloadFile(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-			callUploadLogs(150 * time.Millisecond)
+			callUploadLogs(50 * time.Millisecond)
 		})
 
 		It("Validate upload logs exits with no error + failed upload", func() {
@@ -887,7 +887,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			mockbmclient.EXPECT().DownloadFile(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			mockbmclient.EXPECT().UploadLogs(gomock.Any(), assistedController.ClusterID, models.LogsTypeController, gomock.Any()).Return(fmt.Errorf("dummy")).AnyTimes()
-			callUploadLogs(250 * time.Millisecond)
+			callUploadLogs(50 * time.Millisecond)
 		})
 
 		It("Validate must-gather logs are retried on error - while cluster error occurred", func() {
@@ -897,7 +897,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any(), gomock.Any()).Return("../../test_files/tartest.tar.gz", nil)
 			mockbmclient.EXPECT().DownloadFile(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 			status.Error()
-			callUploadLogs(250 * time.Millisecond)
+			callUploadLogs(50 * time.Millisecond)
 		})
 	})
 
