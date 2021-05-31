@@ -350,11 +350,7 @@ func (c controller) PostInstallConfigs(ctx context.Context, wg *sync.WaitGroup, 
 			utils.RequestIDLogger(ctxReq, c.log).WithError(err).Errorf("Failed to get cluster %s from assisted-service", c.ClusterID)
 			return false
 		}
-		// waiting till cluster will be installed(3 masters must be installed)
-		if *cluster.Status != models.ClusterStatusFinalizing {
-			return false
-		}
-		return true
+		return *cluster.Status == models.ClusterStatusFinalizing
 	})
 	if err != nil {
 		return
