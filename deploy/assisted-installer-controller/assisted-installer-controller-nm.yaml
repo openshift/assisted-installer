@@ -2,5 +2,3 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: assisted-installer
-  labels:
-    openshift.io/run-level: "0"
