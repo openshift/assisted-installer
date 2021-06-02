@@ -435,8 +435,10 @@ func (c controller) applyPostInstallManifests() bool {
 	ctx := utils.GenerateRequestContext()
 	tempDir, err := ioutil.TempDir("", "controller-custom-manifests-")
 	if err != nil {
+		c.log.WithError(err).Error("Failed to create temporary directory to create custom manifests.")
 		return false
 	}
+	c.log.Infof("Created temporary directory %s to store custom manifest content.", tempDir)
 	defer os.RemoveAll(tempDir)
 
 	customManifestPath := path.Join(tempDir, customManifestsFile)
@@ -982,6 +984,7 @@ func (c controller) downloadKubeconfigNoingress(ctx context.Context, dir string)
 		c.log.Errorf("Failed to download noingress kubeconfig %v\n", err)
 		return "", err
 	}
+	c.log.Infof("Downloaded %s to %s.", kubeconfigFileName, kubeconfigPath)
 
 	return kubeconfigPath, nil
 }

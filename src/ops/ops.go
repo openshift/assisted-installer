@@ -574,7 +574,7 @@ func (o *ops) CreateManifests(kubeconfig string, manifestFilePath string) error 
 	if err != nil {
 		return err
 	}
-	o.log.Info(output)
+	o.log.Infof("Applying custom manifest file %s succeed %s", manifestFilePath, output)
 
 	return nil
 }
