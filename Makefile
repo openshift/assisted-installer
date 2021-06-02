@@ -2,13 +2,17 @@ CONTAINER_COMMAND = $(shell if [ -x "$(shell which docker)" ];then echo "docker"
 INSTALLER := $(or ${INSTALLER},quay.io/ocpmetal/assisted-installer:stable)
 CONTROLLER :=  $(or ${CONTROLLER}, quay.io/ocpmetal/assisted-installer-controller:stable)
 ROOT_DIR = $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
-REPORTS = $(ROOT_DIR)/reports
-TEST_PUBLISH_FLAGS = --junitfile-testsuite-name=relative --junitfile-testcase-classname=relative --junitfile $(REPORTS)/unittest.xml
 NAMESPACE := $(or ${NAMESPACE},assisted-installer)
 GIT_REVISION := $(shell git rev-parse HEAD)
 PUBLISH_TAG := $(or ${GIT_REVISION})
 
 CONTAINER_BUILD_PARAMS = --network=host --label git_revision=${GIT_REVISION}
+
+REPORTS ?= $(ROOT_DIR)/reports
+CI ?= false
+TEST_FORMAT ?= standard-verbose
+GOTEST_FLAGS = --format=$(TEST_FORMAT) -- -count=1 -cover -coverprofile=$(REPORTS)/$(TEST_SCENARIO)_coverage.out
+GINKGO_FLAGS = -ginkgo.focus="$(FOCUS)" -ginkgo.v -ginkgo.skip="$(SKIP)" -ginkgo.reportFile=./junit_$(TEST_SCENARIO)_test.xml
 
 all: lint format-check build-images unit-test
 
@@ -25,9 +29,23 @@ generate:
 	go generate $(shell go list ./...)
 	$(MAKE) format
 
-unit-test: $(REPORTS)
-	gotestsum --format=pkgname $(TEST_PUBLISH_FLAGS) -- -cover -coverprofile=$(REPORTS)/coverage.out $(or ${TEST},$(shell go list ./...)) -ginkgo.focus=${FOCUS} -ginkgo.v
-	gocov convert $(REPORTS)/coverage.out | gocov-xml > $(REPORTS)/coverage.xml
+unit-test:
+	$(MAKE) _test TEST_SCENARIO=unit TIMEOUT=30m TEST="$(or $(TEST),$(shell go list ./...))" || (docker kill postgres && /bin/false)
+
+_test: $(REPORTS)
+	gotestsum $(GOTEST_FLAGS) $(TEST) $(GINKGO_FLAGS) -timeout $(TIMEOUT) || ($(MAKE) _post_test && /bin/false)
+	$(MAKE) _post_test
+
+_post_test: $(REPORTS)
+	@for name in `find '$(ROOT_DIR)' -name 'junit*.xml' -type f -not -path '$(REPORTS)/*'`; do \
+		mv -f $$name $(REPORTS)/junit_$(TEST_SCENARIO)_$$(basename $$(dirname $$name)).xml; \
+	done
+	$(MAKE) _coverage
+
+_coverage: $(REPORTS)
+ifeq ($(CI), true)
+	gocov convert $(REPORTS)/$(TEST_SCENARIO)_coverage.out | gocov-xml > $(REPORTS)/$(TEST_SCENARIO)_coverage.xml
+endif
 
 build: installer controller
 
