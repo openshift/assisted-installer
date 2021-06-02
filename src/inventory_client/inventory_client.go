@@ -183,6 +183,7 @@ func (c *inventoryClient) DownloadFile(ctx context.Context, filename string, des
 	defer func() {
 		fo.Close()
 	}()
+	c.logger.Infof("Downloading file %s to %s", filename, dest)
 	_, err = c.ai.Installer.DownloadClusterFiles(ctx, c.createDownloadParams(filename), fo)
 	return aserror.GetAssistedError(err)
 }
