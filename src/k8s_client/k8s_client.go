@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/go-openapi/swag"
 	"io"
 	"os"
 	"strings"
@@ -80,6 +81,7 @@ type K8SClient interface {
 	CreateEvent(namespace, name, message, component string) (*v1.Event, error)
 	DeleteService(namespace, name string) error
 	DeletePods(namespace string) error
+	DeleteNamespace(namespace string) error
 }
 
 type K8SClientBuilder func(configPath string, logger *logrus.Logger) (K8SClient, error)
@@ -180,6 +182,12 @@ func (c *k8sClient) DeleteService(name, namespace string) error {
 
 func (c *k8sClient) DeletePods(namespace string) error {
 	return c.client.CoreV1().Pods(namespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+}
+
+func (c *k8sClient) DeleteNamespace(namespace string) error {
+	return c.client.CoreV1().Namespaces().Delete(context.TODO(), namespace, metav1.DeleteOptions{
+		GracePeriodSeconds: swag.Int64(10),
+	})
 }
 
 func (c *k8sClient) ListMachines() (*machinev1beta1.MachineList, error) {

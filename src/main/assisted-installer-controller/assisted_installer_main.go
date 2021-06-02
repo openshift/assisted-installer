@@ -96,14 +96,24 @@ func main() {
 	wg.Add(1)
 
 	// monitoring installation by cluster status
-	waitForInstallation(client, logger, &status)
+	waitForInstallation(client, kc, logger, &status)
+}
+
+func deleteNamespaceWithRetry(kc k8s_client.K8SClient, log *logrus.Logger)  {
+	_ = utils.Retry(10, 2, log, func() error {
+		err := kc.DeleteNamespace(Options.ControllerConfig.Namespace)
+		if err != nil {
+			log.WithError(err).Info("Failed to remove namespace")
+		}
+		return err
+	})
 }
 
 // waitForInstallation monitor cluster status and is blocking main from cancelling all go routine s
 // if cluster status is (cancelled,installed) there is no need to continue and we will exit.
 // if cluster is in error, in addition to stop waiting we need to set error status to tell upload logs to send must-gather.
 // if we have maximumErrorsBeforeExit GetClusterNotFound/GetClusterUnauthorized errors in a row we force exiting controller
-func waitForInstallation(client inventory_client.InventoryClient, log logrus.FieldLogger, status *assistedinstallercontroller.ControllerStatus) {
+func waitForInstallation(client inventory_client.InventoryClient, kc k8s_client.K8SClient, log *logrus.Logger, status *assistedinstallercontroller.ControllerStatus) {
 	log.Infof("monitor cluster installation status")
 	reqCtx := utils.GenerateRequestContext()
 	errCounter := 0
@@ -130,20 +140,21 @@ func waitForInstallation(client inventory_client.InventoryClient, log logrus.Fie
 			// job will restart assisted-controller.
 			if errCounter >= maximumErrorsBeforeExit {
 				log.Infof("Got more than %d errors from assisted service in a row, exiting", maximumErrorsBeforeExit)
+				deleteNamespaceWithRetry(kc, log)
 				exit(0)
 			}
 			continue
 		}
 		// reset error counter in case no error occurred
 		errCounter = 0
-		finished := handleClusterStatus(*cluster.Status, log, status)
+		finished := handleClusterStatus(*cluster.Status, kc, log, status)
 		if finished {
 			return
 		}
 	}
 }
 
-func handleClusterStatus(clusterStatus string, log logrus.FieldLogger, status *assistedinstallercontroller.ControllerStatus) bool {
+func handleClusterStatus(clusterStatus string, kc k8s_client.K8SClient, log logrus.FieldLogger, status *assistedinstallercontroller.ControllerStatus) bool {
 	switch clusterStatus {
 	case models.ClusterStatusError:
 		log.Infof("Cluster installation failed.")
@@ -153,6 +164,7 @@ func handleClusterStatus(clusterStatus string, log logrus.FieldLogger, status *a
 		log.Infof("Cluster installation aborted. Signal the status")
 		return true
 	case models.ClusterStatusInstalled:
+		deleteNamespaceWithRetry(kc, log)
 		log.Infof("Cluster installation successfully finished.")
 		return true
 	}

@@ -23,6 +23,12 @@ rules:
     verbs:
       - create
   - apiGroups:
+      - ""
+    resources:
+      - namespaces
+    verbs:
+      - delete
+  - apiGroups:
       - certificates.k8s.io
     resources:
       - certificatesigningrequests
