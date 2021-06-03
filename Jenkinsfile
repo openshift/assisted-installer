@@ -4,6 +4,8 @@ pipeline {
   agent { label 'centos_worker' }
   triggers { cron(cron_string) }
   environment {
+        CI="true"
+        
         // Credentials
         SLACK_TOKEN = credentials('slack-token')
         QUAY_IO_CREDS = credentials('ocpmetal_cred')
