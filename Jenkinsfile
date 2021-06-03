@@ -5,7 +5,7 @@ pipeline {
   triggers { cron(cron_string) }
   environment {
         CI="true"
-        
+
         // Credentials
         SLACK_TOKEN = credentials('slack-token')
         QUAY_IO_CREDS = credentials('ocpmetal_cred')
@@ -32,12 +32,6 @@ pipeline {
     stage('build') {
         steps {
             sh 'skipper make'
-        }
-        post {
-            always {
-                junit '**/reports/*test.xml'
-                cobertura coberturaReportFile: '**/reports/*coverage.xml', onlyStable: false, enableNewApi: true
-            }
         }
     }
 
@@ -69,6 +63,9 @@ pipeline {
                }
                sh '''curl -X POST -H 'Content-type: application/json' --data-binary "@data.txt" https://hooks.slack.com/services/${SLACK_TOKEN}'''
            }
+
+            junit '**/reports/junit*.xml'
+            cobertura coberturaReportFile: '**/reports/*coverage.xml', onlyStable: false, enableNewApi: true
         }
     }
   }
