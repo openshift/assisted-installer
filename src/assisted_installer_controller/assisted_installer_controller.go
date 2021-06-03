@@ -799,13 +799,15 @@ func (c controller) waitForOLMOperators() bool {
 			continue
 		}
 
-		err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operator.Name, operatorStatus, csv.Status.Message)
-		if err != nil {
-			c.log.WithError(err).Warnf("Failed to update olm %s status", operator.Name)
-			continue
-		}
+		if operator.Status != operatorStatus || (operator.StatusInfo != csv.Status.Message && csv.Status.Message != "") {
+			c.log.Infof("CSV %s is in status %s, message %s.", operator.Name, csv.Status.Phase, csv.Status.Message)
 
-		c.log.Infof("CSV %s is in status %s, message %s.", operator.Name, csv.Status.Phase, csv.Status.Message)
+			err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operator.Name, operatorStatus, csv.Status.Message)
+			if err != nil {
+				c.log.WithError(err).Warnf("Failed to update olm %s status", operator.Name)
+				continue
+			}
+		}
 	}
 	return false
 }
@@ -818,21 +820,34 @@ func (c controller) isOperatorAvailableInCluster(operatorName string) bool {
 		return false
 	}
 
-	operatorStatus, operatorMessage := utils.ClusterOperatorConditionsToMonitoredOperatorStatus(co.Status.Conditions)
-	err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operatorName, operatorStatus, operatorMessage)
+	operatorStatusInService, err := c.ic.GetClusterMonitoredOperator(utils.GenerateRequestContext(), c.ClusterID, operatorName)
 	if err != nil {
-		c.log.WithError(err).Warnf("Failed to update %s operator status %s with message %s", operatorName, operatorStatus, operatorMessage)
+		c.log.WithError(err).Errorf("Failed to get cluster %s operator %s status", c.ClusterID, operatorName)
 		return false
 	}
 
-	if !c.checkOperatorStatusCondition(co, configv1.OperatorAvailable, configv1.ConditionTrue) ||
-		!c.checkOperatorStatusCondition(co, configv1.OperatorDegraded, configv1.ConditionFalse) {
-		return false
+	operatorStatus, operatorMessage := utils.ClusterOperatorConditionsToMonitoredOperatorStatus(co.Status.Conditions)
+	if operatorStatusInService.Status != operatorStatus || (operatorStatusInService.StatusInfo != operatorMessage && operatorMessage != "") {
+		c.log.Infof("Operator %s status: %s message: %s", operatorName, operatorStatus, operatorMessage)
+
+		err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operatorName, operatorStatus, operatorMessage)
+		if err != nil {
+			c.log.WithError(err).Warnf("Failed to update %s operator status %s with message %s", operatorName, operatorStatus, operatorMessage)
+			return false
+		}
+
+		if !c.checkOperatorStatusCondition(co, configv1.OperatorAvailable, configv1.ConditionTrue) ||
+			!c.checkOperatorStatusCondition(co, configv1.OperatorDegraded, configv1.ConditionFalse) {
+			return false
+		}
+
+		c.log.Infof("%s operator is available in cluster", operatorName)
+
+		return true
+
 	}
 
-	c.log.Infof("%s operator is available in cluster", operatorName)
-
-	return true
+	return false
 }
 
 func (c controller) isOperatorAvailableInService(operatorName string) bool {
