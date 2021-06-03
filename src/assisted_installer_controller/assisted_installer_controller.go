@@ -276,6 +276,12 @@ func (c *controller) deleteDNSOperatorPods() error {
 	})
 }
 
+func (c *controller) deleteAINamespace() error {
+	return utils.Retry(maxDeletionAttempts, DeletionRetryInterval, c.log, func() error {
+		return c.kc.DeleteNamespace(c.ControllerConfig.Namespace)
+	})
+}
+
 func (c *controller) getMCSLogs() (string, error) {
 	logs := ""
 	namespace := "openshift-machine-config-operator"
@@ -425,6 +431,13 @@ func (c controller) postInstallConfigs(ctx context.Context) error {
 			return errors.Errorf("Timeout while waiting for some of the operators and not able to update its state")
 		}
 		c.log.WithError(err).Warnf("Timeout while waiting for OLM operators be installed")
+		return err
+	}
+
+	// Delete assisted-installer namespace after the installation
+	err = c.deleteAINamespace()
+	if err != nil {
+		c.log.WithError(err).Warn("Failed to delete AI namespace after the installation.")
 		return err
 	}
 

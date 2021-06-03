@@ -525,3 +525,17 @@ func (mr *MockK8SClientMockRecorder) DeletePods(namespace interface{}) *gomock.C
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePods", reflect.TypeOf((*MockK8SClient)(nil).DeletePods), namespace)
 }
+
+// DeleteNamespace mocks base method
+func (m *MockK8SClient) DeleteNamespace(namespace string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteNamespace", namespace)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteNamespace indicates an expected call of DeleteNamespace
+func (mr *MockK8SClientMockRecorder) DeleteNamespace(namespace interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteNamespace", reflect.TypeOf((*MockK8SClient)(nil).DeleteNamespace), namespace)
+}

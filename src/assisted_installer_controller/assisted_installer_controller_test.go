@@ -552,6 +552,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(fmt.Errorf("dummy")).Times(1)
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
 
+				// Deletion of NS
+				mockk8sclient.EXPECT().DeleteNamespace(defaultTestControllerConf.Namespace).Return(nil)
+
 				wg.Add(1)
 				go assistedController.PostInstallConfigs(context.TODO(), &wg, status)
 				wg.Wait()
@@ -590,6 +593,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockbmclient.EXPECT().GetClusterMonitoredOLMOperators(gomock.Any(), gomock.Any()).Return([]models.MonitoredOperator{}, nil).AnyTimes()
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(fmt.Errorf("dummy")).Times(1)
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
+				mockk8sclient.EXPECT().DeleteNamespace(defaultTestControllerConf.Namespace).Return(nil)
 
 				wg.Add(1)
 				assistedController.PostInstallConfigs(context.TODO(), &wg, status)
@@ -636,6 +640,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), "cluster-id", "lso", gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(fmt.Errorf("dummy")).Times(1)
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
+				mockk8sclient.EXPECT().DeleteNamespace(defaultTestControllerConf.Namespace).Return(nil)
 
 				wg.Add(1)
 				assistedController.PostInstallConfigs(context.TODO(), &wg, status)
