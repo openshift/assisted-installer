@@ -80,6 +80,7 @@ type K8SClient interface {
 	CreateEvent(namespace, name, message, component string) (*v1.Event, error)
 	DeleteService(namespace, name string) error
 	DeletePods(namespace string) error
+	PatchNamespace(namespace string, data []byte) error
 }
 
 type K8SClientBuilder func(configPath string, logger *logrus.Logger) (K8SClient, error)
@@ -180,6 +181,12 @@ func (c *k8sClient) DeleteService(name, namespace string) error {
 
 func (c *k8sClient) DeletePods(namespace string) error {
 	return c.client.CoreV1().Pods(namespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+}
+
+// TODO: We should be passing the context to these functions
+func (c *k8sClient) PatchNamespace(namespace string, data []byte) error {
+	_, err := c.client.CoreV1().Namespaces().Patch(context.TODO(), namespace, types.StrategicMergePatchType, data, metav1.PatchOptions{})
+	return err
 }
 
 func (c *k8sClient) ListMachines() (*machinev1beta1.MachineList, error) {
