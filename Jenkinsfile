@@ -38,7 +38,7 @@ pipeline {
   agent { label 'centos_worker' }
   triggers { cron(cronScheduleString(env.BRANCH_NAME)) }
   environment {
-        CURRENT_DATE = now.format("Ymd")
+        CURRENT_DATE = now.format("YMMdd")
         PUBLISH_TAG = releaseBranchPublishTag(env.BRANCH_NAME)
 
         // Credentials
