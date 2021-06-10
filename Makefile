@@ -16,7 +16,10 @@ GINKGO_FLAGS = -ginkgo.focus="$(FOCUS)" -ginkgo.v -ginkgo.skip="$(SKIP)" -ginkgo
 
 all: lint format-check build-images unit-test
 
-lint:
+ci-lint:
+	${ROOT_DIR}/hack/check-commits.sh
+
+lint: ci-lint
 	golangci-lint run -v
 
 format:
