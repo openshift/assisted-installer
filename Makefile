@@ -18,6 +18,7 @@ all: lint format-check build-images unit-test
 
 ci-lint:
 	${ROOT_DIR}/hack/check-commits.sh
+	pre-commit run --all-files
 
 lint: ci-lint
 	golangci-lint run -v
