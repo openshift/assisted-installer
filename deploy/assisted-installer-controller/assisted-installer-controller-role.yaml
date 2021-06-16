@@ -23,6 +23,12 @@ rules:
     verbs:
       - create
   - apiGroups:
+      - ""
+    resources:
+      - namespaces
+    verbs:
+      - patch
+  - apiGroups:
       - certificates.k8s.io
     resources:
       - certificatesigningrequests
@@ -148,4 +154,3 @@ rules:
       - pods
     verbs:
       - deletecollection
-
