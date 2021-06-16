@@ -1,6 +1,7 @@
 FROM registry.ci.openshift.org/openshift/release:golang-1.15
 ENV GO111MODULE=on
 ENV GOFLAGS=""
+ENV PRE_COMMIT_HOME=.pre-commit
 
 RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.25.0
 RUN yum install -y docker && \
@@ -11,3 +12,4 @@ RUN go get -u golang.org/x/tools/cmd/goimports@v0.0.0-20200520220537-cf2d1e09c84
               gotest.tools/gotestsum@v0.5.3 \
               github.com/axw/gocov/gocov \
               github.com/AlekSi/gocov-xml@v0.0.0-20190121064608-3a14fb1c4737
+RUN python3 -m pip install pre-commit==2.13.0
