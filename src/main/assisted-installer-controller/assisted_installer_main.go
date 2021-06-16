@@ -65,13 +65,19 @@ func main() {
 		kc,
 	)
 
+	var wg sync.WaitGroup
+	var status assistedinstallercontroller.ControllerStatus
+	mainContext, mainContextCancel := context.WithCancel(context.Background())
+
+	// No need to cancel with context, will finish quickly
+	// we should fix try to fix dns service issue as soon as possible
+	go assistedController.HackDNSAddressConflict(&wg)
+	wg.Add(1)
+
 	assistedController.SetReadyState()
 
 	// While adding new routine don't miss to add wg.add(1)
 	// without adding it will panic
-	var wg sync.WaitGroup
-	var status assistedinstallercontroller.ControllerStatus
-	mainContext, mainContextCancel := context.WithCancel(context.Background())
 
 	defer func() {
 		// stop all go routines
@@ -86,10 +92,6 @@ func main() {
 	go assistedController.PostInstallConfigs(mainContext, &wg, &status)
 	wg.Add(1)
 	go assistedController.UpdateBMHs(mainContext, &wg)
-	wg.Add(1)
-
-	// No need to cancel with context, will finish quickly
-	go assistedController.HackDNSAddressConflict(&wg)
 	wg.Add(1)
 
 	go assistedController.UploadLogs(mainContext, &wg, &status)
