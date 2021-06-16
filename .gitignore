@@ -1,3 +1,11 @@
-build
-reports
+.idea/
+.vscode/
+.venv/
+venv/
+build/
+kubevirtci/
 **/RCS/**
+.*.swp
+
+/vendor
+reports
