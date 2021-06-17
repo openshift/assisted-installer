@@ -48,7 +48,7 @@ func ProcessArgs() {
 	ret := &GlobalConfig
 	flag.StringVar(&ret.Role, "role", string(models.HostRoleMaster), "The node role")
 	flag.StringVar(&ret.ClusterID, "cluster-id", "", "The cluster id")
-	flag.StringVar(&ret.HostID, "host-id", "", "This host id")
+	flag.StringVar(&ret.HostID, "host-id", "", "This host i")
 	flag.StringVar(&ret.Device, "boot-device", "", "The boot device")
 	flag.StringVar(&ret.URL, "url", "", "The BM inventory URL, including a scheme and optionally a port (overrides the host and port arguments")
 	flag.StringVar(&ret.OpenshiftVersion, "openshift-version", "4.4", "Openshift version to install")
