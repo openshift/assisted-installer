@@ -364,3 +364,17 @@ func (mr *MockOpsMockRecorder) EvaluateDiskSymlink(arg0 interface{}) *gomock.Cal
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EvaluateDiskSymlink", reflect.TypeOf((*MockOps)(nil).EvaluateDiskSymlink), arg0)
 }
+
+// CreateManifests mocks base method
+func (m *MockOps) CreateManifests(arg0 string, arg1 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateManifests", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateManifests indicates an expected call of CreateManifests
+func (mr *MockOpsMockRecorder) CreateManifests(arg0 interface{}, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateManifests", reflect.TypeOf((*MockOps)(nil).CreateManifests), arg0, arg1)
+}
