@@ -386,19 +386,6 @@ func (c controller) postInstallConfigs(ctx context.Context) error {
 		}
 	}
 
-	// Unlabel run-level from assisted-installer namespace after the installation.
-	// Keeping the `run-level` label represents a security risk as it overwrites the SecurityContext configurations
-	// used for applications deployed in this namespace.
-	data := []byte(`{"metadata":{"labels":{"$patch": "delete", "openshift.io/run-level":"0"}}}`)
-	c.log.Infof("Removing run-level label from %s namespace", c.ControllerConfig.Namespace)
-	err = c.kc.PatchNamespace(c.ControllerConfig.Namespace, data)
-	if err != nil {
-		// It is a conscious decision not to fail an installation if for any reason patching the namespace
-		// in order to remove the `run-level` label has failed. This will be redesigned in the next release
-		// so that the `run-level` label is not created in the first place.
-		c.log.Warn("Failed to unlabel AI namespace after the installation.")
-	}
-
 	err = utils.WaitForPredicateWithContext(ctx, WaitTimeout, GeneralWaitInterval, c.addRouterCAToClusterCA)
 	if err != nil {
 		return errors.Errorf("Timeout while waiting router ca data")
