@@ -1,7 +1,7 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 aliases:
-  code-reviewers:
+  code-approvers:
     - avishayt
     - empovit
     - eranco74
@@ -16,7 +16,6 @@ aliases:
     - yevgeny-shnaidman
     - yuvigold
     - masayag
-    - erezalster
     - nmagnezi
     - carbonin
     - rollandf
@@ -27,7 +26,7 @@ aliases:
     - asalkeld
     - flaper87
     - mkowalski
-  reviewers-only:
+  code-reviewers:
     - jakub-dzon
     - pkliczewski
     - masayag
