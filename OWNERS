@@ -3,10 +3,10 @@
 filters:
   .*:
     approvers:
-      - code-reviewers
+      - code-approvers
     reviewers:
+      - code-approvers
       - code-reviewers
-      - reviewers-only
   ^Dockerfile\..*:
     labels:
       - downstream-change-needed
