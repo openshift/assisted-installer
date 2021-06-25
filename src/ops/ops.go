@@ -229,7 +229,7 @@ func (o *ops) SetBootOrder(device string) error {
 	o.log.Info("Setting efibootmgr to boot from disk")
 
 	// efi-system is installed onto partition 2
-	_, err = o.ExecPrivilegeCommand(o.logWriter, "efibootmgr", "-d", device, "-p", "2", "-c", "-L", "RHCOS", "-l", "\\EFI\\BOOT\\BOOTX64.EFI")
+	_, err = o.ExecPrivilegeCommand(o.logWriter, "efibootmgr", "-d", device, "-p", "2", "-c", "-L", "Red Hat Enterprise Linux", "-l", "\\EFI\\redhat\\shimx64.efi")
 	if err != nil {
 		o.log.Errorf("Failed to set efibootmgr to boot from disk %s, err: %s", device, err)
 		return err
