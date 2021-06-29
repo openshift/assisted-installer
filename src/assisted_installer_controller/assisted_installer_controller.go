@@ -457,7 +457,8 @@ func (c controller) applyPostInstallManifests() bool {
 	defer os.RemoveAll(tempDir)
 
 	customManifestPath := path.Join(tempDir, customManifestsFile)
-	if err := c.ic.DownloadFile(ctx, customManifestsFile, customManifestPath); err != nil {
+	err = c.ic.DownloadFile(ctx, customManifestsFile, customManifestPath)
+	if err != nil {
 		return false
 	}
 
