@@ -34,6 +34,9 @@ import (
 )
 
 const (
+	// We retry 10 times in 30sec interval meaning that we tolerate the operator to be in failed
+	// state for 5minutes.
+	failedOperatorRetry       = 10
 	generalWaitTimeoutInt     = 30
 	controllerLogsSecondsAgo  = 120 * 60
 	consoleOperatorName       = "console"
@@ -88,10 +91,11 @@ type ControllerStatus struct {
 
 type controller struct {
 	ControllerConfig
-	log *logrus.Logger
-	ops ops.Ops
-	ic  inventory_client.InventoryClient
-	kc  k8s_client.K8SClient
+	log      *logrus.Logger
+	ops      ops.Ops
+	ic       inventory_client.InventoryClient
+	kc       k8s_client.K8SClient
+	retryMap map[string]int
 }
 
 func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inventory_client.InventoryClient, kc k8s_client.K8SClient) *controller {
@@ -101,6 +105,7 @@ func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inv
 		ops:              ops,
 		ic:               ic,
 		kc:               kc,
+		retryMap:         make(map[string]int),
 	}
 }
 
@@ -785,6 +790,15 @@ func (c controller) waitForOLMOperators() bool {
 		}
 
 		operatorStatus := utils.CsvStatusToOperatorStatus(string(csv.Status.Phase))
+
+		// FIXME: We retry the check of the operator status in case it's in failed state to WA bug 1968606
+		// Remove this code when bug 1968606 is fixed
+		if utils.IsStatusFailed(operatorStatus) && c.retryMap[operator.Name] < failedOperatorRetry {
+			c.retryMap[operator.Name]++
+			c.log.Warnf("Operator %s has failed state retry(%d/%d) the check.", operator.Name, c.retryMap[operator.Name], failedOperatorRetry)
+			continue
+		}
+
 		err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operator.Name, operatorStatus, csv.Status.Message)
 		if err != nil {
 			c.log.WithError(err).Warnf("Failed to update olm %s status", operator.Name)

@@ -283,6 +283,10 @@ func CsvStatusToOperatorStatus(csvStatus string) models.OperatorStatus {
 	}
 }
 
+func IsStatusFailed(operatorStatus models.OperatorStatus) bool {
+	return operatorStatus == models.OperatorStatusFailed
+}
+
 func ClusterOperatorConditionsToMonitoredOperatorStatus(conditions []configv1.ClusterOperatorStatusCondition) (models.OperatorStatus, string) {
 	for _, condition := range conditions {
 		if condition.Type == configv1.OperatorAvailable && condition.Status == configv1.ConditionTrue {
