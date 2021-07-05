@@ -800,7 +800,7 @@ func (c controller) waitForOLMOperators() bool {
 		}
 
 		if operator.Status != operatorStatus || (operator.StatusInfo != csv.Status.Message && csv.Status.Message != "") {
-			c.log.Infof("CSV %s is in status %s, message %s.", operator.Name, csv.Status.Phase, csv.Status.Message)
+			c.log.Infof("CSV %s updated, status: %s -> %s, message: %s -> %s.", operator.Name, operator.Status, operatorStatus, operator.StatusInfo, csv.Status.Message)
 
 			err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operator.Name, operatorStatus, csv.Status.Message)
 			if err != nil {
@@ -828,7 +828,7 @@ func (c controller) isOperatorAvailableInCluster(operatorName string) bool {
 
 	operatorStatus, operatorMessage := utils.ClusterOperatorConditionsToMonitoredOperatorStatus(co.Status.Conditions)
 	if operatorStatusInService.Status != operatorStatus || (operatorStatusInService.StatusInfo != operatorMessage && operatorMessage != "") {
-		c.log.Infof("Operator %s status: %s message: %s", operatorName, operatorStatus, operatorMessage)
+		c.log.Infof("Operator %s updated, status: %s -> %s, message: %s -> %s.", operatorName, operatorStatusInService.Status, operatorStatus, operatorStatusInService.StatusInfo, operatorMessage)
 
 		err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operatorName, operatorStatus, operatorMessage)
 		if err != nil {
@@ -898,7 +898,6 @@ func (c controller) waitingForClusterVersion(ctx context.Context) error {
 		}
 
 		operatorStatus, operatorMessage := utils.ClusterOperatorConditionsToMonitoredOperatorStatus(co.Status.Conditions)
-
 		if cvoStatusInService.Status != operatorStatus || (cvoStatusInService.StatusInfo != operatorMessage && operatorMessage != "") {
 			// This is a common pattern to ensure the channel is empty after a stop has been called
 			// More info on time/sleep.go documentation
@@ -907,8 +906,7 @@ func (c controller) waitingForClusterVersion(ctx context.Context) error {
 			}
 			timer.Reset(WaitTimeout)
 
-			status := fmt.Sprintf("Cluster version status: %s message: %s", operatorStatus, operatorMessage)
-			c.log.Infof(status)
+			c.log.Infof("CVO updated, status: %s -> %s, message: %s -> %s.", cvoStatusInService.Status, operatorStatus, cvoStatusInService.StatusInfo, operatorMessage)
 
 			// Update built-in monitored operator cluster version status
 			if err := c.ic.UpdateClusterOperator(utils.GenerateRequestContext(), c.ClusterID, cvoOperatorName, operatorStatus, operatorMessage); err != nil {
