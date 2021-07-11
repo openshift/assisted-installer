@@ -610,7 +610,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				setClusterAsFinalizing()
 				mockk8sclient.EXPECT().GetConfigMap(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("aaa")).MinTimes(1)
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", false,
-					"Timeout while waiting router ca data").Return(nil).Times(1)
+					"Timeout while waiting router ca data: timed out").Return(nil).Times(1)
 
 				// Patching NS
 				mockk8sclient.EXPECT().PatchNamespace(defaultTestControllerConf.Namespace, aiNamespaceRunlevelPatch).Return(nil)
