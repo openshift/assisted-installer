@@ -220,9 +220,9 @@ func (o *ops) Reboot() error {
 }
 
 func (o *ops) SetBootOrder(device string) error {
-	_, err := o.ExecPrivilegeCommand(o.logWriter, "test", "-d", "/sys/firmware/efi")
+	_, err := o.ExecPrivilegeCommand(nil, "test", "-d", "/sys/firmware/efi")
 	if err != nil {
-		o.log.Info("efi not supported")
+		o.log.Info("Setting boot order on efi is not supported. Skipping...")
 		return nil
 	}
 
