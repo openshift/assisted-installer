@@ -372,6 +372,7 @@ func (c controller) PostInstallConfigs(ctx context.Context, wg *sync.WaitGroup, 
 		return
 	}
 	if err != nil {
+		c.log.Error(err)
 		errMessage = err.Error()
 		status.Error()
 	}
@@ -385,9 +386,8 @@ func (c controller) postInstallConfigs(ctx context.Context) error {
 	c.log.Infof("Waiting for cluster version operator: %t", c.WaitForClusterVersion)
 
 	if c.WaitForClusterVersion {
-		err = c.waitingForClusterVersion(ctx)
-		if err != nil {
-			return err
+		if err = c.waitingForClusterVersion(ctx); err != nil {
+			return errors.Wrapf(err, "Timeout while waiting for cluster version to be available")
 		}
 	}
 
@@ -406,32 +406,29 @@ func (c controller) postInstallConfigs(ctx context.Context) error {
 
 	err = utils.WaitForPredicateWithContext(ctx, WaitTimeout, GeneralWaitInterval, c.addRouterCAToClusterCA)
 	if err != nil {
-		return errors.Errorf("Timeout while waiting router ca data")
+		return errors.Wrapf(err, "Timeout while waiting router ca data")
 	}
 
 	unpatch, err := utils.EtcdPatchRequired(c.ControllerConfig.OpenshiftVersion)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "Failed to patch etcd")
 	}
 	if unpatch && c.HighAvailabilityMode != models.ClusterHighAvailabilityModeNone {
-		err = utils.WaitForPredicateWithContext(ctx, WaitTimeout, GeneralWaitInterval, c.unpatchEtcd)
-		if err != nil {
-			return errors.Errorf("Timeout while trying to unpatch etcd")
+		if err = utils.WaitForPredicateWithContext(ctx, WaitTimeout, GeneralWaitInterval, c.unpatchEtcd); err != nil {
+			return errors.Wrapf(err, "Timeout while trying to unpatch etcd")
 		}
 	} else {
 		c.log.Infof("Skipping etcd unpatch for cluster version %s", c.ControllerConfig.OpenshiftVersion)
 	}
 
-	err = utils.WaitForPredicateWithContext(ctx, WaitTimeout, GeneralWaitInterval, c.validateConsoleAvailability)
-	if err != nil {
-		return errors.Errorf("Timeout while waiting for console to become available")
+	if err = utils.WaitForPredicateWithContext(ctx, WaitTimeout, GeneralWaitInterval, c.validateConsoleAvailability); err != nil {
+		return errors.Wrapf(err, "Timeout while waiting for console to become available")
 	}
 
 	// Apply post install manifests
 	err = utils.WaitForPredicateWithContext(ctx, retryPostManifestTimeout, GeneralWaitInterval, c.applyPostInstallManifests)
 	if err != nil {
-		c.log.WithError(err).Warnf("Failed to apply post manifests.")
-		return err
+		return errors.Wrapf(err, "Failed to apply post manifests")
 	}
 
 	waitTimeout := c.getMaximumOLMTimeout()
@@ -442,8 +439,7 @@ func (c controller) postInstallConfigs(ctx context.Context) error {
 		if err = c.updatePendingOLMOperators(); err != nil {
 			return errors.Errorf("Timeout while waiting for some of the operators and not able to update its state")
 		}
-		c.log.WithError(err).Warnf("Timeout while waiting for OLM operators be installed")
-		return err
+		return errors.Wrapf(err, "Timeout while waiting for OLM operators be installed")
 	}
 
 	return nil
@@ -917,15 +913,11 @@ func (c controller) waitingForClusterVersion(ctx context.Context) error {
 		return false
 	}
 
-	err := utils.WaitForPredicateWithTimer(ctx, WaitTimeout, GeneralProgressUpdateInt, isClusterVersionAvailable)
-	if err != nil {
-		return errors.Wrapf(err, "Timeout while waiting for cluster version to be available")
-	}
-	return nil
+	return utils.WaitForPredicateWithTimer(ctx, WaitTimeout, GeneralProgressUpdateInt, isClusterVersionAvailable)
 }
 
 func (c controller) sendCompleteInstallation(ctx context.Context, isSuccess bool, errorInfo string) {
-	c.log.Infof("Start complete installation step, with params success:%t, error info %s", isSuccess, errorInfo)
+	c.log.Infof("Start complete installation step, with params success: %t, error info: %s", isSuccess, errorInfo)
 	_ = utils.WaitForPredicateWithContext(ctx, CompleteTimeout, GeneralProgressUpdateInt, func() bool {
 		ctxReq := utils.GenerateRequestContext()
 		if err := c.ic.CompleteInstallation(ctxReq, c.ClusterID, isSuccess, errorInfo); err != nil {
