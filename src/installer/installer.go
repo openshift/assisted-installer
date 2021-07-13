@@ -337,7 +337,7 @@ func (i *installer) waitForNetworkType(kc k8s_client.K8SClient) error {
 }
 
 func (i *installer) waitForControlPlane(ctx context.Context) error {
-	kc, err := i.kcBuilder(KubeconfigPathLoopBack, i.log)
+	kc, err := i.kcBuilder(KubeconfigPath, i.log)
 	if err != nil {
 		i.log.Error(err)
 		return err
