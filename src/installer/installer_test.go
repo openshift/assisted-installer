@@ -404,7 +404,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			Expect(ret).Should(Equal(err))
 		})
 	})
-	Context("Bootstrap role waiting for controller", func() {
+	Context("Bootstrap role waiting for control plane", func() {
 
 		conf := config.Config{Role: string(models.HostRoleBootstrap),
 			ClusterID:        "cluster-id",
@@ -417,21 +417,19 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		BeforeEach(func() {
 			installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition)
 		})
+		It("waitForControlPlane reload resolv.conf failed", func() {
+			mockops.EXPECT().ReloadHostFile("/etc/resolv.conf").Return(fmt.Errorf("failed to load file")).Times(1)
 
-		It("waitForController reload resolv.conf failed", func() {
-			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostId, models.HostStageWaitingForController, "waiting for controller pod ready event").Return(nil).Times(1)
-			mockops.EXPECT().ReloadHostFile("/etc/resolv.conf").Return(fmt.Errorf("dummy")).Times(1)
-
-			err := installerObj.waitForController()
+			err := installerObj.waitForControlPlane(context.Background())
 			Expect(err).To(HaveOccurred())
 		})
+
 		It("waitForController reload get pods fails then succeeds", func() {
-			resolvConfSuccess()
 			reportLogProgressSuccess()
 			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostId, models.HostStageWaitingForController, "waiting for controller pod ready event").Return(nil).Times(1)
 			mockk8sclient.EXPECT().GetPods("assisted-installer", gomock.Any(), "").Return(nil, fmt.Errorf("dummy")).Times(1)
 			mockk8sclient.EXPECT().ListEvents(assistedControllerNamespace).Return(&events, nil).Times(1)
-			err := installerObj.waitForController()
+			err := installerObj.waitForController(mockk8sclient)
 			Expect(err).NotTo(HaveOccurred())
 		})
 		It("Configuring state", func() {
