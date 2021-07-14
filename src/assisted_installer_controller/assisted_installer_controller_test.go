@@ -15,6 +15,8 @@ import (
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
 	"github.com/openshift/assisted-installer/src/common"
 	machinev1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	ocsv1 "github.com/openshift/ocs-operator/api/v1"
+	ocsv1util "github.com/openshift/ocs-operator/controllers/util"
 	olmv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 
@@ -1016,31 +1018,16 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), "cluster-id", "lso", gomock.Any(), gomock.Any()).Return(nil).Times(1)
 			Expect(assistedController.waitForOLMOperators()).To(Equal(false))
 		})
-		It("check that we tolerate the failed state reported by CSV", func() {
+		It("check that we use SC for OCS instead of checking the CSV status", func() {
 			mockbmclient.EXPECT().GetClusterMonitoredOLMOperators(gomock.Any(), gomock.Any()).Return(
-				[]models.MonitoredOperator{{SubscriptionName: "local-storage-operator", Namespace: "openshift-local-storage", OperatorType: models.OperatorTypeOlm, Name: "lso", Status: models.OperatorStatusProgressing, TimeoutSeconds: 1}}, nil,
+				[]models.MonitoredOperator{{SubscriptionName: "ocs-operator", Namespace: "openshift-storage",
+					Name: "ocs", Status: models.OperatorStatusProgressing, OperatorType: models.OperatorTypeOlm,
+					StatusInfo: "same"}}, nil,
 			).Times(1)
-			mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-local-storage", "local-storage-operator").Return("lso-1.1", nil).Times(1)
-			mockk8sclient.EXPECT().GetCSV("openshift-local-storage", "lso-1.1").Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseFailed}}, nil).Times(1)
-
+			mockk8sclient.EXPECT().GetStorageCluster("openshift-storage").Return(&ocsv1.StorageCluster{
+				Status: ocsv1.StorageClusterStatus{Phase: ocsv1util.PhaseProgressing}}, nil).Times(1)
+			mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), "cluster-id", "ocs", gomock.Any(), gomock.Any()).Return(nil).Times(1)
 			Expect(assistedController.waitForOLMOperators()).To(Equal(false))
-			Expect(assistedController.retryMap["lso"]).To(Equal(1))
-
-			mockbmclient.EXPECT().GetClusterMonitoredOLMOperators(gomock.Any(), gomock.Any()).Return(
-				[]models.MonitoredOperator{{SubscriptionName: "local-storage-operator", Namespace: "openshift-local-storage", OperatorType: models.OperatorTypeOlm, Name: "lso", Status: models.OperatorStatusProgressing, TimeoutSeconds: 1}}, nil,
-			).Times(1)
-			mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-local-storage", "local-storage-operator").Return("lso-1.1", nil).Times(1)
-			mockk8sclient.EXPECT().GetCSV("openshift-local-storage", "lso-1.1").Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseSucceeded}}, nil).Times(1)
-			mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), "cluster-id", "lso", models.OperatorStatusAvailable, gomock.Any()).Return(nil).Times(1)
-
-			Expect(assistedController.waitForOLMOperators()).To(Equal(false))
-			Expect(assistedController.retryMap["lso"]).To(Equal(1))
-
-			mockbmclient.EXPECT().GetClusterMonitoredOLMOperators(gomock.Any(), gomock.Any()).Return(
-				[]models.MonitoredOperator{{SubscriptionName: "local-storage-operator", Namespace: "openshift-local-storage", OperatorType: models.OperatorTypeOlm, Name: "lso", Status: models.OperatorStatusAvailable, TimeoutSeconds: 1}}, nil,
-			).Times(1)
-
-			Expect(assistedController.waitForOLMOperators()).To(Equal(true))
 		})
 	})
 

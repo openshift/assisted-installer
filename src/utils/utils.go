@@ -23,7 +23,9 @@ import (
 
 	"github.com/hashicorp/go-version"
 	configv1 "github.com/openshift/api/config/v1"
+	ocsv1util "github.com/openshift/ocs-operator/controllers/util"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+
 	"github.com/sirupsen/logrus"
 	"github.com/vincent-petithory/dataurl"
 )
@@ -301,4 +303,15 @@ func ClusterOperatorConditionsToMonitoredOperatorStatus(conditions []configv1.Cl
 	}
 
 	return models.OperatorStatusProgressing, ""
+}
+
+func SCStatusToOperatorStatus(scStatus string) models.OperatorStatus {
+	switch scStatus {
+	case ocsv1util.PhaseReady:
+		return models.OperatorStatusAvailable
+	case ocsv1util.PhaseError:
+		return models.OperatorStatusFailed
+	default:
+		return models.OperatorStatusProgressing
+	}
 }

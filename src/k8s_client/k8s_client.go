@@ -18,6 +18,7 @@ import (
 	configv1client "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 	operatorv1 "github.com/openshift/client-go/operator/clientset/versioned"
 	machinev1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	ocsv1 "github.com/openshift/ocs-operator/api/v1"
 	olmv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	olmv1client "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/typed/operators/v1alpha1"
@@ -81,6 +82,7 @@ type K8SClient interface {
 	DeleteService(namespace, name string) error
 	DeletePods(namespace string) error
 	PatchNamespace(namespace string, data []byte) error
+	GetStorageCluster(namespace string) (*ocsv1.StorageCluster, error)
 }
 
 type K8SClientBuilder func(configPath string, logger *logrus.Logger) (K8SClient, error)
@@ -423,6 +425,20 @@ func (c *k8sClient) SetProxyEnvVars() error {
 	return nil
 }
 
+func (c *k8sClient) GetStorageCluster(namespace string) (*ocsv1.StorageCluster, error) {
+	//hard coding this as it's been hardcoded in assisted-service
+	sc := &ocsv1.StorageCluster{}
+	err := c.olmClient.RESTClient().Get().
+		Resource("storageclusters").
+		Namespace(namespace).
+		Name("ocs-storagecluster").
+		Do(context.TODO()).
+		Into(sc)
+	if err != nil {
+		return nil, err
+	}
+	return sc, nil
+}
 func (c *k8sClient) GetCSV(namespace string, name string) (*operatorsv1alpha1.ClusterServiceVersion, error) {
 	csv, err := c.olmClient.ClusterServiceVersions(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {

@@ -34,9 +34,6 @@ import (
 )
 
 const (
-	// We retry 10 times in 30sec interval meaning that we tolerate the operator to be in failed
-	// state for 5minutes.
-	failedOperatorRetry       = 10
 	generalWaitTimeoutInt     = 30
 	controllerLogsSecondsAgo  = 120 * 60
 	consoleOperatorName       = "console"
@@ -91,11 +88,10 @@ type ControllerStatus struct {
 
 type controller struct {
 	ControllerConfig
-	log      *logrus.Logger
-	ops      ops.Ops
-	ic       inventory_client.InventoryClient
-	kc       k8s_client.K8SClient
-	retryMap map[string]int
+	log *logrus.Logger
+	ops ops.Ops
+	ic  inventory_client.InventoryClient
+	kc  k8s_client.K8SClient
 }
 
 func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inventory_client.InventoryClient, kc k8s_client.K8SClient) *controller {
@@ -105,7 +101,6 @@ func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inv
 		ops:              ops,
 		ic:               ic,
 		kc:               kc,
-		retryMap:         make(map[string]int),
 	}
 }
 
@@ -773,31 +768,39 @@ func (c controller) waitForOLMOperators() bool {
 		return true
 	}
 	for _, operator := range operators {
-		csvName, err := c.kc.GetCSVFromSubscription(operator.Namespace, operator.SubscriptionName)
-		if err != nil {
-			c.log.WithError(err).Warnf("Failed to get subscription of operator %s", operator.Name)
-			continue
-		}
 
-		csv, err := c.kc.GetCSV(operator.Namespace, csvName)
-		if err != nil {
-			c.log.WithError(err).Warnf("Failed to get %s", operator.Name)
-			continue
-		}
+		//FIXME: We check the StorageCluster of the OCS operator WA bug 1968606
+		//Remove this code when bug 1968606 is fixed
+		sc, err := c.kc.GetStorageCluster(operator.Namespace)
+		if sc != nil {
+			operatorStatus := utils.SCStatusToOperatorStatus(sc.Status.Phase)
 
-		operatorStatus := utils.CsvStatusToOperatorStatus(string(csv.Status.Phase))
+			if operator.Status != operatorStatus {
+				c.log.Infof("SC %s updated, status: %s -> %s.", operator.Name, operator.Status, operatorStatus)
+			}
 
-		// FIXME: We retry the check of the operator status in case it's in failed state to WA bug 1968606
-		// Remove this code when bug 1968606 is fixed
-		if utils.IsStatusFailed(operatorStatus) && c.retryMap[operator.Name] < failedOperatorRetry {
-			c.retryMap[operator.Name]++
-			c.log.Warnf("Operator %s has failed state retry(%d/%d) the check.", operator.Name, c.retryMap[operator.Name], failedOperatorRetry)
-			continue
-		}
+			err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operator.Name, operatorStatus, sc.Status.Phase)
+			if err != nil {
+				c.log.WithError(err).Warnf("Failed to update olm %s status", operator.Name)
+				continue
+			}
+		} else {
+			csvName, err := c.kc.GetCSVFromSubscription(operator.Namespace, operator.SubscriptionName)
+			if err != nil {
+				c.log.WithError(err).Warnf("Failed to get subscription of operator %s", operator.Name)
+				continue
+			}
 
-		if operator.Status != operatorStatus || (operator.StatusInfo != csv.Status.Message && csv.Status.Message != "") {
-			c.log.Infof("CSV %s updated, status: %s -> %s, message: %s -> %s.", operator.Name, operator.Status, operatorStatus, operator.StatusInfo, csv.Status.Message)
+			csv, err := c.kc.GetCSV(operator.Namespace, csvName)
+			if err != nil {
+				c.log.WithError(err).Warnf("Failed to get %s", operator.Name)
+				continue
+			}
 
+			operatorStatus := utils.CsvStatusToOperatorStatus(string(csv.Status.Phase))
+			if operator.Status != operatorStatus || (operator.StatusInfo != csv.Status.Message && csv.Status.Message != "") {
+				c.log.Infof("CSV %s updated, status: %s -> %s, message: %s -> %s.", operator.Name, operator.Status, operatorStatus, operator.StatusInfo, csv.Status.Message)
+			}
 			err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operator.Name, operatorStatus, csv.Status.Message)
 			if err != nil {
 				c.log.WithError(err).Warnf("Failed to update olm %s status", operator.Name)
