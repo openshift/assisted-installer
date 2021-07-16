@@ -136,6 +136,7 @@ func (i *installer) InstallNode() error {
 
 	}
 	//upload host logs and report log status before reboot
+	i.log.Infof("Uploading logs and reporting status before rebooting the node %s for cluster %s", i.Config.HostID, i.Config.ClusterID)
 	i.inventoryClient.HostLogProgressReport(ctx, i.Config.ClusterID, i.Config.HostID, models.LogsStateRequested)
 	_, err = i.ops.UploadInstallationLogs(isBootstrap || i.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone)
 	if err != nil {
