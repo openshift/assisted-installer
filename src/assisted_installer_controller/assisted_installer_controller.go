@@ -23,7 +23,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/assisted-installer/src/common"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/k8s_client"
@@ -40,7 +39,6 @@ const (
 	generalWaitTimeoutInt     = 30
 	controllerLogsSecondsAgo  = 120 * 60
 	consoleOperatorName       = "console"
-	cvoOperatorName           = "cvo"
 	ingressConfigMapName      = "default-ingress-cert"
 	ingressConfigMapNamespace = "openshift-config-managed"
 	dnsServiceName            = "dns-default"
@@ -51,6 +49,7 @@ const (
 	KeepWaiting               = false
 	ExitWaiting               = true
 	customManifestsFile       = "custom_manifests.yaml"
+	kubeconfigFileName        = "kubeconfig-noingress"
 )
 
 var (
@@ -91,11 +90,10 @@ type ControllerStatus struct {
 
 type controller struct {
 	ControllerConfig
-	log      *logrus.Logger
-	ops      ops.Ops
-	ic       inventory_client.InventoryClient
-	kc       k8s_client.K8SClient
-	retryMap map[string]int
+	log *logrus.Logger
+	ops ops.Ops
+	ic  inventory_client.InventoryClient
+	kc  k8s_client.K8SClient
 }
 
 func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inventory_client.InventoryClient, kc k8s_client.K8SClient) *controller {
@@ -105,7 +103,6 @@ func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inv
 		ops:              ops,
 		ic:               ic,
 		kc:               kc,
-		retryMap:         make(map[string]int),
 	}
 }
 
@@ -431,9 +428,7 @@ func (c controller) postInstallConfigs(ctx context.Context) error {
 		return errors.Wrapf(err, "Failed to apply post manifests")
 	}
 
-	waitTimeout := c.getMaximumOLMTimeout()
-	err = utils.WaitForPredicateWithContext(ctx, waitTimeout, GeneralWaitInterval, c.waitForOLMOperators)
-	if err != nil {
+	if err != c.waitForOLMOperators(ctx) {
 		// In case the timeout occur, we have to update the pending OLM operators to failed state,
 		// so the assisted-service can update the cluster state to completed.
 		if err = c.updatePendingOLMOperators(); err != nil {
@@ -721,14 +716,7 @@ func (c controller) addRouterCAToClusterCA() bool {
 
 }
 
-func (c controller) getMaximumOLMTimeout() time.Duration {
-
-	operators, err := c.ic.GetClusterMonitoredOLMOperators(context.TODO(), c.ClusterID)
-	if err != nil {
-		c.log.WithError(err).Warningf("Failed to connect to assisted service")
-		return WaitTimeout
-	}
-
+func (c controller) getMaximumOLMTimeout(operators []*models.MonitoredOperator) time.Duration {
 	timeout := WaitTimeout.Seconds()
 	for _, operator := range operators {
 		timeout = math.Max(float64(operator.TimeoutSeconds), timeout)
@@ -737,16 +725,16 @@ func (c controller) getMaximumOLMTimeout() time.Duration {
 	return time.Duration(timeout * float64(time.Second))
 }
 
-func (c controller) getProgressingOLMOperators() ([]models.MonitoredOperator, error) {
-	ret := make([]models.MonitoredOperator, 0)
+func (c controller) getProgressingOLMOperators() ([]*models.MonitoredOperator, error) {
+	ret := make([]*models.MonitoredOperator, 0)
 	operators, err := c.ic.GetClusterMonitoredOLMOperators(context.TODO(), c.ClusterID)
 	if err != nil {
 		c.log.WithError(err).Warningf("Failed to connect to assisted service")
 		return ret, err
 	}
-	for _, operator := range operators {
-		if operator.Status != models.OperatorStatusAvailable && operator.Status != models.OperatorStatusFailed {
-			ret = append(ret, operator)
+	for index := range operators {
+		if operators[index].Status != models.OperatorStatusAvailable && operators[index].Status != models.OperatorStatusFailed {
+			ret = append(ret, &operators[index])
 		}
 	}
 	return ret, nil
@@ -766,151 +754,50 @@ func (c controller) updatePendingOLMOperators() error {
 }
 
 // waitForOLMOperators wait until all OLM monitored operators are available or failed.
-func (c controller) waitForOLMOperators() bool {
-	c.log.Infof("Checking OLM operators")
-	operators, _ := c.getProgressingOLMOperators()
-	if len(operators) == 0 {
-		return true
+func (c controller) waitForOLMOperators(ctx context.Context) error {
+	operators, err := c.getProgressingOLMOperators()
+	if err != nil {
+		return err
 	}
-	for _, operator := range operators {
-		csvName, err := c.kc.GetCSVFromSubscription(operator.Namespace, operator.SubscriptionName)
-		if err != nil {
-			c.log.WithError(err).Warnf("Failed to get subscription of operator %s", operator.Name)
-			continue
+	if len(operators) == 0 {
+		return nil
+	}
+
+	handlers := make(map[string]*ClusterServiceVersionHandler)
+
+	for index := range operators {
+		handlers[operators[index].Name] = NewClusterServiceVersionHandler(c.kc, operators[index])
+	}
+
+	areOLMOperatorsAvailable := func() bool {
+		if len(handlers) == 0 {
+			return true
 		}
 
-		csv, err := c.kc.GetCSV(operator.Namespace, csvName)
-		if err != nil {
-			c.log.WithError(err).Warnf("Failed to get %s", operator.Name)
-			continue
-		}
-
-		operatorStatus := utils.CsvStatusToOperatorStatus(string(csv.Status.Phase))
-
-		// FIXME: We retry the check of the operator status in case it's in failed state to WA bug 1968606
-		// Remove this code when bug 1968606 is fixed
-		if utils.IsStatusFailed(operatorStatus) && c.retryMap[operator.Name] < failedOperatorRetry {
-			c.retryMap[operator.Name]++
-			c.log.Warnf("Operator %s has failed state retry(%d/%d) the check.", operator.Name, c.retryMap[operator.Name], failedOperatorRetry)
-			continue
-		}
-
-		if operator.Status != operatorStatus || (operator.StatusInfo != csv.Status.Message && csv.Status.Message != "") {
-			c.log.Infof("CSV %s updated, status: %s -> %s, message: %s -> %s.", operator.Name, operator.Status, operatorStatus, operator.StatusInfo, csv.Status.Message)
-
-			err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operator.Name, operatorStatus, csv.Status.Message)
-			if err != nil {
-				c.log.WithError(err).Warnf("Failed to update olm %s status", operator.Name)
-				continue
+		for index := range handlers {
+			if c.isOperatorAvailable(handlers[index]) {
+				delete(handlers, index)
 			}
 		}
-	}
-	return false
-}
-
-func (c controller) isOperatorAvailableInCluster(operatorName string) bool {
-	c.log.Infof("Checking %s operator availability status", operatorName)
-	co, err := c.kc.GetClusterOperator(operatorName)
-	if err != nil {
-		c.log.WithError(err).Warnf("Failed to get %s operator", operatorName)
 		return false
 	}
 
-	operatorStatusInService, err := c.ic.GetClusterMonitoredOperator(utils.GenerateRequestContext(), c.ClusterID, operatorName)
-	if err != nil {
-		c.log.WithError(err).Errorf("Failed to get cluster %s operator %s status", c.ClusterID, operatorName)
-		return false
-	}
-
-	operatorStatus, operatorMessage := utils.ClusterOperatorConditionsToMonitoredOperatorStatus(co.Status.Conditions)
-	if operatorStatusInService.Status != operatorStatus || (operatorStatusInService.StatusInfo != operatorMessage && operatorMessage != "") {
-		c.log.Infof("Operator %s updated, status: %s -> %s, message: %s -> %s.", operatorName, operatorStatusInService.Status, operatorStatus, operatorStatusInService.StatusInfo, operatorMessage)
-
-		err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operatorName, operatorStatus, operatorMessage)
-		if err != nil {
-			c.log.WithError(err).Warnf("Failed to update %s operator status %s with message %s", operatorName, operatorStatus, operatorMessage)
-			return false
-		}
-
-		if !c.checkOperatorStatusCondition(co, configv1.OperatorAvailable, configv1.ConditionTrue) ||
-			!c.checkOperatorStatusCondition(co, configv1.OperatorDegraded, configv1.ConditionFalse) {
-			return false
-		}
-
-		c.log.Infof("%s operator is available in cluster", operatorName)
-
-		return true
-
-	}
-
-	return false
-}
-
-func (c controller) isOperatorAvailableInService(operatorName string) bool {
-	operatorStatusInService, err := c.ic.GetClusterMonitoredOperator(utils.GenerateRequestContext(), c.ClusterID, operatorName)
-	if err != nil {
-		c.log.WithError(err).Errorf("Failed to get cluster %s %s operator status", c.ClusterID, operatorName)
-		return false
-	}
-
-	if operatorStatusInService.Status == models.OperatorStatusAvailable {
-		c.log.Infof("Service acknowledged %s operator is available for cluster %s", operatorName, c.ClusterID)
-		return true
-	}
-
-	return false
+	waitTimeout := c.getMaximumOLMTimeout(operators)
+	c.log.Infof("Waiting for OLM operators for %v", waitTimeout)
+	return utils.WaitForPredicateWithContext(ctx, waitTimeout, GeneralWaitInterval, areOLMOperatorsAvailable)
 }
 
 // validateConsoleAvailability checks if the console operator is available
 func (c controller) validateConsoleAvailability() bool {
-	return c.isOperatorAvailableInCluster(consoleOperatorName) &&
-		c.isOperatorAvailableInService(consoleOperatorName)
+	return c.isOperatorAvailable(NewClusterOperatorHandler(c.kc, consoleOperatorName))
 }
 
 // waitingForClusterVersion checks the Cluster Version Operator availability in the
 // new OCP cluster. A success would be announced only when the service acknowledges
 // the CVO availability, in order to avoid unsycned scenarios.
-//
-// This function would be aligned with the console operator reporting workflow
-// as part of the deprecation of the old API in MGMT-5188.
 func (c controller) waitingForClusterVersion(ctx context.Context) error {
 	isClusterVersionAvailable := func(timer *time.Timer) bool {
-		c.log.Infof("Checking cluster version operator availability status")
-		co, err := c.kc.GetClusterVersion("version")
-		if err != nil {
-			c.log.WithError(err).Warn("Failed to get cluster version operator")
-			return false
-		}
-
-		cvoStatusInService, err := c.ic.GetClusterMonitoredOperator(utils.GenerateRequestContext(), c.ClusterID, cvoOperatorName)
-		if err != nil {
-			c.log.WithError(err).Errorf("Failed to get cluster %s cvo status", c.ClusterID)
-			return false
-		}
-
-		if cvoStatusInService.Status == models.OperatorStatusAvailable {
-			c.log.Infof("Service acknowledged CVO is available for cluster %s", c.ClusterID)
-			return true
-		}
-
-		operatorStatus, operatorMessage := utils.ClusterOperatorConditionsToMonitoredOperatorStatus(co.Status.Conditions)
-		if cvoStatusInService.Status != operatorStatus || (cvoStatusInService.StatusInfo != operatorMessage && operatorMessage != "") {
-			// This is a common pattern to ensure the channel is empty after a stop has been called
-			// More info on time/sleep.go documentation
-			if !timer.Stop() {
-				<-timer.C
-			}
-			timer.Reset(WaitTimeout)
-
-			c.log.Infof("CVO updated, status: %s -> %s, message: %s -> %s.", cvoStatusInService.Status, operatorStatus, cvoStatusInService.StatusInfo, operatorMessage)
-
-			// Update built-in monitored operator cluster version status
-			if err := c.ic.UpdateClusterOperator(utils.GenerateRequestContext(), c.ClusterID, cvoOperatorName, operatorStatus, operatorMessage); err != nil {
-				c.log.WithError(err).Errorf("Failed to update cluster %s cvo status", c.ClusterID)
-			}
-		}
-
-		return false
+		return c.isOperatorAvailable(NewClusterVersionHandler(c.kc, timer))
 	}
 
 	return utils.WaitForPredicateWithTimer(ctx, WaitTimeout, GeneralProgressUpdateInt, isClusterVersionAvailable)
@@ -1009,7 +896,6 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 
 func (c controller) downloadKubeconfigNoingress(ctx context.Context, dir string) (string, error) {
 	// Download kubeconfig file
-	kubeconfigFileName := "kubeconfig-noingress"
 	kubeconfigPath := path.Join(dir, kubeconfigFileName)
 	err := c.ic.DownloadFile(ctx, kubeconfigFileName, kubeconfigPath)
 	if err != nil {
@@ -1125,22 +1011,4 @@ func (c controller) SetReadyState() {
 
 		return true
 	})
-}
-
-// checkOperatorStatusCondition checks if given operator has a condition with an expected status.
-func (c controller) checkOperatorStatusCondition(co *configv1.ClusterOperator,
-	conditionType configv1.ClusterStatusConditionType,
-	status configv1.ConditionStatus) bool {
-	for _, condition := range co.Status.Conditions {
-		if condition.Type == conditionType {
-			if condition.Status == status {
-				return true
-			}
-			c.log.Warnf("Operator %s condition '%s' is not met due to '%s': %s",
-				co.Name, conditionType, condition.Reason, condition.Message)
-			return false
-		}
-	}
-	c.log.Warnf("Operator %s condition '%s' does not exist", co.Name, conditionType)
-	return false
 }
