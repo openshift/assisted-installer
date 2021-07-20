@@ -308,18 +308,23 @@ func (mr *MockOpsMockRecorder) CreateOpenshiftSshManifest(filePath, template, ss
 }
 
 // GetMustGatherLogs mocks base method
-func (m *MockOps) GetMustGatherLogs(workDir, kubeconfigPath, mustGatherImg string) (string, error) {
+func (m *MockOps) GetMustGatherLogs(workDir, kubeconfigPath string, images ...string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetMustGatherLogs", workDir, kubeconfigPath, mustGatherImg)
+	varargs := []interface{}{workDir, kubeconfigPath}
+	for _, a := range images {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetMustGatherLogs", varargs...)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetMustGatherLogs indicates an expected call of GetMustGatherLogs
-func (mr *MockOpsMockRecorder) GetMustGatherLogs(workDir, kubeconfigPath, mustGatherImg interface{}) *gomock.Call {
+func (mr *MockOpsMockRecorder) GetMustGatherLogs(workDir, kubeconfigPath interface{}, images ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMustGatherLogs", reflect.TypeOf((*MockOps)(nil).GetMustGatherLogs), workDir, kubeconfigPath, mustGatherImg)
+	varargs := append([]interface{}{workDir, kubeconfigPath}, images...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMustGatherLogs", reflect.TypeOf((*MockOps)(nil).GetMustGatherLogs), varargs...)
 }
 
 // CreateRandomHostname mocks base method
@@ -366,7 +371,7 @@ func (mr *MockOpsMockRecorder) EvaluateDiskSymlink(arg0 interface{}) *gomock.Cal
 }
 
 // CreateManifests mocks base method
-func (m *MockOps) CreateManifests(arg0 string, arg1 string) error {
+func (m *MockOps) CreateManifests(arg0, arg1 string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateManifests", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -374,7 +379,7 @@ func (m *MockOps) CreateManifests(arg0 string, arg1 string) error {
 }
 
 // CreateManifests indicates an expected call of CreateManifests
-func (mr *MockOpsMockRecorder) CreateManifests(arg0 interface{}, arg1 interface{}) *gomock.Call {
+func (mr *MockOpsMockRecorder) CreateManifests(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateManifests", reflect.TypeOf((*MockOps)(nil).CreateManifests), arg0, arg1)
 }

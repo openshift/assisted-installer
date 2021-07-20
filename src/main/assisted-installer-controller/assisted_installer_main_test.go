@@ -37,7 +37,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockbmclient = inventory_client.NewMockInventoryClient(ctrl)
 		waitForInstallationInterval = 10 * time.Millisecond
-		status = &assistedinstallercontroller.ControllerStatus{}
+		status = assistedinstallercontroller.NewControllerStatus()
 	})
 	AfterEach(func() {
 		ctrl.Finish()
