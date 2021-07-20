@@ -742,7 +742,11 @@ func (c controller) getProgressingOLMOperators() ([]*models.MonitoredOperator, e
 
 func (c controller) updatePendingOLMOperators() error {
 	c.log.Infof("Updating pending OLM operators")
-	operators, _ := c.getProgressingOLMOperators()
+	operators, err := c.getProgressingOLMOperators()
+	if err != nil {
+		return err
+	}
+
 	for _, operator := range operators {
 		err := c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operator.Name, models.OperatorStatusFailed, "Waiting for operator timed out")
 		if err != nil {
