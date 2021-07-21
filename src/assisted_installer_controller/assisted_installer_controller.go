@@ -939,7 +939,7 @@ func (c controller) parseMustGatherImages() []string {
 		return images
 	}
 
-	c.log.Infof("collecting must-gather logs using a this image configuration %s", c.MustGatherImage)
+	c.log.Infof("collecting must-gather logs using this image configuration %s", c.MustGatherImage)
 	var imageMap map[string]string
 	err := json.Unmarshal([]byte(c.MustGatherImage), &imageMap)
 	if err != nil {
