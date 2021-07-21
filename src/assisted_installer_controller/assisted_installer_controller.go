@@ -86,14 +86,17 @@ type Controller interface {
 
 type ControllerStatus struct {
 	errCounter uint32
+	components map[string]bool
+	lock       sync.Mutex
 }
 
 type controller struct {
 	ControllerConfig
-	log *logrus.Logger
-	ops ops.Ops
-	ic  inventory_client.InventoryClient
-	kc  k8s_client.K8SClient
+	Status *ControllerStatus
+	log    *logrus.Logger
+	ops    ops.Ops
+	ic     inventory_client.InventoryClient
+	kc     k8s_client.K8SClient
 }
 
 func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inventory_client.InventoryClient, kc k8s_client.K8SClient) *controller {
@@ -103,6 +106,13 @@ func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inv
 		ops:              ops,
 		ic:               ic,
 		kc:               kc,
+		Status:           NewControllerStatus(),
+	}
+}
+
+func NewControllerStatus() *ControllerStatus {
+	return &ControllerStatus{
+		components: make(map[string]bool),
 	}
 }
 
@@ -112,6 +122,28 @@ func (status *ControllerStatus) Error() {
 
 func (status *ControllerStatus) HasError() bool {
 	return atomic.LoadUint32(&status.errCounter) > 0
+}
+
+func (status *ControllerStatus) OperatorError(component string) {
+	status.lock.Lock()
+	defer status.lock.Unlock()
+	status.components[component] = true
+}
+
+func (status *ControllerStatus) HasOperatorError() bool {
+	status.lock.Lock()
+	defer status.lock.Unlock()
+	return len(status.components) > 0
+}
+
+func (status *ControllerStatus) GetOperatorsInError() []string {
+	result := make([]string, 0)
+	status.lock.Lock()
+	defer status.lock.Unlock()
+	for op := range status.components {
+		result = append(result, op)
+	}
+	return result
 }
 
 func logHostsStatus(log logrus.FieldLogger, hosts map[string]inventory_client.HostData) {
@@ -343,7 +375,7 @@ func isCsrApproved(csr *certificatesv1.CertificateSigningRequest) bool {
 	return false
 }
 
-func (c controller) PostInstallConfigs(ctx context.Context, wg *sync.WaitGroup, status *ControllerStatus) {
+func (c controller) PostInstallConfigs(ctx context.Context, wg *sync.WaitGroup) {
 	defer func() {
 		c.log.Infof("Finished PostInstallConfigs")
 		wg.Done()
@@ -371,7 +403,7 @@ func (c controller) PostInstallConfigs(ctx context.Context, wg *sync.WaitGroup, 
 	if err != nil {
 		c.log.Error(err)
 		errMessage = err.Error()
-		status.Error()
+		c.Status.Error()
 	}
 	success := err == nil
 	c.sendCompleteInstallation(ctx, success, errMessage)
@@ -742,13 +774,14 @@ func (c controller) getProgressingOLMOperators() ([]*models.MonitoredOperator, e
 
 func (c controller) updatePendingOLMOperators() error {
 	c.log.Infof("Updating pending OLM operators")
+	ctx := utils.GenerateRequestContext()
 	operators, err := c.getProgressingOLMOperators()
 	if err != nil {
 		return err
 	}
-
 	for _, operator := range operators {
-		err := c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operator.Name, models.OperatorStatusFailed, "Waiting for operator timed out")
+		c.Status.OperatorError(operator.Name)
+		err := c.ic.UpdateClusterOperator(ctx, c.ClusterID, operator.Name, models.OperatorStatusFailed, "Waiting for operator timed out")
 		if err != nil {
 			c.log.WithError(err).Warnf("Failed to update olm %s status", operator.Name)
 			return err
@@ -770,7 +803,7 @@ func (c controller) waitForOLMOperators(ctx context.Context) error {
 	handlers := make(map[string]*ClusterServiceVersionHandler)
 
 	for index := range operators {
-		handlers[operators[index].Name] = NewClusterServiceVersionHandler(c.kc, operators[index])
+		handlers[operators[index].Name] = NewClusterServiceVersionHandler(c.kc, operators[index], c.Status)
 	}
 
 	areOLMOperatorsAvailable := func() bool {
@@ -835,20 +868,21 @@ func (c controller) logClusterOperatorsStatus() {
 
 /**
  * This function upload the following logs at once to the service at the end of the installation process
- * It takes a linient approach so if some logs are not available it ignores them and moves on
+ * It takes a lenient approach so if some logs are not available it ignores them and moves on
  * currently the bundled logs are:
  * - controller logs
  * - oc must-gather logs
  **/
-func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSeconds int64, isMustGatherEnabled bool, mustGatherImg string) error {
+func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSeconds int64) error {
 	var tarentries = make([]utils.TarEntry, 0)
 	var ok bool = true
 	ctx := utils.GenerateRequestContext()
 
 	c.logClusterOperatorsStatus()
-	if isMustGatherEnabled {
+	if c.Status.HasError() || c.Status.HasOperatorError() {
 		c.log.Infof("Uploading oc must-gather logs")
-		if tarfile, err := c.collectMustGatherLogs(ctx, mustGatherImg); err == nil {
+		images := c.parseMustGatherImages()
+		if tarfile, err := c.collectMustGatherLogs(ctx, images...); err == nil {
 			if entry, tarerr := utils.NewTarEntryFromFile(tarfile); tarerr == nil {
 				tarentries = append(tarentries, *entry)
 			}
@@ -898,6 +932,40 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 	return nil
 }
 
+func (c controller) parseMustGatherImages() []string {
+	images := make([]string, 0)
+	if c.MustGatherImage == "" {
+		c.log.Infof("collecting must-gather logs into using image from release")
+		return images
+	}
+
+	c.log.Infof("collecting must-gather logs using this image configuration %s", c.MustGatherImage)
+	var imageMap map[string]string
+	err := json.Unmarshal([]byte(c.MustGatherImage), &imageMap)
+	if err != nil {
+		//MustGatherImage is not a JSON. Pass it as is
+		images = append(images, c.MustGatherImage)
+		return images
+	}
+
+	//Use the parsed MustGatherImage to find the images needed for collecting
+	//the information
+	if c.Status.HasError() {
+		//general error - collect all data from the cluster using the standard image
+		images = append(images, imageMap["ocp"])
+	}
+
+	for _, op := range c.Status.GetOperatorsInError() {
+		if imageMap[op] != "" {
+			//per failed operator - add feature image for collecting more
+			//information about failed olm operators
+			images = append(images, imageMap[op])
+		}
+	}
+	c.log.Infof("collecting must-gather logs with images: %v", images)
+	return images
+}
+
 func (c controller) downloadKubeconfigNoingress(ctx context.Context, dir string) (string, error) {
 	// Download kubeconfig file
 	kubeconfigPath := path.Join(dir, kubeconfigFileName)
@@ -911,7 +979,7 @@ func (c controller) downloadKubeconfigNoingress(ctx context.Context, dir string)
 	return kubeconfigPath, nil
 }
 
-func (c controller) collectMustGatherLogs(ctx context.Context, mustGatherImg string) (string, error) {
+func (c controller) collectMustGatherLogs(ctx context.Context, images ...string) (string, error) {
 	tempDir, ferr := ioutil.TempDir("", "controller-must-gather-logs-")
 	if ferr != nil {
 		c.log.Errorf("Failed to create temp directory for must-gather-logs %v\n", ferr)
@@ -924,7 +992,7 @@ func (c controller) collectMustGatherLogs(ctx context.Context, mustGatherImg str
 	}
 
 	//collect must gather logs
-	logtar, err := c.ops.GetMustGatherLogs(tempDir, kubeconfigPath, mustGatherImg)
+	logtar, err := c.ops.GetMustGatherLogs(tempDir, kubeconfigPath, images...)
 	if err != nil {
 		c.log.Errorf("Failed to collect must-gather logs %v\n", err)
 		return "", err
@@ -936,7 +1004,7 @@ func (c controller) collectMustGatherLogs(ctx context.Context, mustGatherImg str
 // Uploading logs every 5 minutes
 // We will take logs of assisted controller and upload them to assisted-service
 // by creating tar gz of them.
-func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup, status *ControllerStatus) {
+func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup) {
 	podName := ""
 	ticker := time.NewTicker(LogsUploadPeriod)
 	progressCtx := utils.GenerateRequestContext()
@@ -953,7 +1021,7 @@ func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup, status 
 				c.log.Infof("Upload final controller and cluster logs before exit")
 				c.ic.ClusterLogProgressReport(progressCtx, c.ClusterID, models.LogsStateRequested)
 				_ = utils.WaitForPredicate(WaitTimeout, LogsUploadPeriod, func() bool {
-					err := c.uploadSummaryLogs(podName, c.Namespace, controllerLogsSecondsAgo, status.HasError(), c.MustGatherImage)
+					err := c.uploadSummaryLogs(podName, c.Namespace, controllerLogsSecondsAgo)
 					if err != nil {
 						c.log.Infof("retry uploading logs in 5 minutes...")
 					}

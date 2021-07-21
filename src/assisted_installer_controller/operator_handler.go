@@ -38,7 +38,7 @@ func (c controller) isOperatorAvailable(handler OperatorHandler) bool {
 	if operatorStatusInService.Status != operatorStatus || (operatorStatusInService.StatusInfo != operatorMessage && operatorMessage != "") {
 		c.log.Infof("Operator <%s> updated, status: %s -> %s, message: %s -> %s.", operatorName, operatorStatusInService.Status, operatorStatus, operatorStatusInService.StatusInfo, operatorMessage)
 		if !handler.OnChange(operatorStatus) {
-			c.log.WithError(err).Warnf("%s operator on change failed", operatorName)
+			c.log.WithError(err).Warnf("<%s> operator's OnChange() returned false. Will skip an update.", operatorName)
 			return false
 		}
 
@@ -125,11 +125,12 @@ func (handler ClusterVersionHandler) OnChange(_ models.OperatorStatus) bool {
 type ClusterServiceVersionHandler struct {
 	kc       k8s_client.K8SClient
 	operator *models.MonitoredOperator
+	status   *ControllerStatus
 	retries  int
 }
 
-func NewClusterServiceVersionHandler(kc k8s_client.K8SClient, operator *models.MonitoredOperator) *ClusterServiceVersionHandler {
-	return &ClusterServiceVersionHandler{kc: kc, operator: operator, retries: 0}
+func NewClusterServiceVersionHandler(kc k8s_client.K8SClient, operator *models.MonitoredOperator, status *ControllerStatus) *ClusterServiceVersionHandler {
+	return &ClusterServiceVersionHandler{kc: kc, operator: operator, status: status, retries: 0}
 }
 
 func (handler ClusterServiceVersionHandler) GetName() string { return handler.operator.Name }
@@ -151,11 +152,14 @@ func (handler ClusterServiceVersionHandler) GetStatus() (models.OperatorStatus, 
 }
 
 func (handler ClusterServiceVersionHandler) OnChange(newStatus models.OperatorStatus) bool {
-	// FIXME: We retry the check of the operator status in case it's in failed state to WA bug 1968606
-	// Remove this code when bug 1968606 is fixed
-	if utils.IsStatusFailed(newStatus) && handler.retries < failedOperatorRetry {
-		handler.retries++
-		return false
+	if utils.IsStatusFailed(newStatus) {
+		if handler.retries < failedOperatorRetry {
+			// FIXME: We retry the check of the operator status in case it's in failed state to WA bug 1968606
+			// Remove this code when bug 1968606 is fixed
+			handler.retries++
+			return false
+		}
+		handler.status.OperatorError(handler.operator.Name)
 	}
 
 	return true

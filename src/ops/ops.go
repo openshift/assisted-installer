@@ -43,7 +43,7 @@ type Ops interface {
 	UploadInstallationLogs(isBootstrap bool) (string, error)
 	ReloadHostFile(filepath string) error
 	CreateOpenshiftSshManifest(filePath, template, sshPubKeyPath string) error
-	GetMustGatherLogs(workDir, kubeconfigPath, mustGatherImg string) (string, error)
+	GetMustGatherLogs(workDir, kubeconfigPath string, images ...string) (string, error)
 	CreateRandomHostname(hostname string) error
 	GetHostname() (string, error)
 	EvaluateDiskSymlink(string) string
@@ -514,16 +514,13 @@ func (o *ops) CreateOpenshiftSshManifest(filePath, tmpl, sshPubKeyPath string) e
 	return nil
 }
 
-func (o *ops) GetMustGatherLogs(workDir, kubeconfigPath, mustGatherImg string) (string, error) {
+func (o *ops) GetMustGatherLogs(workDir, kubeconfigPath string, images ...string) (string, error) {
 	//invoke oc adm must-gather command in the working directory
-	var imageOption string
-	if mustGatherImg == "" {
-		o.log.Infof("collecting must-gather logs into %s using image from release", workDir)
-		imageOption = ""
-	} else {
-		o.log.Infof("collecting must-gather logs into %s using image %s", workDir, mustGatherImg)
-		imageOption = fmt.Sprintf(" --image=%s", mustGatherImg)
+	var imageOption string = ""
+	for _, img := range images {
+		imageOption = imageOption + fmt.Sprintf(" --image=%s", img)
 	}
+
 	command := fmt.Sprintf("cd %s && oc --kubeconfig=%s adm must-gather%s", workDir, kubeconfigPath, imageOption)
 	output, err := o.ExecCommand(o.logWriter, "bash", "-c", command)
 	if err != nil {

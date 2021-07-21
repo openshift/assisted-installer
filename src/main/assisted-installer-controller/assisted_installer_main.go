@@ -66,7 +66,6 @@ func main() {
 	)
 
 	var wg sync.WaitGroup
-	var status assistedinstallercontroller.ControllerStatus
 	mainContext, mainContextCancel := context.WithCancel(context.Background())
 
 	// No need to cancel with context, will finish quickly
@@ -89,16 +88,16 @@ func main() {
 
 	go assistedController.WaitAndUpdateNodesStatus(mainContext, &wg)
 	wg.Add(1)
-	go assistedController.PostInstallConfigs(mainContext, &wg, &status)
+	go assistedController.PostInstallConfigs(mainContext, &wg)
 	wg.Add(1)
 	go assistedController.UpdateBMHs(mainContext, &wg)
 	wg.Add(1)
 
-	go assistedController.UploadLogs(mainContext, &wg, &status)
+	go assistedController.UploadLogs(mainContext, &wg)
 	wg.Add(1)
 
 	// monitoring installation by cluster status
-	waitForInstallation(client, logger, &status)
+	waitForInstallation(client, logger, assistedController.Status)
 }
 
 // waitForInstallation monitor cluster status and is blocking main from cancelling all go routine s
