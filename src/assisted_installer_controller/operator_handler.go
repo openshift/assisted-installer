@@ -18,6 +18,7 @@ type OperatorHandler interface {
 	GetName() string
 	GetStatus() (models.OperatorStatus, string, error)
 	OnChange(newStatus models.OperatorStatus) bool
+	IsInitialized() bool
 }
 
 func (c controller) isOperatorAvailable(handler OperatorHandler) bool {
@@ -78,6 +79,8 @@ func NewClusterOperatorHandler(kc k8s_client.K8SClient, operatorName string) *Cl
 
 func (handler ClusterOperatorHandler) GetName() string { return handler.operatorName }
 
+func (handler ClusterOperatorHandler) IsInitialized() bool { return true }
+
 func (handler ClusterOperatorHandler) GetStatus() (models.OperatorStatus, string, error) {
 	co, err := handler.kc.GetClusterOperator(handler.operatorName)
 	if err != nil {
@@ -100,6 +103,8 @@ func NewClusterVersionHandler(kc k8s_client.K8SClient, timer *time.Timer) *Clust
 }
 
 func (handler ClusterVersionHandler) GetName() string { return cvoOperatorName }
+
+func (handler ClusterVersionHandler) IsInitialized() bool { return true }
 
 func (handler ClusterVersionHandler) GetStatus() (models.OperatorStatus, string, error) {
 	co, err := handler.kc.GetClusterVersion(clusterVersionName)
@@ -135,6 +140,19 @@ func NewClusterServiceVersionHandler(kc k8s_client.K8SClient, operator *models.M
 
 func (handler ClusterServiceVersionHandler) GetName() string { return handler.operator.Name }
 
+func (handler ClusterServiceVersionHandler) IsInitialized() bool {
+	csvName, err := handler.kc.GetCSVFromSubscription(handler.operator.Namespace, handler.operator.SubscriptionName)
+	if err != nil {
+		return false
+	}
+
+	if csvName == "" {
+		return false
+	}
+
+	return true
+}
+
 func (handler ClusterServiceVersionHandler) GetStatus() (models.OperatorStatus, string, error) {
 	csvName, err := handler.kc.GetCSVFromSubscription(handler.operator.Namespace, handler.operator.SubscriptionName)
 	if err != nil {
@@ -152,7 +170,7 @@ func (handler ClusterServiceVersionHandler) GetStatus() (models.OperatorStatus, 
 }
 
 func (handler ClusterServiceVersionHandler) OnChange(newStatus models.OperatorStatus) bool {
-	if utils.IsStatusFailed(newStatus) {
+	if IsStatusFailed(newStatus) {
 		if handler.retries < failedOperatorRetry {
 			// FIXME: We retry the check of the operator status in case it's in failed state to WA bug 1968606
 			// Remove this code when bug 1968606 is fixed
@@ -163,4 +181,12 @@ func (handler ClusterServiceVersionHandler) OnChange(newStatus models.OperatorSt
 	}
 
 	return true
+}
+
+func IsStatusFailed(operatorStatus models.OperatorStatus) bool {
+	return operatorStatus == models.OperatorStatusFailed
+}
+
+func IsStatusSucceeded(operatorStatus models.OperatorStatus) bool {
+	return operatorStatus == models.OperatorStatusAvailable
 }

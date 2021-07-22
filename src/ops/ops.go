@@ -47,7 +47,7 @@ type Ops interface {
 	CreateRandomHostname(hostname string) error
 	GetHostname() (string, error)
 	EvaluateDiskSymlink(string) string
-	CreateManifests(string, string) error
+	CreateManifests(string, []byte) error
 }
 
 const (
@@ -568,13 +568,26 @@ func (o *ops) GetHostname() (string, error) {
 	return os.Hostname()
 }
 
-func (o *ops) CreateManifests(kubeconfig string, manifestFilePath string) error {
-	command := fmt.Sprintf("oc --kubeconfig=%s apply -f %s", kubeconfig, manifestFilePath)
+func (o *ops) CreateManifests(kubeconfig string, content []byte) error {
+	// Create temp file, where we store the content to be create by oc command:
+	file, err := ioutil.TempFile("", "operator-manifest")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(file.Name())
+
+	// Write the content to the temporary file:
+	if err = ioutil.WriteFile(file.Name(), content, 0644); err != nil {
+		return err
+	}
+
+	// Run oc command that creates the custom manifest:
+	command := fmt.Sprintf("oc --kubeconfig=%s apply -f %s", kubeconfig, file.Name())
 	output, err := o.ExecCommand(o.logWriter, "bash", "-c", command)
 	if err != nil {
 		return err
 	}
-	o.log.Infof("Applying custom manifest file %s succeed %s", manifestFilePath, output)
+	o.log.Infof("Applying custom manifest file %s succeed %s", file.Name(), output)
 
 	return nil
 }

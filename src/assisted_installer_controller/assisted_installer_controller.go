@@ -2,6 +2,7 @@ package assisted_installer_controller
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -44,11 +45,12 @@ const (
 	dnsServiceName            = "dns-default"
 	dnsServiceNamespace       = "openshift-dns"
 	dnsOperatorNamespace      = "openshift-dns-operator"
+	maxFetchAttempts          = 5
 	maxDeletionAttempts       = 5
 	maxDNSServiceIPAttempts   = 45
 	KeepWaiting               = false
 	ExitWaiting               = true
-	customManifestsFile       = "custom_manifests.yaml"
+	customManifestsFile       = "custom_manifests.json"
 	kubeconfigFileName        = "kubeconfig-noingress"
 )
 
@@ -61,6 +63,7 @@ var (
 	CompleteTimeout          = 30 * time.Minute
 	DNSAddressRetryInterval  = 20 * time.Second
 	DeletionRetryInterval    = 10 * time.Second
+	FetchRetryInterval       = 10 * time.Second
 	LongWaitTimeout          = 10 * time.Hour
 	CVOMaxTimeout            = 3 * time.Hour
 )
@@ -98,6 +101,14 @@ type controller struct {
 	ops    ops.Ops
 	ic     inventory_client.InventoryClient
 	kc     k8s_client.K8SClient
+}
+
+// manifest store the operator manifest used by assisted-installer to create CRs of the OLM:
+type manifest struct {
+	// name of the operator the CR manifest we want create
+	name string
+	// content of the manifest of the opreator
+	content string
 }
 
 func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inventory_client.InventoryClient, kc k8s_client.K8SClient) *controller {
@@ -459,16 +470,55 @@ func (c controller) postInstallConfigs(ctx context.Context) error {
 		return errors.Wrapf(err, "Timeout while waiting for console to become available")
 	}
 
+	// Wait for OLM operators
+	if err = c.waitForOLMOperators(ctx); err != nil {
+		return errors.Wrapf(err, "Error while initializing OLM operators")
+	}
+
+	return nil
+}
+
+func (c controller) waitForOLMOperators(ctx context.Context) error {
+	var operators []models.MonitoredOperator
+	var err error
+
+	// Get the monitored operators:
+	err = utils.Retry(maxFetchAttempts, FetchRetryInterval, c.log, func() error {
+		operators, err = c.ic.GetClusterMonitoredOLMOperators(context.TODO(), c.ClusterID)
+		if err != nil {
+			return errors.Wrapf(err, "Error while fetch the monitored operators from assisted-service.")
+		}
+		return nil
+	})
+	if err != nil {
+		return errors.Wrapf(err, "Failed to fetch monitored operators")
+	}
+	if len(operators) == 0 {
+		c.log.Info("No OLM operators found.")
+		return nil
+	}
+
+	// Get maximum wait timeout for OLM operators:
+	waitTimeout := c.getMaximumOLMTimeout(operators)
+	c.log.Infof("OLM operators %v wait timeout %v", waitTimeout, operators)
+
+	// Wait for the CSV state of the OLM operators, before applying OLM CRs
+	err = utils.WaitForPredicateParamsWithContext(ctx, waitTimeout, GeneralWaitInterval, c.waitForCSVBeCreated, operators)
+	if err != nil {
+		// We continue in case of failure, because we want to try to apply manifest at least for operators which are ready.
+		c.log.WithError(err).Warnf("Failed to wait for some of the OLM operators to be initilized")
+	}
+
 	// Apply post install manifests
-	err = utils.WaitForPredicateWithContext(ctx, retryPostManifestTimeout, GeneralWaitInterval, c.applyPostInstallManifests)
+	err = utils.WaitForPredicateParamsWithContext(ctx, retryPostManifestTimeout, GeneralWaitInterval, c.applyPostInstallManifests, operators)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to apply post manifests")
 	}
 
-	if err != c.waitForOLMOperators(ctx) {
+	if err != c.waitForCSV(ctx, waitTimeout) {
 		// In case the timeout occur, we have to update the pending OLM operators to failed state,
 		// so the assisted-service can update the cluster state to completed.
-		if err = c.updatePendingOLMOperators(); err != nil {
+		if err = c.updatePendingOLMOperators(ctx); err != nil {
 			return errors.Errorf("Timeout while waiting for some of the operators and not able to update its state")
 		}
 		return errors.Wrapf(err, "Timeout while waiting for OLM operators be installed")
@@ -477,7 +527,32 @@ func (c controller) postInstallConfigs(ctx context.Context) error {
 	return nil
 }
 
-func (c controller) applyPostInstallManifests() bool {
+func (c controller) getReadyOperators(operators []models.MonitoredOperator) ([]string, []models.MonitoredOperator, error) {
+	var readyOperators []string
+	for index := range operators {
+		handler := NewClusterServiceVersionHandler(c.kc, &operators[index], c.Status)
+		if handler.IsInitialized() {
+			readyOperators = append(readyOperators, handler.GetName())
+		}
+	}
+	return readyOperators, operators, nil
+}
+
+func (c controller) waitForCSVBeCreated(arg interface{}) bool {
+	operators := arg.([]models.MonitoredOperator)
+	readyOperators, operators, err := c.getReadyOperators(operators)
+	if err != nil {
+		c.log.WithError(err).Warn("Error while fetch the operators state.")
+		return false
+	}
+	if len(operators) == len(readyOperators) {
+		return true
+	}
+
+	return false
+}
+
+func (c controller) applyPostInstallManifests(arg interface{}) bool {
 	ctx := utils.GenerateRequestContext()
 	tempDir, err := ioutil.TempDir("", "controller-custom-manifests-")
 	if err != nil {
@@ -497,10 +572,49 @@ func (c controller) applyPostInstallManifests() bool {
 		return false
 	}
 
-	err = c.ops.CreateManifests(kubeconfigName, customManifestPath)
+	// Unmarshall the content of the operators manifests:
+	var manifests []manifest
+	data, err := ioutil.ReadFile(customManifestPath)
 	if err != nil {
-		c.log.WithError(err).Error("Failed to apply manifest file.")
+		c.log.WithError(err).Errorf("Failed to read the custom manifests file.")
 		return false
+	}
+	if err = json.Unmarshal(data, &manifests); err != nil {
+		c.log.WithError(err).Errorf("Failed to unmarshall custom manifest file content %s.", data)
+		return false
+	}
+
+	// Create the manifests of the opreators, which are properly initialized:
+	readyOperators, _, err := c.getReadyOperators(arg.([]models.MonitoredOperator))
+	if err != nil {
+		c.log.WithError(err).Errorf("Failed to fetch operators from assisted-service")
+		return false
+	}
+
+	for _, manifest := range manifests {
+		// Check if the operator is properly initialized by CSV:
+		if !func() bool {
+			for _, readyOperator := range readyOperators {
+				if readyOperator == manifest.name {
+					return true
+				}
+			}
+			return false
+		}() {
+			continue
+		}
+
+		content, err := base64.StdEncoding.DecodeString(manifest.content)
+		if err != nil {
+			c.log.WithError(err).Errorf("Failed to decode content of operator CR %s.", manifest.name)
+			return false
+		}
+
+		err = c.ops.CreateManifests(kubeconfigName, content)
+		if err != nil {
+			c.log.WithError(err).Error("Failed to apply manifest file.")
+			return false
+		}
 	}
 
 	return true
@@ -753,7 +867,7 @@ func (c controller) addRouterCAToClusterCA() bool {
 
 }
 
-func (c controller) getMaximumOLMTimeout(operators []*models.MonitoredOperator) time.Duration {
+func (c controller) getMaximumOLMTimeout(operators []models.MonitoredOperator) time.Duration {
 	timeout := WaitTimeout.Seconds()
 	for _, operator := range operators {
 		timeout = math.Max(float64(operator.TimeoutSeconds), timeout)
@@ -777,9 +891,8 @@ func (c controller) getProgressingOLMOperators() ([]*models.MonitoredOperator, e
 	return ret, nil
 }
 
-func (c controller) updatePendingOLMOperators() error {
+func (c controller) updatePendingOLMOperators(ctx context.Context) error {
 	c.log.Infof("Updating pending OLM operators")
-	ctx := utils.GenerateRequestContext()
 	operators, err := c.getProgressingOLMOperators()
 	if err != nil {
 		return err
@@ -795,8 +908,8 @@ func (c controller) updatePendingOLMOperators() error {
 	return nil
 }
 
-// waitForOLMOperators wait until all OLM monitored operators are available or failed.
-func (c controller) waitForOLMOperators(ctx context.Context) error {
+// waitForCSV wait until all OLM monitored operators are available or failed.
+func (c controller) waitForCSV(ctx context.Context, waitTimeout time.Duration) error {
 	operators, err := c.getProgressingOLMOperators()
 	if err != nil {
 		return err
@@ -824,8 +937,6 @@ func (c controller) waitForOLMOperators(ctx context.Context) error {
 		return false
 	}
 
-	waitTimeout := c.getMaximumOLMTimeout(operators)
-	c.log.Infof("Waiting for OLM operators for %v", waitTimeout)
 	return utils.WaitForPredicateWithContext(ctx, waitTimeout, GeneralWaitInterval, areOLMOperatorsAvailable)
 }
 
