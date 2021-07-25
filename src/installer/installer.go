@@ -26,7 +26,6 @@ import (
 
 const (
 	InstallDir                   = "/opt/install-dir"
-	KubeconfigPathLoopBack       = "/opt/openshift/auth/kubeconfig-loopback"
 	KubeconfigPath               = "/opt/openshift/auth/kubeconfig"
 	minMasterNodes               = 2
 	dockerConfigFile             = "/root/.docker/config.json"
@@ -338,12 +337,18 @@ func (i *installer) waitForNetworkType(kc k8s_client.K8SClient) error {
 }
 
 func (i *installer) waitForControlPlane(ctx context.Context) error {
-	kc, err := i.kcBuilder(KubeconfigPathLoopBack, i.log)
+	err := i.ops.ReloadHostFile("/etc/resolv.conf")
+	if err != nil {
+		i.log.WithError(err).Error("Failed to reload resolv.conf")
+		return err
+	}
+	kc, err := i.kcBuilder(KubeconfigPath, i.log)
 	if err != nil {
 		i.log.Error(err)
 		return err
 	}
 	i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, "")
+
 	if err = i.waitForMinMasterNodes(ctx, kc); err != nil {
 		return err
 	}
@@ -365,7 +370,7 @@ func (i *installer) waitForControlPlane(ctx context.Context) error {
 	i.waitForBootkube(ctx)
 
 	// waiting for controller pod to be running
-	if err := i.waitForController(); err != nil {
+	if err := i.waitForController(kc); err != nil {
 		i.log.Error(err)
 		return err
 	}
@@ -470,20 +475,9 @@ func (i *installer) waitForBootkube(ctx context.Context) {
 	}
 }
 
-func (i *installer) waitForController() error {
+func (i *installer) waitForController(kc k8s_client.K8SClient) error {
 	i.log.Infof("Waiting for controller to be ready")
 	i.UpdateHostInstallProgress(models.HostStageWaitingForController, "waiting for controller pod ready event")
-	err := i.ops.ReloadHostFile("/etc/resolv.conf")
-	if err != nil {
-		i.log.WithError(err).Error("Failed to reload resolv.conf")
-		return err
-	}
-
-	kc, err := i.kcBuilder(KubeconfigPath, i.log)
-	if err != nil {
-		i.log.WithError(err).Errorf("Failed to create kc client from %s", KubeconfigPath)
-		return err
-	}
 
 	events := map[string]string{}
 	tickerUploadLogs := time.NewTicker(5 * time.Minute)
