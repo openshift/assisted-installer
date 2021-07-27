@@ -62,6 +62,7 @@ var (
 	DNSAddressRetryInterval  = 20 * time.Second
 	DeletionRetryInterval    = 10 * time.Second
 	LongWaitTimeout          = 10 * time.Hour
+	CVOMaxTimeout            = 3 * time.Hour
 )
 
 // assisted installer controller is added to control installation process after  bootstrap pivot
@@ -832,12 +833,15 @@ func (c controller) validateConsoleAvailability() bool {
 // waitingForClusterVersion checks the Cluster Version Operator availability in the
 // new OCP cluster. A success would be announced only when the service acknowledges
 // the CVO availability, in order to avoid unsycned scenarios.
+// In case cvo changes it message we will update timer but we want to have maximum timeout
+// for this context with timeout is used
 func (c controller) waitingForClusterVersion(ctx context.Context) error {
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, CVOMaxTimeout)
+	defer cancel()
 	isClusterVersionAvailable := func(timer *time.Timer) bool {
 		return c.isOperatorAvailable(NewClusterVersionHandler(c.kc, timer))
 	}
-
-	return utils.WaitForPredicateWithTimer(ctx, WaitTimeout, GeneralProgressUpdateInt, isClusterVersionAvailable)
+	return utils.WaitForPredicateWithTimer(ctxWithTimeout, WaitTimeout, GeneralProgressUpdateInt, isClusterVersionAvailable)
 }
 
 func (c controller) sendCompleteInstallation(ctx context.Context, isSuccess bool, errorInfo string) {

@@ -1283,6 +1283,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		BeforeEach(func() {
 			GeneralProgressUpdateInt = 100 * time.Millisecond
 			WaitTimeout = 150 * time.Millisecond
+			CVOMaxTimeout = 1 * time.Second
 		})
 
 		for i := range tests {
@@ -1337,8 +1338,31 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), gomock.Any(), cvoOperatorName, gomock.Any(), gomock.Any()).AnyTimes()
 
 			err := func() error {
-				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+				ctxTimeout, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 				defer cancel()
+				return assistedController.waitingForClusterVersion(ctxTimeout)
+			}()
+
+			Expect(errors.Is(err, context.DeadlineExceeded)).To(BeTrue())
+		})
+
+		It("service fail to sync - maxTimeout applied", func() {
+			WaitTimeout = 1 * time.Second
+			CVOMaxTimeout = 200 * time.Millisecond
+			currentServiceCVOStatus := &models.MonitoredOperator{Status: models.OperatorStatusProgressing, StatusInfo: ""}
+			clusterVersionReport := &configv1.ClusterVersion{
+				Status: configv1.ClusterVersionStatus{
+					Conditions: []configv1.ClusterOperatorStatusCondition{
+						{Type: configv1.OperatorAvailable, Status: configv1.ConditionTrue, Message: ""},
+					},
+				},
+			}
+
+			mockk8sclient.EXPECT().GetClusterVersion(clusterVersionName).Return(clusterVersionReport, nil).AnyTimes()
+			mockbmclient.EXPECT().GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), cvoOperatorName).Return(currentServiceCVOStatus, nil).AnyTimes()
+			mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), gomock.Any(), cvoOperatorName, gomock.Any(), gomock.Any()).AnyTimes()
+
+			err := func() error {
 				return assistedController.waitingForClusterVersion(ctx)
 			}()
 
