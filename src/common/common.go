@@ -59,7 +59,7 @@ func SetConfiguringStatusForHosts(client inventory_client.InventoryClient, inven
 			ctx := utils.GenerateRequestContext()
 			requestLog := utils.RequestIDLogger(ctx, log)
 			requestLog.Infof("Host %s %q found in mcs logs, moving it to %s state", hostName, host.Host.ID.String(), status)
-			if err := client.UpdateHostInstallProgress(ctx, host.Host.ID.String(), status, ""); err != nil {
+			if err := client.UpdateHostInstallProgress(ctx, host.Host.InfraEnvID.String(), host.Host.ID.String(), status, ""); err != nil {
 				requestLog.Errorf("Failed to update node installation status, %s", err)
 				continue
 			}

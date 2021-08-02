@@ -21,15 +21,17 @@ type CoreosInstallerLogWriter struct {
 	lastLogLine      []byte
 	progressReporter inventory_client.InventoryClient
 	progressRegex    *regexp.Regexp
+	infraEnvID       string
 	hostID           string
 	lastProgress     int
 }
 
-func NewCoreosInstallerLogWriter(logger *logrus.Logger, progressReporter inventory_client.InventoryClient, hostID string) *CoreosInstallerLogWriter {
+func NewCoreosInstallerLogWriter(logger *logrus.Logger, progressReporter inventory_client.InventoryClient, infraEnvID string, hostID string) *CoreosInstallerLogWriter {
 	return &CoreosInstallerLogWriter{log: logger,
 		lastLogLine:      []byte{},
 		progressReporter: progressReporter,
 		progressRegex:    regexp.MustCompile(`(.*?)\((.*?\%)\)\s*`),
+		infraEnvID:       infraEnvID,
 		hostID:           hostID,
 		lastProgress:     0,
 	}
@@ -60,7 +62,7 @@ func (l *CoreosInstallerLogWriter) reportProgress() {
 	if currentPercent >= l.lastProgress+MinProgressDelta || (currentPercent == completed && l.lastProgress != completed) {
 		// If the progress is more than 5% report it
 		ctx := utils.GenerateRequestContext()
-		if err := l.progressReporter.UpdateHostInstallProgress(ctx, l.hostID, models.HostStageWritingImageToDisk, match[2]); err == nil {
+		if err := l.progressReporter.UpdateHostInstallProgress(ctx, l.infraEnvID, l.hostID, models.HostStageWritingImageToDisk, match[2]); err == nil {
 			l.lastProgress = currentPercent
 		}
 	}

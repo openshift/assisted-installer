@@ -96,15 +96,16 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockops = ops.NewMockOps(ctrl)
 		mockbmclient = inventory_client.NewMockInventoryClient(ctrl)
 		mockk8sclient = k8s_client.NewMockK8SClient(ctrl)
+		infraEnvId := strfmt.UUID("7916fa89-ea7a-443e-a862-b3e930309f50")
 		node0Id := strfmt.UUID("7916fa89-ea7a-443e-a862-b3e930309f65")
 		node1Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f238")
 		node2Id := strfmt.UUID("b898d516-3e16-49d0-86a5-0ad5bd04e3ed")
 		currentState := models.HostProgressInfo{CurrentStage: models.HostStageConfiguring}
 		currentStatus := models.HostStatusInstallingInProgress
 		inventoryNamesIds = map[string]inventory_client.HostData{
-			"node0": {Host: &models.Host{ID: &node0Id, Progress: &currentState, Status: &currentStatus}},
-			"node1": {Host: &models.Host{ID: &node1Id, Progress: &currentState, Status: &currentStatus}},
-			"node2": {Host: &models.Host{ID: &node2Id, Progress: &currentState, Status: &currentStatus}}}
+			"node0": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node0Id, Progress: &currentState, Status: &currentStatus}},
+			"node1": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node1Id, Progress: &currentState, Status: &currentStatus}},
+			"node2": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node2Id, Progress: &currentState, Status: &currentStatus}}}
 		kubeNamesIds = map[string]string{"node0": "6d6f00e8-70dd-48a5-859a-0f1459485ad9",
 			"node1": "2834ff2e-8965-48a5-859a-0f1459485a77",
 			"node2": "57df89ee-3546-48a5-859a-0f1459485a66"}
@@ -123,17 +124,19 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	configuringSuccess := func() {
 		mockk8sclient.EXPECT().GetPods(gomock.Any(), gomock.Any(), "").Return([]v1.Pod{}, nil).AnyTimes()
-		mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), gomock.Any(), models.HostStageConfiguring, gomock.Any()).AnyTimes()
+		mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), gomock.Any(), gomock.Any(), models.HostStageConfiguring, gomock.Any()).AnyTimes()
 	}
 
 	updateProgressSuccess := func(stages []models.HostStage, inventoryNamesIds map[string]inventory_client.HostData) {
 		var hostIds []string
+		var infraEnvIds []string
 		for _, host := range inventoryNamesIds {
 			hostIds = append(hostIds, host.Host.ID.String())
+			infraEnvIds = append(infraEnvIds, host.Host.InfraEnvID.String())
 		}
 
 		for i, stage := range stages {
-			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostIds[i], stage, "").Return(nil).Times(1)
+			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), infraEnvIds[i], hostIds[i], stage, "").Return(nil).Times(1)
 		}
 	}
 
@@ -328,11 +331,13 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		BeforeEach(func() {
 			updateProgressSuccess = func(stages []models.HostStage, inventoryNamesIds map[string]inventory_client.HostData) {
 				var hostIds []string
+				var infraEnvIds []string
 				for _, host := range inventoryNamesIds {
 					hostIds = append(hostIds, host.Host.ID.String())
+					infraEnvIds = append(infraEnvIds, host.Host.InfraEnvID.String())
 				}
 				for i, stage := range stages {
-					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostIds[i], stage, "").Return(nil).Times(1)
+					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), infraEnvIds[i], hostIds[i], stage, "").Return(nil).Times(1)
 				}
 			}
 			kubeNamesIds = map[string]string{"node0": "6d6f00e8-70dd-48a5-859a-0f1459485ad9",
@@ -381,12 +386,14 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("UpdateStatus fails and then succeeds, list nodes failed ", func() {
 			updateProgressSuccessFailureTest := func(stages []models.HostStage, inventoryNamesIds map[string]inventory_client.HostData) {
 				var hostIds []string
+				var infraEnvIds []string
 				for _, host := range inventoryNamesIds {
 					hostIds = append(hostIds, host.Host.ID.String())
+					infraEnvIds = append(infraEnvIds, host.Host.InfraEnvID.String())
 				}
 				for i, stage := range stages {
-					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostIds[i], stage, "").Return(fmt.Errorf("dummy")).Times(1)
-					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), hostIds[i], stage, "").Return(nil).Times(1)
+					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), infraEnvIds[i], hostIds[i], stage, "").Return(fmt.Errorf("dummy")).Times(1)
+					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), infraEnvIds[i], hostIds[i], stage, "").Return(nil).Times(1)
 				}
 			}
 			mockk8sclient.EXPECT().ListNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(2)
@@ -1521,11 +1528,12 @@ func getClusterOperatorWithConditionsStatus(availableStatus, degradedStatus conf
 
 func create3Hosts(currentStatus string, stage models.HostStage) map[string]inventory_client.HostData {
 	currentState := models.HostProgressInfo{CurrentStage: stage}
+	infraEnvId := strfmt.UUID("7916fa89-ea7a-443e-a862-b3e930309f50")
 	node0Id := strfmt.UUID("7916fa89-ea7a-443e-a862-b3e930309f65")
 	node1Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f238")
 	node2Id := strfmt.UUID("b898d516-3e16-49d0-86a5-0ad5bd04e3ed")
 	return map[string]inventory_client.HostData{
-		"node0": {Host: &models.Host{ID: &node0Id, Progress: &currentState, Status: &currentStatus}},
-		"node1": {Host: &models.Host{ID: &node1Id, Progress: &currentState, Status: &currentStatus}},
-		"node2": {Host: &models.Host{ID: &node2Id, Progress: &currentState, Status: &currentStatus}}}
+		"node0": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node0Id, Progress: &currentState, Status: &currentStatus}},
+		"node1": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node1Id, Progress: &currentState, Status: &currentStatus}},
+		"node2": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node2Id, Progress: &currentState, Status: &currentStatus}}}
 }

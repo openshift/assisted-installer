@@ -29,10 +29,11 @@ const (
 
 var _ = Describe("inventory_client_tests", func() {
 	var (
-		clusterID = "cluster-id"
-		logger    = logrus.New()
-		client    *inventoryClient
-		server    *ghttp.Server
+		clusterID  = "cluster-id"
+		infraEnvID = "infra-env-id"
+		logger     = logrus.New()
+		client     *inventoryClient
+		server     *ghttp.Server
 	)
 
 	AfterEach(func() {
@@ -62,26 +63,26 @@ var _ = Describe("inventory_client_tests", func() {
 
 		It("positive_response", func() {
 			server.Start()
-			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v1/clusters/%s/hosts/%s/progress", clusterID, hostID), expectedJson, http.StatusOK)
-			Expect(client.UpdateHostInstallProgress(context.Background(), hostID, models.HostStageInstalling, "")).ShouldNot(HaveOccurred())
+			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/hosts/%s/progress", infraEnvID, hostID), expectedJson, http.StatusOK)
+			Expect(client.UpdateHostInstallProgress(context.Background(), infraEnvID, hostID, models.HostStageInstalling, "")).ShouldNot(HaveOccurred())
 			Expect(server.ReceivedRequests()).Should(HaveLen(1))
 
 		})
 
 		It("negative_server_error_response", func() {
 			server.Start()
-			Expect(client.UpdateHostInstallProgress(context.Background(), hostID, models.HostStageInstalling, "")).Should(HaveOccurred())
+			Expect(client.UpdateHostInstallProgress(context.Background(), infraEnvID, hostID, models.HostStageInstalling, "")).Should(HaveOccurred())
 			Expect(server.ReceivedRequests()).Should(HaveLen(testMaxRetries + 1))
 
 		})
 
 		It("positive_late_response", func() {
 			server.Start()
-			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v1/clusters/%s/hosts/%s/progress", clusterID, hostID), expectedJson, http.StatusInternalServerError)
-			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v1/clusters/%s/hosts/%s/progress", clusterID, hostID), expectedJson, http.StatusForbidden)
-			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v1/clusters/%s/hosts/%s/progress", clusterID, hostID), expectedJson, http.StatusOK)
+			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/hosts/%s/progress", infraEnvID, hostID), expectedJson, http.StatusInternalServerError)
+			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/hosts/%s/progress", infraEnvID, hostID), expectedJson, http.StatusForbidden)
+			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/hosts/%s/progress", infraEnvID, hostID), expectedJson, http.StatusOK)
 
-			Expect(client.UpdateHostInstallProgress(context.Background(), hostID, models.HostStageInstalling, "")).ShouldNot(HaveOccurred())
+			Expect(client.UpdateHostInstallProgress(context.Background(), infraEnvID, hostID, models.HostStageInstalling, "")).ShouldNot(HaveOccurred())
 			Expect(server.ReceivedRequests()).Should(HaveLen(3))
 		})
 
@@ -89,18 +90,18 @@ var _ = Describe("inventory_client_tests", func() {
 			go func() {
 
 				time.Sleep(testRetryMaxDelay * 2)
-				expectServerCall(server, fmt.Sprintf("/api/assisted-install/v1/clusters/%s/hosts/%s/progress", clusterID, hostID), expectedJson, http.StatusOK)
+				expectServerCall(server, fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/hosts/%s/progress", infraEnvID, hostID), expectedJson, http.StatusOK)
 				server.Start()
 			}()
 
-			Expect(client.UpdateHostInstallProgress(context.Background(), hostID, models.HostStageInstalling, "")).ShouldNot(HaveOccurred())
+			Expect(client.UpdateHostInstallProgress(context.Background(), infraEnvID, hostID, models.HostStageInstalling, "")).ShouldNot(HaveOccurred())
 			Expect(server.ReceivedRequests()).Should(HaveLen(1))
 		})
 
 		It("server_down", func() {
 			server.Start()
 			server.Close()
-			Expect(client.UpdateHostInstallProgress(context.Background(), hostID, models.HostStageInstalling, "")).Should(HaveOccurred())
+			Expect(client.UpdateHostInstallProgress(context.Background(), infraEnvID, hostID, models.HostStageInstalling, "")).Should(HaveOccurred())
 		})
 	})
 })

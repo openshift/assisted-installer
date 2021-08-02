@@ -15,6 +15,7 @@ import (
 type Config struct {
 	Role                 string
 	ClusterID            string
+	InfraEnvID           string
 	HostID               string
 	Device               string
 	URL                  string
@@ -48,6 +49,7 @@ func ProcessArgs() {
 	ret := &GlobalConfig
 	flag.StringVar(&ret.Role, "role", string(models.HostRoleMaster), "The node role")
 	flag.StringVar(&ret.ClusterID, "cluster-id", "", "The cluster id")
+	flag.StringVar(&ret.InfraEnvID, "infra-env-id", "", "This host infra env id")
 	flag.StringVar(&ret.HostID, "host-id", "", "This host id")
 	flag.StringVar(&ret.Device, "boot-device", "", "The boot device")
 	flag.StringVar(&ret.URL, "url", "", "The BM inventory URL, including a scheme and optionally a port (overrides the host and port arguments")
@@ -95,5 +97,8 @@ func ProcessArgs() {
 			println("high-availability-mode is set to None, but host role is %s. should be one of: %s", ret.Role, validRoles)
 			printHelpAndExit()
 		}
+	}
+	if ret.InfraEnvID == "" {
+		ret.InfraEnvID = ret.ClusterID
 	}
 }

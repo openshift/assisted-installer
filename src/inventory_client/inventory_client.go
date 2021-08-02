@@ -43,7 +43,7 @@ const (
 type InventoryClient interface {
 	DownloadFile(ctx context.Context, filename string, dest string) error
 	DownloadHostIgnition(ctx context.Context, hostID string, dest string) error
-	UpdateHostInstallProgress(ctx context.Context, hostId string, newStage models.HostStage, info string) error
+	UpdateHostInstallProgress(ctx context.Context, infraEnvId string, hostId string, newStage models.HostStage, info string) error
 	GetEnabledHostsNamesHosts(ctx context.Context, log logrus.FieldLogger) (map[string]HostData, error)
 	UploadIngressCa(ctx context.Context, ingressCA string, clusterId string) error
 	GetCluster(ctx context.Context) (*models.Cluster, error)
@@ -53,7 +53,7 @@ type InventoryClient interface {
 	GetHosts(ctx context.Context, log logrus.FieldLogger, skippedStatuses []string) (map[string]HostData, error)
 	UploadLogs(ctx context.Context, clusterId string, logsType models.LogsType, upfile io.Reader) error
 	ClusterLogProgressReport(ctx context.Context, clusterId string, progress models.LogsState)
-	HostLogProgressReport(ctx context.Context, clusterId string, hostId string, progress models.LogsState)
+	HostLogProgressReport(ctx context.Context, infraEnvId string, hostId string, progress models.LogsState)
 	UpdateClusterOperator(ctx context.Context, clusterId string, operatorName string, operatorStatus models.OperatorStatus, operatorStatusInfo string) error
 }
 
@@ -207,8 +207,8 @@ func (c *inventoryClient) DownloadHostIgnition(ctx context.Context, hostID strin
 	return aserror.GetAssistedError(err)
 }
 
-func (c *inventoryClient) UpdateHostInstallProgress(ctx context.Context, hostId string, newStage models.HostStage, info string) error {
-	_, err := c.ai.Installer.UpdateHostInstallProgress(ctx, c.createUpdateHostInstallProgressParams(hostId, newStage, info))
+func (c *inventoryClient) UpdateHostInstallProgress(ctx context.Context, infraEnvId, hostId string, newStage models.HostStage, info string) error {
+	_, err := c.ai.Installer.V2UpdateHostInstallProgress(ctx, c.createUpdateHostInstallProgressParams(infraEnvId, hostId, newStage, info))
 	return aserror.GetAssistedError(err)
 }
 
@@ -291,10 +291,10 @@ func (c *inventoryClient) createDownloadParams(filename string) *installer.Downl
 	}
 }
 
-func (c *inventoryClient) createUpdateHostInstallProgressParams(hostId string, newStage models.HostStage, info string) *installer.UpdateHostInstallProgressParams {
-	return &installer.UpdateHostInstallProgressParams{
-		ClusterID: c.clusterId,
-		HostID:    strfmt.UUID(hostId),
+func (c *inventoryClient) createUpdateHostInstallProgressParams(infraEnvId, hostId string, newStage models.HostStage, info string) *installer.V2UpdateHostInstallProgressParams {
+	return &installer.V2UpdateHostInstallProgressParams{
+		InfraEnvID: strfmt.UUID(infraEnvId),
+		HostID:     strfmt.UUID(hostId),
 		HostProgress: &models.HostProgress{
 			CurrentStage: newStage,
 			ProgressInfo: info,

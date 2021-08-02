@@ -447,7 +447,7 @@ func (i *installer) UpdateHostInstallProgress(newStage models.HostStage, info st
 	log := utils.RequestIDLogger(ctx, i.log)
 	log.Infof("Updating node installation stage: %s - %s", newStage, info)
 	if i.HostID != "" {
-		if err := i.inventoryClient.UpdateHostInstallProgress(ctx, i.HostID, newStage, info); err != nil {
+		if err := i.inventoryClient.UpdateHostInstallProgress(ctx, i.Config.InfraEnvID, i.Config.HostID, newStage, info); err != nil {
 			log.Errorf("Failed to update node installation stage, %s", err)
 		}
 	}
@@ -612,7 +612,7 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 				return fmt.Errorf("Node %s is not in inventory hosts", node.Name)
 			}
 			ctx = utils.GenerateRequestContext()
-			if err := i.inventoryClient.UpdateHostInstallProgress(ctx, host.Host.ID.String(), models.HostStageJoined, ""); err != nil {
+			if err := i.inventoryClient.UpdateHostInstallProgress(ctx, host.Host.InfraEnvID.String(), host.Host.ID.String(), models.HostStageJoined, ""); err != nil {
 				utils.RequestIDLogger(ctx, i.log).Errorf("Failed to update node installation status, %s", err)
 			}
 		}

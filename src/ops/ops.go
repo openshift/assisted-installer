@@ -178,7 +178,7 @@ func (o *ops) SystemctlAction(action string, args ...string) error {
 func (o *ops) WriteImageToDisk(ignitionPath string, device string, progressReporter inventory_client.InventoryClient, extraArgs []string) error {
 	allArgs := installerArgs(ignitionPath, device, extraArgs)
 	o.log.Infof("Writing image and ignition to disk with arguments: %v", allArgs)
-	_, err := o.ExecPrivilegeCommand(NewCoreosInstallerLogWriter(o.log, progressReporter, config.GlobalConfig.HostID),
+	_, err := o.ExecPrivilegeCommand(NewCoreosInstallerLogWriter(o.log, progressReporter, config.GlobalConfig.InfraEnvID, config.GlobalConfig.HostID),
 		"coreos-installer", allArgs...)
 	return err
 }
