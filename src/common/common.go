@@ -1,6 +1,7 @@
 package common
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"regexp"
@@ -97,7 +98,8 @@ func UploadPodLogs(kc k8s_client.K8SClient, ic inventory_client.InventoryClient,
 	log.Infof("Uploading logs for %s in %s", podName, namespace)
 	podLogs, err := kc.GetPodLogsAsBuffer(namespace, podName, sinceSeconds)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get logs of pod %s", podName)
+		podLogs = &bytes.Buffer{}
+		podLogs.WriteString(errors.Wrapf(err, "Failed to get logs of pod %s", podName).Error())
 	}
 	pr, pw := io.Pipe()
 	defer pr.Close()
