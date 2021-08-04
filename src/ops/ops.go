@@ -238,7 +238,7 @@ func (o *ops) SetBootOrder(device string) error {
 }
 
 func (o *ops) ExtractFromIgnition(ignitionPath string, fileToExtract string) error {
-	o.log.Infof("Getting pull secret from %s", ignitionPath)
+	o.log.Infof("Getting data from %s", ignitionPath)
 	ignitionData, err := ioutil.ReadFile(ignitionPath)
 	if err != nil {
 		o.log.Errorf("Error occurred while trying to read %s : %e", ignitionPath, err)
