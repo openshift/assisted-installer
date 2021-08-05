@@ -254,13 +254,14 @@ func (c *controller) HackDNSAddressConflict(wg *sync.WaitGroup) {
 		return
 	}
 
-	ip, _, _ := net.ParseCIDR(networks[0])
-	ip4 := ip.To4()
-	if ip4 == nil {
-		c.log.Infof("Service network is IPv6: %s, skipping the .10 address hack", ip)
+	netIp, _, _ := net.ParseCIDR(networks[0])
+	ip := netIp.To16()
+	if ip == nil {
+		c.log.Infof("Failed to parse service network cidr %s, skipping", networks[0])
 		return
 	}
-	ip4[3] = 10 // .10 is the conflicting address
+
+	ip[len(ip)-1] = 10 // .10 or :a is the conflicting address
 
 	for i := 0; i < maxDNSServiceIPAttempts; i++ {
 		svs, err := c.kc.ListServices("")
@@ -269,17 +270,17 @@ func (c *controller) HackDNSAddressConflict(wg *sync.WaitGroup) {
 			time.Sleep(DNSAddressRetryInterval)
 			continue
 		}
-		s := c.findServiceByIP(ip4.String(), &svs.Items)
+		s := c.findServiceByIP(ip.String(), &svs.Items)
 		if s == nil {
-			c.log.Infof("No service found with IP %s, attempt %d/%d", ip4, i+1, maxDNSServiceIPAttempts)
+			c.log.Infof("No service found with IP %s, attempt %d/%d", ip, i+1, maxDNSServiceIPAttempts)
 			time.Sleep(DNSAddressRetryInterval)
 			continue
 		}
 		if s.Name == dnsServiceName && s.Namespace == dnsServiceNamespace {
-			c.log.Infof("Service %s has successfully taken IP %s", dnsServiceName, ip4)
+			c.log.Infof("Service %s has successfully taken IP %s", dnsServiceName, ip)
 			break
 		}
-		c.log.Warnf("Deleting service %s in namespace %s whose IP %s conflicts with %s", s.Name, s.Namespace, ip4, dnsServiceName)
+		c.log.Warnf("Deleting service %s in namespace %s whose IP %s conflicts with %s", s.Name, s.Namespace, ip, dnsServiceName)
 		if err := c.killConflictingService(s); err != nil {
 			c.log.WithError(err).Warnf("Failed to delete service %s in namespace %s", s.Name, s.Namespace)
 			continue

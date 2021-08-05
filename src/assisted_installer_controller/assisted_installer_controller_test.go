@@ -191,7 +191,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		setConsoleAsAvailable(clusterID)
 	}
 
-	returnServiceWithDot10Address := func(name, namespace string) *gomock.Call {
+	returnServiceWithAddress := func(name, namespace, ip string) *gomock.Call {
 		return mockk8sclient.EXPECT().ListServices("").Return(&v1.ServiceList{
 			Items: []v1.Service{
 				{
@@ -200,11 +200,15 @@ var _ = Describe("installer HostRoleMaster role", func() {
 						Namespace: namespace,
 					},
 					Spec: v1.ServiceSpec{
-						ClusterIP: "10.56.20.10",
+						ClusterIP: ip,
 					},
 				},
 			},
 		}, nil)
+	}
+
+	returnServiceWithDot10Address := func(name, namespace string) *gomock.Call {
+		return returnServiceWithAddress(name, namespace, "10.56.20.10")
 	}
 
 	returnServiceNetwork := func() {
@@ -1415,8 +1419,12 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().GetServiceNetworks().Return(nil, errors.New("get service network failed"))
 			hackConflict()
 		})
-		It("Exit if service network is IPv6", func() {
+		It("Kill service and DNS pods if DNS service IP is taken in IPV6 env", func() {
 			mockk8sclient.EXPECT().GetServiceNetworks().Return([]string{"2002:db8::/64"}, nil)
+			returnServiceWithAddress(conflictServiceName, conflictServiceNamespace, "2002:db8::a")
+			mockk8sclient.EXPECT().DeleteService(conflictServiceName, conflictServiceNamespace).Return(nil)
+			mockk8sclient.EXPECT().DeletePods(dnsOperatorNamespace).Return(nil)
+			returnServiceWithAddress(dnsServiceName, dnsServiceNamespace, "2002:db8::a")
 			hackConflict()
 		})
 		It("Retry if list services fails", func() {
