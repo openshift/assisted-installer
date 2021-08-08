@@ -30,9 +30,9 @@ var _ = Describe("Verify CoreosInstallerLogger", func() {
 		updateProgressSuccess := func(stages [][]string) {
 			for _, stage := range stages {
 				if len(stage) == 2 {
-					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), "hostID", models.HostStage(stage[0]), stage[1]).Return(nil).Times(1)
+					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), "infraEnvID", "hostID", models.HostStage(stage[0]), stage[1]).Return(nil).Times(1)
 				} else {
-					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), "hostID", models.HostStage(stage[0]), "").Return(nil).Times(1)
+					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), "infraEnvID", "hostID", models.HostStage(stage[0]), "").Return(nil).Times(1)
 				}
 			}
 		}
@@ -41,7 +41,7 @@ var _ = Describe("Verify CoreosInstallerLogger", func() {
 			logger, hook = test.NewNullLogger()
 			ctrl := gomock.NewController(GinkgoT())
 			mockbmclient = inventory_client.NewMockInventoryClient(ctrl)
-			cilogger = NewCoreosInstallerLogWriter(logger, mockbmclient, "hostID")
+			cilogger = NewCoreosInstallerLogWriter(logger, mockbmclient, "infraEnvID", "hostID")
 		})
 		It("test log with new line", func() {
 			_, err := cilogger.Write([]byte("some log with a new line \n"))

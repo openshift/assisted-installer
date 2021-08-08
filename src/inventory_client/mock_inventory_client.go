@@ -66,17 +66,17 @@ func (mr *MockInventoryClientMockRecorder) DownloadHostIgnition(ctx, hostID, des
 }
 
 // UpdateHostInstallProgress mocks base method
-func (m *MockInventoryClient) UpdateHostInstallProgress(ctx context.Context, hostId string, newStage models.HostStage, info string) error {
+func (m *MockInventoryClient) UpdateHostInstallProgress(ctx context.Context, infraEnvId, hostId string, newStage models.HostStage, info string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateHostInstallProgress", ctx, hostId, newStage, info)
+	ret := m.ctrl.Call(m, "UpdateHostInstallProgress", ctx, infraEnvId, hostId, newStage, info)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UpdateHostInstallProgress indicates an expected call of UpdateHostInstallProgress
-func (mr *MockInventoryClientMockRecorder) UpdateHostInstallProgress(ctx, hostId, newStage, info interface{}) *gomock.Call {
+func (mr *MockInventoryClientMockRecorder) UpdateHostInstallProgress(ctx, infraEnvId, hostId, newStage, info interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHostInstallProgress", reflect.TypeOf((*MockInventoryClient)(nil).UpdateHostInstallProgress), ctx, hostId, newStage, info)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHostInstallProgress", reflect.TypeOf((*MockInventoryClient)(nil).UpdateHostInstallProgress), ctx, infraEnvId, hostId, newStage, info)
 }
 
 // GetEnabledHostsNamesHosts mocks base method
@@ -209,15 +209,15 @@ func (mr *MockInventoryClientMockRecorder) ClusterLogProgressReport(ctx, cluster
 }
 
 // HostLogProgressReport mocks base method
-func (m *MockInventoryClient) HostLogProgressReport(ctx context.Context, clusterId, hostId string, progress models.LogsState) {
+func (m *MockInventoryClient) HostLogProgressReport(ctx context.Context, infraEnvId, hostId string, progress models.LogsState) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "HostLogProgressReport", ctx, clusterId, hostId, progress)
+	m.ctrl.Call(m, "HostLogProgressReport", ctx, infraEnvId, hostId, progress)
 }
 
 // HostLogProgressReport indicates an expected call of HostLogProgressReport
-func (mr *MockInventoryClientMockRecorder) HostLogProgressReport(ctx, clusterId, hostId, progress interface{}) *gomock.Call {
+func (mr *MockInventoryClientMockRecorder) HostLogProgressReport(ctx, infraEnvId, hostId, progress interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HostLogProgressReport", reflect.TypeOf((*MockInventoryClient)(nil).HostLogProgressReport), ctx, clusterId, hostId, progress)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HostLogProgressReport", reflect.TypeOf((*MockInventoryClient)(nil).HostLogProgressReport), ctx, infraEnvId, hostId, progress)
 }
 
 // UpdateClusterOperator mocks base method
