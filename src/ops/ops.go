@@ -101,17 +101,20 @@ type ExecCommandError struct {
 	WaitStatus int
 }
 
+func removePullSecret(s []string) []string {
+	return strings.Split(strings.ReplaceAll(strings.Join(s, " "), config.GlobalConfig.PullSecretToken, "<SECRET>"), " ")
+}
+
 func (e *ExecCommandError) Error() string {
 	lastOutput := e.Output
 	if len(e.Output) > 200 {
 		lastOutput = "... " + e.Output[len(e.Output)-200:]
 	}
-
-	return fmt.Sprintf("failed executing %s %v, Error %s, LastOutput \"%s\"", e.Command, e.Args, e.ExitErr, lastOutput)
+	return fmt.Sprintf("failed executing %s %v, Error %s, LastOutput \"%s\"", e.Command, removePullSecret(e.Args), e.ExitErr, lastOutput)
 }
 
 func (e *ExecCommandError) DetailedError() string {
-	return fmt.Sprintf("failed executing %s %v, env vars %v, error %s, waitStatus %d, Output \"%s\"", e.Command, e.Args, e.Env, e.ExitErr, e.WaitStatus, e.Output)
+	return fmt.Sprintf("failed executing %s %v, env vars %v, error %s, waitStatus %d, Output \"%s\"", e.Command, removePullSecret(e.Args), removePullSecret(e.Env), e.ExitErr, e.WaitStatus, e.Output)
 }
 
 // ExecCommand executes command.
@@ -156,7 +159,7 @@ func (o *ops) ExecCommand(liveLogger io.Writer, command string, args ...string) 
 		}
 		return output, execErr
 	}
-	o.log.Debug("Command executed:", " command", command, " arguments", args, "env vars", cmd.Env, "output", output)
+	o.log.Debug("Command executed:", " command", command, " arguments", removePullSecret(args), "env vars", removePullSecret(cmd.Env), "output", output)
 	return output, err
 }
 
