@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-openapi/swag"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -133,6 +134,11 @@ func (i *installer) InstallNode() error {
 		}
 		i.log.Info("Setting bootstrap node new role to master")
 
+	} else if i.Config.Role == string(models.HostRoleWorker) {
+		// Wait for 2 masters to be ready before rebooting
+		if err = i.workerWaitFor2ReadyMasters(ctx); err != nil {
+			return err
+		}
 	}
 	//upload host logs and report log status before reboot
 	i.log.Infof("Uploading logs and reporting status before rebooting the node %s for cluster %s", i.Config.HostID, i.Config.ClusterID)
@@ -376,6 +382,32 @@ func (i *installer) waitForControlPlane(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func numDoneMasters(cluster *models.Cluster) int {
+	numDoneMasters := 0
+	for _, h := range cluster.Hosts {
+		if h.Role == models.HostRoleMaster && h.Progress.CurrentStage == models.HostStageDone {
+			numDoneMasters++
+		}
+	}
+	return numDoneMasters
+}
+
+func (i *installer) workerWaitFor2ReadyMasters(ctx context.Context) error {
+	i.log.Info("Waiting for 2 ready masters")
+	i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, "")
+	for {
+		cluster, err := i.inventoryClient.GetCluster(ctx)
+		if err != nil {
+			i.log.WithError(err).Errorf("Getting cluster %s", i.ClusterID)
+			return err
+		}
+		if swag.StringValue(cluster.Kind) == models.ClusterKindAddHostsCluster || numDoneMasters(cluster) >= minMasterNodes {
+			return nil
+		}
+		time.Sleep(generalWaitInterval)
+	}
 }
 
 func (i *installer) shouldControlPlaneReplicasPatchApplied(kc k8s_client.K8SClient) (bool, error) {
