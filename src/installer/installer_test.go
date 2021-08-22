@@ -233,7 +233,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockops.EXPECT().ExtractFromIgnition(filepath.Join(InstallDir, bootstrapIgn), dockerConfigFile).Return(nil).Times(1)
 		}
 		generateSshKeyPairSuccess := func() {
-			mkdirSuccess(sshDir)
 			mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "ssh-keygen", "-q", "-f", sshKeyPath, "-N", "").Return("OK", nil).Times(1)
 		}
 		createOpenshiftSshManifestSuccess := func() {
@@ -242,6 +241,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 		bootstrapSetup := func() {
 			cleanInstallDevice()
+			mkdirSuccess(sshDir)
 			mkdirSuccess(InstallDir)
 			downloadFileSuccess(bootstrapIgn)
 			extractSecretFromIgnitionSuccess()
@@ -330,6 +330,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			})
 			cleanInstallDevice()
 			mkdirSuccess(InstallDir)
+			mkdirSuccess(sshDir)
 			downloadFileSuccess(bootstrapIgn)
 			extractSecretFromIgnitionSuccess()
 			extractIgnitionToFS("Success", nil)
@@ -378,6 +379,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			})
 			cleanInstallDevice()
 			mkdirSuccess(InstallDir)
+			mkdirSuccess(sshDir)
 			downloadFileSuccess(bootstrapIgn)
 			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
 			writeToDiskSuccess(gomock.Any())
@@ -713,6 +715,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		singleNodeBootstrapSetup := func() {
 			cleanInstallDevice()
 			mkdirSuccess(InstallDir)
+			mkdirSuccess(sshDir)
 			downloadFileSuccess(bootstrapIgn)
 			extractSecretFromIgnitionSuccess()
 			extractIgnitionToFS("Success", nil)

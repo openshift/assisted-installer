@@ -201,6 +201,12 @@ func (i *installer) writeImageToDisk(ignitionPath string) error {
 
 func (i *installer) startBootstrap() error {
 	i.log.Infof("Running bootstrap")
+	// This is required for the log collection command to work since it will try to mount this directory
+	// This directory is also required by `generateSshKeyPair` as it will place the key there
+	if err := i.ops.Mkdir(sshDir); err != nil {
+		i.log.WithError(err).Error("Failed to create SSH dir")
+		return err
+	}
 	ignitionFileName := "bootstrap.ign"
 	ignitionPath, err := i.getFileFromService(ignitionFileName)
 	if err != nil {
@@ -295,10 +301,6 @@ func (i *installer) extractIgnitionToFS(ignitionPath string) (err error) {
 
 func (i *installer) generateSshKeyPair() error {
 	i.log.Info("Generating new SSH key pair")
-	if err := i.ops.Mkdir(sshDir); err != nil {
-		i.log.WithError(err).Error("Failed to create SSH dir")
-		return err
-	}
 	if _, err := i.ops.ExecPrivilegeCommand(utils.NewLogWriter(i.log), "ssh-keygen", "-q", "-f", sshKeyPath, "-N", ""); err != nil {
 		i.log.WithError(err).Error("Failed to generate SSH key pair")
 		return err
