@@ -222,6 +222,12 @@ func WaitForPredicateWithContext(ctx context.Context, timeout time.Duration, int
 	})
 }
 
+func WaitForPredicateParamsWithContext(ctx context.Context, timeout time.Duration, interval time.Duration, predicate func(arg interface{}) bool, arg interface{}) error {
+	return WaitForPredicateWithTimer(ctx, timeout, interval, func(timer *time.Timer) bool {
+		return predicate(arg)
+	})
+}
+
 // ProxyFromEnvVars provides an alternative to http.ProxyFromEnvironment since it is being initialized only
 // once and that happens by k8s before proxy settings was obtained. While this is no issue for k8s, it prevents
 // any out-of-cluster traffic from using the proxy
@@ -281,10 +287,6 @@ func CsvStatusToOperatorStatus(csvStatus string) models.OperatorStatus {
 	default:
 		return models.OperatorStatusProgressing
 	}
-}
-
-func IsStatusFailed(operatorStatus models.OperatorStatus) bool {
-	return operatorStatus == models.OperatorStatusFailed
 }
 
 func ClusterOperatorConditionsToMonitoredOperatorStatus(conditions []configv1.ClusterOperatorStatusCondition) (models.OperatorStatus, string) {

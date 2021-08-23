@@ -371,7 +371,7 @@ func (mr *MockOpsMockRecorder) EvaluateDiskSymlink(arg0 interface{}) *gomock.Cal
 }
 
 // CreateManifests mocks base method
-func (m *MockOps) CreateManifests(arg0, arg1 string) error {
+func (m *MockOps) CreateManifests(arg0 string, arg1 []byte) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateManifests", arg0, arg1)
 	ret0, _ := ret[0].(error)
