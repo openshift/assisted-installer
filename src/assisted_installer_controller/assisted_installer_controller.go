@@ -106,9 +106,9 @@ type controller struct {
 // manifest store the operator manifest used by assisted-installer to create CRs of the OLM:
 type manifest struct {
 	// name of the operator the CR manifest we want create
-	name string
+	Name string
 	// content of the manifest of the opreator
-	content string
+	Content string
 }
 
 func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inventory_client.InventoryClient, kc k8s_client.K8SClient) *controller {
@@ -591,11 +591,15 @@ func (c controller) applyPostInstallManifests(arg interface{}) bool {
 		return false
 	}
 
+	c.log.Infof("Ready operators to be applied: %v", readyOperators)
+
 	for _, manifest := range manifests {
+		c.log.Infof("Applying manifest %s: %s", manifest.Name, manifest.Content)
+
 		// Check if the operator is properly initialized by CSV:
 		if !func() bool {
 			for _, readyOperator := range readyOperators {
-				if readyOperator == manifest.name {
+				if readyOperator == manifest.Name {
 					return true
 				}
 			}
@@ -604,9 +608,9 @@ func (c controller) applyPostInstallManifests(arg interface{}) bool {
 			continue
 		}
 
-		content, err := base64.StdEncoding.DecodeString(manifest.content)
+		content, err := base64.StdEncoding.DecodeString(manifest.Content)
 		if err != nil {
-			c.log.WithError(err).Errorf("Failed to decode content of operator CR %s.", manifest.name)
+			c.log.WithError(err).Errorf("Failed to decode content of operator CR %s.", manifest.Name)
 			return false
 		}
 
@@ -615,6 +619,8 @@ func (c controller) applyPostInstallManifests(arg interface{}) bool {
 			c.log.WithError(err).Error("Failed to apply manifest file.")
 			return false
 		}
+
+		c.log.Infof("Manifest %s applied.", manifest.Name)
 	}
 
 	return true
