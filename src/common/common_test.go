@@ -41,7 +41,7 @@ var _ = Describe("verify common", func() {
 				IPs: []string{"192.168.126.10", "192.168.11.122", "fe80::5054:ff:fe9a:4738"}},
 				"node1": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node1Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}, Role: models.HostRoleMaster}, IPs: []string{"192.168.126.11", "192.168.11.123", "fe80::5054:ff:fe9a:4739"}},
 				"node2": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node2Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}, Role: models.HostRoleWorker}, IPs: []string{"192.168.126.12", "192.168.11.124", "fe80::5054:ff:fe9a:4740"}}}
-
+			// note that in the MCS log we use node 1 IPv6 address
 			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), infraEnvId.String(), node1Id.String(), models.HostStageConfiguring, gomock.Any()).Return(fmt.Errorf("dummy")).Times(1)
 			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), infraEnvId.String(), node2Id.String(), models.HostStageWaitingForIgnition, gomock.Any()).Return(nil).Times(1)
 			SetConfiguringStatusForHosts(mockbmclient, testInventoryIdsIps, logs, true, l)
