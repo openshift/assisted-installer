@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strconv"
 	"text/template"
 
@@ -232,12 +233,24 @@ func (o *ops) SetBootOrder(device string) error {
 	o.log.Info("Setting efibootmgr to boot from disk")
 
 	// efi-system is installed onto partition 2
-	_, err = o.ExecPrivilegeCommand(o.logWriter, "efibootmgr", "-d", device, "-p", "2", "-c", "-L", "Red Hat Enterprise Linux", "-l", "\\EFI\\redhat\\shimx64.efi")
+	_, err = o.ExecPrivilegeCommand(o.logWriter, "efibootmgr", "-d", device, "-p", "2", "-c", "-L", "Red Hat Enterprise Linux", "-l", o.getEfiFilePath())
 	if err != nil {
 		o.log.Errorf("Failed to set efibootmgr to boot from disk %s, err: %s", device, err)
 		return err
 	}
 	return nil
+}
+
+func (o *ops) getEfiFilePath() string {
+	var efiFileName string
+	switch runtime.GOARCH {
+	case "arm64":
+		efiFileName = "shimaa64.efi"
+	default:
+		efiFileName = "shimx64.efi"
+	}
+	o.log.Infof("Using EFI file '%s' for GOARCH '%s'", efiFileName, runtime.GOARCH)
+	return fmt.Sprintf("\\EFI\\redhat\\%s", efiFileName)
 }
 
 func (o *ops) ExtractFromIgnition(ignitionPath string, fileToExtract string) error {
