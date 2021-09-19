@@ -1003,8 +1003,14 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 	var ok bool = true
 	ctx := utils.GenerateRequestContext()
 
+	// Send upload operator logs before must-gather
 	c.logClusterOperatorsStatus()
 	if c.Status.HasError() || c.Status.HasOperatorError() {
+		c.log.Infof("Uploading cluster operator status logs before must-gather")
+		err := common.UploadPodLogs(c.kc, c.ic, c.ClusterID, podName, c.Namespace, controllerLogsSecondsAgo, c.log)
+		if err != nil {
+			c.log.WithError(err).Warnf("Failed to upload controller logs")
+		}
 		c.log.Infof("Uploading oc must-gather logs")
 		images := c.parseMustGatherImages()
 		if tarfile, err := c.collectMustGatherLogs(ctx, images...); err == nil {
