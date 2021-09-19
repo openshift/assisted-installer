@@ -178,6 +178,7 @@ github.com/bradfitz/gomemcache v0.0.0-20190913173617-a41fca850d0b/go.mod h1:H0wQ
 github.com/brancz/gojsontoyaml v0.0.0-20190425155809-e8bd32d46b3d/go.mod h1:IyUJYN1gvWjtLF5ZuygmxbnsAyP3aJS6cHzIuZY50B0=
 github.com/bshuster-repo/logrus-logstash-hook v0.4.1/go.mod h1:zsTqEiSzDgAa/8GZR7E1qaXrhYNDKBYy5/dWPTIflbk=
 github.com/bshuster-repo/logrus-logstash-hook v1.0.0/go.mod h1:zsTqEiSzDgAa/8GZR7E1qaXrhYNDKBYy5/dWPTIflbk=
+github.com/buger/jsonparser v1.1.1/go.mod h1:6RYKKt7H4d4+iWqouImQ9R2FZql3VbhNgx27UK13J/0=
 github.com/bugsnag/bugsnag-go v0.0.0-20141110184014-b1d153021fcd/go.mod h1:2oa8nejYd4cQ/b0hMIopN0lCRxU0bueqREvZLWFrtK8=
 github.com/bugsnag/bugsnag-go v1.5.3/go.mod h1:2oa8nejYd4cQ/b0hMIopN0lCRxU0bueqREvZLWFrtK8=
 github.com/bugsnag/osext v0.0.0-20130617224835-0dd3f918b21b/go.mod h1:obH5gd0BsqsP2LwDJ9aOkm/6J86V6lyAXCoQWGw3K50=
@@ -903,6 +904,7 @@ github.com/mattn/go-sqlite3 v1.10.0/go.mod h1:FPy6KqzDD04eiIsT53CuJW3U88zkxoIYsO
 github.com/mattn/go-sqlite3 v1.12.0/go.mod h1:FPy6KqzDD04eiIsT53CuJW3U88zkxoIYsOqkbpncsNc=
 github.com/mattn/go-sqlite3 v2.0.1+incompatible h1:xQ15muvnzGBHpIpdrNi1DA5x0+TcBZzsIDwmw9uTHzw=
 github.com/mattn/go-sqlite3 v2.0.1+incompatible/go.mod h1:FPy6KqzDD04eiIsT53CuJW3U88zkxoIYsOqkbpncsNc=
+github.com/mattn/go-sqlite3 v2.0.3+incompatible/go.mod h1:FPy6KqzDD04eiIsT53CuJW3U88zkxoIYsOqkbpncsNc=
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
 github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 h1:I0XW9+e1XWDxdcEniV4rQAIOPUGDq67JSCiRCgGCZLI=
 github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369/go.mod h1:BSXmuO+STAnVfrANrmjBb36TMTDstsz7MSK+HVaYKv4=
@@ -1039,6 +1041,10 @@ github.com/openshift/assisted-service v1.0.10-0.20210729090313-b33b6f69330b h1:8
 github.com/openshift/assisted-service v1.0.10-0.20210729090313-b33b6f69330b/go.mod h1:06CYHjrS5tanbGRM4ZB3Sd0gcaSIfMkXNjDmZVFAWhs=
 github.com/openshift/assisted-service v1.0.10-0.20210808073533-4afc4b5ae515 h1:1CnH/Cy9KjPeT3+ThA6nLSUY3cA3IEix1k3rKvNuxJY=
 github.com/openshift/assisted-service v1.0.10-0.20210808073533-4afc4b5ae515/go.mod h1:06CYHjrS5tanbGRM4ZB3Sd0gcaSIfMkXNjDmZVFAWhs=
+github.com/openshift/assisted-service v1.0.10-0.20210919133239-48a7ecedcb85 h1:xU8eqsoc2YenPcD9MAaXDMEQDTmcTsVfbaHoKZ+eemw=
+github.com/openshift/assisted-service v1.0.10-0.20210919133239-48a7ecedcb85/go.mod h1:SsuNh9LQjVGO4N8PG5fp8G0LVSkVcWcF158yOCJFAj8=
+github.com/openshift/assisted-service v1.0.10-0.20210921191140-7dcb60579fdf h1:wvV0DoZNXFPPLiqv1O4VpjhOhAZW+KcKkZ9w0z/f7Lg=
+github.com/openshift/assisted-service v1.0.10-0.20210921191140-7dcb60579fdf/go.mod h1:SsuNh9LQjVGO4N8PG5fp8G0LVSkVcWcF158yOCJFAj8=
 github.com/openshift/baremetal-operator v0.0.0-20200715132148-0f91f62a41fe h1:bu99IMkaN6o/JcxpWEb1eT8gDdL9hLcwOmfiVIbXWj8=
 github.com/openshift/baremetal-operator v0.0.0-20200715132148-0f91f62a41fe/go.mod h1:DOgBIuBcXuTD8uub0jL7h6gBdIBt3CFrwz6K2FtfMBA=
 github.com/openshift/build-machinery-go v0.0.0-20200819073603-48aa266c95f7/go.mod h1:b1BuldmJlbA/xYtdZvKi+7j5YGB44qJUJDZ9zwiNCfE=
