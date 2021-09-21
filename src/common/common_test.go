@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-service/models"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
 )
 
 func TestCommon(t *testing.T) {
@@ -121,4 +123,61 @@ var _ = Describe("verify common", func() {
 			})
 		}
 	})
+
+	Context("Verify name- and IP-based matching", func() {
+		var testInventoryIdsIps, knownIpAddresses map[string]inventory_client.HostData
+		var node0Id, node1Id, node2Id strfmt.UUID
+
+		BeforeEach(func() {
+			infraEnvId := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f250")
+			node0Id = strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f238")
+			node1Id = strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f239")
+			node2Id = strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f240")
+
+			testInventoryIdsIps = map[string]inventory_client.HostData{"node0": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node0Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}, Role: models.HostRoleMaster},
+				IPs: []string{"192.168.126.10", "192.168.39.248", "fe80::5054:ff:fe9a:4738"}},
+				"node1": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node1Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}, Role: models.HostRoleMaster}, IPs: []string{"192.168.126.11", "192.168.11.123", "fe80::5054:ff:fe9a:4739"}},
+				"node2": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node2Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}, Role: models.HostRoleWorker}, IPs: []string{"192.168.126.12", "192.168.11.124", "fe80::5054:ff:fe9a:4740"}}}
+			knownIpAddresses = BuildHostsMapIPAddressBased(testInventoryIdsIps)
+		})
+
+		It("test BuildHostsMapIPAddressBased", func() {
+			Expect(len(knownIpAddresses)).To(Equal(9))
+			Expect(knownIpAddresses["192.168.126.10"].Host.ID).To(Equal(&node0Id))
+			Expect(knownIpAddresses["192.168.11.123"].Host.ID).To(Equal(&node1Id))
+			Expect(knownIpAddresses["fe80::5054:ff:fe9a:4740"].Host.ID).To(Equal(&node2Id))
+			Expect(knownIpAddresses["10.0.0.1"]).To(Equal(inventory_client.HostData{IPs: nil, Inventory: nil, Host: nil}))
+		})
+
+		It("test HostMatchByNameOrIPAddress by name", func() {
+			nodes := GetKubeNodes(map[string]string{"node1": "6d6f00e8-dead-beef-cafe-0f1459485ad9"})
+			Expect(len(nodes.Items)).To(Equal(1))
+			Expect(nodes.Items[0].Name).To(Equal("node1"))
+			match, ok := HostMatchByNameOrIPAddress(nodes.Items[0], testInventoryIdsIps, knownIpAddresses)
+			Expect(ok).To(Equal(true))
+			Expect(match.Host.ID).To(Equal(&node1Id))
+		})
+
+		It("test HostMatchByNameOrIPAddress by IP", func() {
+			nodes := GetKubeNodes(map[string]string{"some-fake-name": "6d6f00e8-dead-beef-cafe-0f1459485ad9"})
+			Expect(len(nodes.Items)).To(Equal(1))
+			Expect(nodes.Items[0].Name).To(Equal("some-fake-name"))
+			match, ok := HostMatchByNameOrIPAddress(nodes.Items[0], testInventoryIdsIps, knownIpAddresses)
+			Expect(ok).To(Equal(true))
+			Expect(match.Host.ID).To(Equal(&node0Id))
+		})
+	})
 })
+
+func GetKubeNodes(kubeNamesIds map[string]string) *v1.NodeList {
+	file, _ := ioutil.ReadFile("../../test_files/node.json")
+	var node v1.Node
+	_ = json.Unmarshal(file, &node)
+	nodeList := &v1.NodeList{}
+	for name, id := range kubeNamesIds {
+		node.Status.NodeInfo.SystemUUID = id
+		node.Name = name
+		nodeList.Items = append(nodeList.Items, node)
+	}
+	return nodeList
+}

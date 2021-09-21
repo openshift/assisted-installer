@@ -194,6 +194,7 @@ func (c *controller) waitAndUpdateNodesStatus() bool {
 	log := utils.RequestIDLogger(ctxReq, c.log)
 
 	assistedNodesMap, err := c.ic.GetHosts(ctxReq, log, ignoreStatuses)
+	knownIpAddresses := common.BuildHostsMapIPAddressBased(assistedNodesMap)
 	if err != nil {
 		log.WithError(err).Error("Failed to get node map from the assisted service")
 		return KeepWaiting
@@ -223,12 +224,9 @@ func (c *controller) waitAndUpdateNodesStatus() bool {
 		return KeepWaiting
 	}
 	for _, node := range nodes.Items {
-		host, ok := hostsInProgressMap[strings.ToLower(node.Name)]
+		host, ok := common.HostMatchByNameOrIPAddress(node, hostsInProgressMap, knownIpAddresses)
 		if !ok {
-			if _, ok := assistedNodesMap[strings.ToLower(node.Name)]; !ok {
-				log.Warnf("Node %s is not in inventory hosts", strings.ToLower(node.Name))
-			}
-
+			log.Warnf("Node %s is not in inventory hosts", strings.ToLower(node.Name))
 			continue
 		}
 
