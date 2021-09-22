@@ -132,3 +132,35 @@ func IsK8sNodeIsReady(node v1.Node) bool {
 	}
 	return false
 }
+
+// BuildHostsMapIPAddressBased builds a map containing all the IP addresses of the hosts in the
+// inventory so that later we can match reporting hosts based on the IP and not only on the name.
+func BuildHostsMapIPAddressBased(inventoryHostsMap map[string]inventory_client.HostData) map[string]inventory_client.HostData {
+	knownIpAddresses := map[string]inventory_client.HostData{}
+	for _, v := range inventoryHostsMap {
+		for _, ip := range v.IPs {
+			knownIpAddresses[ip] = v
+		}
+	}
+	return knownIpAddresses
+}
+
+// Matching of the host happens based on 2 rules
+//   * if the name of the host and in the inventory is exactly the same, use use it
+//   * if the name is not known in the inventory, we check if the IP address of the
+//     reporting host is known to the inventory
+// Using those rules we can cover the cases where e.g. inventory expects a short
+// hostname, but the host reports itself using its FQDN
+func HostMatchByNameOrIPAddress(node v1.Node, namesMap, IPAddressMap map[string]inventory_client.HostData) (inventory_client.HostData, bool) {
+	host, ok := namesMap[strings.ToLower(node.Name)]
+	if !ok {
+		for _, ip := range node.Status.Addresses {
+			_, exists := IPAddressMap[ip.Address]
+			if exists && ip.Type == v1.NodeInternalIP {
+				ok = true
+				host = IPAddressMap[ip.Address]
+			}
+		}
+	}
+	return host, ok
+}

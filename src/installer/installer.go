@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/go-openapi/swag"
@@ -634,6 +633,8 @@ func (i *installer) getInventoryHostsMap(hostsMap map[string]inventory_client.Ho
 
 func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]string, inventoryHostsMap map[string]inventory_client.HostData) error {
 	nodeNameAndCondition := map[string][]v1.NodeCondition{}
+	knownIpAddresses := common.BuildHostsMapIPAddressBased(inventoryHostsMap)
+
 	for _, node := range nodes.Items {
 		nodeNameAndCondition[node.Name] = node.Status.Conditions
 		if common.IsK8sNodeIsReady(node) && !funk.ContainsString(*readyMasters, node.Name) {
@@ -641,7 +642,8 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 			log := utils.RequestIDLogger(ctx, i.log)
 			log.Infof("Found a new ready master node %s with id %s", node.Name, node.Status.NodeInfo.SystemUUID)
 			*readyMasters = append(*readyMasters, node.Name)
-			host, ok := inventoryHostsMap[strings.ToLower(node.Name)]
+
+			host, ok := common.HostMatchByNameOrIPAddress(node, inventoryHostsMap, knownIpAddresses)
 			if !ok {
 				return fmt.Errorf("Node %s is not in inventory hosts", node.Name)
 			}
