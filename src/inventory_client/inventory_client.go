@@ -42,7 +42,8 @@ const (
 //go:generate mockgen -source=inventory_client.go -package=inventory_client -destination=mock_inventory_client.go
 type InventoryClient interface {
 	DownloadFile(ctx context.Context, filename string, dest string) error
-	DownloadHostIgnition(ctx context.Context, hostID string, dest string) error
+	DownloadClusterCredentials(ctx context.Context, filename string, dest string) error
+	DownloadHostIgnition(ctx context.Context, infraEnvID string, hostID string, dest string) error
 	UpdateHostInstallProgress(ctx context.Context, infraEnvId string, hostId string, newStage models.HostStage, info string) error
 	GetEnabledHostsNamesHosts(ctx context.Context, log logrus.FieldLogger) (map[string]HostData, error)
 	UploadIngressCa(ctx context.Context, ingressCA string, clusterId string) error
@@ -184,11 +185,31 @@ func (c *inventoryClient) DownloadFile(ctx context.Context, filename string, des
 		fo.Close()
 	}()
 	c.logger.Infof("Downloading file %s to %s", filename, dest)
-	_, err = c.ai.Installer.DownloadClusterFiles(ctx, c.createDownloadParams(filename), fo)
+	_, err = c.ai.Installer.V2DownloadClusterFiles(ctx, c.createDownloadParams(filename), fo)
 	return aserror.GetAssistedError(err)
 }
 
-func (c *inventoryClient) DownloadHostIgnition(ctx context.Context, hostID string, dest string) error {
+func (c *inventoryClient) DownloadClusterCredentials(ctx context.Context, filename string, dest string) error {
+	// open output file
+	fo, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	// close fo on exit and check for its returned error
+	defer func() {
+		fo.Close()
+	}()
+	c.logger.Infof("Downloading cluster credentials %s to %s", filename, dest)
+
+	params := installer.V2DownloadClusterCredentialsParams{
+		ClusterID: c.clusterId,
+		FileName:  filename,
+	}
+	_, err = c.ai.Installer.V2DownloadClusterCredentials(ctx, &params, fo)
+	return aserror.GetAssistedError(err)
+}
+
+func (c *inventoryClient) DownloadHostIgnition(ctx context.Context, infraEnvID string, hostID string, dest string) error {
 	// open output file
 	fo, err := os.Create(dest)
 	if err != nil {
@@ -199,11 +220,11 @@ func (c *inventoryClient) DownloadHostIgnition(ctx context.Context, hostID strin
 		fo.Close()
 	}()
 
-	params := installer.DownloadHostIgnitionParams{
-		ClusterID: c.clusterId,
-		HostID:    strfmt.UUID(hostID),
+	params := installer.V2DownloadHostIgnitionParams{
+		InfraEnvID: strfmt.UUID(infraEnvID),
+		HostID:     strfmt.UUID(hostID),
 	}
-	_, err = c.ai.Installer.DownloadHostIgnition(ctx, &params, fo)
+	_, err = c.ai.Installer.V2DownloadHostIgnition(ctx, &params, fo)
 	return aserror.GetAssistedError(err)
 }
 
@@ -213,13 +234,13 @@ func (c *inventoryClient) UpdateHostInstallProgress(ctx context.Context, infraEn
 }
 
 func (c *inventoryClient) UploadIngressCa(ctx context.Context, ingressCA string, clusterId string) error {
-	_, err := c.ai.Installer.UploadClusterIngressCert(ctx,
-		&installer.UploadClusterIngressCertParams{ClusterID: strfmt.UUID(clusterId), IngressCertParams: models.IngressCertParams(ingressCA)})
+	_, err := c.ai.Installer.V2UploadClusterIngressCert(ctx,
+		&installer.V2UploadClusterIngressCertParams{ClusterID: strfmt.UUID(clusterId), IngressCertParams: models.IngressCertParams(ingressCA)})
 	return aserror.GetAssistedError(err)
 }
 
 func (c *inventoryClient) GetCluster(ctx context.Context) (*models.Cluster, error) {
-	cluster, err := c.ai.Installer.GetCluster(ctx, &installer.GetClusterParams{ClusterID: c.clusterId})
+	cluster, err := c.ai.Installer.V2GetCluster(ctx, &installer.V2GetClusterParams{ClusterID: c.clusterId})
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +249,7 @@ func (c *inventoryClient) GetCluster(ctx context.Context) (*models.Cluster, erro
 }
 
 func (c *inventoryClient) GetClusterMonitoredOperator(ctx context.Context, clusterId, operatorName string) (*models.MonitoredOperator, error) {
-	monitoredOperators, err := c.ai.Operators.ListOfClusterOperators(ctx, &operators.ListOfClusterOperatorsParams{
+	monitoredOperators, err := c.ai.Operators.V2ListOfClusterOperators(ctx, &operators.V2ListOfClusterOperatorsParams{
 		ClusterID:    strfmt.UUID(clusterId),
 		OperatorName: &operatorName,
 	})
@@ -240,7 +261,7 @@ func (c *inventoryClient) GetClusterMonitoredOperator(ctx context.Context, clust
 }
 
 func (c *inventoryClient) GetClusterMonitoredOLMOperators(ctx context.Context, clusterId string) ([]models.MonitoredOperator, error) {
-	monitoredOperators, err := c.ai.Operators.ListOfClusterOperators(ctx, &operators.ListOfClusterOperatorsParams{ClusterID: strfmt.UUID(clusterId)})
+	monitoredOperators, err := c.ai.Operators.V2ListOfClusterOperators(ctx, &operators.V2ListOfClusterOperatorsParams{ClusterID: strfmt.UUID(clusterId)})
 	if err != nil {
 		return nil, aserror.GetAssistedError(err)
 	}
@@ -284,8 +305,8 @@ func createUrl(baseURL string) string {
 	)
 }
 
-func (c *inventoryClient) createDownloadParams(filename string) *installer.DownloadClusterFilesParams {
-	return &installer.DownloadClusterFilesParams{
+func (c *inventoryClient) createDownloadParams(filename string) *installer.V2DownloadClusterFilesParams {
+	return &installer.V2DownloadClusterFilesParams{
 		ClusterID: c.clusterId,
 		FileName:  filename,
 	}
@@ -304,11 +325,11 @@ func (c *inventoryClient) createUpdateHostInstallProgressParams(infraEnvId, host
 
 func (c *inventoryClient) getHostsWithInventoryInfo(ctx context.Context, log logrus.FieldLogger, skippedStatuses []string) (map[string]HostData, error) {
 	hostsWithHwInfo := make(map[string]HostData)
-	hosts, err := c.ai.Installer.ListHosts(ctx, &installer.ListHostsParams{ClusterID: c.clusterId})
+	clusterData, err := c.GetCluster(ctx)
 	if err != nil {
-		return nil, aserror.GetAssistedError(err)
+		return nil, err
 	}
-	for _, host := range hosts.Payload {
+	for _, host := range clusterData.Hosts {
 		if funk.IndexOf(skippedStatuses, *host.Status) > -1 {
 			continue
 		}
@@ -324,22 +345,22 @@ func (c *inventoryClient) getHostsWithInventoryInfo(ctx context.Context, log log
 }
 
 func (c *inventoryClient) CompleteInstallation(ctx context.Context, clusterId string, isSuccess bool, errorInfo string) error {
-	_, err := c.ai.Installer.CompleteInstallation(ctx,
-		&installer.CompleteInstallationParams{ClusterID: strfmt.UUID(clusterId),
+	_, err := c.ai.Installer.V2CompleteInstallation(ctx,
+		&installer.V2CompleteInstallationParams{ClusterID: strfmt.UUID(clusterId),
 			CompletionParams: &models.CompletionParams{IsSuccess: &isSuccess, ErrorInfo: errorInfo}})
 	return aserror.GetAssistedError(err)
 }
 
 func (c *inventoryClient) UploadLogs(ctx context.Context, clusterId string, logsType models.LogsType, upfile io.Reader) error {
 	fileName := fmt.Sprintf("%s_logs.tar.gz", string(logsType))
-	_, err := c.ai.Installer.UploadLogs(ctx,
-		&installer.UploadLogsParams{ClusterID: strfmt.UUID(clusterId), LogsType: string(logsType),
+	_, err := c.ai.Installer.V2UploadLogs(ctx,
+		&installer.V2UploadLogsParams{ClusterID: strfmt.UUID(clusterId), LogsType: string(logsType),
 			Upfile: runtime.NamedReader(fileName, upfile)})
 	return aserror.GetAssistedError(err)
 }
 
 func (c *inventoryClient) ClusterLogProgressReport(ctx context.Context, clusterId string, progress models.LogsState) {
-	_, err := c.ai.Installer.UpdateClusterLogsProgress(ctx, &installer.UpdateClusterLogsProgressParams{
+	_, err := c.ai.Installer.V2UpdateClusterLogsProgress(ctx, &installer.V2UpdateClusterLogsProgressParams{
 		ClusterID: strfmt.UUID(clusterId),
 		LogsProgressParams: &models.LogsProgressParams{
 			LogsState: progress,
@@ -350,10 +371,10 @@ func (c *inventoryClient) ClusterLogProgressReport(ctx context.Context, clusterI
 	}
 }
 
-func (c *inventoryClient) HostLogProgressReport(ctx context.Context, clusterId string, hostId string, progress models.LogsState) {
-	_, err := c.ai.Installer.UpdateHostLogsProgress(ctx, &installer.UpdateHostLogsProgressParams{
-		ClusterID: strfmt.UUID(clusterId),
-		HostID:    strfmt.UUID(hostId),
+func (c *inventoryClient) HostLogProgressReport(ctx context.Context, infraEnvId string, hostId string, progress models.LogsState) {
+	_, err := c.ai.Installer.V2UpdateHostLogsProgress(ctx, &installer.V2UpdateHostLogsProgressParams{
+		InfraEnvID: strfmt.UUID(infraEnvId),
+		HostID:     strfmt.UUID(hostId),
 		LogsProgressParams: &models.LogsProgressParams{
 			LogsState: progress,
 		},
@@ -364,7 +385,7 @@ func (c *inventoryClient) HostLogProgressReport(ctx context.Context, clusterId s
 }
 
 func (c *inventoryClient) UpdateClusterOperator(ctx context.Context, clusterId string, operatorName string, operatorStatus models.OperatorStatus, operatorStatusInfo string) error {
-	_, err := c.ai.Operators.ReportMonitoredOperatorStatus(ctx, &operators.ReportMonitoredOperatorStatusParams{
+	_, err := c.ai.Operators.V2ReportMonitoredOperatorStatus(ctx, &operators.V2ReportMonitoredOperatorStatusParams{
 		ClusterID: c.clusterId,
 		ReportParams: &models.OperatorMonitorReport{
 			Name:       operatorName,

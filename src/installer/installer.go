@@ -141,7 +141,7 @@ func (i *installer) InstallNode() error {
 	}
 	//upload host logs and report log status before reboot
 	i.log.Infof("Uploading logs and reporting status before rebooting the node %s for cluster %s", i.Config.HostID, i.Config.ClusterID)
-	i.inventoryClient.HostLogProgressReport(ctx, i.Config.ClusterID, i.Config.HostID, models.LogsStateRequested)
+	i.inventoryClient.HostLogProgressReport(ctx, i.Config.InfraEnvID, i.Config.HostID, models.LogsStateRequested)
 	_, err = i.ops.UploadInstallationLogs(isBootstrap || i.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone)
 	if err != nil {
 		i.log.Errorf("upload installation logs %s", err)
@@ -326,7 +326,7 @@ func (i *installer) downloadHostIgnition() (string, error) {
 	log.Infof("Getting %s file", filename)
 
 	dest := filepath.Join(InstallDir, filename)
-	err := i.inventoryClient.DownloadHostIgnition(ctx, i.Config.HostID, dest)
+	err := i.inventoryClient.DownloadHostIgnition(ctx, i.Config.InfraEnvID, i.Config.HostID, dest)
 	if err != nil {
 		log.Errorf("Failed to fetch file (%s) from server. err: %s", filename, err)
 	}

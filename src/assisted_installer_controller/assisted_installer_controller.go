@@ -1098,7 +1098,7 @@ func (c controller) parseMustGatherImages() []string {
 func (c controller) downloadKubeconfigNoingress(ctx context.Context, dir string) (string, error) {
 	// Download kubeconfig file
 	kubeconfigPath := path.Join(dir, kubeconfigFileName)
-	err := c.ic.DownloadFile(ctx, kubeconfigFileName, kubeconfigPath)
+	err := c.ic.DownloadClusterCredentials(ctx, kubeconfigFileName, kubeconfigPath)
 	if err != nil {
 		c.log.Errorf("Failed to download noingress kubeconfig %v\n", err)
 		return "", err

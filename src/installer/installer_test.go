@@ -66,8 +66,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	downloadFileSuccess := func(fileName string) {
 		mockbmclient.EXPECT().DownloadFile(gomock.Any(), fileName, filepath.Join(InstallDir, fileName)).Return(nil).Times(1)
 	}
-	downloadHostIgnitionSuccess := func(hostID string, fileName string) {
-		mockbmclient.EXPECT().DownloadHostIgnition(gomock.Any(), hostID, filepath.Join(InstallDir, fileName)).Return(nil).Times(1)
+	downloadHostIgnitionSuccess := func(infraEnvID string, hostID string, fileName string) {
+		mockbmclient.EXPECT().DownloadHostIgnition(gomock.Any(), infraEnvID, hostID, filepath.Join(InstallDir, fileName)).Return(nil).Times(1)
 	}
 
 	reportLogProgressSuccess := func() {
@@ -279,7 +279,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					resolvConfSuccess()
 					waitForControllerSuccessfully(conf.ClusterID)
 					//HostRoleMaster flow:
-					downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
+					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 					writeToDiskSuccess(gomock.Any())
 					reportLogProgressSuccess()
 					setBootOrderSuccess(gomock.Any())
@@ -312,7 +312,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					resolvConfSuccess()
 					waitForControllerSuccessfully(conf.ClusterID)
 					//HostRoleMaster flow:
-					downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
+					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 					writeToDiskSuccess(gomock.Any())
 					setBootOrderSuccess(gomock.Any())
 					uploadLogsSuccess(true)
@@ -338,7 +338,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			err := fmt.Errorf("generate SSH keys failed")
 			mockops.EXPECT().CreateOpenshiftSshManifest(assistedInstallerSshManifest, sshManifestTmpl, sshPubKeyPath).Return(err).Times(1)
 			//HostRoleMaster flow:
-			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
+			downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 			writeToDiskSuccess(gomock.Any())
 			setBootOrderSuccess(gomock.Any())
 			ret := installerObj.InstallNode()
@@ -363,7 +363,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			resolvConfSuccess()
 			waitForControllerSuccessfully(conf.ClusterID)
 			//HostRoleMaster flow:
-			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
+			downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 			writeToDiskSuccess(gomock.Any())
 			setBootOrderSuccess(gomock.Any())
 			uploadLogsSuccess(true)
@@ -381,7 +381,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mkdirSuccess(InstallDir)
 			mkdirSuccess(sshDir)
 			downloadFileSuccess(bootstrapIgn)
-			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
+			downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 			writeToDiskSuccess(gomock.Any())
 			setBootOrderSuccess(gomock.Any())
 			extractSecretFromIgnitionSuccess()
@@ -402,7 +402,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			err := fmt.Errorf("Failed to restart NetworkManager")
 			restartNetworkManager(err)
 			//HostRoleMaster flow:
-			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
+			downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 			writeToDiskSuccess(gomock.Any())
 			setBootOrderSuccess(gomock.Any())
 			ret := installerObj.InstallNode()
@@ -517,7 +517,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			})
 			cleanInstallDevice()
 			mkdirSuccess(InstallDir)
-			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
+			downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 			writeToDiskSuccess(installerArgs)
 			setBootOrderSuccess(gomock.Any())
 			uploadLogsSuccess(false)
@@ -566,7 +566,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			cleanInstallDevice()
 			mkdirSuccess(InstallDir)
 			err := fmt.Errorf("failed to fetch file")
-			mockbmclient.EXPECT().DownloadHostIgnition(gomock.Any(), hostId, filepath.Join(InstallDir, "master-host-id.ign")).Return(err).Times(1)
+			mockbmclient.EXPECT().DownloadHostIgnition(gomock.Any(), infraEnvId, hostId, filepath.Join(InstallDir, "master-host-id.ign")).Return(err).Times(1)
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
@@ -577,7 +577,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			})
 			cleanInstallDevice()
 			mkdirSuccess(InstallDir)
-			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
+			downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 			err := fmt.Errorf("failed to write image to disk")
 			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, "master-host-id.ign"), device, mockbmclient, installerArgs).Return(err).Times(3)
 			ret := installerObj.InstallNode()
@@ -591,7 +591,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			})
 			cleanInstallDevice()
 			mkdirSuccess(InstallDir)
-			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
+			downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 			uploadLogsSuccess(false)
 			reportLogProgressSuccess()
 			writeToDiskSuccess(installerArgs)
@@ -641,7 +641,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(&cluster, nil).Times(1)
 			cleanInstallDevice()
 			mkdirSuccess(InstallDir)
-			downloadHostIgnitionSuccess(hostId, "worker-host-id.ign")
+			downloadHostIgnitionSuccess(infraEnvId, hostId, "worker-host-id.ign")
 			mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, "worker-host-id.ign"), device, mockbmclient, nil).Return(nil).Times(1)
 			setBootOrderSuccess(gomock.Any())
 			// failure must do nothing
@@ -742,7 +742,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			//HostRoleMaster flow:
 			verifySingleNodeMasterIgnitionSuccess()
 			singleNodeMergeIgnitionSuccess()
-			downloadHostIgnitionSuccess(hostId, "master-host-id.ign")
+			downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 			mockops.EXPECT().WriteImageToDisk(singleNodeMasterIgnitionPath, device, mockbmclient, nil).Return(nil).Times(1)
 			setBootOrderSuccess(gomock.Any())
 			uploadLogsSuccess(true)

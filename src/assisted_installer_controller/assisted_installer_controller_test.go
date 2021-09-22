@@ -232,7 +232,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				return nil
 			},
 		).Times(1)
-		mockbmclient.EXPECT().DownloadFile(gomock.Any(), kubeconfigFileName, gomock.Any()).Return(nil).Times(1)
+		mockbmclient.EXPECT().DownloadClusterCredentials(gomock.Any(), kubeconfigFileName, gomock.Any()).Return(nil).Times(1)
 	}
 
 	Context("Waiting for 3 nodes", func() {
@@ -1033,7 +1033,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			successUpload()
 			logClusterOperatorsSuccess()
 			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any(), assistedController.MustGatherImage).Return("../../test_files/tartest.tar.gz", nil).Times(1)
-			mockbmclient.EXPECT().DownloadFile(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
+			mockbmclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
 			assistedController.Status.Error()
 			callUploadLogs(150 * time.Millisecond)
 		})
@@ -1042,14 +1042,14 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			successUpload()
 			logClusterOperatorsSuccess()
 			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-			mockbmclient.EXPECT().DownloadFile(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+			mockbmclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			callUploadLogs(50 * time.Millisecond)
 		})
 
 		It("Validate upload logs exits with no error + failed upload", func() {
 			logClusterOperatorsSuccess()
 			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-			mockbmclient.EXPECT().DownloadFile(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+			mockbmclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			mockbmclient.EXPECT().UploadLogs(gomock.Any(), assistedController.ClusterID, models.LogsTypeController, gomock.Any()).Return(fmt.Errorf("dummy")).AnyTimes()
 			callUploadLogs(50 * time.Millisecond)
 		})
@@ -1059,7 +1059,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			logClusterOperatorsSuccess()
 			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any(), gomock.Any()).Return("", fmt.Errorf("failed"))
 			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any(), gomock.Any()).Return("../../test_files/tartest.tar.gz", nil)
-			mockbmclient.EXPECT().DownloadFile(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
+			mockbmclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 			assistedController.Status.Error()
 			callUploadLogs(50 * time.Millisecond)
 		})

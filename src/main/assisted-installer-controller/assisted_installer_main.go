@@ -117,10 +117,10 @@ func waitForInstallation(client inventory_client.InventoryClient, log logrus.Fie
 			// we should exit controller after maximumErrorsBeforeExit errors
 			// in case cluster was deleted we should exit immediately
 			switch err.(type) {
-			case *installer.GetClusterNotFound:
+			case *installer.V2GetClusterNotFound:
 				errCounter = errCounter + maximumErrorsBeforeExit
 				log.WithError(err).Errorf("Cluster was not found in inventory or user is not authorized")
-			case *installer.GetClusterUnauthorized:
+			case *installer.V2GetClusterUnauthorized:
 				errCounter++
 				log.WithError(err).Errorf("User is not authenticated to perform the operation")
 			}

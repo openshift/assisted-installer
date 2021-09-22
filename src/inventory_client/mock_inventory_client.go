@@ -51,18 +51,32 @@ func (mr *MockInventoryClientMockRecorder) DownloadFile(ctx, filename, dest inte
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DownloadFile", reflect.TypeOf((*MockInventoryClient)(nil).DownloadFile), ctx, filename, dest)
 }
 
-// DownloadHostIgnition mocks base method
-func (m *MockInventoryClient) DownloadHostIgnition(ctx context.Context, hostID, dest string) error {
+// DownloadClusterCredentials mocks base method
+func (m *MockInventoryClient) DownloadClusterCredentials(ctx context.Context, filename, dest string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DownloadHostIgnition", ctx, hostID, dest)
+	ret := m.ctrl.Call(m, "DownloadClusterCredentials", ctx, filename, dest)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DownloadClusterCredentials indicates an expected call of DownloadClusterCredentials
+func (mr *MockInventoryClientMockRecorder) DownloadClusterCredentials(ctx, filename, dest interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DownloadClusterCredentials", reflect.TypeOf((*MockInventoryClient)(nil).DownloadClusterCredentials), ctx, filename, dest)
+}
+
+// DownloadHostIgnition mocks base method
+func (m *MockInventoryClient) DownloadHostIgnition(ctx context.Context, infraEnvID, hostID, dest string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DownloadHostIgnition", ctx, infraEnvID, hostID, dest)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DownloadHostIgnition indicates an expected call of DownloadHostIgnition
-func (mr *MockInventoryClientMockRecorder) DownloadHostIgnition(ctx, hostID, dest interface{}) *gomock.Call {
+func (mr *MockInventoryClientMockRecorder) DownloadHostIgnition(ctx, infraEnvID, hostID, dest interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DownloadHostIgnition", reflect.TypeOf((*MockInventoryClient)(nil).DownloadHostIgnition), ctx, hostID, dest)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DownloadHostIgnition", reflect.TypeOf((*MockInventoryClient)(nil).DownloadHostIgnition), ctx, infraEnvID, hostID, dest)
 }
 
 // UpdateHostInstallProgress mocks base method
