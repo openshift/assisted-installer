@@ -1,4 +1,4 @@
-FROM quay.io/openshift/origin-cli:4.9.0 AS cli
+FROM quay.io/openshift/origin-cli:4.10.0 AS cli
 
 FROM registry.ci.openshift.org/openshift/release:golang-1.16 AS builder
 ENV GOFLAGS=-mod=mod
