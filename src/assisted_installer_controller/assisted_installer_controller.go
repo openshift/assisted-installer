@@ -426,12 +426,8 @@ func (c controller) PostInstallConfigs(ctx context.Context, wg *sync.WaitGroup) 
 func (c controller) postInstallConfigs(ctx context.Context) error {
 	var err error
 
-	c.log.Infof("Waiting for cluster version operator: %t", c.WaitForClusterVersion)
-
-	if c.WaitForClusterVersion {
-		if err = c.waitingForClusterVersion(ctx); err != nil {
-			return errors.Wrapf(err, "Timeout while waiting for cluster version to be available")
-		}
+	if err = c.waitingForClusterOperators(ctx); err != nil {
+		return errors.Wrapf(err, "Timeout while waiting for cluster operators to be available")
 	}
 
 	err = utils.WaitForPredicateWithContext(ctx, WaitTimeout, GeneralWaitInterval, c.addRouterCAToClusterCA)
@@ -449,10 +445,6 @@ func (c controller) postInstallConfigs(ctx context.Context) error {
 		}
 	} else {
 		c.log.Infof("Skipping etcd unpatch for cluster version %s", c.ControllerConfig.OpenshiftVersion)
-	}
-
-	if err = utils.WaitForPredicateWithContext(ctx, WaitTimeout, GeneralWaitInterval, c.validateConsoleAvailability); err != nil {
-		return errors.Wrapf(err, "Timeout while waiting for console to become available")
 	}
 
 	// Wait for OLM operators
@@ -931,21 +923,23 @@ func (c controller) waitForCSV(ctx context.Context, waitTimeout time.Duration) e
 	return utils.WaitForPredicateWithContext(ctx, waitTimeout, GeneralWaitInterval, areOLMOperatorsAvailable)
 }
 
-// validateConsoleAvailability checks if the console operator is available
-func (c controller) validateConsoleAvailability() bool {
-	return c.isOperatorAvailable(NewClusterOperatorHandler(c.kc, consoleOperatorName))
-}
-
-// waitingForClusterVersion checks the Cluster Version Operator availability in the
-// new OCP cluster. A success would be announced only when the service acknowledges
-// the CVO availability, in order to avoid unsycned scenarios.
-// In case cvo changes it message we will update timer but we want to have maximum timeout
-// for this context with timeout is used
-func (c controller) waitingForClusterVersion(ctx context.Context) error {
+// waitingForClusterOperators checks Console operator and the Cluster Version Operator availability in the
+// new OCP cluster in parallel.
+// A success would be announced only when the service acknowledges the operators availability,
+// in order to avoid unsycned scenarios.
+func (c controller) waitingForClusterOperators(ctx context.Context) error {
+	// In case cvo changes it message we will update timer but we want to have maximum timeout
+	// for this context with timeout is used
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, CVOMaxTimeout)
 	defer cancel()
 	isClusterVersionAvailable := func(timer *time.Timer) bool {
-		return c.isOperatorAvailable(NewClusterVersionHandler(c.kc, timer))
+		result := c.isOperatorAvailable(NewClusterOperatorHandler(c.kc, consoleOperatorName))
+
+		if c.WaitForClusterVersion {
+			result = c.isOperatorAvailable(NewClusterVersionHandler(c.kc, timer))
+		}
+
+		return result
 	}
 	return utils.WaitForPredicateWithTimer(ctxWithTimeout, WaitTimeout, GeneralProgressUpdateInt, isClusterVersionAvailable)
 }
