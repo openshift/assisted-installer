@@ -154,3 +154,17 @@ rules:
       - pods
     verbs:
       - deletecollection
+  - apiGroups:
+      - "security.openshift.io"
+    resourceNames:
+      - "anyuid"
+      - "nonroot"
+      - "hostmount-anyuid"
+      - "machine-api-termination-handler"
+      - "hostnetwork"
+      - "hostaccess"
+      - "node-exporter"
+    resources:
+      - securitycontextconstraints
+    verbs:
+      - use
