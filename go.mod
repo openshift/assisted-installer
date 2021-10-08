@@ -44,6 +44,7 @@ replace (
 	github.com/openshift/api => github.com/openshift/api v0.0.0-20200901182017-7ac89ba6b971
 	github.com/openshift/hive/pkg/apis => github.com/carbonin/hive/pkg/apis v0.0.0-20210209195732-57e8c3ae12d1
 	github.com/openshift/machine-api-operator => github.com/openshift/machine-api-operator v0.2.1-0.20201026110925-50ea569da51b
+	github.com/irifrance/gini => github.com/go-air/gini v1.0.1
 	k8s.io/api => k8s.io/api v0.19.2
 	k8s.io/apimachinery => k8s.io/apimachinery v0.19.2
 	k8s.io/client-go => k8s.io/client-go v0.19.2
