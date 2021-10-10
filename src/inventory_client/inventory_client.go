@@ -36,7 +36,8 @@ import (
 const (
 	defaultRetryMinDelay = time.Duration(2) * time.Second
 	defaultRetryMaxDelay = time.Duration(10) * time.Second
-	defaultMaxRetries    = 10
+	defaultMinRetries    = 10
+	defaultMaxRetries    = 360
 )
 
 //go:generate mockgen -source=inventory_client.go -package=inventory_client -destination=mock_inventory_client.go
@@ -73,12 +74,12 @@ type HostData struct {
 func CreateInventoryClient(clusterId string, inventoryURL string, pullSecret string, insecure bool, caPath string,
 	logger *logrus.Logger, proxyFunc func(*http.Request) (*url.URL, error)) (*inventoryClient, error) {
 	return CreateInventoryClientWithDelay(clusterId, inventoryURL, pullSecret, insecure, caPath,
-		logger, proxyFunc, defaultRetryMinDelay, defaultRetryMaxDelay, defaultMaxRetries)
+		logger, proxyFunc, defaultRetryMinDelay, defaultRetryMaxDelay, defaultMaxRetries, defaultMinRetries)
 }
 
 func CreateInventoryClientWithDelay(clusterId string, inventoryURL string, pullSecret string, insecure bool, caPath string,
 	logger *logrus.Logger, proxyFunc func(*http.Request) (*url.URL, error),
-	retryMinDelay, retryMaxDelay time.Duration, maxRetries int) (*inventoryClient, error) {
+	retryMinDelay, retryMaxDelay time.Duration, maxRetries int, minRetries int) (*inventoryClient, error) {
 	clientConfig := client.Config{}
 	var err error
 	clientConfig.URL, err = url.ParseRequestURI(createUrl(inventoryURL))
@@ -117,8 +118,12 @@ func CreateInventoryClientWithDelay(clusterId string, inventoryURL string, pullS
 		transport,
 		rehttp.RetryAny(
 			rehttp.RetryAll(
+				rehttp.RetryMaxRetries(minRetries),
+				rehttp.RetryStatusInterval(400, 404),
+			),
+			rehttp.RetryAll(
 				rehttp.RetryMaxRetries(maxRetries),
-				rehttp.RetryStatusInterval(400, 600),
+				rehttp.RetryStatusInterval(405, 600),
 			),
 			rehttp.RetryAll(
 				rehttp.RetryMaxRetries(maxRetries),
