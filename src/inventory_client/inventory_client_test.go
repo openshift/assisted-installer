@@ -46,7 +46,7 @@ var _ = Describe("inventory_client_tests", func() {
 		server.SetAllowUnhandledRequests(true)
 		server.SetUnhandledRequestStatusCode(http.StatusInternalServerError) // 500
 		client, err = CreateInventoryClientWithDelay(clusterID, "http://"+server.Addr(), "pullSecret", true, "",
-			logger, nil, testRetryDelay, testRetryMaxDelay, testMaxRetries)
+			logger, nil, testRetryDelay, testRetryMaxDelay, testMaxRetries, testMaxRetries)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(client).ShouldNot(BeNil())
 	})
@@ -79,7 +79,7 @@ var _ = Describe("inventory_client_tests", func() {
 		It("positive_late_response", func() {
 			server.Start()
 			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/hosts/%s/progress", infraEnvID, hostID), expectedJson, http.StatusInternalServerError)
-			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/hosts/%s/progress", infraEnvID, hostID), expectedJson, http.StatusForbidden)
+			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/hosts/%s/progress", infraEnvID, hostID), expectedJson, http.StatusServiceUnavailable)
 			expectServerCall(server, fmt.Sprintf("/api/assisted-install/v2/infra-envs/%s/hosts/%s/progress", infraEnvID, hostID), expectedJson, http.StatusOK)
 
 			Expect(client.UpdateHostInstallProgress(context.Background(), infraEnvID, hostID, models.HostStageInstalling, "")).ShouldNot(HaveOccurred())
