@@ -463,12 +463,16 @@ func (o *ops) GetMCSLogs() (string, error) {
 	return string(logs), nil
 }
 
+// This function actually runs container that imeplements logs_sender command
+// Any change to the assisted-service API that is used by the logs_sender command
+// ( for example UploadLogs), must be reflected here (input parameters, etc'),
+// if needed
 func (o *ops) UploadInstallationLogs(isBootstrap bool) (string, error) {
 	command := "podman"
 	args := []string{"run", "--rm", "--privileged", "--net=host", "--pid=host", "-v", "/run/systemd/journal/socket:/run/systemd/journal/socket",
 		"-v", "/var/log:/var/log", config.GlobalConfig.AgentImage, "logs_sender",
 		"-cluster-id", config.GlobalConfig.ClusterID, "-url", config.GlobalConfig.URL,
-		"-host-id", config.GlobalConfig.HostID,
+		"-host-id", config.GlobalConfig.HostID, "-infra-env-id", config.GlobalConfig.InfraEnvID,
 		"-pull-secret-token", config.GlobalConfig.PullSecretToken,
 		fmt.Sprintf("-insecure=%s", strconv.FormatBool(config.GlobalConfig.SkipCertVerification)),
 		fmt.Sprintf("-bootstrap=%s", strconv.FormatBool(isBootstrap)),
