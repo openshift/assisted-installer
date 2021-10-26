@@ -35,6 +35,7 @@ type Config struct {
 	HighAvailabilityMode string
 	CheckClusterVersion  bool
 	MustGatherImage      string
+	DisksToFormat        ArrayFlags
 }
 
 var GlobalConfig Config
@@ -68,12 +69,14 @@ func ProcessArgs() {
 	flag.StringVar(&ret.HighAvailabilityMode, "high-availability-mode", "Full", "high-availability expectations. default is 'Full', which represents the behavior in a \"normal\" cluster. Use 'None' for single-node deployment")
 	flag.BoolVar(&ret.CheckClusterVersion, "check-cluster-version", false, "Do not monitor CVO")
 	flag.StringVar(&ret.MustGatherImage, "must-gather-image", "", "Custom must-gather image")
+	flag.Var(&ret.DisksToFormat, "format-disk", "Disk to format. Can be specified multiple times")
 
 	var installerArgs string
 	flag.StringVar(&installerArgs, "installer-args", "", "JSON array of additional coreos-installer arguments")
 
 	h := flag.Bool("help", false, "Help message")
 	flag.Parse()
+
 	if ret.NoProxy != "" {
 		utils.SetNoProxyEnv(ret.NoProxy)
 	}

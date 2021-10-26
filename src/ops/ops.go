@@ -24,6 +24,11 @@ import (
 	"github.com/openshift/assisted-installer/src/utils"
 )
 
+const (
+	coreosInstallerExecutable       = "coreos-installer"
+	dryRunCoreosInstallerExecutable = "dry-installer"
+)
+
 //go:generate mockgen -source=ops.go -package=ops -destination=mock_ops.go
 type Ops interface {
 	ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error)
@@ -48,6 +53,7 @@ type Ops interface {
 	CreateRandomHostname(hostname string) error
 	GetHostname() (string, error)
 	EvaluateDiskSymlink(string) string
+	FormatDisk(string) error
 	CreateManifests(string, []byte) error
 }
 
@@ -87,8 +93,28 @@ func NewOps(logger *logrus.Logger, proxySet bool) Ops {
 
 // ExecPrivilegeCommand execute a command in the host environment via nsenter
 func (o *ops) ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
+	// nsenter is used here to launch processes inside the container in a way that makes said processes feel
+	// and behave as if they're running on the host directly rather than inside the container
 	commandBase := "nsenter"
-	arguments := []string{"-t", "1", "-m", "-i", "--", command}
+
+	arguments := []string{
+		"--target", "1",
+		// Entering the cgroup namespace is not required for podman on CoreOS (where the
+		// agent typically runs), but it's needed on some Fedora versions and
+		// some other systemd based systems. Those systems are used to run dry-mode
+		// agents for load testing. If this flag is not used, Podman will sometimes
+		// have trouble creating a systemd cgroup slice for new containers.
+		"--cgroup",
+		// The mount namespace is required for podman to access the host's container
+		// storage
+		"--mount",
+		// TODO: Document why we need the IPC namespace
+		"--ipc",
+		"--pid",
+		"--",
+		command,
+	}
+
 	arguments = append(arguments, args...)
 	return o.ExecCommand(liveLogger, commandBase, arguments...)
 }
@@ -103,6 +129,10 @@ type ExecCommandError struct {
 }
 
 func removePullSecret(s []string) []string {
+	if config.GlobalConfig.PullSecretToken == "" {
+		return s
+	}
+
 	return strings.Split(strings.ReplaceAll(strings.Join(s, " "), config.GlobalConfig.PullSecretToken, "<SECRET>"), " ")
 }
 
@@ -171,6 +201,10 @@ func (o *ops) Mkdir(dirName string) error {
 }
 
 func (o *ops) SystemctlAction(action string, args ...string) error {
+	if config.GlobalDryRunConfig.DryRunEnabled {
+		return nil
+	}
+
 	o.log.Infof("Running systemctl %s %s", action, args)
 	_, err := o.ExecPrivilegeCommand(o.logWriter, "systemctl", append([]string{action}, args...)...)
 	if err != nil {
@@ -182,8 +216,17 @@ func (o *ops) SystemctlAction(action string, args ...string) error {
 func (o *ops) WriteImageToDisk(ignitionPath string, device string, progressReporter inventory_client.InventoryClient, extraArgs []string) error {
 	allArgs := installerArgs(ignitionPath, device, extraArgs)
 	o.log.Infof("Writing image and ignition to disk with arguments: %v", allArgs)
+
+	installerExecutable := coreosInstallerExecutable
+	if config.GlobalDryRunConfig.DryRunEnabled {
+		// In dry run, we use an executable called dry-installer rather than coreos-installer.
+		// This executable is expected to pretend to be doing coreos-installer stuff and print fake
+		// progress. It's up to the dry-mode user to make sure such executable is available in PATH
+		installerExecutable = dryRunCoreosInstallerExecutable
+	}
+
 	_, err := o.ExecPrivilegeCommand(NewCoreosInstallerLogWriter(o.log, progressReporter, config.GlobalConfig.InfraEnvID, config.GlobalConfig.HostID),
-		"coreos-installer", allArgs...)
+		installerExecutable, allArgs...)
 	return err
 }
 
@@ -205,6 +248,20 @@ func (o *ops) EvaluateDiskSymlink(device string) string {
 	return device
 }
 
+func (o *ops) FormatDisk(disk string) error {
+	if config.GlobalDryRunConfig.DryRunEnabled {
+		return nil
+	}
+
+	o.log.Infof("Formatting disk %s", disk)
+	_, err := o.ExecPrivilegeCommand(o.logWriter, "dd", "if=/dev/zero", fmt.Sprintf("of=%s", disk), "bs=512", "count=1")
+	if err != nil {
+		o.log.Errorf("Failed to format disk %s, err: %s", disk, err)
+		return err
+	}
+	return nil
+}
+
 func installerArgs(ignitionPath string, device string, extra []string) []string {
 	allArgs := []string{"install", "--insecure", "-i", ignitionPath}
 	if extra != nil {
@@ -214,6 +271,11 @@ func installerArgs(ignitionPath string, device string, extra []string) []string 
 }
 
 func (o *ops) Reboot() error {
+	if config.GlobalDryRunConfig.DryRunEnabled {
+		_, err := o.ExecPrivilegeCommand(o.logWriter, "touch", config.GlobalDryRunConfig.FakeRebootMarkerPath)
+		return errors.Wrap(err, "failed to touch fake reboot marker")
+	}
+
 	o.log.Info("Rebooting node")
 	_, err := o.ExecPrivilegeCommand(o.logWriter, "shutdown", "-r", "+1", "'Installation completed, server is going to reboot.'")
 	if err != nil {
@@ -224,6 +286,10 @@ func (o *ops) Reboot() error {
 }
 
 func (o *ops) SetBootOrder(device string) error {
+	if config.GlobalDryRunConfig.DryRunEnabled {
+		return nil
+	}
+
 	_, err := o.ExecPrivilegeCommand(nil, "test", "-d", "/sys/firmware/efi")
 	if err != nil {
 		o.log.Info("setting the boot order on BIOS systems is not supported. Skipping...")
@@ -254,6 +320,10 @@ func (o *ops) getEfiFilePath() string {
 }
 
 func (o *ops) ExtractFromIgnition(ignitionPath string, fileToExtract string) error {
+	if config.GlobalDryRunConfig.DryRunEnabled {
+		return nil
+	}
+
 	o.log.Infof("Getting data from %s", ignitionPath)
 	ignitionData, err := ioutil.ReadFile(ignitionPath)
 	if err != nil {
@@ -511,6 +581,10 @@ func (o *ops) ReloadHostFile(filepath string) error {
 }
 
 func (o *ops) CreateOpenshiftSshManifest(filePath, tmpl, sshPubKeyPath string) error {
+	if config.GlobalDryRunConfig.DryRunEnabled {
+		return nil
+	}
+
 	o.log.Info("Create an openshift manifets for SSH public key")
 	sshPublicKey, err := o.ExecPrivilegeCommand(o.logWriter, "cat", sshPubKeyPath)
 	if err != nil {

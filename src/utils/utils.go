@@ -62,10 +62,15 @@ func NewLogWriter(logger *logrus.Logger) *LogWriter {
 	return &LogWriter{logger}
 }
 
-func InitLogger(verbose bool, enableJournal bool) *logrus.Logger {
+func InitLogger(verbose bool, enableJournal bool, hostID string, dryMode bool) *logrus.Logger {
 	var log = logrus.New()
 	// log to console and file
-	f, err := os.OpenFile("/var/log/assisted-installer.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	logPath := "/var/log/assisted-installer.log"
+	if dryMode {
+		// Use a different log path for each host in dry mode, so they don't collide on the same machine
+		logPath = fmt.Sprintf("/var/log/assisted-installer-%s.log", hostID)
+	}
+	f, err := os.OpenFile(logPath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("error opening file: %v", err)
 	}
@@ -77,7 +82,8 @@ func InitLogger(verbose bool, enableJournal bool) *logrus.Logger {
 	// log to journal
 	if enableJournal {
 		journalLogger.SetJournalLogging(log, &journalLogger.JournalWriter{}, map[string]interface{}{
-			"TAG": "installer",
+			"TAG":          "installer",
+			"DRY_AGENT_ID": hostID,
 		})
 	}
 
