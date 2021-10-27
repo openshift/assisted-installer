@@ -53,6 +53,7 @@ type K8SClient interface {
 	PatchControlPlaneReplicas() error
 	UnPatchControlPlaneReplicas() error
 	ListNodes() (*v1.NodeList, error)
+	PatchNodeLabels(node *v1.Node, labels string) error
 	ListMachines() (*machinev1beta1.MachineList, error)
 	RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error)
 	ApproveCsr(csr *certificatesv1.CertificateSigningRequest) error
@@ -157,6 +158,12 @@ func (c *k8sClient) ListMasterNodes() (*v1.NodeList, error) {
 		return &v1.NodeList{}, err
 	}
 	return nodes, nil
+}
+
+func (c *k8sClient) PatchNodeLabels(node *v1.Node, labels string) error {
+	data := []byte(`{"metadata":{"labels":` + labels + `}}`)
+	_, err := c.client.CoreV1().Nodes().Patch(context.Background(), node.Name, types.MergePatchType, data, metav1.PatchOptions{})
+	return err
 }
 
 func (c *k8sClient) ListNodes() (*v1.NodeList, error) {

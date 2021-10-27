@@ -187,6 +187,43 @@ func (c *controller) WaitAndUpdateNodesStatus(ctx context.Context, wg *sync.Wait
 	_ = utils.WaitForPredicateWithContext(ctx, LongWaitTimeout, GeneralWaitInterval, c.waitAndUpdateNodesStatus)
 }
 
+func (c *controller) updateNodesLabel() bool {
+	ignoreStatuses := []string{models.HostStatusDisabled}
+	ctxReq := utils.GenerateRequestContext()
+	log := utils.RequestIDLogger(ctxReq, c.log)
+
+	assistedNodesMap, err := c.ic.GetHosts(ctxReq, log, ignoreStatuses)
+	if err != nil {
+		log.WithError(err).Error("Failed to get node map from the assisted service")
+		return KeepWaiting
+	}
+
+	nodes, err := c.kc.ListNodes()
+	if err != nil {
+		log.WithError(err).Error("Failed to get list of nodes from k8s client")
+		return KeepWaiting
+	}
+
+	for _, node := range nodes.Items {
+		hostData, ok := assistedNodesMap[strings.ToLower(node.Name)]
+		if !ok {
+			log.Warnf("Node %s is not in inventory hosts", strings.ToLower(node.Name))
+			continue
+		}
+
+		if len(hostData.Host.Labels) == 0 {
+			continue
+		}
+
+		err = c.kc.PatchNodeLabels(&node, hostData.Host.Labels)
+		if err != nil {
+			log.WithError(err).Errorf("Failed to patch %s node with OCS label", node.Name)
+			continue
+		}
+	}
+	return ExitWaiting
+}
+
 func (c *controller) waitAndUpdateNodesStatus() bool {
 	ignoreStatuses := []string{models.HostStatusDisabled}
 	var hostsInError int
@@ -428,6 +465,11 @@ func (c controller) postInstallConfigs(ctx context.Context) error {
 
 	if err = c.waitingForClusterOperators(ctx); err != nil {
 		return errors.Wrapf(err, "Timeout while waiting for cluster operators to be available")
+	}
+
+	err = utils.WaitForPredicateWithContext(ctx, WaitTimeout, GeneralWaitInterval, c.updateNodesLabel)
+	if err != nil {
+		c.log.Warn("Failed to label the nodes.")
 	}
 
 	err = utils.WaitForPredicateWithContext(ctx, WaitTimeout, GeneralWaitInterval, c.addRouterCAToClusterCA)

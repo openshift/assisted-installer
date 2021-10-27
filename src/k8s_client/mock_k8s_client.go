@@ -127,6 +127,20 @@ func (mr *MockK8SClientMockRecorder) ListNodes() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListNodes", reflect.TypeOf((*MockK8SClient)(nil).ListNodes))
 }
 
+// PatchNodeLabels mocks base method
+func (m *MockK8SClient) PatchNodeLabels(node *v11.Node, labels string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PatchNodeLabels", node, labels)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PatchNodeLabels indicates an expected call of PatchNodeLabels
+func (mr *MockK8SClientMockRecorder) PatchNodeLabels(node, labels interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchNodeLabels", reflect.TypeOf((*MockK8SClient)(nil).PatchNodeLabels), node, labels)
+}
+
 // ListMachines mocks base method
 func (m *MockK8SClient) ListMachines() (*v1beta1.MachineList, error) {
 	m.ctrl.T.Helper()
