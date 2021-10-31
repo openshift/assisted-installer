@@ -16,7 +16,7 @@ spec:
       containers:
         - name: assisted-installer-controller
           image: {{.ControllerImage}}
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           env:
             # Define the environment variable
             - name: CLUSTER_ID
@@ -73,6 +73,7 @@ spec:
             mountPath: {{.CACertPath}}
           {{end}}
       restartPolicy: OnFailure
+      backoffLimit: 100
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
