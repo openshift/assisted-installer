@@ -5,6 +5,7 @@ go 1.16
 require (
 	github.com/Microsoft/go-winio v0.4.15-0.20200113171025-3fe6c5262873 // indirect
 	github.com/PuerkitoBio/rehttp v1.0.0
+	github.com/ReneKroon/ttlcache/v2 v2.9.0
 	github.com/aybabtme/iocontrol v0.0.0-20150809002002-ad15bcfc95a0 // indirect
 	github.com/benbjohnson/clock v1.0.3 // indirect
 	github.com/coreos/ignition/v2 v2.10.1
@@ -40,11 +41,11 @@ require (
 )
 
 replace (
+	github.com/irifrance/gini => github.com/go-air/gini v1.0.1
 	github.com/metal3-io/baremetal-operator => github.com/openshift/baremetal-operator v0.0.0-20200715132148-0f91f62a41fe // Use OpenShift fork
 	github.com/openshift/api => github.com/openshift/api v0.0.0-20200901182017-7ac89ba6b971
 	github.com/openshift/hive/pkg/apis => github.com/carbonin/hive/pkg/apis v0.0.0-20210209195732-57e8c3ae12d1
 	github.com/openshift/machine-api-operator => github.com/openshift/machine-api-operator v0.2.1-0.20201026110925-50ea569da51b
-	github.com/irifrance/gini => github.com/go-air/gini v1.0.1
 	k8s.io/api => k8s.io/api v0.19.2
 	k8s.io/apimachinery => k8s.io/apimachinery v0.19.2
 	k8s.io/client-go => k8s.io/client-go v0.19.2
