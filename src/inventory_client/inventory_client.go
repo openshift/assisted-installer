@@ -21,6 +21,7 @@ import (
 	"github.com/thoas/go-funk"
 
 	"github.com/PuerkitoBio/rehttp"
+	ttlCache "github.com/ReneKroon/ttlcache/v2"
 	"github.com/go-openapi/strfmt"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/client"
@@ -63,6 +64,7 @@ type inventoryClient struct {
 	ai        *client.AssistedInstall
 	clusterId strfmt.UUID
 	logger    *logrus.Logger
+	cache     ttlCache.SimpleCache
 }
 
 type HostData struct {
@@ -141,7 +143,10 @@ func CreateInventoryClientWithDelay(clusterId string, inventoryURL string, pullS
 
 	clientConfig.AuthInfo = auth.AgentAuthHeaderWriter(pullSecret)
 	assistedInstallClient := client.New(clientConfig)
-	return &inventoryClient{assistedInstallClient, strfmt.UUID(clusterId), logger}, nil
+	cache := ttlCache.NewCache()
+	cache.SetTTL(30 * time.Second)
+
+	return &inventoryClient{assistedInstallClient, strfmt.UUID(clusterId), logger, cache}, nil
 }
 
 func RetryConnectionRefusedErr() rehttp.RetryFn {
@@ -253,26 +258,46 @@ func (c *inventoryClient) GetCluster(ctx context.Context) (*models.Cluster, erro
 	return cluster.Payload, nil
 }
 
-func (c *inventoryClient) GetClusterMonitoredOperator(ctx context.Context, clusterId, operatorName string) (*models.MonitoredOperator, error) {
+func (c *inventoryClient) GetMonitoredOperator(ctx context.Context, clusterId string) (models.MonitoredOperatorsList, error) {
+	cacheKey := fmt.Sprintf("GetMonitoredOperator-%s", clusterId)
+	if val, err := c.cache.Get(cacheKey); err != ttlCache.ErrNotFound {
+		fmt.Printf("Got it: %s\n", val)
+		return val.(models.MonitoredOperatorsList), nil
+	}
+
 	monitoredOperators, err := c.ai.Operators.V2ListOfClusterOperators(ctx, &operators.V2ListOfClusterOperatorsParams{
-		ClusterID:    strfmt.UUID(clusterId),
-		OperatorName: &operatorName,
+		ClusterID: strfmt.UUID(clusterId),
 	})
 	if err != nil {
 		return nil, aserror.GetAssistedError(err)
 	}
 
-	return monitoredOperators.Payload[0], nil
+	c.cache.Set(cacheKey, monitoredOperators.Payload)
+	return monitoredOperators.Payload, nil
+}
+
+func (c *inventoryClient) GetClusterMonitoredOperator(ctx context.Context, clusterId, operatorName string) (*models.MonitoredOperator, error) {
+	monitoredOperators, err := c.GetMonitoredOperator(ctx, clusterId)
+	if err != nil {
+		return nil, err
+	}
+	for _, operator := range monitoredOperators {
+		if operator.Name == operatorName {
+			return operator, nil
+		}
+	}
+
+	return nil, fmt.Errorf("operator %s not found", operatorName)
 }
 
 func (c *inventoryClient) GetClusterMonitoredOLMOperators(ctx context.Context, clusterId string) ([]models.MonitoredOperator, error) {
-	monitoredOperators, err := c.ai.Operators.V2ListOfClusterOperators(ctx, &operators.V2ListOfClusterOperatorsParams{ClusterID: strfmt.UUID(clusterId)})
+	monitoredOperators, err := c.GetMonitoredOperator(ctx, clusterId)
 	if err != nil {
-		return nil, aserror.GetAssistedError(err)
+		return nil, err
 	}
 
 	olmOperators := make([]models.MonitoredOperator, 0)
-	for _, operator := range monitoredOperators.Payload {
+	for _, operator := range monitoredOperators {
 		if operator.OperatorType == models.OperatorTypeOlm {
 			olmOperators = append(olmOperators, *operator)
 		}
