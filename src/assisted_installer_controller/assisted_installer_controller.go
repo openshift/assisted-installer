@@ -73,16 +73,20 @@ var (
 // as a first step it will wait till nodes are added to cluster and update their status to Done
 
 type ControllerConfig struct {
-	ClusterID             string `envconfig:"CLUSTER_ID" required:"true"`
-	URL                   string `envconfig:"INVENTORY_URL" required:"true"`
-	PullSecretToken       string `envconfig:"PULL_SECRET_TOKEN" required:"true" secret:"true"`
-	SkipCertVerification  bool   `envconfig:"SKIP_CERT_VERIFICATION" required:"false" default:"false"`
-	CACertPath            string `envconfig:"CA_CERT_PATH" required:"false" default:""`
-	Namespace             string `envconfig:"NAMESPACE" required:"false" default:"assisted-installer"`
-	OpenshiftVersion      string `envconfig:"OPENSHIFT_VERSION" required:"true"`
-	HighAvailabilityMode  string `envconfig:"HIGH_AVAILABILITY_MODE" required:"false" default:"Full"`
-	WaitForClusterVersion bool   `envconfig:"CHECK_CLUSTER_VERSION" required:"false" default:"false"`
-	MustGatherImage       string `envconfig:"MUST_GATHER_IMAGE" required:"false" default:""`
+	ClusterID               string `envconfig:"CLUSTER_ID" required:"true"`
+	URL                     string `envconfig:"INVENTORY_URL" required:"true"`
+	PullSecretToken         string `envconfig:"PULL_SECRET_TOKEN" required:"true" secret:"true"`
+	SkipCertVerification    bool   `envconfig:"SKIP_CERT_VERIFICATION" required:"false" default:"false"`
+	CACertPath              string `envconfig:"CA_CERT_PATH" required:"false" default:""`
+	Namespace               string `envconfig:"NAMESPACE" required:"false" default:"assisted-installer"`
+	OpenshiftVersion        string `envconfig:"OPENSHIFT_VERSION" required:"true"`
+	HighAvailabilityMode    string `envconfig:"HIGH_AVAILABILITY_MODE" required:"false" default:"Full"`
+	WaitForClusterVersion   bool   `envconfig:"CHECK_CLUSTER_VERSION" required:"false" default:"false"`
+	MustGatherImage         string `envconfig:"MUST_GATHER_IMAGE" required:"false" default:""`
+	DryRunEnabled           bool   `envconfig:"DRY_ENABLE" required:"false" default:"false"`
+	DryRunHostnames         string `envconfig:"DRY_HOSTNAMES" required:"false" default:""`
+	DryMcsAccessIps         string `envconfig:"DRY_MCS_ACCESS_IPS" required:"false" default:""`
+	DryFakeRebootMarkerPath string `envconfig:"DRY_FAKE_REBOOT_MARKER_PATH" required:"false" default:""`
 }
 type Controller interface {
 	WaitAndUpdateNodesStatus(status *ControllerStatus)
@@ -253,7 +257,6 @@ func (c *controller) waitAndUpdateNodesStatus() bool {
 }
 
 func (c *controller) HackDNSAddressConflict(wg *sync.WaitGroup) {
-
 	c.log.Infof("Making sure service %s can reserve the .10 address", dnsServiceName)
 
 	defer func() {

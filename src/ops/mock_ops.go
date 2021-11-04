@@ -370,6 +370,20 @@ func (mr *MockOpsMockRecorder) EvaluateDiskSymlink(arg0 interface{}) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EvaluateDiskSymlink", reflect.TypeOf((*MockOps)(nil).EvaluateDiskSymlink), arg0)
 }
 
+// FormatDisk mocks base method
+func (m *MockOps) FormatDisk(arg0 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FormatDisk", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// FormatDisk indicates an expected call of FormatDisk
+func (mr *MockOpsMockRecorder) FormatDisk(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FormatDisk", reflect.TypeOf((*MockOps)(nil).FormatDisk), arg0)
+}
+
 // CreateManifests mocks base method
 func (m *MockOps) CreateManifests(arg0 string, arg1 []byte) error {
 	m.ctrl.T.Helper()

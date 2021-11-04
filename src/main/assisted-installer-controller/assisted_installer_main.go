@@ -7,10 +7,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/onsi/ginkgo"
 	assistedinstallercontroller "github.com/openshift/assisted-installer/src/assisted_installer_controller"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/k8s_client"
+	"github.com/openshift/assisted-installer/src/main/assisted-installer-controller/drymock"
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/client/installer"
@@ -31,6 +34,14 @@ var Options struct {
 
 const maximumErrorsBeforeExit = 3
 
+func DryRebootComplete() bool {
+	if _, err := os.Stat(Options.ControllerConfig.DryFakeRebootMarkerPath); err == nil {
+		return true
+	}
+
+	return false
+}
+
 func main() {
 	logger := logrus.New()
 
@@ -39,11 +50,26 @@ func main() {
 		log.Fatal(err.Error())
 	}
 
+	if Options.ControllerConfig.DryRunEnabled {
+		// In dry run mode, we need to wait for the reboot to complete before starting the controller
+		for !DryRebootComplete() {
+			time.Sleep(time.Second * 1)
+		}
+	}
+
 	logger.Infof("Start running Assisted-Controller. Configuration is:\n %s", secretdump.DumpSecretStruct(Options.ControllerConfig))
 
-	kc, err := k8s_client.NewK8SClient("", logger)
-	if err != nil {
-		log.Fatalf("Failed to create k8 client %v", err)
+	var kc k8s_client.K8SClient
+	if !Options.ControllerConfig.DryRunEnabled {
+		kc, err = k8s_client.NewK8SClient("", logger)
+		if err != nil {
+			log.Fatalf("Failed to create k8 client %v", err)
+		}
+	} else {
+		mockController := gomock.NewController(ginkgo.GinkgoT())
+		kc = k8s_client.NewMockK8SClient(mockController)
+		mock, _ := kc.(*k8s_client.MockK8SClient)
+		drymock.PrepareDryMock(mock, logger, Options.ControllerConfig.DryRunHostnames, Options.ControllerConfig.DryMcsAccessIps)
 	}
 
 	err = kc.SetProxyEnvVars()
@@ -70,8 +96,11 @@ func main() {
 
 	// No need to cancel with context, will finish quickly
 	// we should fix try to fix dns service issue as soon as possible
-	go assistedController.HackDNSAddressConflict(&wg)
-	wg.Add(1)
+	if !Options.ControllerConfig.DryRunEnabled {
+		// This check is unnecessary in dry run mode, and mocking for it is complicated
+		go assistedController.HackDNSAddressConflict(&wg)
+		wg.Add(1)
+	}
 
 	assistedController.SetReadyState()
 

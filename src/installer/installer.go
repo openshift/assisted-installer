@@ -42,6 +42,8 @@ var generalWaitInterval = 5 * time.Second
 
 // Installer will run the install operations on the node
 type Installer interface {
+	// FormatDisks formats all disks that have been configured to be formatted
+	FormatDisks() error
 	InstallNode() error
 	UpdateHostInstallProgress(newStage models.HostStage, info string)
 }
@@ -63,6 +65,16 @@ func NewAssistedInstaller(log *logrus.Logger, cfg config.Config, ops ops.Ops, ic
 		inventoryClient: ic,
 		kcBuilder:       kcb,
 		ign:             ign,
+	}
+}
+
+func (i *installer) FormatDisks() {
+	for _, diskToFormat := range i.Config.DisksToFormat {
+		if err := i.ops.FormatDisk(diskToFormat); err != nil {
+			// This is best effort - keep trying to format other disks
+			// and go on with the installation, log a warning
+			i.log.Warnf("Failed to format disk %s, err %s", diskToFormat, err)
+		}
 	}
 }
 
@@ -157,6 +169,10 @@ func (i *installer) InstallNode() error {
 
 //updateSingleNodeIgnition will download the host ignition config and add the files under storage
 func (i *installer) updateSingleNodeIgnition(singleNodeIgnitionPath string) error {
+	if config.GlobalDryRunConfig.DryRunEnabled {
+		return nil
+	}
+
 	hostIgnitionPath, err := i.downloadHostIgnition()
 	if err != nil {
 		return err
@@ -275,6 +291,10 @@ func (i *installer) startBootstrap() error {
 }
 
 func (i *installer) extractIgnitionToFS(ignitionPath string) (err error) {
+	if config.GlobalDryRunConfig.DryRunEnabled {
+		return nil
+	}
+
 	mcoImage := i.MCOImage
 
 	i.log.Infof("Extracting ignition to disk using %s mcoImage", mcoImage)
@@ -299,6 +319,10 @@ func (i *installer) extractIgnitionToFS(ignitionPath string) (err error) {
 }
 
 func (i *installer) generateSshKeyPair() error {
+	if config.GlobalDryRunConfig.DryRunEnabled {
+		return nil
+	}
+
 	i.log.Info("Generating new SSH key pair")
 	if _, err := i.ops.ExecPrivilegeCommand(utils.NewLogWriter(i.log), "ssh-keygen", "-q", "-f", sshKeyPath, "-N", ""); err != nil {
 		i.log.WithError(err).Error("Failed to generate SSH key pair")
@@ -659,6 +683,10 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 }
 
 func (i *installer) cleanupInstallDevice() error {
+	if config.GlobalDryRunConfig.DryRunEnabled {
+		return nil
+	}
+
 	vgName, err := i.ops.GetVGByPV(i.Device)
 	if err != nil {
 		return err
@@ -752,6 +780,10 @@ func (i *installer) createSingleNodeMasterIgnition() (string, error) {
 }
 
 func (i *installer) checkLocalhostName() error {
+	if config.GlobalDryRunConfig.DryRunEnabled {
+		return nil
+	}
+
 	i.log.Infof("Start checking localhostname")
 	hostname, err := i.ops.GetHostname()
 	if err != nil {
