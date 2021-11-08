@@ -258,10 +258,9 @@ func (c *inventoryClient) GetCluster(ctx context.Context) (*models.Cluster, erro
 	return cluster.Payload, nil
 }
 
-func (c *inventoryClient) GetMonitoredOperator(ctx context.Context, clusterId string) (models.MonitoredOperatorsList, error) {
-	cacheKey := fmt.Sprintf("GetMonitoredOperator-%s", clusterId)
-	if val, err := c.cache.Get(cacheKey); err != ttlCache.ErrNotFound {
-		fmt.Printf("Got it: %s\n", val)
+func (c *inventoryClient) getMonitoredOperators(ctx context.Context, clusterId string) (models.MonitoredOperatorsList, error) {
+	cacheKey := fmt.Sprintf("getMonitoredOperators-%s", clusterId)
+	if val, err := c.cache.Get(cacheKey); err == nil {
 		return val.(models.MonitoredOperatorsList), nil
 	}
 
@@ -277,7 +276,7 @@ func (c *inventoryClient) GetMonitoredOperator(ctx context.Context, clusterId st
 }
 
 func (c *inventoryClient) GetClusterMonitoredOperator(ctx context.Context, clusterId, operatorName string) (*models.MonitoredOperator, error) {
-	monitoredOperators, err := c.GetMonitoredOperator(ctx, clusterId)
+	monitoredOperators, err := c.getMonitoredOperators(ctx, clusterId)
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +290,7 @@ func (c *inventoryClient) GetClusterMonitoredOperator(ctx context.Context, clust
 }
 
 func (c *inventoryClient) GetClusterMonitoredOLMOperators(ctx context.Context, clusterId string) ([]models.MonitoredOperator, error) {
-	monitoredOperators, err := c.GetMonitoredOperator(ctx, clusterId)
+	monitoredOperators, err := c.getMonitoredOperators(ctx, clusterId)
 	if err != nil {
 		return nil, err
 	}
