@@ -939,7 +939,7 @@ func (c controller) waitingForClusterOperators(ctx context.Context) error {
 		result := c.isOperatorAvailable(NewClusterOperatorHandler(c.kc, consoleOperatorName))
 
 		if c.WaitForClusterVersion {
-			result = c.isOperatorAvailable(NewClusterVersionHandler(c.kc, timer))
+			result = c.isOperatorAvailable(NewClusterVersionHandler(c.kc, timer)) && result
 		}
 
 		return result
