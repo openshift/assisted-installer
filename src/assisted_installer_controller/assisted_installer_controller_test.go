@@ -587,6 +587,32 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				GeneralWaitInterval = 1 * time.Millisecond
 			})
 
+			It("failure if console not available in service or failed to set status and success if available", func() {
+				installing := models.ClusterStatusInstalling
+				mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(&models.Cluster{Status: &installing}, nil).Times(2)
+
+				mockGetServiceOperators([]models.MonitoredOperator{{Name: consoleOperatorName, Status: models.OperatorStatusProgressing}})
+				mockk8sclient.EXPECT().GetClusterOperator(consoleOperatorName).Return(validConsoleOperator, nil).Times(2)
+				mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), assistedController.ClusterID, consoleOperatorName, models.OperatorStatusAvailable, gomock.Any()).Return(fmt.Errorf("dummy")).Times(1)
+				mockGetServiceOperators([]models.MonitoredOperator{{Name: consoleOperatorName, Status: models.OperatorStatusProgressing}})
+				mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), assistedController.ClusterID, consoleOperatorName, models.OperatorStatusAvailable, gomock.Any()).Return(nil).Times(1)
+				mockGetServiceOperators([]models.MonitoredOperator{{Name: consoleOperatorName, Status: models.OperatorStatusAvailable}})
+
+				setClusterAsFinalizing()
+				uploadIngressCert(assistedController.ClusterID)
+				setCvoAsAvailable()
+
+				// Completion
+				mockGetOLMOperators([]models.MonitoredOperator{})
+				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, gomock.Any()).Return(nil).Times(1)
+
+				wg.Add(1)
+				go assistedController.PostInstallConfigs(context.TODO(), &wg)
+				wg.Wait()
+
+				Expect(assistedController.Status.HasError()).Should(Equal(false))
+			})
+
 			It("success", func() {
 				installing := models.ClusterStatusInstalling
 				mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(&models.Cluster{Status: &installing}, nil).Times(1)

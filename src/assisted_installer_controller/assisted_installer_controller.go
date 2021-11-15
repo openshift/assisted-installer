@@ -36,9 +36,10 @@ import (
 const (
 	// We retry 10 times in 30sec interval meaning that we tolerate the operator to be in failed
 	// state for 5minutes.
-	failedOperatorRetry       = 10
-	generalWaitTimeoutInt     = 30
-	controllerLogsSecondsAgo  = 120 * 60
+	failedOperatorRetry   = 10
+	generalWaitTimeoutInt = 30
+	// zero means -> bring all logs
+	controllerLogsSecondsAgo  = 0
 	consoleOperatorName       = "console"
 	ingressConfigMapName      = "default-ingress-cert"
 	ingressConfigMapNamespace = "openshift-config-managed"
@@ -939,7 +940,7 @@ func (c controller) waitingForClusterOperators(ctx context.Context) error {
 		result := c.isOperatorAvailable(NewClusterOperatorHandler(c.kc, consoleOperatorName))
 
 		if c.WaitForClusterVersion {
-			result = c.isOperatorAvailable(NewClusterVersionHandler(c.kc, timer))
+			result = c.isOperatorAvailable(NewClusterVersionHandler(c.kc, timer)) && result
 		}
 
 		return result
