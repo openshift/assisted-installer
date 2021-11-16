@@ -13,7 +13,7 @@ import (
 	assistedinstallercontroller "github.com/openshift/assisted-installer/src/assisted_installer_controller"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/k8s_client"
-	"github.com/openshift/assisted-installer/src/main/assisted-installer-controller/drymock"
+	"github.com/openshift/assisted-installer/src/main/drymock"
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/client/installer"
@@ -69,7 +69,7 @@ func main() {
 		mockController := gomock.NewController(ginkgo.GinkgoT())
 		kc = k8s_client.NewMockK8SClient(mockController)
 		mock, _ := kc.(*k8s_client.MockK8SClient)
-		drymock.PrepareDryMock(mock, logger, Options.ControllerConfig.DryRunHostnames, Options.ControllerConfig.DryMcsAccessIps)
+		drymock.PrepareControllerDryMock(mock, logger, Options.ControllerConfig.DryRunHostnames, Options.ControllerConfig.DryMcsAccessIps)
 	}
 
 	err = kc.SetProxyEnvVars()

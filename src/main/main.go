@@ -4,8 +4,13 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/openshift/assisted-installer/src/ignition"
+	"github.com/sirupsen/logrus"
 
+	"github.com/openshift/assisted-installer/src/ignition"
+	"github.com/openshift/assisted-installer/src/main/drymock"
+
+	"github.com/golang/mock/gomock"
+	"github.com/onsi/ginkgo"
 	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/installer"
 	"github.com/openshift/assisted-installer/src/inventory_client"
@@ -33,11 +38,25 @@ func main() {
 		logger.Fatalf("Failed to create inventory client %e", err)
 	}
 
+	var k8sClientBuilder k8s_client.K8SClientBuilder
+	if !config.GlobalDryRunConfig.DryRunEnabled {
+		k8sClientBuilder = k8s_client.NewK8SClient
+	} else {
+		k8sClientBuilder = func(configPath string, logger *logrus.Logger) (k8s_client.K8SClient, error) {
+			var kc k8s_client.K8SClient
+			mockController := gomock.NewController(ginkgo.GinkgoT())
+			kc = k8s_client.NewMockK8SClient(mockController)
+			mock, _ := kc.(*k8s_client.MockK8SClient)
+			drymock.PrepareInstallerDryK8sMock(mock, logger, config.GlobalDryRunConfig.DryRunHostnames)
+			return kc, nil
+		}
+	}
+
 	ai := installer.NewAssistedInstaller(logger,
 		config.GlobalConfig,
 		ops.NewOps(logger, true),
 		client,
-		k8s_client.NewK8SClient,
+		k8sClientBuilder,
 		ignition.NewIgnition(),
 	)
 
