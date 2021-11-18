@@ -512,6 +512,14 @@ func (o *ops) Wipefs(device string) error {
 }
 
 func (o *ops) GetMCSLogs() (string, error) {
+	if config.GlobalDryRunConfig.DryRunEnabled {
+		mcsLogs := ""
+		for _, ip := range strings.Split(config.GlobalDryRunConfig.DryRunIps, ",") {
+			// Add IP access log for each IP, this is how the installer determines which node has downloaded the ignition
+			mcsLogs += fmt.Sprintf("%s.(Ignition)\n", ip)
+		}
+		return mcsLogs, nil
+	}
 
 	files, err := utils.FindFiles("/var/log/containers/", utils.W_FILEONLY, "*machine-config-server*.log")
 	if err != nil {
@@ -558,6 +566,10 @@ func (o *ops) UploadInstallationLogs(isBootstrap bool) (string, error) {
 // For example /etc/resolv.conf, it can't be changed with Z flag but is updated by bootkube.sh
 // and we need this update for dns resolve of kubeapi
 func (o *ops) ReloadHostFile(filepath string) error {
+	if config.GlobalDryRunConfig.DryRunEnabled {
+		return nil
+	}
+
 	o.log.Infof("Reloading %s", filepath)
 	output, err := o.ExecPrivilegeCommand(o.logWriter, "cat", filepath)
 	if err != nil {
