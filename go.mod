@@ -11,10 +11,10 @@ require (
 	github.com/coreos/ignition/v2 v2.10.1
 	github.com/go-logr/logr v0.4.0 // indirect
 	github.com/go-openapi/runtime v0.19.28
-	github.com/go-openapi/strfmt v0.20.1
-	github.com/go-openapi/swag v0.19.9
+	github.com/go-openapi/strfmt v0.20.3
+	github.com/go-openapi/swag v0.19.15
 	github.com/golang/mock v1.5.0
-	github.com/google/uuid v1.2.0
+	github.com/google/uuid v1.3.0
 	github.com/hashicorp/go-version v1.3.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/metal3-io/baremetal-operator v0.0.0
@@ -22,7 +22,7 @@ require (
 	github.com/onsi/gomega v1.13.0
 	github.com/openshift/api v3.9.1-0.20191111211345-a27ff30ebf09+incompatible
 	github.com/openshift/assisted-installer-agent v0.0.0-20200811180147-bc9c7b899b8a
-	github.com/openshift/assisted-service v1.0.10-0.20210921191140-7dcb60579fdf
+	github.com/openshift/assisted-service v1.0.10-0.20211121085606-2c0b10ee076f
 	github.com/openshift/client-go v0.0.0-20201020074620-f8fd44879f7c
 	github.com/openshift/machine-api-operator v0.2.1-0.20201002104344-6abfb5440597
 	github.com/operator-framework/api v0.8.0

@@ -392,7 +392,7 @@ func (c *inventoryClient) ClusterLogProgressReport(ctx context.Context, clusterI
 	_, err := c.ai.Installer.V2UpdateClusterLogsProgress(ctx, &installer.V2UpdateClusterLogsProgressParams{
 		ClusterID: strfmt.UUID(clusterId),
 		LogsProgressParams: &models.LogsProgressParams{
-			LogsState: progress,
+			LogsState: &progress,
 		},
 	})
 	if err != nil {
@@ -405,7 +405,7 @@ func (c *inventoryClient) HostLogProgressReport(ctx context.Context, infraEnvId 
 		InfraEnvID: strfmt.UUID(infraEnvId),
 		HostID:     strfmt.UUID(hostId),
 		LogsProgressParams: &models.LogsProgressParams{
-			LogsState: progress,
+			LogsState: &progress,
 		},
 	})
 	if err != nil {
