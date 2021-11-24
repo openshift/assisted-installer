@@ -32,7 +32,10 @@ var Options struct {
 	ControllerConfig assistedinstallercontroller.ControllerConfig
 }
 
-const maximumErrorsBeforeExit = 3
+const (
+	maximumInventoryClientRetries = 15
+	maximumErrorsBeforeExit       = 3
+)
 
 func DryRebootComplete() bool {
 	if _, err := os.Stat(Options.ControllerConfig.DryFakeRebootMarkerPath); err == nil {
@@ -77,9 +80,13 @@ func main() {
 		log.Fatalf("Failed to set env vars for installer-controller pod %v", err)
 	}
 
-	client, err := inventory_client.CreateInventoryClient(Options.ControllerConfig.ClusterID,
+	// everything in assisted-controller runs in loops, we prefer to fail early on error and to retry on the next loop
+	// this will allow us to show service error more quickly
+	// Currently we will retry maximum for 10 times per call
+	client, err := inventory_client.CreateInventoryClientWithDelay(Options.ControllerConfig.ClusterID,
 		Options.ControllerConfig.URL, Options.ControllerConfig.PullSecretToken, Options.ControllerConfig.SkipCertVerification,
-		Options.ControllerConfig.CACertPath, logger, utils.ProxyFromEnvVars)
+		Options.ControllerConfig.CACertPath, logger, utils.ProxyFromEnvVars, inventory_client.DefaultRetryMinDelay,
+		inventory_client.DefaultRetryMaxDelay, maximumInventoryClientRetries, inventory_client.DefaultMinRetries)
 	if err != nil {
 		log.Fatalf("Failed to create inventory client %v", err)
 	}
