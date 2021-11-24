@@ -35,9 +35,9 @@ import (
 )
 
 const (
-	defaultRetryMinDelay = time.Duration(2) * time.Second
-	defaultRetryMaxDelay = time.Duration(10) * time.Second
-	defaultMinRetries    = 10
+	DefaultRetryMinDelay = time.Duration(2) * time.Second
+	DefaultRetryMaxDelay = time.Duration(10) * time.Second
+	DefaultMinRetries    = 10
 	defaultMaxRetries    = 360
 )
 
@@ -76,7 +76,7 @@ type HostData struct {
 func CreateInventoryClient(clusterId string, inventoryURL string, pullSecret string, insecure bool, caPath string,
 	logger *logrus.Logger, proxyFunc func(*http.Request) (*url.URL, error)) (*inventoryClient, error) {
 	return CreateInventoryClientWithDelay(clusterId, inventoryURL, pullSecret, insecure, caPath,
-		logger, proxyFunc, defaultRetryMinDelay, defaultRetryMaxDelay, defaultMaxRetries, defaultMinRetries)
+		logger, proxyFunc, DefaultRetryMinDelay, DefaultRetryMaxDelay, defaultMaxRetries, DefaultMinRetries)
 }
 
 func CreateInventoryClientWithDelay(clusterId string, inventoryURL string, pullSecret string, insecure bool, caPath string,
