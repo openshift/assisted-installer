@@ -272,7 +272,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 			hosts := create3Hosts(models.HostStatusInstalling, models.HostStageConfiguring)
 			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
-				Return(hosts, nil).Times(1)
+				Return(hosts, nil).Times(2)
 			configuringSuccess()
 			listNodes()
 
@@ -296,7 +296,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 			hosts := create3Hosts(models.HostStatusInstalling, models.HostStageConfiguring)
 			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
-				Return(hosts, nil).Times(1)
+				Return(hosts, nil).Times(2)
 			// not ready nodes
 			nodes := GetKubeNodes(kubeNamesIds)
 			for _, node := range nodes.Items {
@@ -321,7 +321,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 			hosts := create3Hosts(models.HostStatusInstalling, models.HostStageJoined)
 			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
-				Return(hosts, nil).Times(1)
+				Return(hosts, nil).Times(2)
 			nodes := GetKubeNodes(kubeNamesIds)
 			mockk8sclient.EXPECT().ListNodes().Return(nodes, nil).Times(1)
 			updateProgressSuccess(done, inventoryNamesIds)
@@ -377,7 +377,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 						targetMap[key] = value
 					}
 					mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
-						Return(targetMap, nil).Times(1)
+						Return(targetMap, nil).Times(2)
 					delete(inventoryNamesIds, name)
 				}
 				mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
@@ -420,7 +420,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().ListNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(2)
 			hosts := create3Hosts(models.HostStatusInstalling, models.HostStageJoined)
 			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
-				Return(hosts, nil).Times(2)
+				Return(hosts, nil).Times(4)
 			updateProgressSuccessFailureTest(defaultStages, hosts)
 			hosts = create3Hosts(models.HostStatusInstalled, models.HostStageDone)
 			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
@@ -447,7 +447,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			updateProgressSuccess(defaultStages, hosts)
 			hosts = create3Hosts(models.HostStatusInstalled, models.HostStageDone)
 			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
-				Return(hosts, nil).Times(1)
+				Return(hosts, nil).Times(2)
 
 			listNodesOneFailure()
 			configuringSuccess()
