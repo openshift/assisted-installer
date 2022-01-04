@@ -25,7 +25,7 @@ func (c controller) isOperatorAvailable(handler OperatorHandler) bool {
 	operatorName := handler.GetName()
 	c.log.Infof("Checking <%s> operator availability status", operatorName)
 
-	operatorStatusInService, isAvailable := c.isOperatorAvailableInService(operatorName)
+	operatorStatusInService, isAvailable := c.isOperatorAvailableInService(operatorName, c.OpenshiftVersion)
 	if isAvailable {
 		return true
 	}
@@ -53,8 +53,8 @@ func (c controller) isOperatorAvailable(handler OperatorHandler) bool {
 	return false
 }
 
-func (c controller) isOperatorAvailableInService(operatorName string) (*models.MonitoredOperator, bool) {
-	operatorStatusInService, err := c.ic.GetClusterMonitoredOperator(utils.GenerateRequestContext(), c.ClusterID, operatorName)
+func (c controller) isOperatorAvailableInService(operatorName string, openshiftVersion string) (*models.MonitoredOperator, bool) {
+	operatorStatusInService, err := c.ic.GetClusterMonitoredOperator(utils.GenerateRequestContext(), c.ClusterID, operatorName, openshiftVersion)
 	if err != nil {
 		c.log.WithError(err).Errorf("Failed to get cluster %s %s operator status", c.ClusterID, operatorName)
 		return nil, false
@@ -158,14 +158,11 @@ func (handler ClusterServiceVersionHandler) GetStatus() (models.OperatorStatus, 
 	if err != nil {
 		return "", "", err
 	}
-
 	csv, err := handler.kc.GetCSV(handler.operator.Namespace, csvName)
 	if err != nil {
 		return "", "", err
 	}
-
 	operatorStatus := utils.CsvStatusToOperatorStatus(string(csv.Status.Phase))
-
 	return operatorStatus, csv.Status.Message, nil
 }
 

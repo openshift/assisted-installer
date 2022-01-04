@@ -16,6 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/hashicorp/go-version"
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/apis/metal3.io/v1alpha1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -477,7 +478,7 @@ func (c controller) waitForOLMOperators(ctx context.Context) error {
 
 	// Get the monitored operators:
 	err = utils.Retry(maxFetchAttempts, FetchRetryInterval, c.log, func() error {
-		operators, err = c.ic.GetClusterMonitoredOLMOperators(context.TODO(), c.ClusterID)
+		operators, err = c.ic.GetClusterMonitoredOLMOperators(context.TODO(), c.ClusterID, c.OpenshiftVersion)
 		if err != nil {
 			return errors.Wrapf(err, "Error while fetch the monitored operators from assisted-service.")
 		}
@@ -587,6 +588,19 @@ func (c controller) applyPostInstallManifests(arg interface{}) bool {
 	c.log.Infof("Ready operators to be applied: %v", readyOperators)
 
 	for _, manifest := range manifests {
+		v1, err := version.NewVersion(c.OpenshiftVersion)
+		if err != nil {
+			return false
+		}
+		constraints, err := version.NewConstraint(">= 4.8, < 4.9")
+		if err != nil {
+			return false
+		}
+
+		// renaming odf if ocs as manifest is applied based on the ready operators list
+		if manifest.Name == "odf" && constraints.Check(v1) {
+			manifest.Name = "ocs"
+		}
 		c.log.Infof("Applying manifest %s: %s", manifest.Name, manifest.Content)
 
 		// Check if the operator is properly initialized by CSV:
@@ -877,7 +891,7 @@ func (c controller) getMaximumOLMTimeout(operators []models.MonitoredOperator) t
 
 func (c controller) getProgressingOLMOperators() ([]*models.MonitoredOperator, error) {
 	ret := make([]*models.MonitoredOperator, 0)
-	operators, err := c.ic.GetClusterMonitoredOLMOperators(context.TODO(), c.ClusterID)
+	operators, err := c.ic.GetClusterMonitoredOLMOperators(context.TODO(), c.ClusterID, c.OpenshiftVersion)
 	if err != nil {
 		c.log.WithError(err).Warningf("Failed to connect to assisted service")
 		return ret, err
@@ -922,7 +936,6 @@ func (c controller) waitForCSV(ctx context.Context, waitTimeout time.Duration) e
 	for index := range operators {
 		handlers[operators[index].Name] = NewClusterServiceVersionHandler(c.kc, operators[index], c.Status)
 	}
-
 	areOLMOperatorsAvailable := func() bool {
 		if len(handlers) == 0 {
 			return true
