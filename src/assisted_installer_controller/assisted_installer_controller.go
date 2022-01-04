@@ -253,7 +253,17 @@ func (c *controller) waitAndUpdateNodesStatus() bool {
 			}
 		}
 	}
-	c.updateConfiguringStatusIfNeeded(assistedNodesMap)
+
+	// Since the host statuses may have changed due to the above loop,
+	// we need to get the updated list of hosts again so we don't operate
+	// on stale data.
+	assistedNodesMapUpdated, err2 := c.ic.GetHosts(ctxReq, log, ignoreStatuses)
+	if err2 != nil {
+		log.WithError(err2).Error("Failed to get node map from the assisted service")
+		return KeepWaiting
+	}
+
+	c.updateConfiguringStatusIfNeeded(assistedNodesMapUpdated)
 	return KeepWaiting
 }
 
