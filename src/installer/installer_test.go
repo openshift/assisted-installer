@@ -85,6 +85,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	cleanInstallDevice := func() {
 		mockops.EXPECT().GetVGByPV(device).Return("", nil).Times(1)
+		mockops.EXPECT().IsRaidDevice(device).Return(false).Times(1)
+		mockops.EXPECT().Wipefs(device).Return(nil).Times(1)
 	}
 
 	updateProgressSuccess := func(stages [][]string) {
@@ -530,6 +532,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			cleanInstallDeviceClean := func() {
 				mockops.EXPECT().GetVGByPV(device).Return("vg1", nil).Times(1)
 				mockops.EXPECT().RemoveVG("vg1").Return(nil).Times(1)
+				mockops.EXPECT().IsRaidDevice(device).Return(false).Times(1)
 				mockops.EXPECT().Wipefs(device).Return(nil).Times(1)
 				mockops.EXPECT().RemovePV(device).Return(nil).Times(1)
 			}
@@ -548,6 +551,33 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			}
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
 			cleanInstallDeviceError()
+			ret := installerObj.InstallNode()
+			Expect(ret).Should(Equal(err))
+		})
+		It("HostRoleMaster role raid cleanup disk - happy flow", func() {
+			cleanInstallDeviceClean := func() {
+				mockops.EXPECT().GetVGByPV(device).Return("", nil).Times(1)
+				mockops.EXPECT().IsRaidDevice(device).Return(true).Times(1)
+				mockops.EXPECT().CleanRaidDevice(device).Return(nil).Times(1)
+				mockops.EXPECT().Wipefs(device).Return(nil).Times(1)
+			}
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
+			cleanInstallDeviceClean()
+			err := fmt.Errorf("failed to create dir")
+			mockops.EXPECT().Mkdir(InstallDir).Return(err).Times(1)
+			ret := installerObj.InstallNode()
+			Expect(ret).Should(Equal(err))
+		})
+		It("HostRoleMaster role raid cleanup disk - failed", func() {
+			err := fmt.Errorf("failed cleaning raid device")
+
+			cleanInstallDeviceClean := func() {
+				mockops.EXPECT().GetVGByPV(device).Return("", nil).Times(1)
+				mockops.EXPECT().IsRaidDevice(device).Return(true).Times(1)
+				mockops.EXPECT().CleanRaidDevice(device).Return(err).Times(1)
+			}
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
+			cleanInstallDeviceClean()
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})

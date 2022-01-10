@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"runtime"
 	"strconv"
 	"text/template"
@@ -45,6 +46,8 @@ type Ops interface {
 	RemoveLV(lvName, vgName string) error
 	RemovePV(pvName string) error
 	Wipefs(device string) error
+	IsRaidDevice(device string) bool
+	CleanRaidDevice(device string) error
 	GetMCSLogs() (string, error)
 	UploadInstallationLogs(isBootstrap bool) (string, error)
 	ReloadHostFile(filepath string) error
@@ -504,11 +507,132 @@ func (o *ops) RemovePV(pvName string) error {
 }
 
 func (o *ops) Wipefs(device string) error {
-	output, err := o.ExecPrivilegeCommand(o.logWriter, "wipefs", "-a", device)
+	_, err := o.ExecPrivilegeCommand(o.logWriter, "wipefs", "--all", "--force", device)
+
 	if err != nil {
-		o.log.Errorf("Failed to wipefs device %s, output %s, error %s", device, output, err)
+		_, err = o.ExecPrivilegeCommand(o.logWriter, "wipefs", "--all", device)
 	}
+
 	return err
+}
+
+func (o *ops) IsRaidDevice(device string) bool {
+	raidDevices, err := o.getRaidDevices()
+
+	if err != nil {
+		o.log.WithError(err).Errorf("Error occurred while trying to get list of raid devices - continue without cleaning")
+		return false
+	}
+
+	// The device itself or one of its partitions
+	expression, _ := regexp.Compile(device + "[\\d]*")
+
+	for _, raidArrayMembers := range raidDevices {
+		for _, raidMember := range raidArrayMembers {
+			if expression.MatchString(raidMember) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func (o *ops) CleanRaidDevice(device string) error {
+	raidDevices, err := o.getRaidDevices()
+
+	if err != nil {
+		return err
+	}
+
+	for raidDeviceName, raidArrayMembers := range raidDevices {
+		err = o.cleanDeviceFromRaidDevice(device, raidDeviceName, raidArrayMembers)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (o *ops) getRaidDevices() (map[string][]string, error) {
+	output, err := o.ExecPrivilegeCommand(o.logWriter, "mdadm", "-v", "--query", "--detail", "--scan")
+
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(output, "\n")
+	result := make(map[string][]string)
+
+	/*
+		The output pattern is:
+		ARRAY /dev/md0 level=raid1 num-devices=2 metadata=1.2 name=0 UUID=77e1b6f2:56530ebd:38bd6808:17fd01c4
+		   devices=/dev/vda2,/dev/vda3
+		ARRAY /dev/md1 level=raid1 num-devices=1 metadata=1.2 name=1 UUID=aad7aca9:81db82f3:2f1fedb1:f89ddb43
+		   devices=/dev/vda1
+	*/
+	for i := 0; i < len(lines); {
+		if !strings.Contains(lines[i], "ARRAY") {
+			i++
+			continue
+		}
+
+		fields := strings.Fields(lines[i])
+		raidDeviceName := fields[1]
+		i++
+
+		// Ensuring that we have at least two lines per device.
+		if len(lines) == i {
+			break
+		}
+
+		raidArrayMembersStr := strings.TrimSpace(lines[i])
+		prefix := "devices="
+
+		if !strings.HasPrefix(raidArrayMembersStr, prefix) {
+			continue
+		}
+
+		raidArrayMembersStr = raidArrayMembersStr[len(prefix):]
+		result[raidDeviceName] = strings.Split(raidArrayMembersStr, ",")
+		i++
+	}
+
+	return result, nil
+}
+
+func (o *ops) cleanDeviceFromRaidDevice(deviceName string, raidDeviceName string, raidArrayMembers []string) error {
+	raidStopped := false
+
+	expression, _ := regexp.Compile(deviceName + "[\\d]*")
+
+	for _, raidMember := range raidArrayMembers {
+		// A partition or the device itself is part of the raid array.
+		if expression.MatchString(raidMember) {
+			// Stop the raid device.
+			if !raidStopped {
+				o.log.Info("Stopping raid device: " + raidDeviceName)
+				_, err := o.ExecPrivilegeCommand(o.logWriter, "mdadm", "--stop", raidDeviceName)
+
+				if err != nil {
+					return err
+				}
+
+				raidStopped = true
+			}
+
+			// Clean the raid superblock from the device
+			o.log.Infof("Cleaning raid member %s superblock", raidMember)
+			_, err := o.ExecPrivilegeCommand(o.logWriter, "mdadm", "--zero-superblock", raidMember)
+
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (o *ops) GetMCSLogs() (string, error) {

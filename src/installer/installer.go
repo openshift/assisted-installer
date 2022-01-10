@@ -692,19 +692,31 @@ func (i *installer) cleanupInstallDevice() error {
 		return err
 	}
 
-	if vgName == "" {
-		i.log.Infof("No VG/LVM was found on device %s, no need to clean", i.Device)
-		return nil
+	if vgName != "" {
+		i.log.Infof("A virtual group was detected on the installation device (%s) - cleaning", i.Device)
+		err = i.ops.RemoveVG(vgName)
+
+		if err != nil {
+			return err
+		}
+
+		err = i.ops.RemovePV(i.Device)
+
+		if err != nil {
+			return err
+		}
 	}
 
-	err = i.ops.RemoveVG(vgName)
-	if err != nil {
-		return err
+	if i.ops.IsRaidDevice(i.Device) {
+		i.log.Infof("A raid was detected on the installation device (%s) - cleaning", i.Device)
+		err = i.ops.CleanRaidDevice(i.Device)
+
+		if err != nil {
+			return err
+		}
 	}
 
-	_ = i.ops.Wipefs(i.Device)
-
-	return i.ops.RemovePV(i.Device)
+	return i.ops.Wipefs(i.Device)
 }
 
 func (i *installer) verifyHostCanMoveToConfigurationStatus(inventoryHostsMapWithIp map[string]inventory_client.HostData) {
