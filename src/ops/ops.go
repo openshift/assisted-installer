@@ -55,6 +55,7 @@ type Ops interface {
 	EvaluateDiskSymlink(string) string
 	FormatDisk(string) error
 	CreateManifests(string, []byte) error
+	DryRebootHappened(markerPath string) bool
 }
 
 const (
@@ -92,6 +93,7 @@ func NewOps(logger *logrus.Logger, proxySet bool) Ops {
 }
 
 // ExecPrivilegeCommand execute a command in the host environment via nsenter
+
 func (o *ops) ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
 	// nsenter is used here to launch processes inside the container in a way that makes said processes feel
 	// and behave as if they're running on the host directly rather than inside the container
@@ -514,9 +516,13 @@ func (o *ops) Wipefs(device string) error {
 func (o *ops) GetMCSLogs() (string, error) {
 	if config.GlobalDryRunConfig.DryRunEnabled {
 		mcsLogs := ""
-		for _, ip := range strings.Split(config.GlobalDryRunConfig.DryRunIps, ",") {
+		for _, clusterHost := range config.GlobalDryRunConfig.ParsedClusterHosts {
 			// Add IP access log for each IP, this is how the installer determines which node has downloaded the ignition
-			mcsLogs += fmt.Sprintf("%s.(Ignition)\n", ip)
+			if !o.DryRebootHappened(clusterHost.RebootMarkerPath) {
+				// Host didn't even reboot yet, don't pretend it fetched the ignition
+				continue
+			}
+			mcsLogs += fmt.Sprintf("%s.(Ignition)\n", clusterHost.Ip)
 		}
 		return mcsLogs, nil
 	}
@@ -693,4 +699,13 @@ func (o *ops) CreateManifests(kubeconfig string, content []byte) error {
 	o.log.Infof("Applying custom manifest file %s succeed %s", file.Name(), output)
 
 	return nil
+}
+
+// DryRebootHappened checks if a reboot happened according to a particular reboot marker path
+// The dry run installer creates this file on "Reboot" (instead of actually rebooting)
+// We use this function to check whether the given node in the cluster have already rebooted
+func (o *ops) DryRebootHappened(markerPath string) bool {
+	_, err := o.ExecPrivilegeCommand(nil, "stat", markerPath)
+
+	return err == nil
 }

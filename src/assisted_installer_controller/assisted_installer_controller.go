@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/openshift/assisted-installer/src/common"
+	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/ops"
@@ -85,9 +86,10 @@ type ControllerConfig struct {
 	WaitForClusterVersion   bool   `envconfig:"CHECK_CLUSTER_VERSION" required:"false" default:"false"`
 	MustGatherImage         string `envconfig:"MUST_GATHER_IMAGE" required:"false" default:""`
 	DryRunEnabled           bool   `envconfig:"DRY_ENABLE" required:"false" default:"false"`
-	DryRunHostnames         string `envconfig:"DRY_HOSTNAMES" required:"false" default:""`
-	DryMcsAccessIps         string `envconfig:"DRY_MCS_ACCESS_IPS" required:"false" default:""`
 	DryFakeRebootMarkerPath string `envconfig:"DRY_FAKE_REBOOT_MARKER_PATH" required:"false" default:""`
+	DryRunClusterHosts      string `envconfig:"DRY_CLUSTER_HOSTS"`
+	// DryRunClusterHosts gets parsed into ParsedClusterHosts by config.DryParseClusterHosts
+	ParsedClusterHosts config.DryClusterHosts
 }
 type Controller interface {
 	WaitAndUpdateNodesStatus(status *ControllerStatus)
