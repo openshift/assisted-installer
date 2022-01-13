@@ -11,6 +11,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/onsi/ginkgo"
 	assistedinstallercontroller "github.com/openshift/assisted-installer/src/assisted_installer_controller"
+	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/main/drymock"
@@ -54,6 +55,10 @@ func main() {
 	}
 
 	if Options.ControllerConfig.DryRunEnabled {
+		if err = config.DryParseClusterHosts(Options.ControllerConfig.DryRunClusterHosts, &Options.ControllerConfig.ParsedClusterHosts); err != nil {
+			log.Fatalf("Failed to parse dry cluster hosts: %v", err)
+		}
+
 		// In dry run mode, we need to wait for the reboot to complete before starting the controller
 		for !DryRebootComplete() {
 			time.Sleep(time.Second * 1)
@@ -61,6 +66,8 @@ func main() {
 	}
 
 	logger.Infof("Start running Assisted-Controller. Configuration is:\n %s", secretdump.DumpSecretStruct(Options.ControllerConfig))
+
+	o := ops.NewOps(logger, false)
 
 	var kc k8s_client.K8SClient
 	if !Options.ControllerConfig.DryRunEnabled {
@@ -72,7 +79,7 @@ func main() {
 		mockController := gomock.NewController(ginkgo.GinkgoT())
 		kc = k8s_client.NewMockK8SClient(mockController)
 		mock, _ := kc.(*k8s_client.MockK8SClient)
-		drymock.PrepareControllerDryMock(mock, logger, Options.ControllerConfig.DryRunHostnames, Options.ControllerConfig.DryMcsAccessIps)
+		drymock.PrepareControllerDryMock(mock, logger, o, Options.ControllerConfig.ParsedClusterHosts)
 	}
 
 	err = kc.SetProxyEnvVars()
@@ -93,7 +100,7 @@ func main() {
 
 	assistedController := assistedinstallercontroller.NewController(logger,
 		Options.ControllerConfig,
-		ops.NewOps(logger, false),
+		o,
 		client,
 		kc,
 	)
@@ -173,14 +180,14 @@ func waitForInstallation(client inventory_client.InventoryClient, log logrus.Fie
 		}
 		// reset error counter in case no error occurred
 		errCounter = 0
-		finished := handleClusterStatus(*cluster.Status, log, status)
+		finished := didInstallationFinish(*cluster.Status, log, status)
 		if finished {
 			return
 		}
 	}
 }
 
-func handleClusterStatus(clusterStatus string, log logrus.FieldLogger, status *assistedinstallercontroller.ControllerStatus) bool {
+func didInstallationFinish(clusterStatus string, log logrus.FieldLogger, status *assistedinstallercontroller.ControllerStatus) bool {
 	switch clusterStatus {
 	case models.ClusterStatusError:
 		log.Infof("Cluster installation failed.")
@@ -191,6 +198,9 @@ func handleClusterStatus(clusterStatus string, log logrus.FieldLogger, status *a
 		return true
 	case models.ClusterStatusInstalled:
 		log.Infof("Cluster installation successfully finished.")
+		return true
+	case models.ClusterStatusAddingHosts:
+		log.Infof("Cluster is day2")
 		return true
 	}
 	return false

@@ -397,3 +397,17 @@ func (mr *MockOpsMockRecorder) CreateManifests(arg0, arg1 interface{}) *gomock.C
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateManifests", reflect.TypeOf((*MockOps)(nil).CreateManifests), arg0, arg1)
 }
+
+// DryRebootHappened mocks base method
+func (m *MockOps) DryRebootHappened(markerPath string) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DryRebootHappened", markerPath)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// DryRebootHappened indicates an expected call of DryRebootHappened
+func (mr *MockOpsMockRecorder) DryRebootHappened(markerPath interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DryRebootHappened", reflect.TypeOf((*MockOps)(nil).DryRebootHappened), markerPath)
+}

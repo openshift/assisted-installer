@@ -3,13 +3,14 @@ package drymock
 import (
 	"bytes"
 	"fmt"
-	"strings"
 
 	"github.com/golang/mock/gomock"
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/assisted-installer/src/common"
+	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/k8s_client"
+	"github.com/openshift/assisted-installer/src/ops"
 	machinev1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	"github.com/sirupsen/logrus"
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -17,12 +18,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func mockNodeList(mockk8sclient *k8s_client.MockK8SClient, hostnames string) v1.NodeList {
+func mockNodeList(mockk8sclient *k8s_client.MockK8SClient, clusterHosts config.DryClusterHosts, o ops.Ops) v1.NodeList {
 	nodeListPopulated := v1.NodeList{}
-	for _, hostname := range strings.Split(hostnames, ",") {
+	for _, clusterHost := range clusterHosts {
+		if !o.DryRebootHappened(clusterHost.RebootMarkerPath) {
+			// Host didn't even reboot yet, don't pretend it's a node
+			continue
+		}
+
 		nodeListPopulated.Items = append(nodeListPopulated.Items, v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: hostname,
+				Name: clusterHost.Hostname,
 			},
 			Status: v1.NodeStatus{
 				Conditions: []v1.NodeCondition{
@@ -66,7 +72,7 @@ Dry`)
 // PrepareControllerDryMock utilizes k8s_client.MockK8SClient to fake the k8s API to make the
 // controller think it's running on an actual cluster, just enough to make it pass an installation.
 // Used in dry mode.
-func PrepareControllerDryMock(mockk8sclient *k8s_client.MockK8SClient, logger *logrus.Logger, hostnames string, mcsAccessIps string) {
+func PrepareControllerDryMock(mockk8sclient *k8s_client.MockK8SClient, logger *logrus.Logger, o ops.Ops, clusterHosts config.DryClusterHosts) {
 	// Called by main
 	mockk8sclient.EXPECT().SetProxyEnvVars().Return(nil).AnyTimes()
 
@@ -92,17 +98,25 @@ func PrepareControllerDryMock(mockk8sclient *k8s_client.MockK8SClient, logger *l
 	podListMcs := []v1.Pod{{ObjectMeta: metav1.ObjectMeta{Name: fakeMcsName}}}
 	mockk8sclient.EXPECT().GetPods(gomock.Any(), map[string]string{"k8s-app": "machine-config-server"}, gomock.Any()).Return(podListMcs, nil).AnyTimes()
 
-	mcsLogs := ""
-	for _, ip := range strings.Split(mcsAccessIps, ",") {
-		// Add IP access log for each IP, this is how the controller determines which node has downloaded the ignition
-		mcsLogs += fmt.Sprintf("%s.(Ignition)\n", ip)
-	}
-	mockk8sclient.EXPECT().GetPodLogs(gomock.Any(), fakeMcsName, gomock.Any()).Return(mcsLogs, nil).AnyTimes()
+	mockk8sclient.EXPECT().GetPodLogs(gomock.Any(), fakeMcsName, gomock.Any()).DoAndReturn(func(namespace, podName string, sinceSeconds int64) (string, error) {
+		mcsLogs := ""
+		for _, clusterHost := range clusterHosts {
+			// Add IP access log for each IP, this is how the controller determines which node has downloaded the ignition
+			if !o.DryRebootHappened(clusterHost.RebootMarkerPath) {
+				// Host didn't even reboot yet, don't pretend it fetched the ignition
+				continue
+			}
+			mcsLogs += fmt.Sprintf("%s.(Ignition)\n", clusterHost.Ip)
+		}
+		return mcsLogs, nil
+	}).AnyTimes()
 
 	// The controller compares AI host objects to cluster Node objects (Either by name or by IP) to check which AI hosts are already
 	// joined as nodes. This fakes the node list so that check will pass
-	nodeListPopulated := mockNodeList(mockk8sclient, hostnames)
-	mockk8sclient.EXPECT().ListNodes().Return(&nodeListPopulated, nil).AnyTimes()
+	mockk8sclient.EXPECT().ListNodes().DoAndReturn(func() (*v1.NodeList, error) {
+		nodeListPopulated := mockNodeList(mockk8sclient, clusterHosts, o)
+		return &nodeListPopulated, nil
+	}).AnyTimes()
 
 	mockControllerPodLogs(mockk8sclient)
 
@@ -263,11 +277,13 @@ dEFgad6P3hMZTOg7yVkMOd3QtgVQ9I8dXqS2nG9EMEh97WIhi6f5ztvcQvQ5tXjh
 // PrepareInstallerDryK8sMock utilizes k8s_client.MockK8SClient to fake the k8s API to make the
 // installer think it's talking with an actual cluster, just enough to make it pass an installation.
 // Used in dry mode.
-func PrepareInstallerDryK8sMock(mockk8sclient *k8s_client.MockK8SClient, logger *logrus.Logger, hostnames string) {
+func PrepareInstallerDryK8sMock(mockk8sclient *k8s_client.MockK8SClient, logger *logrus.Logger, o ops.Ops, clusterHosts config.DryClusterHosts) {
 	// The installer compares AI host objects to cluster Node objects (either by name or by IP) to check which AI hosts are already
 	// joined as nodes. This fakes the node list so that check will pass
-	nodeListPopulated := mockNodeList(mockk8sclient, hostnames)
-	mockk8sclient.EXPECT().ListMasterNodes().Return(&nodeListPopulated, nil).AnyTimes()
+	mockk8sclient.EXPECT().ListMasterNodes().DoAndReturn(func() (*v1.NodeList, error) {
+		nodeListPopulated := mockNodeList(mockk8sclient, clusterHosts, o)
+		return &nodeListPopulated, nil
+	}).AnyTimes()
 
 	events := v1.EventList{Items: []v1.Event{
 		{

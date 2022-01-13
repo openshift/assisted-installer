@@ -38,7 +38,7 @@ const (
 	DefaultRetryMinDelay = time.Duration(2) * time.Second
 	DefaultRetryMaxDelay = time.Duration(10) * time.Second
 	DefaultMinRetries    = 10
-	defaultMaxRetries    = 360
+	DefaultMaxRetries    = 360
 )
 
 //go:generate mockgen -source=inventory_client.go -package=inventory_client -destination=mock_inventory_client.go
@@ -76,7 +76,7 @@ type HostData struct {
 func CreateInventoryClient(clusterId string, inventoryURL string, pullSecret string, insecure bool, caPath string,
 	logger *logrus.Logger, proxyFunc func(*http.Request) (*url.URL, error)) (*inventoryClient, error) {
 	return CreateInventoryClientWithDelay(clusterId, inventoryURL, pullSecret, insecure, caPath,
-		logger, proxyFunc, DefaultRetryMinDelay, DefaultRetryMaxDelay, defaultMaxRetries, DefaultMinRetries)
+		logger, proxyFunc, DefaultRetryMinDelay, DefaultRetryMaxDelay, DefaultMaxRetries, DefaultMinRetries)
 }
 
 func CreateInventoryClientWithDelay(clusterId string, inventoryURL string, pullSecret string, insecure bool, caPath string,

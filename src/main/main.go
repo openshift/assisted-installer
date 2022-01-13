@@ -21,6 +21,10 @@ import (
 	"github.com/openshift/assisted-service/pkg/secretdump"
 )
 
+// In dry run mode we prefer to get quick feedback about errors rather
+// than keep retrying many times.
+const dryRunMaximumInventoryClientRetries = 3
+
 func main() {
 	config.ProcessArgs()
 	config.ProcessDryRunArgs()
@@ -32,11 +36,31 @@ func main() {
 
 	logger.Infof("Assisted installer started. Configuration is:\n %s", secretdump.DumpSecretStruct(config.GlobalConfig))
 	logger.Infof("Dry configuration is:\n %s", secretdump.DumpSecretStruct(config.GlobalDryRunConfig))
-	client, err := inventory_client.CreateInventoryClient(config.GlobalConfig.ClusterID, config.GlobalConfig.URL,
-		config.GlobalConfig.PullSecretToken, config.GlobalConfig.SkipCertVerification, config.GlobalConfig.CACertPath, logger, http.ProxyFromEnvironment)
+
+	numRetries := inventory_client.DefaultMaxRetries
+	if config.GlobalDryRunConfig.DryRunEnabled {
+		numRetries = dryRunMaximumInventoryClientRetries
+	}
+
+	client, err := inventory_client.CreateInventoryClientWithDelay(
+		config.GlobalConfig.ClusterID,
+		config.GlobalConfig.URL,
+		config.GlobalConfig.PullSecretToken,
+		config.GlobalConfig.SkipCertVerification,
+		config.GlobalConfig.CACertPath,
+		logger,
+		http.ProxyFromEnvironment,
+		inventory_client.DefaultRetryMinDelay,
+		inventory_client.DefaultRetryMaxDelay,
+		numRetries,
+		inventory_client.DefaultMinRetries,
+	)
+
 	if err != nil {
 		logger.Fatalf("Failed to create inventory client %e", err)
 	}
+
+	o := ops.NewOps(logger, true)
 
 	var k8sClientBuilder k8s_client.K8SClientBuilder
 	if !config.GlobalDryRunConfig.DryRunEnabled {
@@ -47,14 +71,14 @@ func main() {
 			mockController := gomock.NewController(ginkgo.GinkgoT())
 			kc = k8s_client.NewMockK8SClient(mockController)
 			mock, _ := kc.(*k8s_client.MockK8SClient)
-			drymock.PrepareInstallerDryK8sMock(mock, logger, config.GlobalDryRunConfig.DryRunHostnames)
+			drymock.PrepareInstallerDryK8sMock(mock, logger, o, config.GlobalDryRunConfig.ParsedClusterHosts)
 			return kc, nil
 		}
 	}
 
 	ai := installer.NewAssistedInstaller(logger,
 		config.GlobalConfig,
-		ops.NewOps(logger, true),
+		o,
 		client,
 		k8sClientBuilder,
 		ignition.NewIgnition(),
