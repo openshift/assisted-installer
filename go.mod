@@ -15,7 +15,7 @@ require (
 	github.com/go-openapi/swag v0.19.15
 	github.com/golang/mock v1.5.0
 	github.com/google/uuid v1.3.0
-	github.com/hashicorp/go-version v1.3.0
+	github.com/hashicorp/go-version v1.4.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/metal3-io/baremetal-operator v0.0.0
 	github.com/onsi/ginkgo v1.16.4
