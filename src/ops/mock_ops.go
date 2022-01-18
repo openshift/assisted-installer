@@ -249,6 +249,34 @@ func (mr *MockOpsMockRecorder) Wipefs(device interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Wipefs", reflect.TypeOf((*MockOps)(nil).Wipefs), device)
 }
 
+// IsRaidDevice mocks base method
+func (m *MockOps) IsRaidDevice(device string) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsRaidDevice", device)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsRaidDevice indicates an expected call of IsRaidDevice
+func (mr *MockOpsMockRecorder) IsRaidDevice(device interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsRaidDevice", reflect.TypeOf((*MockOps)(nil).IsRaidDevice), device)
+}
+
+// CleanRaidDevice mocks base method
+func (m *MockOps) CleanRaidDevice(device string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CleanRaidDevice", device)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CleanRaidDevice indicates an expected call of CleanRaidDevice
+func (mr *MockOpsMockRecorder) CleanRaidDevice(device interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CleanRaidDevice", reflect.TypeOf((*MockOps)(nil).CleanRaidDevice), device)
+}
+
 // GetMCSLogs mocks base method
 func (m *MockOps) GetMCSLogs() (string, error) {
 	m.ctrl.T.Helper()
