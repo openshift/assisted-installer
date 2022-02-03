@@ -12,8 +12,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	bmoapis "github.com/metal3-io/baremetal-operator/pkg/apis"
-	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/pkg/apis/metal3/v1alpha1"
+	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/apis/metal3.io/v1alpha1"
 	configv1 "github.com/openshift/api/config/v1"
 	configv1client "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 	operatorv1 "github.com/openshift/client-go/operator/clientset/versioned"
@@ -133,7 +132,7 @@ func NewK8SClient(configPath string, logger *logrus.Logger) (K8SClient, error) {
 			return &k8sClient{}, errors.Wrap(err, "failed to add scheme to")
 		}
 
-		err = bmoapis.AddToScheme(scheme)
+		err = metal3v1alpha1.AddToScheme(scheme)
 		if err != nil {
 			return &k8sClient{}, errors.Wrap(err, "failed to add BMH scheme")
 		}
