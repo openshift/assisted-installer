@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"strings"
 	"syscall"
 	"time"
@@ -84,7 +85,8 @@ func CreateInventoryClientWithDelay(clusterId string, inventoryURL string, pullS
 	retryMinDelay, retryMaxDelay time.Duration, maxRetries int, minRetries int) (*inventoryClient, error) {
 	clientConfig := client.Config{}
 	var err error
-	clientConfig.URL, err = url.ParseRequestURI(createUrl(inventoryURL))
+
+	clientConfig.URL, err = createUrl(inventoryURL)
 	if err != nil {
 		return nil, err
 	}
@@ -327,11 +329,13 @@ func (c *inventoryClient) GetHosts(ctx context.Context, log logrus.FieldLogger, 
 	return namesIdsMap, nil
 }
 
-func createUrl(baseURL string) string {
-	return fmt.Sprintf("%s/%s",
-		baseURL,
-		client.DefaultBasePath,
-	)
+func createUrl(baseURL string) (*url.URL, error) {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, err
+	}
+	u.Path = path.Join(u.Path, client.DefaultBasePath)
+	return u, nil
 }
 
 func (c *inventoryClient) createDownloadParams(filename string) *installer.V2DownloadClusterFilesParams {
