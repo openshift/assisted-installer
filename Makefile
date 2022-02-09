@@ -48,6 +48,9 @@ _post_test: $(REPORTS)
 _coverage: $(REPORTS)
 ifeq ($(CI), true)
 	gocov convert $(REPORTS)/$(TEST_SCENARIO)_coverage.out | gocov-xml > $(REPORTS)/$(TEST_SCENARIO)_coverage.xml
+ifeq ($(TEST_SCENARIO), unit)
+	COVER_PROFILE=$(REPORTS)/$(TEST_SCENARIO)_coverage.out ./hack/publish-codecov.sh
+endif
 endif
 
 build: installer controller
