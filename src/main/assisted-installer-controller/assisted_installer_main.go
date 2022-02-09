@@ -55,7 +55,7 @@ func main() {
 	}
 
 	if Options.ControllerConfig.DryRunEnabled {
-		if err = config.DryParseClusterHosts(Options.ControllerConfig.DryRunClusterHosts, &Options.ControllerConfig.ParsedClusterHosts); err != nil {
+		if err = config.DryParseClusterHosts(Options.ControllerConfig.DryRunClusterHostsPath, &Options.ControllerConfig.ParsedClusterHosts); err != nil {
 			log.Fatalf("Failed to parse dry cluster hosts: %v", err)
 		}
 
