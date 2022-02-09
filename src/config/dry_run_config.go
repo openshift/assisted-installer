@@ -76,8 +76,8 @@ func ProcessDryRunArgs() {
 	flag.Parse()
 
 	if GlobalDryRunConfig.DryRunEnabled {
-		if DryParseClusterHosts(GlobalDryRunConfig.DryRunClusterHostsPath, &GlobalDryRunConfig.ParsedClusterHosts) != nil {
-			fmt.Printf("Error parsing cluster hosts: %v", err)
+		if parseErr := DryParseClusterHosts(GlobalDryRunConfig.DryRunClusterHostsPath, &GlobalDryRunConfig.ParsedClusterHosts); parseErr != nil {
+			fmt.Printf("Error parsing cluster hosts: %v", parseErr)
 			os.Exit(1)
 		}
 	}
