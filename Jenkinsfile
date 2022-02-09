@@ -31,7 +31,7 @@ pipeline {
 
     stage('build') {
         steps {
-            sh 'skipper make'
+            sh 'skipper make build-images'
         }
     }
 
