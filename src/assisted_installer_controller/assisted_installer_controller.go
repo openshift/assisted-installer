@@ -87,8 +87,8 @@ type ControllerConfig struct {
 	MustGatherImage         string `envconfig:"MUST_GATHER_IMAGE" required:"false" default:""`
 	DryRunEnabled           bool   `envconfig:"DRY_ENABLE" required:"false" default:"false"`
 	DryFakeRebootMarkerPath string `envconfig:"DRY_FAKE_REBOOT_MARKER_PATH" required:"false" default:""`
-	DryRunClusterHosts      string `envconfig:"DRY_CLUSTER_HOSTS"`
-	// DryRunClusterHosts gets parsed into ParsedClusterHosts by config.DryParseClusterHosts
+	DryRunClusterHostsPath  string `envconfig:"DRY_CLUSTER_HOSTS_PATH"`
+	// DryRunClusterHostsPath gets read parsed into ParsedClusterHosts by DryParseClusterHosts
 	ParsedClusterHosts config.DryClusterHosts
 }
 type Controller interface {

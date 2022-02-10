@@ -77,8 +77,8 @@ func PrepareControllerDryMock(mockk8sclient *k8s_client.MockK8SClient, logger *l
 	mockk8sclient.EXPECT().SetProxyEnvVars().Return(nil).AnyTimes()
 
 	// Called a lot
-	mockk8sclient.EXPECT().CreateEvent(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Do(func(args ...string) {
-		logger.Infof("Fake creating event %+v", args)
+	mockk8sclient.EXPECT().CreateEvent(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Do(func(namespace, name, message, component string) {
+		logger.Infof("Fake creating event %s %s %s %s", namespace, name, message, component)
 	}).AnyTimes()
 
 	// Called by GetReadyState to make sure we're online

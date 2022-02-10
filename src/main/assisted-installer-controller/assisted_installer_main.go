@@ -9,7 +9,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/onsi/ginkgo"
 	assistedinstallercontroller "github.com/openshift/assisted-installer/src/assisted_installer_controller"
 	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/inventory_client"
@@ -55,7 +54,7 @@ func main() {
 	}
 
 	if Options.ControllerConfig.DryRunEnabled {
-		if err = config.DryParseClusterHosts(Options.ControllerConfig.DryRunClusterHosts, &Options.ControllerConfig.ParsedClusterHosts); err != nil {
+		if err = config.DryParseClusterHosts(Options.ControllerConfig.DryRunClusterHostsPath, &Options.ControllerConfig.ParsedClusterHosts); err != nil {
 			log.Fatalf("Failed to parse dry cluster hosts: %v", err)
 		}
 
@@ -76,7 +75,7 @@ func main() {
 			log.Fatalf("Failed to create k8 client %v", err)
 		}
 	} else {
-		mockController := gomock.NewController(ginkgo.GinkgoT())
+		mockController := gomock.NewController(logger)
 		kc = k8s_client.NewMockK8SClient(mockController)
 		mock, _ := kc.(*k8s_client.MockK8SClient)
 		drymock.PrepareControllerDryMock(mock, logger, o, Options.ControllerConfig.ParsedClusterHosts)
@@ -115,7 +114,6 @@ func main() {
 		go assistedController.HackDNSAddressConflict(&wg)
 		wg.Add(1)
 	}
-
 	assistedController.SetReadyState()
 
 	// While adding new routine don't miss to add wg.add(1)
