@@ -1,10 +1,9 @@
 CONTAINER_COMMAND = $(shell if [ -x "$(shell which docker)" ];then echo "docker" ; else echo "podman";fi)
-INSTALLER := $(or ${INSTALLER},quay.io/ocpmetal/assisted-installer:stable)
-CONTROLLER :=  $(or ${CONTROLLER}, quay.io/ocpmetal/assisted-installer-controller:stable)
+INSTALLER := $(or ${INSTALLER},quay.io/edge-infrastructure/assisted-installer:latest)
+CONTROLLER :=  $(or ${CONTROLLER}, quay.io/edge-infrastructure/assisted-installer-controller:latest)
 ROOT_DIR = $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 NAMESPACE := $(or ${NAMESPACE},assisted-installer)
 GIT_REVISION := $(shell git rev-parse HEAD)
-PUBLISH_TAG := $(or ${GIT_REVISION})
 
 CONTAINER_BUILD_PARAMS = --network=host --label git_revision=${GIT_REVISION}
 
@@ -77,15 +76,6 @@ push-controller: controller-image
 
 $(REPORTS):
 	-mkdir -p $(REPORTS)
-
-define publish_image
-        docker tag ${1} ${2}
-        docker push ${2}
-endef # publish_image
-
-publish:
-	$(call publish_image,${INSTALLER},quay.io/ocpmetal/assisted-installer:${PUBLISH_TAG})
-	$(call publish_image,${CONTROLLER},quay.io/ocpmetal/assisted-installer-controller:${PUBLISH_TAG})
 
 clean:
 	-rm -rf build $(REPORTS)
