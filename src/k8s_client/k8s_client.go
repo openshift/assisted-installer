@@ -485,7 +485,7 @@ func (c *k8sClient) GetPodLogsAsBuffer(namespace string, podName string, sinceSe
 }
 
 func (c *k8sClient) IsMetalProvisioningExists() (bool, error) {
-	u := &unstructured.UnstructuredList{}
+	u := &unstructured.Unstructured{}
 	u.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   "metal3.io",
 		Kind:    "Provisioning",
