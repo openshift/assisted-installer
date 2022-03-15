@@ -17,13 +17,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-openapi/runtime"
-
-	"github.com/thoas/go-funk"
-
 	"github.com/PuerkitoBio/rehttp"
 	ttlCache "github.com/ReneKroon/ttlcache/v2"
+	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/strfmt"
+	"github.com/hashicorp/go-version"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/client"
 	"github.com/openshift/assisted-service/client/installer"
@@ -33,6 +31,7 @@ import (
 	aserror "github.com/openshift/assisted-service/pkg/error"
 	"github.com/openshift/assisted-service/pkg/requestid"
 	"github.com/sirupsen/logrus"
+	"github.com/thoas/go-funk"
 )
 
 const (
@@ -51,8 +50,8 @@ type InventoryClient interface {
 	GetEnabledHostsNamesHosts(ctx context.Context, log logrus.FieldLogger) (map[string]HostData, error)
 	UploadIngressCa(ctx context.Context, ingressCA string, clusterId string) error
 	GetCluster(ctx context.Context) (*models.Cluster, error)
-	GetClusterMonitoredOperator(ctx context.Context, clusterId, operatorName string) (*models.MonitoredOperator, error)
-	GetClusterMonitoredOLMOperators(ctx context.Context, clusterId string) ([]models.MonitoredOperator, error)
+	GetClusterMonitoredOperator(ctx context.Context, clusterId, operatorName string, openshiftVersion string) (*models.MonitoredOperator, error)
+	GetClusterMonitoredOLMOperators(ctx context.Context, clusterId string, openshiftVersion string) ([]models.MonitoredOperator, error)
 	CompleteInstallation(ctx context.Context, clusterId string, isSuccess bool, errorInfo string) error
 	GetHosts(ctx context.Context, log logrus.FieldLogger, skippedStatuses []string) (map[string]HostData, error)
 	UploadLogs(ctx context.Context, clusterId string, logsType models.LogsType, upfile io.Reader) error
@@ -277,12 +276,31 @@ func (c *inventoryClient) getMonitoredOperators(ctx context.Context, clusterId s
 	return monitoredOperators.Payload, nil
 }
 
-func (c *inventoryClient) GetClusterMonitoredOperator(ctx context.Context, clusterId, operatorName string) (*models.MonitoredOperator, error) {
+func (c *inventoryClient) GetClusterMonitoredOperator(ctx context.Context, clusterId, operatorName string, openshiftVersion string) (*models.MonitoredOperator, error) {
 	monitoredOperators, err := c.getMonitoredOperators(ctx, clusterId)
 	if err != nil {
 		return nil, err
 	}
 	for _, operator := range monitoredOperators {
+		/*
+			Check the OCP version is 4.8 and rename the operator name and subscriptionName to ocs,
+			This is a temporary fix to a problem which will be removed when we stop supporting OCP4.8 in day1 operation
+			This is needed as Assisted Service returns ODF operator in case of all the OCP versions but in case of OCP4.8,
+			we deploy OCS, the Installer should check for ocs-operator instead of odf as odf will not be found and eventually
+			it will fail.
+		*/
+		v1, err := version.NewVersion(openshiftVersion)
+		if err != nil {
+			return nil, err
+		}
+		constraints, err := version.NewConstraint(">= 4.8, < 4.9")
+		if err != nil {
+			return nil, err
+		}
+		if operator.Name == "odf" && constraints.Check(v1) {
+			operator.Name = "ocs"
+			operator.SubscriptionName = "ocs-operator"
+		}
 		if operator.Name == operatorName {
 			return operator, nil
 		}
@@ -291,7 +309,7 @@ func (c *inventoryClient) GetClusterMonitoredOperator(ctx context.Context, clust
 	return nil, fmt.Errorf("operator %s not found", operatorName)
 }
 
-func (c *inventoryClient) GetClusterMonitoredOLMOperators(ctx context.Context, clusterId string) ([]models.MonitoredOperator, error) {
+func (c *inventoryClient) GetClusterMonitoredOLMOperators(ctx context.Context, clusterId string, openshiftVersion string) ([]models.MonitoredOperator, error) {
 	monitoredOperators, err := c.getMonitoredOperators(ctx, clusterId)
 	if err != nil {
 		return nil, err
@@ -300,6 +318,26 @@ func (c *inventoryClient) GetClusterMonitoredOLMOperators(ctx context.Context, c
 	olmOperators := make([]models.MonitoredOperator, 0)
 	for _, operator := range monitoredOperators {
 		if operator.OperatorType == models.OperatorTypeOlm {
+
+			/*
+				Check the OCP version is 4.8 and rename the operator name and subscriptionName to ocs,
+				This is a temporary fix to a problem which will be removed when we stop supporting OCP4.8 in day1 operation
+				This is needed as Assisted Service returns ODF operator in case of all the OCP versions but in case of OCP4.8,
+				we deploy OCS, the Installer should check for ocs-operator instead of odf as odf will not be found and eventually
+				it will fail.
+			*/
+			v1, err := version.NewVersion(openshiftVersion)
+			if err != nil {
+				return nil, err
+			}
+			constraints, err := version.NewConstraint(">= 4.8, < 4.9")
+			if err != nil {
+				return nil, err
+			}
+			if operator.Name == "odf" && constraints.Check(v1) {
+				operator.Name = "ocs"
+				operator.SubscriptionName = "ocs-operator"
+			}
 			olmOperators = append(olmOperators, *operator)
 		}
 	}
@@ -418,6 +456,10 @@ func (c *inventoryClient) HostLogProgressReport(ctx context.Context, infraEnvId 
 }
 
 func (c *inventoryClient) UpdateClusterOperator(ctx context.Context, clusterId string, operatorName string, operatorStatus models.OperatorStatus, operatorStatusInfo string) error {
+	// Service api expects odf
+	if operatorName == "ocs" {
+		operatorName = "odf"
+	}
 	_, err := c.ai.Operators.V2ReportMonitoredOperatorStatus(ctx, &operators.V2ReportMonitoredOperatorStatusParams{
 		ClusterID: c.clusterId,
 		ReportParams: &models.OperatorMonitorReport{
