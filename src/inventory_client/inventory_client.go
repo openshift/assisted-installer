@@ -21,6 +21,7 @@ import (
 	ttlCache "github.com/ReneKroon/ttlcache/v2"
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/strfmt"
+	"github.com/go-openapi/swag"
 	"github.com/hashicorp/go-version"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/client"
@@ -49,7 +50,8 @@ type InventoryClient interface {
 	UpdateHostInstallProgress(ctx context.Context, infraEnvId string, hostId string, newStage models.HostStage, info string) error
 	GetEnabledHostsNamesHosts(ctx context.Context, log logrus.FieldLogger) (map[string]HostData, error)
 	UploadIngressCa(ctx context.Context, ingressCA string, clusterId string) error
-	GetCluster(ctx context.Context) (*models.Cluster, error)
+	GetCluster(ctx context.Context, withHosts bool) (*models.Cluster, error)
+	ListsHostsForRole(ctx context.Context, role string) (models.HostList, error)
 	GetClusterMonitoredOperator(ctx context.Context, clusterId, operatorName string, openshiftVersion string) (*models.MonitoredOperator, error)
 	GetClusterMonitoredOLMOperators(ctx context.Context, clusterId string, openshiftVersion string) ([]models.MonitoredOperator, error)
 	CompleteInstallation(ctx context.Context, clusterId string, isSuccess bool, errorInfo string) error
@@ -250,13 +252,21 @@ func (c *inventoryClient) UploadIngressCa(ctx context.Context, ingressCA string,
 	return aserror.GetAssistedError(err)
 }
 
-func (c *inventoryClient) GetCluster(ctx context.Context) (*models.Cluster, error) {
-	cluster, err := c.ai.Installer.V2GetCluster(ctx, &installer.V2GetClusterParams{ClusterID: c.clusterId})
+func (c *inventoryClient) GetCluster(ctx context.Context, withHosts bool) (*models.Cluster, error) {
+	cluster, err := c.ai.Installer.V2GetCluster(ctx, &installer.V2GetClusterParams{ClusterID: c.clusterId, ExcludeHosts: swag.Bool(!withHosts)})
 	if err != nil {
 		return nil, err
 	}
 
 	return cluster.Payload, nil
+}
+
+func (c *inventoryClient) ListsHostsForRole(ctx context.Context, role string) (models.HostList, error) {
+	ret, err := c.ai.Installer.ListClusterHosts(ctx, &installer.ListClusterHostsParams{ClusterID: c.clusterId, Role: swag.String(role)})
+	if err != nil {
+		return nil, err
+	}
+	return ret.Payload, nil
 }
 
 func (c *inventoryClient) getMonitoredOperators(ctx context.Context, clusterId string) (models.MonitoredOperatorsList, error) {
@@ -396,7 +406,7 @@ func (c *inventoryClient) createUpdateHostInstallProgressParams(infraEnvId, host
 
 func (c *inventoryClient) getHostsWithInventoryInfo(ctx context.Context, log logrus.FieldLogger, skippedStatuses []string) (map[string]HostData, error) {
 	hostsWithHwInfo := make(map[string]HostData)
-	clusterData, err := c.GetCluster(ctx)
+	clusterData, err := c.GetCluster(ctx, true)
 	if err != nil {
 		return nil, err
 	}
