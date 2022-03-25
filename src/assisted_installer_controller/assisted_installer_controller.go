@@ -413,7 +413,7 @@ func (c controller) PostInstallConfigs(ctx context.Context, wg *sync.WaitGroup) 
 	}()
 	err := utils.WaitForPredicateWithContext(ctx, LongWaitTimeout, GeneralWaitInterval, func() bool {
 		ctxReq := utils.GenerateRequestContext()
-		cluster, err := c.ic.GetCluster(ctx)
+		cluster, err := c.ic.GetCluster(ctx, false)
 		if err != nil {
 			utils.RequestIDLogger(ctxReq, c.log).WithError(err).Errorf("Failed to get cluster %s from assisted-service", c.ClusterID)
 			return false
@@ -1198,7 +1198,7 @@ func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup) {
 func (c controller) SetReadyState() {
 	c.log.Infof("Start waiting to be ready")
 	_ = utils.WaitForPredicate(WaitTimeout, 1*time.Second, func() bool {
-		_, err := c.ic.GetCluster(context.TODO())
+		_, err := c.ic.GetCluster(context.TODO(), false)
 		if err != nil {
 			c.log.WithError(err).Warningf("Failed to connect to assisted service")
 			return false
