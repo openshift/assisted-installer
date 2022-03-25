@@ -409,26 +409,34 @@ func (i *installer) waitForControlPlane(ctx context.Context) error {
 	return nil
 }
 
-func numDoneMasters(cluster *models.Cluster) int {
-	numDoneMasters := 0
-	for _, h := range cluster.Hosts {
-		if h.Role == models.HostRoleMaster && h.Progress.CurrentStage == models.HostStageDone {
-			numDoneMasters++
+func numDone(hosts models.HostList) int {
+	numDone := 0
+	for _, h := range hosts {
+		if h.Progress.CurrentStage == models.HostStageDone {
+			numDone++
 		}
 	}
-	return numDoneMasters
+	return numDone
 }
 
 func (i *installer) workerWaitFor2ReadyMasters(ctx context.Context) error {
 	i.log.Info("Waiting for 2 ready masters")
 	i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, "")
+	cluster, err := i.inventoryClient.GetCluster(ctx, false)
+	if err != nil {
+		i.log.WithError(err).Errorf("Getting cluster %s", i.ClusterID)
+		return err
+	}
+	if swag.StringValue(cluster.Kind) == models.ClusterKindAddHostsCluster {
+		return nil
+	}
 	for {
-		cluster, err := i.inventoryClient.GetCluster(ctx)
+		hosts, err := i.inventoryClient.ListsHostsForRole(ctx, string(models.HostRoleMaster))
 		if err != nil {
-			i.log.WithError(err).Errorf("Getting cluster %s", i.ClusterID)
+			i.log.WithError(err).Errorf("Getting cluster %s hosts", i.ClusterID)
 			return err
 		}
-		if swag.StringValue(cluster.Kind) == models.ClusterKindAddHostsCluster || numDoneMasters(cluster) >= minMasterNodes {
+		if numDone(hosts) >= minMasterNodes {
 			return nil
 		}
 		time.Sleep(generalWaitInterval)

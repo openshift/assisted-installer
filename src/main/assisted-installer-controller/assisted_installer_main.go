@@ -152,7 +152,7 @@ func waitForInstallation(client inventory_client.InventoryClient, log logrus.Fie
 
 	for {
 		time.Sleep(waitForInstallationInterval)
-		cluster, err := client.GetCluster(reqCtx)
+		cluster, err := client.GetCluster(reqCtx, false)
 		if err != nil {
 			// In case cluster was deleted or controller is not authorised
 			// we should exit controller after maximumErrorsBeforeExit errors
