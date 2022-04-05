@@ -39,6 +39,7 @@ const (
 
 var generalWaitTimeout = 30 * time.Second
 var generalWaitInterval = 5 * time.Second
+var waitForMastersTimeout = 60 * time.Minute
 
 // Installer will run the install operations on the node
 type Installer interface {
@@ -420,27 +421,45 @@ func numDone(hosts models.HostList) int {
 }
 
 func (i *installer) workerWaitFor2ReadyMasters(ctx context.Context) error {
+	var cluster *models.Cluster
+
 	i.log.Info("Waiting for 2 ready masters")
 	i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, "")
-	cluster, err := i.inventoryClient.GetCluster(ctx, false)
+	start := time.Now()
+	err := utils.WaitForPredicate(waitForMastersTimeout, generalWaitInterval, func() bool {
+		var callErr error
+		cluster, callErr = i.inventoryClient.GetCluster(ctx, false)
+		if callErr != nil {
+			i.log.WithError(callErr).Errorf("Getting cluster %s", i.ClusterID)
+			return false
+		}
+		return true
+	})
 	if err != nil {
-		i.log.WithError(err).Errorf("Getting cluster %s", i.ClusterID)
+		i.log.WithError(err).Errorf("Timed out getting cluster %s", i.ClusterID)
 		return err
 	}
 	if swag.StringValue(cluster.Kind) == models.ClusterKindAddHostsCluster {
 		return nil
 	}
-	for {
-		hosts, err := i.inventoryClient.ListsHostsForRole(ctx, string(models.HostRoleMaster))
-		if err != nil {
-			i.log.WithError(err).Errorf("Getting cluster %s hosts", i.ClusterID)
-			return err
-		}
-		if numDone(hosts) >= minMasterNodes {
-			return nil
-		}
-		time.Sleep(generalWaitInterval)
+	remainingTimeout := waitForMastersTimeout - time.Since(start)
+	if remainingTimeout <= 0 {
+		i.log.Errorf("Timed out getting cluster %s", i.ClusterID)
+		return errors.New("Timed out")
 	}
+	err = utils.WaitForPredicate(remainingTimeout, generalWaitInterval, func() bool {
+		hosts, callErr := i.inventoryClient.ListsHostsForRole(ctx, string(models.HostRoleMaster))
+		if callErr != nil {
+			i.log.WithError(callErr).Errorf("Getting cluster %s hosts", i.ClusterID)
+			return false
+		}
+		return numDone(hosts) >= minMasterNodes
+	})
+	if err != nil {
+		i.log.WithError(err).Errorf("Timed out waiting for 2 ready masters of cluster %s", i.ClusterID)
+		return err
+	}
+	return nil
 }
 
 func (i *installer) shouldControlPlaneReplicasPatchApplied(kc k8s_client.K8SClient) (bool, error) {
