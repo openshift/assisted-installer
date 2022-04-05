@@ -1164,11 +1164,11 @@ github.com/openshift/api v0.0.0-20220310165943-abf6417c2748/go.mod h1:F/eU6jgr6Q
 github.com/openshift/assisted-installer-agent v1.0.9 h1:s81YAJXegCHpRgLrZJZkscf+7UAQI9tsaaKmJDt3NOE=
 github.com/openshift/assisted-installer-agent v1.0.9/go.mod h1:9KhBmp9fvRY1spNbAtK2KbmGYSLBi0bP0GSsIXroyQY=
 github.com/openshift/assisted-service v0.0.0-20200830102625-2f0da134c290/go.mod h1:2B7eiF34TSZA9XEEgZSpnS6uwowORikRZVWApjMYbMs=
-github.com/openshift/assisted-service v1.0.10-0.20220315080954-241ad46db74a h1:RIGtHO7UlViWDTxlhm6yMPd5RSIE3p2uipqnA9tJwNc=
-github.com/openshift/assisted-service v1.0.10-0.20220315080954-241ad46db74a/go.mod h1:TcA+nXQMitIEpO2rZzZbQ2hXZihrlehcmvfJzf6Njn8=
-github.com/openshift/assisted-service/api v0.0.0-20220315080954-241ad46db74a/go.mod h1:KXLo37GRdMYq/8PHRbvWPW9AEZjLI3NdFCySAwBJfAQ=
-github.com/openshift/assisted-service/models v0.0.0-20220315080954-241ad46db74a h1:rUglDWK2lL5NkAGq+6INxPG0a/5GSSJ+/N6rslYxvpg=
-github.com/openshift/assisted-service/models v0.0.0-20220315080954-241ad46db74a/go.mod h1:jTawnnM2LU/AzpZLYxPeXQy4qBRl5iwFo1bu3zrPv2s=
+github.com/openshift/assisted-service v1.0.10-0.20220403100847-e32775972980 h1:MFplUdf4KIwmylFfnp5aD7ndNKUFtEhoLqc5R/a42ZM=
+github.com/openshift/assisted-service v1.0.10-0.20220403100847-e32775972980/go.mod h1:TcA+nXQMitIEpO2rZzZbQ2hXZihrlehcmvfJzf6Njn8=
+github.com/openshift/assisted-service/api v0.0.0-20220314012014-141adc8ae8f8/go.mod h1:KXLo37GRdMYq/8PHRbvWPW9AEZjLI3NdFCySAwBJfAQ=
+github.com/openshift/assisted-service/models v0.0.0-20220320125840-bf8fcab0e181 h1:uXzdSyxfMVLaBYfD3GnVpUByCRL1aY2LwcTb1ejf9Wk=
+github.com/openshift/assisted-service/models v0.0.0-20220320125840-bf8fcab0e181/go.mod h1:jTawnnM2LU/AzpZLYxPeXQy4qBRl5iwFo1bu3zrPv2s=
 github.com/openshift/baremetal-operator/apis v0.0.0-20220217140404-6b1ecb71984f h1:I90Nqv4Gq1L7q9xC69i8drrGi9cJikI0lnhxwSHTkjE=
 github.com/openshift/baremetal-operator/apis v0.0.0-20220217140404-6b1ecb71984f/go.mod h1:bTFE2qR9PJJQbLC6Gd74c3WXcgYnR1njVDgabCxXQNI=
 github.com/openshift/baremetal-operator/pkg/hardwareutils v0.0.0-20220217140404-6b1ecb71984f h1:hHra0TWuiDS9Yas6i38MZ7VsguUfV++SkGf7QSyo3S8=
