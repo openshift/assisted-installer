@@ -1,0 +1,16 @@
+FROM quay.io/openshift/origin-cli:4.11.0 AS cli
+
+FROM registry.ci.openshift.org/openshift/release:golang-1.17 AS builder
+
+WORKDIR /go/src/github.com/openshift/assisted-installer
+ENV GOFLAGS="-mod=vendor"
+
+COPY . .
+RUN make controller
+
+FROM registry.ci.openshift.org/ocp/4.11:base
+
+COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/assisted-installer-controller /usr/bin/assisted-installer-controller
+COPY --from=cli /usr/bin/oc /usr/bin/oc
+
+ENTRYPOINT ["/usr/bin/assisted-installer-controller"]
