@@ -39,7 +39,6 @@ const (
 
 var generalWaitTimeout = 30 * time.Second
 var generalWaitInterval = 5 * time.Second
-var waitForMastersTimeout = 60 * time.Minute
 
 // Installer will run the install operations on the node
 type Installer interface {
@@ -425,40 +424,28 @@ func (i *installer) workerWaitFor2ReadyMasters(ctx context.Context) error {
 
 	i.log.Info("Waiting for 2 ready masters")
 	i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, "")
-	start := time.Now()
-	err := utils.WaitForPredicate(waitForMastersTimeout, generalWaitInterval, func() bool {
-		var callErr error
-		cluster, callErr = i.inventoryClient.GetCluster(ctx, false)
-		if callErr != nil {
-			i.log.WithError(callErr).Errorf("Getting cluster %s", i.ClusterID)
-			return false
+	_ = utils.WaitForPredicate(waitForeverTimeout, generalWaitInterval, func() bool {
+		if cluster == nil {
+			var callErr error
+			cluster, callErr = i.inventoryClient.GetCluster(ctx, false)
+			if callErr != nil {
+				i.log.WithError(callErr).Errorf("Getting cluster %s", i.ClusterID)
+				return false
+			}
 		}
-		return true
-	})
-	if err != nil {
-		i.log.WithError(err).Errorf("Timed out getting cluster %s", i.ClusterID)
-		return err
-	}
-	if swag.StringValue(cluster.Kind) == models.ClusterKindAddHostsCluster {
-		return nil
-	}
-	remainingTimeout := waitForMastersTimeout - time.Since(start)
-	if remainingTimeout <= 0 {
-		i.log.Errorf("Timed out getting cluster %s", i.ClusterID)
-		return errors.New("Timed out")
-	}
-	err = utils.WaitForPredicate(remainingTimeout, generalWaitInterval, func() bool {
+		if swag.StringValue(cluster.Kind) == models.ClusterKindAddHostsCluster {
+			return true
+		}
+
 		hosts, callErr := i.inventoryClient.ListsHostsForRole(ctx, string(models.HostRoleMaster))
 		if callErr != nil {
 			i.log.WithError(callErr).Errorf("Getting cluster %s hosts", i.ClusterID)
 			return false
 		}
 		return numDone(hosts) >= minMasterNodes
+
 	})
-	if err != nil {
-		i.log.WithError(err).Errorf("Timed out waiting for 2 ready masters of cluster %s", i.ClusterID)
-		return err
-	}
+
 	return nil
 }
 
