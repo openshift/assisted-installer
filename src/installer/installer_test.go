@@ -652,23 +652,23 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				{string(models.HostStageWaitingForControlPlane)},
 				{string(models.HostStageRebooting)},
 			})
-			cluster := models.Cluster{
-				Hosts: []*models.Host{
-					{
-						Role: models.HostRoleMaster,
-						Progress: &models.HostProgressInfo{
-							CurrentStage: models.HostStageDone,
-						},
+			cluster := models.Cluster{}
+			hosts := models.HostList{
+				{
+					Role: models.HostRoleMaster,
+					Progress: &models.HostProgressInfo{
+						CurrentStage: models.HostStageDone,
 					},
-					{
-						Role: models.HostRoleMaster,
-						Progress: &models.HostProgressInfo{
-							CurrentStage: models.HostStageDone,
-						},
+				},
+				{
+					Role: models.HostRoleMaster,
+					Progress: &models.HostProgressInfo{
+						CurrentStage: models.HostStageDone,
 					},
 				},
 			}
-			mockbmclient.EXPECT().GetCluster(gomock.Any()).Return(&cluster, nil).Times(1)
+			mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(&cluster, nil).Times(1)
+			mockbmclient.EXPECT().ListsHostsForRole(gomock.Any(), "master").Return(hosts, nil).Times(1)
 			cleanInstallDevice()
 			mkdirSuccess(InstallDir)
 			downloadHostIgnitionSuccess(infraEnvId, hostId, "worker-host-id.ign")
