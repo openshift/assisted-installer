@@ -6,6 +6,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/apis/metal3.io/v1alpha1"
+	"github.com/onsi/ginkgo"
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/assisted-installer/src/common"
 	"github.com/openshift/assisted-installer/src/config"
@@ -296,4 +297,15 @@ func PrepareInstallerDryK8sMock(mockk8sclient *k8s_client.MockK8SClient, logger 
 	mockk8sclient.EXPECT().ListEvents(gomock.Any()).Return(&events, nil).AnyTimes()
 
 	mockControllerPodLogs(mockk8sclient)
+}
+
+func NewDryRunK8SClientBuilder(installerConfig *config.Config, ops ops.Ops) func(string, *logrus.Logger) (k8s_client.K8SClient, error) {
+	return func(configPath string, logger *logrus.Logger) (k8s_client.K8SClient, error) {
+		var kc k8s_client.K8SClient
+		mockController := gomock.NewController(ginkgo.GinkgoT())
+		kc = k8s_client.NewMockK8SClient(mockController)
+		mock, _ := kc.(*k8s_client.MockK8SClient)
+		PrepareInstallerDryK8sMock(mock, logger, ops, installerConfig.ParsedClusterHosts)
+		return kc, nil
+	}
 }

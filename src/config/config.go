@@ -13,6 +13,7 @@ import (
 )
 
 type Config struct {
+	DryRunConfig
 	Role                 string
 	ClusterID            string
 	InfraEnvID           string
@@ -38,15 +39,13 @@ type Config struct {
 	DisksToFormat        ArrayFlags
 }
 
-var GlobalConfig Config
-
 func printHelpAndExit() {
 	flag.CommandLine.Usage()
 	os.Exit(0)
 }
 
-func ProcessArgs() {
-	ret := &GlobalConfig
+func ProcessArgs() *Config {
+	ret := &Config{}
 	flag.StringVar(&ret.Role, "role", string(models.HostRoleMaster), "The node role")
 	flag.StringVar(&ret.ClusterID, "cluster-id", "", "The cluster id")
 	flag.StringVar(&ret.InfraEnvID, "infra-env-id", "", "This host infra env id")
@@ -101,4 +100,5 @@ func ProcessArgs() {
 	if ret.InfraEnvID == "" {
 		ret.InfraEnvID = ret.ClusterID
 	}
+	return ret
 }

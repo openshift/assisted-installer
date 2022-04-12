@@ -19,9 +19,7 @@ type DryRunConfig struct {
 	ParsedClusterHosts DryClusterHosts
 }
 
-var GlobalDryRunConfig DryRunConfig
-
-var DefaultDryRunConfig DryRunConfig = DryRunConfig{
+var DefaultDryRunConfig = DryRunConfig{
 	DryRunEnabled:          false,
 	FakeRebootMarkerPath:   "",
 	ForcedHostID:           "",
@@ -62,21 +60,21 @@ func DryParseClusterHosts(clusterHostsJsonPath string, parsedClusterHosts *DryCl
 	return nil
 }
 
-func ProcessDryRunArgs() {
+func ProcessDryRunArgs(dryRunConfig *DryRunConfig) {
 	err := envconfig.Process("dryconfig", &DefaultDryRunConfig)
 	if err != nil {
 		fmt.Printf("envconfig error: %v", err)
 		os.Exit(1)
 	}
 
-	flag.BoolVar(&GlobalDryRunConfig.DryRunEnabled, "dry-run", DefaultDryRunConfig.DryRunEnabled, "Dry run avoids/fakes certain actions while communicating with the service")
-	flag.StringVar(&GlobalDryRunConfig.ForcedHostID, "force-id", DefaultDryRunConfig.ForcedHostID, "The fake host ID to give to the host")
-	flag.StringVar(&GlobalDryRunConfig.FakeRebootMarkerPath, "fake-reboot-marker-path", DefaultDryRunConfig.FakeRebootMarkerPath, "A path whose existence indicates a fake reboot happened")
-	flag.StringVar(&GlobalDryRunConfig.DryRunClusterHostsPath, "dry-run-cluster-hosts-path", DefaultDryRunConfig.DryRunClusterHostsPath, "A path to a JSON file with information about hosts in the cluster")
+	flag.BoolVar(&dryRunConfig.DryRunEnabled, "dry-run", DefaultDryRunConfig.DryRunEnabled, "Dry run avoids/fakes certain actions while communicating with the service")
+	flag.StringVar(&dryRunConfig.ForcedHostID, "force-id", DefaultDryRunConfig.ForcedHostID, "The fake host ID to give to the host")
+	flag.StringVar(&dryRunConfig.FakeRebootMarkerPath, "fake-reboot-marker-path", DefaultDryRunConfig.FakeRebootMarkerPath, "A path whose existence indicates a fake reboot happened")
+	flag.StringVar(&dryRunConfig.DryRunClusterHostsPath, "dry-run-cluster-hosts-path", DefaultDryRunConfig.DryRunClusterHostsPath, "A path to a JSON file with information about hosts in the cluster")
 	flag.Parse()
 
-	if GlobalDryRunConfig.DryRunEnabled {
-		if parseErr := DryParseClusterHosts(GlobalDryRunConfig.DryRunClusterHostsPath, &GlobalDryRunConfig.ParsedClusterHosts); parseErr != nil {
+	if dryRunConfig.DryRunEnabled {
+		if parseErr := DryParseClusterHosts(dryRunConfig.DryRunClusterHostsPath, &dryRunConfig.ParsedClusterHosts); parseErr != nil {
 			fmt.Printf("Error parsing cluster hosts: %v", parseErr)
 			os.Exit(1)
 		}
