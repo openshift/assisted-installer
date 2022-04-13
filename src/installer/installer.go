@@ -3,11 +3,14 @@ package installer
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"path/filepath"
 	"time"
 
 	"github.com/go-openapi/swag"
 	"github.com/google/uuid"
+	"github.com/openshift/assisted-installer/src/main/drymock"
+	"github.com/openshift/assisted-service/pkg/secretdump"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/thoas/go-funk"
@@ -23,6 +26,10 @@ import (
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/models"
 )
+
+// In dry run mode we prefer to get quick feedback about errors rather
+// than keep retrying many times.
+const dryRunMaximumInventoryClientRetries = 3
 
 const (
 	InstallDir                   = "/opt/install-dir"
@@ -169,7 +176,7 @@ func (i *installer) InstallNode() error {
 
 //updateSingleNodeIgnition will download the host ignition config and add the files under storage
 func (i *installer) updateSingleNodeIgnition(singleNodeIgnitionPath string) error {
-	if config.GlobalDryRunConfig.DryRunEnabled {
+	if i.DryRunEnabled {
 		return nil
 	}
 
@@ -291,7 +298,7 @@ func (i *installer) startBootstrap() error {
 }
 
 func (i *installer) extractIgnitionToFS(ignitionPath string) (err error) {
-	if config.GlobalDryRunConfig.DryRunEnabled {
+	if i.DryRunEnabled {
 		return nil
 	}
 
@@ -319,7 +326,7 @@ func (i *installer) extractIgnitionToFS(ignitionPath string) (err error) {
 }
 
 func (i *installer) generateSshKeyPair() error {
-	if config.GlobalDryRunConfig.DryRunEnabled {
+	if i.DryRunEnabled {
 		return nil
 	}
 
@@ -697,7 +704,7 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 }
 
 func (i *installer) cleanupInstallDevice() error {
-	if config.GlobalDryRunConfig.DryRunEnabled {
+	if i.DryRunEnabled {
 		return nil
 	}
 
@@ -806,7 +813,7 @@ func (i *installer) createSingleNodeMasterIgnition() (string, error) {
 }
 
 func (i *installer) checkLocalhostName() error {
-	if config.GlobalDryRunConfig.DryRunEnabled {
+	if i.DryRunEnabled {
 		return nil
 	}
 
@@ -824,4 +831,58 @@ func (i *installer) checkLocalhostName() error {
 	data := fmt.Sprintf("random-hostname-%s", uuid.New().String())
 	i.log.Infof("write data into /etc/hostname")
 	return i.ops.CreateRandomHostname(data)
+}
+
+func RunInstaller(installerConfig *config.Config, logger *logrus.Logger) error {
+	logger.Infof("Assisted installer started. Configuration is:\n %s", secretdump.DumpSecretStruct(*installerConfig))
+	logger.Infof("Dry configuration is:\n %s", secretdump.DumpSecretStruct(installerConfig.DryRunConfig))
+
+	numRetries := inventory_client.DefaultMaxRetries
+	if installerConfig.DryRunEnabled {
+		numRetries = dryRunMaximumInventoryClientRetries
+	}
+
+	client, err := inventory_client.CreateInventoryClientWithDelay(
+		installerConfig.ClusterID,
+		installerConfig.URL,
+		installerConfig.PullSecretToken,
+		installerConfig.SkipCertVerification,
+		installerConfig.CACertPath,
+		logger,
+		http.ProxyFromEnvironment,
+		inventory_client.DefaultRetryMinDelay,
+		inventory_client.DefaultRetryMaxDelay,
+		numRetries,
+		inventory_client.DefaultMinRetries,
+	)
+
+	if err != nil {
+		logger.Fatalf("Failed to create inventory client %e", err)
+	}
+
+	o := ops.NewOpsWithConfig(installerConfig, logger, true)
+
+	var k8sClientBuilder k8s_client.K8SClientBuilder
+	if !installerConfig.DryRunEnabled {
+		k8sClientBuilder = k8s_client.NewK8SClient
+	} else {
+		k8sClientBuilder = drymock.NewDryRunK8SClientBuilder(installerConfig, o)
+	}
+
+	ai := NewAssistedInstaller(logger,
+		*installerConfig,
+		o,
+		client,
+		k8sClientBuilder,
+		ignition.NewIgnition(),
+	)
+
+	// Try to format requested disks. May fail formatting some disks, this is not an error.
+	ai.FormatDisks()
+
+	if err = ai.InstallNode(); err != nil {
+		ai.UpdateHostInstallProgress(models.HostStageFailed, err.Error())
+		return err
+	}
+	return nil
 }

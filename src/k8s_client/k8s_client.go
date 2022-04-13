@@ -38,7 +38,6 @@ import (
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	runtimeconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 
-	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-installer/src/utils"
 )
@@ -204,10 +203,6 @@ func (c *k8sClient) ListMachines() (*machinev1beta1.MachineList, error) {
 }
 
 func (c *k8sClient) PatchEtcd() error {
-	if config.GlobalDryRunConfig.DryRunEnabled {
-		return nil
-	}
-
 	c.log.Info("Patching etcd")
 	data := []byte(`{"spec": {"unsupportedConfigOverrides": {"useUnsupportedUnsafeNonHANonProductionUnstableEtcd": true}}}`)
 	result, err := c.ocClient.OperatorV1().Etcds().Patch(context.Background(), "cluster", types.MergePatchType, data, metav1.PatchOptions{})

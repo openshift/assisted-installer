@@ -73,26 +73,35 @@ const (
 )
 
 type ops struct {
-	log       *logrus.Logger
-	logWriter *utils.LogWriter
-	cmdEnv    []string
+	log             *logrus.Logger
+	logWriter       *utils.LogWriter
+	cmdEnv          []string
+	installerConfig *config.Config
+}
+
+func NewOps(logger *logrus.Logger, proxySet bool) Ops {
+	return NewOpsWithConfig(&config.Config{}, logger, proxySet)
 }
 
 // NewOps return a new ops interface
-func NewOps(logger *logrus.Logger, proxySet bool) Ops {
+func NewOpsWithConfig(installerConfig *config.Config, logger *logrus.Logger, proxySet bool) Ops {
 	cmdEnv := os.Environ()
-	if proxySet && (config.GlobalConfig.HTTPProxy != "" || config.GlobalConfig.HTTPSProxy != "") {
-		if config.GlobalConfig.HTTPProxy != "" {
-			cmdEnv = append(cmdEnv, fmt.Sprintf("HTTP_PROXY=%s", config.GlobalConfig.HTTPProxy))
+	if proxySet && (installerConfig.HTTPProxy != "" || installerConfig.HTTPSProxy != "") {
+		if installerConfig.HTTPProxy != "" {
+			cmdEnv = append(cmdEnv, fmt.Sprintf("HTTP_PROXY=%s", installerConfig.HTTPProxy))
 		}
-		if config.GlobalConfig.HTTPSProxy != "" {
-			cmdEnv = append(cmdEnv, fmt.Sprintf("HTTPS_PROXY=%s", config.GlobalConfig.HTTPSProxy))
+		if installerConfig.HTTPSProxy != "" {
+			cmdEnv = append(cmdEnv, fmt.Sprintf("HTTPS_PROXY=%s", installerConfig.HTTPSProxy))
 		}
-		if config.GlobalConfig.NoProxy != "" {
-			cmdEnv = append(cmdEnv, fmt.Sprintf("NO_PROXY=%s", config.GlobalConfig.NoProxy))
+		if installerConfig.NoProxy != "" {
+			cmdEnv = append(cmdEnv, fmt.Sprintf("NO_PROXY=%s", installerConfig.NoProxy))
 		}
 	}
-	return &ops{logger, utils.NewLogWriter(logger), cmdEnv}
+	return &ops{
+		log:             logger,
+		logWriter:       utils.NewLogWriter(logger),
+		cmdEnv:          cmdEnv,
+		installerConfig: installerConfig}
 }
 
 // ExecPrivilegeCommand execute a command in the host environment via nsenter
@@ -125,20 +134,21 @@ func (o *ops) ExecPrivilegeCommand(liveLogger io.Writer, command string, args ..
 }
 
 type ExecCommandError struct {
-	Command    string
-	Args       []string
-	Env        []string
-	ExitErr    error
-	Output     string
-	WaitStatus int
+	Command         string
+	Args            []string
+	Env             []string
+	ExitErr         error
+	Output          string
+	WaitStatus      int
+	PullSecretToken string
 }
 
-func removePullSecret(s []string) []string {
-	if config.GlobalConfig.PullSecretToken == "" {
+func removePullSecret(s []string, pullSecretToken string) []string {
+	if pullSecretToken == "" {
 		return s
 	}
 
-	return strings.Split(strings.ReplaceAll(strings.Join(s, " "), config.GlobalConfig.PullSecretToken, "<SECRET>"), " ")
+	return strings.Split(strings.ReplaceAll(strings.Join(s, " "), pullSecretToken, "<SECRET>"), " ")
 }
 
 func (e *ExecCommandError) Error() string {
@@ -146,11 +156,11 @@ func (e *ExecCommandError) Error() string {
 	if len(e.Output) > 200 {
 		lastOutput = "... " + e.Output[len(e.Output)-200:]
 	}
-	return fmt.Sprintf("failed executing %s %v, Error %s, LastOutput \"%s\"", e.Command, removePullSecret(e.Args), e.ExitErr, lastOutput)
+	return fmt.Sprintf("failed executing %s %v, Error %s, LastOutput \"%s\"", e.Command, removePullSecret(e.Args, e.PullSecretToken), e.ExitErr, lastOutput)
 }
 
 func (e *ExecCommandError) DetailedError() string {
-	return fmt.Sprintf("failed executing %s %v, env vars %v, error %s, waitStatus %d, Output \"%s\"", e.Command, removePullSecret(e.Args), removePullSecret(e.Env), e.ExitErr, e.WaitStatus, e.Output)
+	return fmt.Sprintf("failed executing %s %v, env vars %v, error %s, waitStatus %d, Output \"%s\"", e.Command, removePullSecret(e.Args, e.PullSecretToken), removePullSecret(e.Env, e.PullSecretToken), e.ExitErr, e.WaitStatus, e.Output)
 }
 
 // ExecCommand executes command.
@@ -178,11 +188,12 @@ func (o *ops) ExecCommand(liveLogger io.Writer, command string, args ...string) 
 		}
 
 		execErr := &ExecCommandError{
-			Command: command,
-			Args:    args,
-			Env:     cmd.Env,
-			ExitErr: err,
-			Output:  output,
+			Command:         command,
+			Args:            args,
+			Env:             cmd.Env,
+			ExitErr:         err,
+			Output:          output,
+			PullSecretToken: o.installerConfig.PullSecretToken,
 		}
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
@@ -195,7 +206,8 @@ func (o *ops) ExecCommand(liveLogger io.Writer, command string, args ...string) 
 		}
 		return output, execErr
 	}
-	o.log.Debug("Command executed:", " command", command, " arguments", removePullSecret(args), "env vars", removePullSecret(cmd.Env), "output", output)
+	o.log.Debug("Command executed:", " command", command, " arguments", removePullSecret(args, o.installerConfig.PullSecretToken), "env vars",
+		removePullSecret(cmd.Env, o.installerConfig.PullSecretToken), "output", output)
 	return output, err
 }
 
@@ -206,7 +218,7 @@ func (o *ops) Mkdir(dirName string) error {
 }
 
 func (o *ops) SystemctlAction(action string, args ...string) error {
-	if config.GlobalDryRunConfig.DryRunEnabled {
+	if o.installerConfig.DryRunEnabled {
 		return nil
 	}
 
@@ -223,14 +235,14 @@ func (o *ops) WriteImageToDisk(ignitionPath string, device string, progressRepor
 	o.log.Infof("Writing image and ignition to disk with arguments: %v", allArgs)
 
 	installerExecutable := coreosInstallerExecutable
-	if config.GlobalDryRunConfig.DryRunEnabled {
+	if o.installerConfig.DryRunEnabled {
 		// In dry run, we use an executable called dry-installer rather than coreos-installer.
 		// This executable is expected to pretend to be doing coreos-installer stuff and print fake
 		// progress. It's up to the dry-mode user to make sure such executable is available in PATH
 		installerExecutable = dryRunCoreosInstallerExecutable
 	}
 
-	_, err := o.ExecPrivilegeCommand(NewCoreosInstallerLogWriter(o.log, progressReporter, config.GlobalConfig.InfraEnvID, config.GlobalConfig.HostID),
+	_, err := o.ExecPrivilegeCommand(NewCoreosInstallerLogWriter(o.log, progressReporter, o.installerConfig.InfraEnvID, o.installerConfig.HostID),
 		installerExecutable, allArgs...)
 	return err
 }
@@ -254,7 +266,7 @@ func (o *ops) EvaluateDiskSymlink(device string) string {
 }
 
 func (o *ops) FormatDisk(disk string) error {
-	if config.GlobalDryRunConfig.DryRunEnabled {
+	if o.installerConfig.DryRunEnabled {
 		return nil
 	}
 
@@ -276,8 +288,8 @@ func installerArgs(ignitionPath string, device string, extra []string) []string 
 }
 
 func (o *ops) Reboot() error {
-	if config.GlobalDryRunConfig.DryRunEnabled {
-		_, err := o.ExecPrivilegeCommand(o.logWriter, "touch", config.GlobalDryRunConfig.FakeRebootMarkerPath)
+	if o.installerConfig.DryRunEnabled {
+		_, err := o.ExecPrivilegeCommand(o.logWriter, "touch", o.installerConfig.FakeRebootMarkerPath)
 		return errors.Wrap(err, "failed to touch fake reboot marker")
 	}
 
@@ -291,7 +303,7 @@ func (o *ops) Reboot() error {
 }
 
 func (o *ops) SetBootOrder(device string) error {
-	if config.GlobalDryRunConfig.DryRunEnabled {
+	if o.installerConfig.DryRunEnabled {
 		return nil
 	}
 
@@ -325,7 +337,7 @@ func (o *ops) getEfiFilePath() string {
 }
 
 func (o *ops) ExtractFromIgnition(ignitionPath string, fileToExtract string) error {
-	if config.GlobalDryRunConfig.DryRunEnabled {
+	if o.installerConfig.DryRunEnabled {
 		return nil
 	}
 
@@ -397,13 +409,13 @@ func (o *ops) PrepareController() error {
 
 func (o *ops) renderControllerCm() error {
 	var params = map[string]interface{}{
-		"InventoryUrl":         config.GlobalConfig.URL,
-		"ClusterId":            config.GlobalConfig.ClusterID,
-		"SkipCertVerification": strconv.FormatBool(config.GlobalConfig.SkipCertVerification),
-		"CACertPath":           config.GlobalConfig.CACertPath,
-		"HaMode":               config.GlobalConfig.HighAvailabilityMode,
-		"CheckCVO":             config.GlobalConfig.CheckClusterVersion,
-		"MustGatherImage":      config.GlobalConfig.MustGatherImage,
+		"InventoryUrl":         o.installerConfig.URL,
+		"ClusterId":            o.installerConfig.ClusterID,
+		"SkipCertVerification": strconv.FormatBool(o.installerConfig.SkipCertVerification),
+		"CACertPath":           o.installerConfig.CACertPath,
+		"HaMode":               o.installerConfig.HighAvailabilityMode,
+		"CheckCVO":             o.installerConfig.CheckClusterVersion,
+		"MustGatherImage":      o.installerConfig.MustGatherImage,
 	}
 
 	return o.renderDeploymentFiles(filepath.Join(controllerDeployFolder, controllerDeployCmTemplate),
@@ -412,7 +424,7 @@ func (o *ops) renderControllerCm() error {
 
 func (o *ops) renderControllerSecret() error {
 	var params = map[string]interface{}{
-		"PullSecretToken": config.GlobalConfig.PullSecretToken,
+		"PullSecretToken": o.installerConfig.PullSecretToken,
 	}
 
 	return o.renderDeploymentFiles(filepath.Join(controllerDeployFolder, controllerDeploySecretTemplate),
@@ -421,13 +433,13 @@ func (o *ops) renderControllerSecret() error {
 
 func (o *ops) renderControllerPod() error {
 	var params = map[string]interface{}{
-		"ControllerImage":  config.GlobalConfig.ControllerImage,
-		"CACertPath":       config.GlobalConfig.CACertPath,
-		"OpenshiftVersion": config.GlobalConfig.OpenshiftVersion,
+		"ControllerImage":  o.installerConfig.ControllerImage,
+		"CACertPath":       o.installerConfig.CACertPath,
+		"OpenshiftVersion": o.installerConfig.OpenshiftVersion,
 	}
 
-	if config.GlobalConfig.ServiceIPs != "" {
-		params["ServiceIPs"] = strings.Split(config.GlobalConfig.ServiceIPs, ",")
+	if o.installerConfig.ServiceIPs != "" {
+		params["ServiceIPs"] = strings.Split(o.installerConfig.ServiceIPs, ",")
 	}
 
 	return o.renderDeploymentFiles(filepath.Join(controllerDeployFolder, controllerDeployPodTemplate),
@@ -638,9 +650,9 @@ func (o *ops) cleanDeviceFromRaidDevice(deviceName string, raidDeviceName string
 }
 
 func (o *ops) GetMCSLogs() (string, error) {
-	if config.GlobalDryRunConfig.DryRunEnabled {
+	if o.installerConfig.DryRunEnabled {
 		mcsLogs := ""
-		for _, clusterHost := range config.GlobalDryRunConfig.ParsedClusterHosts {
+		for _, clusterHost := range o.installerConfig.ParsedClusterHosts {
 			// Add IP access log for each IP, this is how the installer determines which node has downloaded the ignition
 			if !o.DryRebootHappened(clusterHost.RebootMarkerPath) {
 				// Host didn't even reboot yet, don't pretend it fetched the ignition
@@ -678,16 +690,16 @@ func (o *ops) GetMCSLogs() (string, error) {
 func (o *ops) UploadInstallationLogs(isBootstrap bool) (string, error) {
 	command := "podman"
 	args := []string{"run", "--rm", "--privileged", "--net=host", "--pid=host", "-v", "/run/systemd/journal/socket:/run/systemd/journal/socket",
-		"-v", "/var/log:/var/log", config.GlobalConfig.AgentImage, "logs_sender",
-		"-cluster-id", config.GlobalConfig.ClusterID, "-url", config.GlobalConfig.URL,
-		"-host-id", config.GlobalConfig.HostID, "-infra-env-id", config.GlobalConfig.InfraEnvID,
-		"-pull-secret-token", config.GlobalConfig.PullSecretToken,
-		fmt.Sprintf("-insecure=%s", strconv.FormatBool(config.GlobalConfig.SkipCertVerification)),
+		"-v", "/var/log:/var/log", o.installerConfig.AgentImage, "logs_sender",
+		"-cluster-id", o.installerConfig.ClusterID, "-url", o.installerConfig.URL,
+		"-host-id", o.installerConfig.HostID, "-infra-env-id", o.installerConfig.InfraEnvID,
+		"-pull-secret-token", o.installerConfig.PullSecretToken,
+		fmt.Sprintf("-insecure=%s", strconv.FormatBool(o.installerConfig.SkipCertVerification)),
 		fmt.Sprintf("-bootstrap=%s", strconv.FormatBool(isBootstrap)),
 	}
 
-	if config.GlobalConfig.CACertPath != "" {
-		args = append(args, fmt.Sprintf("-cacert=%s", config.GlobalConfig.CACertPath))
+	if o.installerConfig.CACertPath != "" {
+		args = append(args, fmt.Sprintf("-cacert=%s", o.installerConfig.CACertPath))
 	}
 	return o.ExecPrivilegeCommand(o.logWriter, command, args...)
 }
@@ -696,7 +708,7 @@ func (o *ops) UploadInstallationLogs(isBootstrap bool) (string, error) {
 // For example /etc/resolv.conf, it can't be changed with Z flag but is updated by bootkube.sh
 // and we need this update for dns resolve of kubeapi
 func (o *ops) ReloadHostFile(filepath string) error {
-	if config.GlobalDryRunConfig.DryRunEnabled {
+	if o.installerConfig.DryRunEnabled {
 		return nil
 	}
 
@@ -723,7 +735,7 @@ func (o *ops) ReloadHostFile(filepath string) error {
 }
 
 func (o *ops) CreateOpenshiftSshManifest(filePath, tmpl, sshPubKeyPath string) error {
-	if config.GlobalDryRunConfig.DryRunEnabled {
+	if o.installerConfig.DryRunEnabled {
 		return nil
 	}
 
