@@ -7,5 +7,4 @@ kubevirtci/
 **/RCS/**
 .*.swp
 
-/vendor
 reports
