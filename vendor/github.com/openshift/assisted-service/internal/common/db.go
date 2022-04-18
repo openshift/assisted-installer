@@ -1,8 +1,6 @@
 package common
 
 import (
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/go-openapi/strfmt"
@@ -21,7 +19,7 @@ const (
 
 	ProgressWeightPreparingForInstallationStage float64 = 0.1
 	ProgressWeightInstallingStage               float64 = 0.7
-	ProgressWeightFinalizingStage               float64 = 0.2
+	ProgressWeightFinalizingStage               float64 = 0.15
 )
 
 type Cluster struct {
@@ -361,12 +359,6 @@ func (c *Cluster) AfterFind(db *gorm.DB) error {
 	}
 	c.TotalHostCount = int64(len(c.Hosts))
 	return nil
-}
-
-func ToSqlList(strs []string) string {
-	res := strings.Join(strs, `', '`)
-	res = fmt.Sprintf("('%s')", res)
-	return res
 }
 
 func CreateInfraEnvForCluster(db *gorm.DB, cluster *Cluster, imageType models.ImageType) error {

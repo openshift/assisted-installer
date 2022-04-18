@@ -270,7 +270,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				models.HostStageJoined}, inventoryNamesIds)
 			updateProgressSuccess(defaultStages, inventoryNamesIds)
 
-			hosts := create3Hosts(models.HostStatusInstalling, models.HostStageConfiguring)
+			hosts := create3Hosts(models.HostStatusInstalling, models.HostStageConfiguring, "")
 			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
 				Return(hosts, nil).Times(2)
 			configuringSuccess()
@@ -282,7 +282,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 		It("waitAndUpdateNodesStatus happy flow - all nodes installed", func() {
 
-			hosts := create3Hosts(models.HostStatusInstalled, models.HostStageDone)
+			hosts := create3Hosts(models.HostStatusInstalled, models.HostStageDone, "")
 			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
 				Return(hosts, nil).Times(1)
 			exit := assistedController.waitAndUpdateNodesStatus()
@@ -294,7 +294,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				models.HostStageJoined,
 				models.HostStageJoined}
 
-			hosts := create3Hosts(models.HostStatusInstalling, models.HostStageConfiguring)
+			hosts := create3Hosts(models.HostStatusInstalling, models.HostStageConfiguring, "")
 			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
 				Return(hosts, nil).Times(2)
 			// not ready nodes
@@ -319,7 +319,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				models.HostStageDone,
 				models.HostStageDone}
 
-			hosts := create3Hosts(models.HostStatusInstalling, models.HostStageJoined)
+			hosts := create3Hosts(models.HostStatusInstalling, models.HostStageJoined, "")
 			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
 				Return(hosts, nil).Times(2)
 			nodes := GetKubeNodes(kubeNamesIds)
@@ -340,7 +340,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 
 		It("All hosts move to error state - exit true", func() {
-			hosts := create3Hosts(models.HostStatusError, models.HostStageJoined)
+			hosts := create3Hosts(models.HostStatusError, models.HostStageJoined, "")
 			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
 				Return(hosts, nil).Times(1)
 			exit := assistedController.waitAndUpdateNodesStatus()
@@ -418,11 +418,11 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				}
 			}
 			mockk8sclient.EXPECT().ListNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(2)
-			hosts := create3Hosts(models.HostStatusInstalling, models.HostStageJoined)
+			hosts := create3Hosts(models.HostStatusInstalling, models.HostStageJoined, "")
 			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
 				Return(hosts, nil).Times(4)
 			updateProgressSuccessFailureTest(defaultStages, hosts)
-			hosts = create3Hosts(models.HostStatusInstalled, models.HostStageDone)
+			hosts = create3Hosts(models.HostStatusInstalled, models.HostStageDone, "")
 			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
 				Return(hosts, nil).Times(1)
 
@@ -441,11 +441,11 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockk8sclient.EXPECT().ListNodes().Return(nil, fmt.Errorf("dummy")).Times(1)
 				mockk8sclient.EXPECT().ListNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
 			}
-			hosts := create3Hosts(models.HostStatusInstalling, models.HostStageJoined)
+			hosts := create3Hosts(models.HostStatusInstalling, models.HostStageJoined, "")
 			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
 				Return(hosts, nil).Times(2)
 			updateProgressSuccess(defaultStages, hosts)
-			hosts = create3Hosts(models.HostStatusInstalled, models.HostStageDone)
+			hosts = create3Hosts(models.HostStatusInstalled, models.HostStageDone, "")
 			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
 				Return(hosts, nil).Times(2)
 
@@ -606,6 +606,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockGetOLMOperators([]models.MonitoredOperator{})
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, gomock.Any()).Return(nil).Times(1)
 
+				hosts := create3Hosts(models.HostStatusInstalled, models.HostStageDone, "")
+				mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled, models.HostStatusError}).
+					Return(hosts, nil).Times(1)
+
 				wg.Add(1)
 				go assistedController.PostInstallConfigs(context.TODO(), &wg)
 				wg.Wait()
@@ -623,6 +627,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockGetOLMOperators([]models.MonitoredOperator{})
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(fmt.Errorf("dummy")).Times(1)
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
+
+				hosts := create3Hosts(models.HostStatusInstalled, models.HostStageDone, "")
+				mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled, models.HostStatusError}).
+					Return(hosts, nil).Times(1)
 
 				wg.Add(1)
 				go assistedController.PostInstallConfigs(context.TODO(), &wg)
@@ -717,6 +725,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(fmt.Errorf("dummy")).Times(1)
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
 
+				hosts := create3Hosts(models.HostStatusInstalled, models.HostStageDone, "")
+				mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled, models.HostStatusError}).
+					Return(hosts, nil).Times(1)
+
 				wg.Add(1)
 				go assistedController.PostInstallConfigs(context.TODO(), &wg)
 				wg.Wait()
@@ -756,6 +768,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(fmt.Errorf("dummy")).Times(1)
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
 
+				hosts := create3Hosts(models.HostStatusInstalled, models.HostStageDone, "")
+				mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled, models.HostStatusError}).
+					Return(hosts, nil).Times(1)
+
 				wg.Add(1)
 				assistedController.PostInstallConfigs(context.TODO(), &wg)
 				wg.Wait()
@@ -767,6 +783,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockk8sclient.EXPECT().GetConfigMap(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("aaa")).MinTimes(1)
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", false,
 					"Timeout while waiting router ca data: timed out").Return(nil).Times(1)
+
+				hosts := create3Hosts(models.HostStatusInstalled, models.HostStageDone, "")
+				mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled, models.HostStatusError}).
+					Return(hosts, nil).Times(1)
 
 				wg.Add(1)
 				go assistedController.PostInstallConfigs(context.TODO(), &wg)
@@ -823,6 +843,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(fmt.Errorf("dummy")).Times(1)
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
 
+				hosts := create3Hosts(models.HostStatusInstalled, models.HostStageDone, "")
+				mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled, models.HostStatusError}).
+					Return(hosts, nil).Times(1)
+
 				wg.Add(1)
 				assistedController.PostInstallConfigs(context.TODO(), &wg)
 				wg.Wait()
@@ -848,11 +872,44 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), "cluster-id", "lso", models.OperatorStatusFailed, "Waiting for operator timed out").Return(nil).Times(1)
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
 
+				hosts := create3Hosts(models.HostStatusInstalled, models.HostStageDone, "")
+				mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled, models.HostStatusError}).
+					Return(hosts, nil).Times(1)
+
 				wg.Add(1)
 				assistedController.PostInstallConfigs(context.TODO(), &wg)
 				wg.Wait()
 				Expect(assistedController.Status.HasError()).Should(Equal(false))
 				Expect(assistedController.Status.GetOperatorsInError()).To(ContainElement("lso"))
+			})
+		})
+
+		Context("Patching node labels", func() {
+			BeforeEach(func() {
+				assistedController.WaitForClusterVersion = false
+				GeneralWaitInterval = 10 * time.Millisecond
+			})
+			It("success", func() {
+				installing := models.ClusterStatusInstalling
+				mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(&models.Cluster{Status: &installing}, nil).Times(1)
+				setControllerWaitForOLMOperators(assistedController.ClusterID)
+				mockGetOLMOperators([]models.MonitoredOperator{})
+				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "").Return(nil).Times(1)
+
+				nodeLabels := `{"node.ocs.openshift.io/storage":""}`
+				hosts := create3Hosts(models.HostStatusInstalled, models.HostStageDone, nodeLabels)
+				mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled, models.HostStatusError}).
+					Return(hosts, nil).Times(1)
+				nodes := GetKubeNodes(kubeNamesIds)
+				for _, node := range nodes.Items {
+					mockk8sclient.EXPECT().GetNode(node.Name).Return(&node, nil).Times(1)
+				}
+				mockk8sclient.EXPECT().PatchNodeLabels(gomock.Any(), nodeLabels).Return(nil).Times(3)
+
+				wg.Add(1)
+				assistedController.PostInstallConfigs(context.TODO(), &wg)
+				wg.Wait()
+				Expect(assistedController.Status.HasError()).Should(Equal(false))
 			})
 		})
 	})
@@ -1621,14 +1678,14 @@ func getClusterOperatorWithConditionsStatus(availableStatus, degradedStatus conf
 	}
 }
 
-func create3Hosts(currentStatus string, stage models.HostStage) map[string]inventory_client.HostData {
+func create3Hosts(currentStatus string, stage models.HostStage, nodeLabels string) map[string]inventory_client.HostData {
 	currentState := models.HostProgressInfo{CurrentStage: stage}
 	infraEnvId := strfmt.UUID("7916fa89-ea7a-443e-a862-b3e930309f50")
 	node0Id := strfmt.UUID("7916fa89-ea7a-443e-a862-b3e930309f65")
 	node1Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f238")
 	node2Id := strfmt.UUID("b898d516-3e16-49d0-86a5-0ad5bd04e3ed")
 	return map[string]inventory_client.HostData{
-		"node0": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node0Id, Progress: &currentState, Status: &currentStatus}},
-		"node1": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node1Id, Progress: &currentState, Status: &currentStatus}},
-		"node2": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node2Id, Progress: &currentState, Status: &currentStatus}}}
+		"node0": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node0Id, NodeLabels: nodeLabels, Progress: &currentState, Status: &currentStatus}},
+		"node1": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node1Id, NodeLabels: nodeLabels, Progress: &currentState, Status: &currentStatus}},
+		"node2": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node2Id, NodeLabels: nodeLabels, Progress: &currentState, Status: &currentStatus}}}
 }

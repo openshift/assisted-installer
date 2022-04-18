@@ -447,6 +447,11 @@ func (c controller) postInstallConfigs(ctx context.Context) error {
 		return errors.Wrapf(err, "Timeout while waiting for cluster operators to be available")
 	}
 
+	err = utils.WaitForPredicateWithContext(ctx, WaitTimeout, GeneralWaitInterval, c.updateNodesLabels)
+	if err != nil {
+		c.log.Warn("Failed to label the nodes")
+	}
+
 	err = utils.WaitForPredicateWithContext(ctx, WaitTimeout, GeneralWaitInterval, c.addRouterCAToClusterCA)
 	if err != nil {
 		return errors.Wrapf(err, "Timeout while waiting router ca data")
@@ -971,6 +976,62 @@ func (c controller) waitingForClusterOperators(ctx context.Context) error {
 		return result
 	}
 	return utils.WaitForPredicateWithTimer(ctxWithTimeout, WaitTimeout, GeneralProgressUpdateInt, isClusterVersionAvailable)
+}
+
+func areNodeLabelsUpdated(node *v1.Node, nodeLabels string) bool {
+	nodeLabelsPresent := node.Labels
+	nodeLabelsRequired := make(map[string]string)
+	_ = json.Unmarshal([]byte(nodeLabels), &nodeLabelsRequired)
+
+	for key, value := range nodeLabelsRequired {
+		if val, found := nodeLabelsPresent[key]; !found || value != val {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (c *controller) updateNodesLabels() bool {
+	ignoreStatuses := []string{models.HostStatusDisabled, models.HostStatusError}
+	ctxReq := utils.GenerateRequestContext()
+	log := utils.RequestIDLogger(ctxReq, c.log)
+
+	assistedNodesMap, err := c.ic.GetHosts(ctxReq, log, ignoreStatuses)
+	if err != nil {
+		log.WithError(err).Error("Failed to get node map from the assisted service")
+		return KeepWaiting
+	}
+
+	retry := false
+
+	for hostname, hostData := range assistedNodesMap {
+
+		if len(hostData.Host.NodeLabels) == 0 {
+			continue
+		}
+
+		node, err := c.kc.GetNode(hostname)
+		if err != nil {
+			log.WithError(err).Errorf("Failed to get node %s from k8s client", hostname)
+			retry = true
+			continue
+		} else if areNodeLabelsUpdated(node, hostData.Host.NodeLabels) {
+			continue
+		}
+
+		err = c.kc.PatchNodeLabels(node.Name, hostData.Host.NodeLabels)
+		if err != nil {
+			log.WithError(err).Errorf("Failed to patch node %s with node labels %s", node.Name, hostData.Host.NodeLabels)
+			retry = true
+		}
+	}
+
+	if retry {
+		return KeepWaiting
+	} else {
+		return ExitWaiting
+	}
 }
 
 func (c controller) sendCompleteInstallation(ctx context.Context, isSuccess bool, errorInfo string) {

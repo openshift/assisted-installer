@@ -539,3 +539,32 @@ func (mr *MockK8SClientMockRecorder) PatchNamespace(namespace, data interface{})
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchNamespace", reflect.TypeOf((*MockK8SClient)(nil).PatchNamespace), namespace, data)
 }
+
+// GetNode mocks base method
+func (m *MockK8SClient) GetNode(name string) (*v11.Node, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNode", name)
+	ret0, _ := ret[0].(*v11.Node)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNode indicates an expected call of GetNode
+func (mr *MockK8SClientMockRecorder) GetNode(name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNode", reflect.TypeOf((*MockK8SClient)(nil).GetNode), name)
+}
+
+// PatchNodeLabels mocks base method
+func (m *MockK8SClient) PatchNodeLabels(nodeName, nodeLabels string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PatchNodeLabels", nodeName, nodeLabels)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PatchNodeLabels indicates an expected call of PatchNodeLabels
+func (mr *MockK8SClientMockRecorder) PatchNodeLabels(nodeName, nodeLabels interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchNodeLabels", reflect.TypeOf((*MockK8SClient)(nil).PatchNodeLabels), nodeName, nodeLabels)
+}

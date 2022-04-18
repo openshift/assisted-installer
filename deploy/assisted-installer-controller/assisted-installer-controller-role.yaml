@@ -8,7 +8,6 @@ rules:
   - apiGroups:
       - ""
     resources:
-      - nodes
       - pods
       - configmaps
       - pods/log
@@ -16,6 +15,15 @@ rules:
       - get
       - list
       - watch
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - get
+      - list
+      - watch
+      - patch
   - apiGroups:
       - ""
     resources:

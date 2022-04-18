@@ -10,6 +10,7 @@ import (
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/openshift/assisted-service/internal/common"
+	"github.com/openshift/assisted-service/internal/identity"
 	params "github.com/openshift/assisted-service/pkg/context"
 	"github.com/openshift/assisted-service/pkg/ocm"
 	"github.com/openshift/assisted-service/restapi"
@@ -19,34 +20,19 @@ import (
 	"gorm.io/gorm"
 )
 
+/* AuthzHandler is the authorizer middleware that is being used for
+ * RHSSO authentication cases and work with AMS to ensure tenancy
+ * and user based access policies
+ */
 type AuthzHandler struct {
-	cfg     *Config
-	Enabled bool
-	log     logrus.FieldLogger
-	client  *ocm.Client
-	db      *gorm.DB
+	cfg    *Config
+	log    logrus.FieldLogger
+	client *ocm.Client
+	db     *gorm.DB
 }
 
-func NewAuthzHandler(cfg *Config, ocmCLient *ocm.Client, log logrus.FieldLogger, db *gorm.DB) *AuthzHandler {
-	a := &AuthzHandler{
-		cfg:     cfg,
-		Enabled: cfg.AuthType == TypeRHSSO,
-		client:  ocmCLient,
-		log:     log,
-		db:      db,
-	}
-	return a
-}
-
-// CreateAuthorizer returns Authorizer if auth is enabled
 func (a *AuthzHandler) CreateAuthorizer() func(*http.Request) error {
-	if !a.Enabled {
-		return func(*http.Request) error {
-			return nil
-		}
-	}
-
-	return a.Authorizer
+	return a.authorizerMiddleware
 }
 
 func (a *AuthzHandler) isTenancyEnabled() bool {
@@ -63,6 +49,29 @@ func handleOwnershipQueryError(err error) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+func (a *AuthzHandler) OwnedBy(ctx context.Context, db *gorm.DB) *gorm.DB {
+	if identity.IsAdmin(ctx) {
+		return db
+	}
+	if a.isTenancyEnabled() {
+		return db.Where("org_id = ?", ocm.OrgIDFromContext(ctx))
+	} else {
+		return db.Where("user_name = ?", ocm.UserNameFromContext(ctx))
+	}
+}
+
+func (a *AuthzHandler) OwnedByUser(ctx context.Context, db *gorm.DB, username string) *gorm.DB {
+	// When tenancy-based access is supported, the following query returns records
+	// for the input user alone. With a user-based access policy, the query returns
+	// the user's records, provided it is the current user. Otherwise, it returns an
+	// empty set since we do not support listing objects on behalf of other users in
+	// that mode.
+	if username == "" {
+		return a.OwnedBy(ctx, db)
+	}
+	return a.OwnedBy(ctx, db).Where("user_name = ?", username)
 }
 
 func (a *AuthzHandler) isObjectOwnedByUser(id string, obj interface{}, payload *ocm.AuthPayload) (bool, error) {
@@ -112,7 +121,7 @@ func (a *AuthzHandler) hasSubscriptionAccess(clusterId string, action string, pa
 			return handleOwnershipQueryError(err)
 		}
 
-		cacheKey := fmt.Sprintf("%s_%s_%s", payload.Username, payload.Organization, cluster.AmsSubscriptionID)
+		cacheKey := fmt.Sprintf("%s_%s_%s_%s", payload.Username, payload.Organization, cluster.AmsSubscriptionID, action)
 		if cacheData, existInCache := a.client.Cache.Get(cacheKey); existInCache {
 			var ok bool
 			isAllowed, ok = cacheData.(bool)
@@ -123,7 +132,6 @@ func (a *AuthzHandler) hasSubscriptionAccess(clusterId string, action string, pa
 			}
 			return isAllowed, nil
 		}
-
 		isAllowed, err = a.hasClusterEditRole(payload, action, cluster.AmsSubscriptionID.String())
 		if shouldStorePayloadInCache(err) {
 			a.client.Cache.Set(cacheKey, isAllowed, 10*time.Minute)
@@ -134,22 +142,41 @@ func (a *AuthzHandler) hasSubscriptionAccess(clusterId string, action string, pa
 	return false, err
 }
 
-func (a *AuthzHandler) checkClusterBasedAccess(id string, request *http.Request, payload *ocm.AuthPayload) (bool, error) {
+func (a *AuthzHandler) HasAccessTo(ctx context.Context, obj interface{}, action Action) (bool, error) {
+	if identity.IsAdmin(ctx) {
+		return true, nil
+	}
+	if cluster, ok := obj.(*common.Cluster); ok && cluster != nil {
+		return a.checkClusterBasedAccess(cluster.ID.String(), action, ocm.PayloadFromContext(ctx))
+	}
+	if infraEnv, ok := obj.(*common.InfraEnv); ok && infraEnv != nil {
+		return a.checkInfraEnvBasedAccess(infraEnv.ID.String(), action, ocm.PayloadFromContext(ctx))
+	}
+	if host, ok := obj.(*common.Host); ok && host != nil {
+		if host.ClusterID != nil {
+			return a.checkClusterBasedAccess(host.ClusterID.String(), action, ocm.PayloadFromContext(ctx))
+		}
+		return a.checkInfraEnvBasedAccess(host.InfraEnvID.String(), action, ocm.PayloadFromContext(ctx))
+	}
+	return false, errors.New("can not perform access check on this object")
+}
+
+func (a *AuthzHandler) checkClusterBasedAccess(id string, action Action, payload *ocm.AuthPayload) (bool, error) {
 	if a.db == nil {
 		return true, nil
 	}
 
-	switch {
-	case isUpdateRequest(request):
+	switch action {
+	case UpdateAction:
 		return a.hasSubscriptionAccess(id, ocm.AMSActionUpdate, payload)
-	case isDeleteRequest(request):
+	case DeleteAction:
 		return a.hasSubscriptionAccess(id, ocm.AMSActionDelete, payload)
 	default:
 		return a.hasOwnerAccess(id, &common.Cluster{}, payload)
 	}
 }
 
-func (a *AuthzHandler) checkInfraEnvBasedAccess(id string, request *http.Request, payload *ocm.AuthPayload) (bool, error) {
+func (a *AuthzHandler) checkInfraEnvBasedAccess(id string, action Action, payload *ocm.AuthPayload) (bool, error) {
 	if a.db == nil {
 		return true, nil
 	}
@@ -158,28 +185,41 @@ func (a *AuthzHandler) checkInfraEnvBasedAccess(id string, request *http.Request
 		return a.isObjectOwnedByUser(id, &common.InfraEnv{}, payload)
 	}
 
+	var isAllowed bool
+	var err error
+
 	//if the infraenv is bound to a cluster the access check
 	//are performed based on the bound cluster data. As a fallback
 	//we test for ownership on the infraenv object itself
 	var infraEnv common.InfraEnv
-	err := a.db.Select("cluster_id").First(&infraEnv, "id = ?", id).Error
+	err = a.db.Select("cluster_id").First(&infraEnv, "id = ?", id).Error
 	if err != nil {
 		a.log.WithError(err).Errorf("failed to retrieve infra-env record %s", id)
 		return false, err
 	}
 
+	// read action is always available for owners
+	if action == ReadAction {
+		return a.hasOwnerAccess(id, &common.InfraEnv{}, payload)
+	}
+
+	// write actions are always available for the strict owner
+	// (the user that created this object)
+	if isAllowed, err = a.isObjectOwnedByUser(id, &common.InfraEnv{}, payload); isAllowed {
+		return true, nil
+	}
+
+	//otherwise, update actions has 2 cases:
+	//for bound infra-env, check the access rights on the cluster
 	if infraEnv.ClusterID != "" {
-		if isAllowed, _ := a.checkClusterBasedAccess(infraEnv.ClusterID.String(), request, payload); isAllowed {
+		if isAllowed, err = a.checkClusterBasedAccess(infraEnv.ClusterID.String(), action, payload); isAllowed {
 			return true, nil
 		}
 	}
-
-	//fallback option for both failures in bound infraEnv access checks and
-	//for non bound infraEnv related objects
-	return a.isObjectOwnedByUser(id, &common.InfraEnv{}, payload)
+	return false, err
 }
 
-func (a *AuthzHandler) Authorizer(request *http.Request) error {
+func (a *AuthzHandler) authorizerMiddleware(request *http.Request) error {
 	route := middleware.MatchedRouteFrom(request)
 	switch authScheme := route.Authenticator.Schemes[0]; authScheme {
 	case "imageAuth", "imageURLAuth":
@@ -260,9 +300,9 @@ func (a *AuthzHandler) ocmAuthorizer(request *http.Request) error {
 		//handle their authorization at the application level
 		isAllowed := true
 		if clusterID := params.GetParam(request.Context(), params.ClusterId); clusterID != "" {
-			isAllowed, err = a.checkClusterBasedAccess(clusterID, request, payload)
+			isAllowed, err = a.checkClusterBasedAccess(clusterID, toAction(request), payload)
 		} else if infraEnvID := params.GetParam(request.Context(), params.InfraEnvId); infraEnvID != "" {
-			isAllowed, err = a.checkInfraEnvBasedAccess(infraEnvID, request, payload)
+			isAllowed, err = a.checkInfraEnvBasedAccess(infraEnvID, toAction(request), payload)
 		}
 		if err != nil {
 			a.log.Errorf("Failed to verify access to object. Error %v", err)
