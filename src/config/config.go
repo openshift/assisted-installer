@@ -5,10 +5,7 @@ import (
 	"flag"
 	"os"
 
-	"github.com/thoas/go-funk"
-
 	"github.com/openshift/assisted-installer/src/utils"
-
 	"github.com/openshift/assisted-service/models"
 )
 
@@ -39,7 +36,10 @@ type Config struct {
 	DisksToFormat        ArrayFlags
 }
 
-func printHelpAndExit() {
+func printHelpAndExit(err error) {
+	if err != nil {
+		println(err)
+	}
 	flag.CommandLine.Usage()
 	os.Exit(0)
 }
@@ -65,40 +65,46 @@ func ProcessArgs() *Config {
 	flag.StringVar(&ret.HTTPSProxy, "https-proxy", "", "A proxy URL to use for creating HTTPS connections outside the cluster")
 	flag.StringVar(&ret.NoProxy, "no-proxy", "", "A comma-separated list of destination domain names, domains, IP addresses, or other network CIDRs to exclude proxying")
 	flag.StringVar(&ret.ServiceIPs, "service-ips", "", "All IPs of assisted service node")
-	flag.StringVar(&ret.HighAvailabilityMode, "high-availability-mode", "Full", "high-availability expectations. default is 'Full', which represents the behavior in a \"normal\" cluster. Use 'None' for single-node deployment")
+	flag.StringVar(&ret.HighAvailabilityMode, "high-availability-mode", "", "high-availability expectations, \"Full\" which represents the behavior in a \"normal\" cluster. Use 'None' for single-node deployment. Leave this value as \"\" for workers as we do not care about HA mode for workers.")
 	flag.BoolVar(&ret.CheckClusterVersion, "check-cluster-version", false, "Do not monitor CVO")
 	flag.StringVar(&ret.MustGatherImage, "must-gather-image", "", "Custom must-gather image")
 	flag.Var(&ret.DisksToFormat, "format-disk", "Disk to format. Can be specified multiple times")
 
 	var installerArgs string
 	flag.StringVar(&installerArgs, "installer-args", "", "JSON array of additional coreos-installer arguments")
-
 	h := flag.Bool("help", false, "Help message")
 	flag.Parse()
+
+	if err := ret.SetInstallerArgs(installerArgs); err != nil {
+		printHelpAndExit(err)
+	}
+
+	if h != nil && *h {
+		printHelpAndExit(nil)
+	}
 
 	if ret.NoProxy != "" {
 		utils.SetNoProxyEnv(ret.NoProxy)
 	}
-	if h != nil && *h {
-		printHelpAndExit()
+
+	ret.SetDefaults()
+	return ret
+}
+
+func (c *Config) SetInstallerArgs(installerArgs string) error {
+	if installerArgs != "" {
+		return json.Unmarshal([]byte(installerArgs), &c.InstallerArgs)
+	}
+	return nil
+}
+
+func (c *Config) SetDefaults() {
+	if c.Role == string(models.HostRoleWorker) {
+		//High availability mode is not relevant to workers, so make sure we clear this.
+		c.HighAvailabilityMode = ""
 	}
 
-	if installerArgs != "" {
-		err := json.Unmarshal([]byte(installerArgs), &ret.InstallerArgs)
-		if err != nil {
-			println(err.Error())
-			printHelpAndExit()
-		}
+	if c.InfraEnvID == "" {
+		c.InfraEnvID = c.ClusterID
 	}
-	if ret.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone {
-		validRoles := []string{string(models.HostRoleMaster), string(models.HostRoleBootstrap)}
-		if !funk.ContainsString(validRoles, ret.Role) {
-			println("high-availability-mode is set to None, but host role is %s. should be one of: %s", ret.Role, validRoles)
-			printHelpAndExit()
-		}
-	}
-	if ret.InfraEnvID == "" {
-		ret.InfraEnvID = ret.ClusterID
-	}
-	return ret
 }
