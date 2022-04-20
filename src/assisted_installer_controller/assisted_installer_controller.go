@@ -466,7 +466,8 @@ func (c controller) postInstallConfigs(ctx context.Context) error {
 
 	// Wait for OLM operators
 	if err = c.waitForOLMOperators(ctx); err != nil {
-		return errors.Wrapf(err, "Error while initializing OLM operators")
+		// no need to send error in case olm failed as service should move to degraded in that case
+		c.log.WithError(err).Warn("Error while initializing OLM operators")
 	}
 
 	return nil
@@ -476,6 +477,23 @@ func (c controller) waitForOLMOperators(ctx context.Context) error {
 	var operators []models.MonitoredOperator
 	var err error
 
+	// In case the timeout occur, we have to update the pending OLM operators to failed state,
+	// so the assisted-service can update the cluster state to completed.
+	defer func() {
+		if err == nil {
+			return
+		}
+		updateFunc := func() bool {
+			if err = c.updatePendingOLMOperators(ctx); err != nil {
+				return KeepWaiting
+			}
+			return ExitWaiting
+		}
+		err = utils.WaitForPredicateWithContext(ctx, WaitTimeout, GeneralWaitInterval, updateFunc)
+		if err != nil {
+			c.log.WithError(err).Error("Timeout while waiting for some of the operators and not able to update its state")
+		}
+	}()
 	// Get the monitored operators:
 	err = utils.Retry(maxFetchAttempts, FetchRetryInterval, c.log, func() error {
 		operators, err = c.ic.GetClusterMonitoredOLMOperators(context.TODO(), c.ClusterID, c.OpenshiftVersion)
@@ -509,12 +527,8 @@ func (c controller) waitForOLMOperators(ctx context.Context) error {
 		return errors.Wrapf(err, "Failed to apply post manifests")
 	}
 
-	if err != c.waitForCSV(ctx, waitTimeout) {
-		// In case the timeout occur, we have to update the pending OLM operators to failed state,
-		// so the assisted-service can update the cluster state to completed.
-		if err = c.updatePendingOLMOperators(ctx); err != nil {
-			return errors.Errorf("Timeout while waiting for some of the operators and not able to update its state")
-		}
+	err = c.waitForCSV(ctx, waitTimeout)
+	if err != nil {
 		return errors.Wrapf(err, "Timeout while waiting for OLM operators be installed")
 	}
 
