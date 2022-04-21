@@ -80,6 +80,8 @@ type K8SClient interface {
 	DeleteService(namespace, name string) error
 	DeletePods(namespace string) error
 	PatchNamespace(namespace string, data []byte) error
+	GetNode(name string) (*v1.Node, error)
+	PatchNodeLabels(nodeName string, nodeLabels string) error
 }
 
 type K8SClientBuilder func(configPath string, logger *logrus.Logger) (K8SClient, error)
@@ -583,4 +585,18 @@ func (c *k8sClient) GetCSVFromSubscription(namespace string, name string) (strin
 		return "", err
 	}
 	return result.Status.CurrentCSV, nil
+}
+
+func (c *k8sClient) GetNode(name string) (*v1.Node, error) {
+	node, err := c.client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return &v1.Node{}, err
+	}
+	return node, nil
+}
+
+func (c *k8sClient) PatchNodeLabels(nodeName string, nodeLabels string) error {
+	data := []byte(`{"metadata": {"labels": ` + nodeLabels + `}}`)
+	_, err := c.client.CoreV1().Nodes().Patch(context.Background(), nodeName, types.MergePatchType, data, metav1.PatchOptions{})
+	return err
 }

@@ -649,7 +649,7 @@ func init() {
             "agentAuth": []
           }
         ],
-        "description": "Agent API to mark a finalizing installation as complete.",
+        "description": "Agent API to mark a finalizing installation as complete and progress to 100%.",
         "tags": [
           "installer"
         ],
@@ -5988,11 +5988,13 @@ func init() {
         "ip_addresses": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))$"
           }
         },
         "mac": {
-          "type": "string"
+          "type": "string",
+          "format": "mac"
         },
         "name": {
           "type": "string"
@@ -6072,7 +6074,8 @@ func init() {
           "type": "array",
           "items": {
             "description": "A fully qualified image name (FQIN).",
-            "type": "string"
+            "type": "string",
+            "pattern": "^(([a-zA-Z0-9\\-\\.]+)(:[0-9]+)?\\/)?[a-z0-9\\._\\-\\/@]+[?::a-zA-Z0-9_\\-.]+$"
           }
         },
         "timeout": {
@@ -6427,7 +6430,8 @@ func init() {
             "properties": {
               "domain_name": {
                 "description": "The domain name that should be resolved",
-                "type": "string"
+                "type": "string",
+                "pattern": "^([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*[.])+[a-zA-Z]{2,}$"
               }
             },
             "x-go-name": "DomainResolutionRequestDomain"
@@ -6864,6 +6868,11 @@ func init() {
         "machine_config_pool_name": {
           "type": "string"
         },
+        "node_labels": {
+          "description": "Json containing node's labels.",
+          "type": "string",
+          "x-go-custom-tag": "gorm:\"type:text\""
+        },
         "ntp_sources": {
           "description": "The configured NTP sources on the host.",
           "type": "string",
@@ -7126,6 +7135,14 @@ func init() {
         },
         "machine_config_pool_name": {
           "type": "string",
+          "x-nullable": true
+        },
+        "node_labels": {
+          "description": "Labels to be added to the corresponding node.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/node-label-params"
+          },
           "x-nullable": true
         }
       }
@@ -7621,7 +7638,8 @@ func init() {
         },
         "controller_image": {
           "description": "Assisted installer controller image",
-          "type": "string"
+          "type": "string",
+          "pattern": "^(([a-zA-Z0-9\\-\\.]+)(:[0-9]+)?\\/)?[a-z0-9\\._\\-\\/@]+[?::a-zA-Z0-9_\\-.]+$"
         },
         "disks_to_format": {
           "description": "List of disks to format",
@@ -7656,11 +7674,13 @@ func init() {
         },
         "installer_image": {
           "description": "Assisted installer image",
-          "type": "string"
+          "type": "string",
+          "pattern": "^(([a-zA-Z0-9\\-\\.]+)(:[0-9]+)?\\/)?[a-z0-9\\._\\-\\/@]+[?::a-zA-Z0-9_\\-.]+$"
         },
         "mco_image": {
           "description": "Machine config operator image",
-          "type": "string"
+          "type": "string",
+          "pattern": "^(([a-zA-Z0-9\\-\\.]+)(:[0-9]+)?\\/)?[a-z0-9\\._\\-\\/@]+[?::a-zA-Z0-9_\\-.]+$"
         },
         "must_gather_image": {
           "description": "Must-gather images to use",
@@ -8123,7 +8143,8 @@ func init() {
       "properties": {
         "agent_version": {
           "description": "Agent image version",
-          "type": "string"
+          "type": "string",
+          "pattern": "^(([a-zA-Z0-9\\-\\.]+)(:[0-9]+)?\\/)?[a-z0-9\\._\\-\\/@]+[?::a-zA-Z0-9_\\-.]+$"
         },
         "host_id": {
           "description": "Host id",
@@ -8134,6 +8155,23 @@ func init() {
           "description": "Infra env id",
           "type": "string",
           "format": "uuid"
+        }
+      }
+    },
+    "node-label-params": {
+      "type": "object",
+      "required": [
+        "key",
+        "value"
+      ],
+      "properties": {
+        "key": {
+          "description": "The key for the label's key-value pair.",
+          "type": "string"
+        },
+        "value": {
+          "description": "The value for the label's key-value pair.",
+          "type": "string"
         }
       }
     },
@@ -9643,7 +9681,7 @@ func init() {
             "agentAuth": []
           }
         ],
-        "description": "Agent API to mark a finalizing installation as complete.",
+        "description": "Agent API to mark a finalizing installation as complete and progress to 100%.",
         "tags": [
           "installer"
         ],
@@ -14168,7 +14206,8 @@ func init() {
       "properties": {
         "domain_name": {
           "description": "The domain name that should be resolved",
-          "type": "string"
+          "type": "string",
+          "pattern": "^([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*[.])+[a-zA-Z]{2,}$"
         }
       },
       "x-go-name": "DomainResolutionRequestDomain"
@@ -15110,11 +15149,13 @@ func init() {
         "ip_addresses": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))$"
           }
         },
         "mac": {
-          "type": "string"
+          "type": "string",
+          "format": "mac"
         },
         "name": {
           "type": "string"
@@ -15194,7 +15235,8 @@ func init() {
           "type": "array",
           "items": {
             "description": "A fully qualified image name (FQIN).",
-            "type": "string"
+            "type": "string",
+            "pattern": "^(([a-zA-Z0-9\\-\\.]+)(:[0-9]+)?\\/)?[a-z0-9\\._\\-\\/@]+[?::a-zA-Z0-9_\\-.]+$"
           }
         },
         "timeout": {
@@ -15917,6 +15959,11 @@ func init() {
         "machine_config_pool_name": {
           "type": "string"
         },
+        "node_labels": {
+          "description": "Json containing node's labels.",
+          "type": "string",
+          "x-go-custom-tag": "gorm:\"type:text\""
+        },
         "ntp_sources": {
           "description": "The configured NTP sources on the host.",
           "type": "string",
@@ -16179,6 +16226,14 @@ func init() {
         },
         "machine_config_pool_name": {
           "type": "string",
+          "x-nullable": true
+        },
+        "node_labels": {
+          "description": "Labels to be added to the corresponding node.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/node-label-params"
+          },
           "x-nullable": true
         }
       }
@@ -16676,7 +16731,8 @@ func init() {
         },
         "controller_image": {
           "description": "Assisted installer controller image",
-          "type": "string"
+          "type": "string",
+          "pattern": "^(([a-zA-Z0-9\\-\\.]+)(:[0-9]+)?\\/)?[a-z0-9\\._\\-\\/@]+[?::a-zA-Z0-9_\\-.]+$"
         },
         "disks_to_format": {
           "description": "List of disks to format",
@@ -16711,11 +16767,13 @@ func init() {
         },
         "installer_image": {
           "description": "Assisted installer image",
-          "type": "string"
+          "type": "string",
+          "pattern": "^(([a-zA-Z0-9\\-\\.]+)(:[0-9]+)?\\/)?[a-z0-9\\._\\-\\/@]+[?::a-zA-Z0-9_\\-.]+$"
         },
         "mco_image": {
           "description": "Machine config operator image",
-          "type": "string"
+          "type": "string",
+          "pattern": "^(([a-zA-Z0-9\\-\\.]+)(:[0-9]+)?\\/)?[a-z0-9\\._\\-\\/@]+[?::a-zA-Z0-9_\\-.]+$"
         },
         "must_gather_image": {
           "description": "Must-gather images to use",
@@ -17167,7 +17225,8 @@ func init() {
       "properties": {
         "agent_version": {
           "description": "Agent image version",
-          "type": "string"
+          "type": "string",
+          "pattern": "^(([a-zA-Z0-9\\-\\.]+)(:[0-9]+)?\\/)?[a-z0-9\\._\\-\\/@]+[?::a-zA-Z0-9_\\-.]+$"
         },
         "host_id": {
           "description": "Host id",
@@ -17178,6 +17237,23 @@ func init() {
           "description": "Infra env id",
           "type": "string",
           "format": "uuid"
+        }
+      }
+    },
+    "node-label-params": {
+      "type": "object",
+      "required": [
+        "key",
+        "value"
+      ],
+      "properties": {
+        "key": {
+          "description": "The key for the label's key-value pair.",
+          "type": "string"
+        },
+        "value": {
+          "description": "The value for the label's key-value pair.",
+          "type": "string"
         }
       }
     },
