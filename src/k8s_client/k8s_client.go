@@ -84,10 +84,10 @@ type K8SClient interface {
 	PatchNodeLabels(nodeName string, nodeLabels string) error
 }
 
-type K8SClientBuilder func(configPath string, logger *logrus.Logger) (K8SClient, error)
+type K8SClientBuilder func(configPath string, logger logrus.FieldLogger) (K8SClient, error)
 
 type k8sClient struct {
-	log           *logrus.Logger
+	log           logrus.FieldLogger
 	client        *kubernetes.Clientset
 	ocClient      *operatorv1.Clientset
 	olmClient     *olmv1client.OperatorsV1alpha1Client
@@ -103,7 +103,7 @@ const (
 	CLUSTER_CONFIG_V1_NAME = "cluster-config-v1"
 )
 
-func NewK8SClient(configPath string, logger *logrus.Logger) (K8SClient, error) {
+func NewK8SClient(configPath string, logger logrus.FieldLogger) (K8SClient, error) {
 	config, err := clientcmd.BuildConfigFromFlags("", configPath)
 	if err != nil {
 		return &k8sClient{}, errors.Wrap(err, "loading kubeconfig")

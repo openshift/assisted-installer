@@ -17,7 +17,7 @@ const MinProgressDelta = 5
 const completed = 100
 
 type CoreosInstallerLogWriter struct {
-	log              *logrus.Logger
+	log              logrus.FieldLogger
 	lastLogLine      []byte
 	progressReporter inventory_client.InventoryClient
 	progressRegex    *regexp.Regexp
@@ -26,7 +26,7 @@ type CoreosInstallerLogWriter struct {
 	lastProgress     int
 }
 
-func NewCoreosInstallerLogWriter(logger *logrus.Logger, progressReporter inventory_client.InventoryClient, infraEnvID string, hostID string) *CoreosInstallerLogWriter {
+func NewCoreosInstallerLogWriter(logger logrus.FieldLogger, progressReporter inventory_client.InventoryClient, infraEnvID string, hostID string) *CoreosInstallerLogWriter {
 	return &CoreosInstallerLogWriter{log: logger,
 		lastLogLine:      []byte{},
 		progressReporter: progressReporter,

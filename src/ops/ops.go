@@ -73,7 +73,7 @@ const (
 )
 
 type ops struct {
-	log             *logrus.Logger
+	log             logrus.FieldLogger
 	logWriter       *utils.LogWriter
 	cmdEnv          []string
 	installerConfig *config.Config
@@ -84,7 +84,7 @@ func NewOps(logger *logrus.Logger, proxySet bool) Ops {
 }
 
 // NewOps return a new ops interface
-func NewOpsWithConfig(installerConfig *config.Config, logger *logrus.Logger, proxySet bool) Ops {
+func NewOpsWithConfig(installerConfig *config.Config, logger logrus.FieldLogger, proxySet bool) Ops {
 	cmdEnv := os.Environ()
 	if proxySet && (installerConfig.HTTPProxy != "" || installerConfig.HTTPSProxy != "") {
 		if installerConfig.HTTPProxy != "" {

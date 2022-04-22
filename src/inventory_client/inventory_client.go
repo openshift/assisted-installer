@@ -65,7 +65,7 @@ type InventoryClient interface {
 type inventoryClient struct {
 	ai        *client.AssistedInstall
 	clusterId strfmt.UUID
-	logger    *logrus.Logger
+	logger    logrus.FieldLogger
 	cache     ttlCache.SimpleCache
 }
 
@@ -82,7 +82,7 @@ func CreateInventoryClient(clusterId string, inventoryURL string, pullSecret str
 }
 
 func CreateInventoryClientWithDelay(clusterId string, inventoryURL string, pullSecret string, insecure bool, caPath string,
-	logger *logrus.Logger, proxyFunc func(*http.Request) (*url.URL, error),
+	logger logrus.FieldLogger, proxyFunc func(*http.Request) (*url.URL, error),
 	retryMinDelay, retryMaxDelay time.Duration, maxRetries int, minRetries int) (*inventoryClient, error) {
 	clientConfig := client.Config{}
 	var err error
@@ -166,7 +166,7 @@ func RetryConnectionRefusedErr() rehttp.RetryFn {
 	}
 }
 
-func readCACertificate(capath string, logger *logrus.Logger) (*x509.CertPool, error) {
+func readCACertificate(capath string, logger logrus.FieldLogger) (*x509.CertPool, error) {
 
 	if capath == "" {
 		return nil, nil

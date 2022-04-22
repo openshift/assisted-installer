@@ -34,7 +34,7 @@ func GetHostsInStatus(hosts map[string]inventory_client.HostData, status []strin
 }
 
 func SetConfiguringStatusForHosts(client inventory_client.InventoryClient, inventoryHostsMapWithIp map[string]inventory_client.HostData,
-	mcsLogs string, fromBootstrap bool, log *logrus.Logger) {
+	mcsLogs string, fromBootstrap bool, log logrus.FieldLogger) {
 	notValidStates := map[models.HostStage]struct{}{models.HostStageConfiguring: {}, models.HostStageJoined: {}, models.HostStageDone: {}}
 	if fromBootstrap {
 		notValidStates[models.HostStageWaitingForIgnition] = struct{}{}
@@ -94,7 +94,7 @@ func GetPodInStatus(k8Client k8s_client.K8SClient, podNamePrefix string, namespa
 // upload tar.gz from pipe to assisted service.
 // close read and write pipes
 func UploadPodLogs(kc k8s_client.K8SClient, ic inventory_client.InventoryClient, clusterId string, podName string, namespace string,
-	sinceSeconds int64, log *logrus.Logger) error {
+	sinceSeconds int64, log logrus.FieldLogger) error {
 	log.Infof("Uploading logs for %s in %s", podName, namespace)
 	podLogs, err := kc.GetPodLogsAsBuffer(namespace, podName, sinceSeconds)
 	if err != nil {

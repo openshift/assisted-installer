@@ -57,14 +57,14 @@ type Installer interface {
 
 type installer struct {
 	config.Config
-	log             *logrus.Logger
+	log             logrus.FieldLogger
 	ops             ops.Ops
 	inventoryClient inventory_client.InventoryClient
 	kcBuilder       k8s_client.K8SClientBuilder
 	ign             ignition.Ignition
 }
 
-func NewAssistedInstaller(log *logrus.Logger, cfg config.Config, ops ops.Ops, ic inventory_client.InventoryClient, kcb k8s_client.K8SClientBuilder, ign ignition.Ignition) *installer {
+func NewAssistedInstaller(log logrus.FieldLogger, cfg config.Config, ops ops.Ops, ic inventory_client.InventoryClient, kcb k8s_client.K8SClientBuilder, ign ignition.Ignition) *installer {
 	return &installer{
 		log:             log,
 		Config:          cfg,
@@ -833,7 +833,7 @@ func (i *installer) checkLocalhostName() error {
 	return i.ops.CreateRandomHostname(data)
 }
 
-func RunInstaller(installerConfig *config.Config, logger *logrus.Logger) error {
+func RunInstaller(installerConfig *config.Config, logger logrus.FieldLogger) error {
 	logger.Infof("Assisted installer started. Configuration is:\n %s", secretdump.DumpSecretStruct(*installerConfig))
 	logger.Infof("Dry configuration is:\n %s", secretdump.DumpSecretStruct(installerConfig.DryRunConfig))
 
