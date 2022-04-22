@@ -144,7 +144,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			"node1": {Host: &models.Host{InfraEnvID: nodesInfraEnvId, ID: &node1Id}, IPs: []string{"192.168.126.11"}},
 			"node2": {Host: &models.Host{InfraEnvID: nodesInfraEnvId, ID: &node2Id}, IPs: []string{"192.168.126.12"}}}
 	})
-	k8sBuilder := func(configPath string, logger *logrus.Logger) (k8s_client.K8SClient, error) {
+	k8sBuilder := func(configPath string, logger logrus.FieldLogger) (k8s_client.K8SClient, error) {
 		return mockk8sclient, nil
 	}
 

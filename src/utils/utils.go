@@ -50,7 +50,7 @@ func (wm WalkMode) IncludeDirs() bool {
 }
 
 type LogWriter struct {
-	log *logrus.Logger
+	log logrus.FieldLogger
 }
 
 func (l *LogWriter) Write(p []byte) (n int, err error) {
@@ -58,7 +58,7 @@ func (l *LogWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func NewLogWriter(logger *logrus.Logger) *LogWriter {
+func NewLogWriter(logger logrus.FieldLogger) *LogWriter {
 	return &LogWriter{logger}
 }
 
@@ -161,7 +161,7 @@ func FindAndRemoveElementFromStringList(s []string, r string) []string {
 	return s
 }
 
-func Retry(attempts int, sleep time.Duration, log *logrus.Logger, f func() error) (err error) {
+func Retry(attempts int, sleep time.Duration, log logrus.FieldLogger, f func() error) (err error) {
 	for i := 0; i < attempts-1; i++ {
 		err = f()
 		if err == nil {
@@ -263,7 +263,7 @@ func GenerateRequestContext() context.Context {
 	return requestid.ToContext(context.Background(), requestid.NewID())
 }
 
-func RequestIDLogger(ctx context.Context, log *logrus.Logger) logrus.FieldLogger {
+func RequestIDLogger(ctx context.Context, log logrus.FieldLogger) logrus.FieldLogger {
 	return requestid.RequestIDLogger(log, requestid.FromContext(ctx))
 }
 

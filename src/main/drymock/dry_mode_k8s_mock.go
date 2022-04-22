@@ -278,7 +278,7 @@ dEFgad6P3hMZTOg7yVkMOd3QtgVQ9I8dXqS2nG9EMEh97WIhi6f5ztvcQvQ5tXjh
 // PrepareInstallerDryK8sMock utilizes k8s_client.MockK8SClient to fake the k8s API to make the
 // installer think it's talking with an actual cluster, just enough to make it pass an installation.
 // Used in dry mode.
-func PrepareInstallerDryK8sMock(mockk8sclient *k8s_client.MockK8SClient, logger *logrus.Logger, o ops.Ops, clusterHosts config.DryClusterHosts) {
+func PrepareInstallerDryK8sMock(mockk8sclient *k8s_client.MockK8SClient, logger logrus.FieldLogger, o ops.Ops, clusterHosts config.DryClusterHosts) {
 	// The installer compares AI host objects to cluster Node objects (either by name or by IP) to check which AI hosts are already
 	// joined as nodes. This fakes the node list so that check will pass
 	mockk8sclient.EXPECT().ListMasterNodes().DoAndReturn(func() (*v1.NodeList, error) {
@@ -299,8 +299,8 @@ func PrepareInstallerDryK8sMock(mockk8sclient *k8s_client.MockK8SClient, logger 
 	mockControllerPodLogs(mockk8sclient)
 }
 
-func NewDryRunK8SClientBuilder(installerConfig *config.Config, ops ops.Ops) func(string, *logrus.Logger) (k8s_client.K8SClient, error) {
-	return func(configPath string, logger *logrus.Logger) (k8s_client.K8SClient, error) {
+func NewDryRunK8SClientBuilder(installerConfig *config.Config, ops ops.Ops) func(string, logrus.FieldLogger) (k8s_client.K8SClient, error) {
+	return func(configPath string, logger logrus.FieldLogger) (k8s_client.K8SClient, error) {
 		var kc k8s_client.K8SClient
 		mockController := gomock.NewController(ginkgo.GinkgoT())
 		kc = k8s_client.NewMockK8SClient(mockController)
