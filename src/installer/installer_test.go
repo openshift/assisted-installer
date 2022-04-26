@@ -130,6 +130,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	rebootSuccess := func() {
 		mockops.EXPECT().Reboot().Return(nil).Times(1)
 	}
+	ironicAgentDoesntExist := func() {
+		mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "systemctl", "list-units", "--no-legend", "ironic-agent.service").Return("", nil).Times(1)
+	}
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockops = ops.NewMockOps(ctrl)
@@ -286,6 +289,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					reportLogProgressSuccess()
 					setBootOrderSuccess(gomock.Any())
 					uploadLogsSuccess(true)
+					ironicAgentDoesntExist()
 					rebootSuccess()
 					ret := installerObj.InstallNode()
 					Expect(ret).Should(BeNil())
@@ -319,6 +323,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					setBootOrderSuccess(gomock.Any())
 					uploadLogsSuccess(true)
 					reportLogProgressSuccess()
+					ironicAgentDoesntExist()
 					rebootSuccess()
 					ret := installerObj.InstallNode()
 					Expect(ret).Should(BeNil())
@@ -370,6 +375,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			setBootOrderSuccess(gomock.Any())
 			uploadLogsSuccess(true)
 			reportLogProgressSuccess()
+			ironicAgentDoesntExist()
 			rebootSuccess()
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(BeNil())
@@ -524,6 +530,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			setBootOrderSuccess(gomock.Any())
 			uploadLogsSuccess(false)
 			reportLogProgressSuccess()
+			ironicAgentDoesntExist()
 			rebootSuccess()
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(BeNil())
@@ -581,6 +588,24 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
+		It("master role happy flow with ironic agent", func() {
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+				{string(models.HostStageInstalling), conf.Role},
+				{string(models.HostStageWritingImageToDisk)},
+				{string(models.HostStageRebooting)},
+			})
+			cleanInstallDevice()
+			mkdirSuccess(InstallDir)
+			downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
+			writeToDiskSuccess(installerArgs)
+			setBootOrderSuccess(gomock.Any())
+			uploadLogsSuccess(false)
+			reportLogProgressSuccess()
+			mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "systemctl", "list-units", "--no-legend", "ironic-agent.service").Return("ironic-agent.service loaded active ", nil).Times(1)
+			mockops.EXPECT().SystemctlAction("stop", "agent.service").Return(nil).Times(1)
+			ret := installerObj.InstallNode()
+			Expect(ret).Should(BeNil())
+		})
 		It("HostRoleMaster role failed to create dir", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
 			cleanInstallDevice()
@@ -626,6 +651,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			reportLogProgressSuccess()
 			writeToDiskSuccess(installerArgs)
 			setBootOrderSuccess(gomock.Any())
+			ironicAgentDoesntExist()
 			err := fmt.Errorf("failed to reboot")
 			mockops.EXPECT().Reboot().Return(err).Times(1)
 			ret := installerObj.InstallNode()
@@ -677,6 +703,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			// failure must do nothing
 			reportLogProgressSuccess()
 			mockops.EXPECT().UploadInstallationLogs(false).Return("", errors.Errorf("Dummy")).Times(1)
+			ironicAgentDoesntExist()
 			rebootSuccess()
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(BeNil())
@@ -777,6 +804,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			setBootOrderSuccess(gomock.Any())
 			uploadLogsSuccess(true)
 			reportLogProgressSuccess()
+			ironicAgentDoesntExist()
 			rebootSuccess()
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(BeNil())

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-openapi/swag"
@@ -165,11 +166,36 @@ func (i *installer) InstallNode() error {
 	if err != nil {
 		i.log.Errorf("upload installation logs %s", err)
 	}
+	return i.finalize()
+}
+
+func (i *installer) finalize() error {
 	//update installation progress
 	i.UpdateHostInstallProgress(models.HostStageRebooting, "")
-	//reboot
-	if err = i.ops.Reboot(); err != nil {
+	if i.DryRunEnabled {
+		_, err := i.ops.ExecPrivilegeCommand(nil, "touch", i.Config.FakeRebootMarkerPath)
+		return errors.Wrap(err, "failed to touch fake reboot marker")
+	}
+
+	// in case ironic-agent exists on the host we should stop the assisted-agent service instead of rebooting the node.
+	// the assisted agent service stop will signal the ironic agent that we are done so that IPA can continue with its flow.
+	// regardless, we update the host install progress to `rebooting` since the node will get rebooted shortly after.
+	ironicAgentServiceName := "ironic-agent.service"
+	out, err := i.ops.ExecPrivilegeCommand(nil, "systemctl", "list-units", "--no-legend", ironicAgentServiceName)
+	if err != nil {
+		i.log.Errorf("Failed to check if ironic agent service exists on the node %s", err)
 		return err
+	}
+	if strings.Contains(out, ironicAgentServiceName) {
+		// in case the ironic-agent exists the installer should stop the assisted agent.service
+		if err = i.ops.SystemctlAction("stop", "agent.service"); err != nil {
+			return err
+		}
+	} else {
+		//reboot
+		if err = i.ops.Reboot(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
