@@ -378,7 +378,10 @@ func (o *ops) ExtractFromIgnition(ignitionPath string, fileToExtract string) err
 }
 
 func (o *ops) PrepareController() error {
-
+	// Do not prepare controller files in dry mode
+	if o.installerConfig.DryRunEnabled {
+		return nil
+	}
 	if err := o.renderControllerCm(); err != nil {
 		return err
 	}
