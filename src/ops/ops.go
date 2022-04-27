@@ -288,11 +288,6 @@ func installerArgs(ignitionPath string, device string, extra []string) []string 
 }
 
 func (o *ops) Reboot() error {
-	if o.installerConfig.DryRunEnabled {
-		_, err := o.ExecPrivilegeCommand(o.logWriter, "touch", o.installerConfig.FakeRebootMarkerPath)
-		return errors.Wrap(err, "failed to touch fake reboot marker")
-	}
-
 	o.log.Info("Rebooting node")
 	_, err := o.ExecPrivilegeCommand(o.logWriter, "shutdown", "-r", "+1", "'Installation completed, server is going to reboot.'")
 	if err != nil {
