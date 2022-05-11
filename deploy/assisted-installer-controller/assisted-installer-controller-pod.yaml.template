@@ -4,6 +4,7 @@ metadata:
   name: assisted-installer-controller
   namespace: assisted-installer
 spec:
+  backoffLimit: 100
   template:
     metadata:
       labels:
@@ -73,7 +74,6 @@ spec:
             mountPath: {{.CACertPath}}
           {{end}}
       restartPolicy: OnFailure
-      backoffLimit: 100
       hostNetwork: true
       nodeSelector:
         node-role.kubernetes.io/master: ""
