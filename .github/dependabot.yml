@@ -12,15 +12,7 @@ updates:
     labels:
       - "approved"
       - "lgtm"
-      - "ok-to-test"
       - "go"
       - "dependencies"
-    commit-message:
-      prefix: "NO-ISSUE"
-
-  - package-ecosystem: "docker"
-    directory: "/"
-    schedule:
-      interval: "weekly"
     commit-message:
       prefix: "NO-ISSUE"
