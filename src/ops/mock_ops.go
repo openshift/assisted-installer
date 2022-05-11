@@ -249,32 +249,47 @@ func (mr *MockOpsMockRecorder) Wipefs(device interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Wipefs", reflect.TypeOf((*MockOps)(nil).Wipefs), device)
 }
 
-// IsRaidDevice mocks base method
-func (m *MockOps) IsRaidDevice(device string) bool {
+// IsRaidMember mocks base method
+func (m *MockOps) IsRaidMember(device string) bool {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsRaidDevice", device)
+	ret := m.ctrl.Call(m, "IsRaidMember", device)
 	ret0, _ := ret[0].(bool)
 	return ret0
 }
 
-// IsRaidDevice indicates an expected call of IsRaidDevice
-func (mr *MockOpsMockRecorder) IsRaidDevice(device interface{}) *gomock.Call {
+// IsRaidMember indicates an expected call of IsRaidMember
+func (mr *MockOpsMockRecorder) IsRaidMember(device interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsRaidDevice", reflect.TypeOf((*MockOps)(nil).IsRaidDevice), device)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsRaidMember", reflect.TypeOf((*MockOps)(nil).IsRaidMember), device)
 }
 
-// CleanRaidDevice mocks base method
-func (m *MockOps) CleanRaidDevice(device string) error {
+// GetRaidDevices mocks base method
+func (m *MockOps) GetRaidDevices(device string) ([]string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CleanRaidDevice", device)
+	ret := m.ctrl.Call(m, "GetRaidDevices", device)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRaidDevices indicates an expected call of GetRaidDevices
+func (mr *MockOpsMockRecorder) GetRaidDevices(device interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRaidDevices", reflect.TypeOf((*MockOps)(nil).GetRaidDevices), device)
+}
+
+// CleanRaidMembership mocks base method
+func (m *MockOps) CleanRaidMembership(device string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CleanRaidMembership", device)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// CleanRaidDevice indicates an expected call of CleanRaidDevice
-func (mr *MockOpsMockRecorder) CleanRaidDevice(device interface{}) *gomock.Call {
+// CleanRaidMembership indicates an expected call of CleanRaidMembership
+func (mr *MockOpsMockRecorder) CleanRaidMembership(device interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CleanRaidDevice", reflect.TypeOf((*MockOps)(nil).CleanRaidDevice), device)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CleanRaidMembership", reflect.TypeOf((*MockOps)(nil).CleanRaidMembership), device)
 }
 
 // GetMCSLogs mocks base method

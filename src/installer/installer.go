@@ -734,7 +734,42 @@ func (i *installer) cleanupInstallDevice() error {
 		return nil
 	}
 
-	vgName, err := i.ops.GetVGByPV(i.Device)
+	err := i.cleanupDevice(i.Device)
+
+	if err != nil {
+		return err
+	}
+
+	if i.ops.IsRaidMember(i.Device) {
+		i.log.Infof("A raid was detected on the device (%s) - cleaning", i.Device)
+		var devices []string
+		devices, err = i.ops.GetRaidDevices(i.Device)
+
+		if err != nil {
+			return err
+		}
+
+		for _, device := range devices {
+			// Cleaning the raid device itself before removing membership.
+			err = i.cleanupDevice(device)
+
+			if err != nil {
+				return err
+			}
+		}
+
+		err = i.ops.CleanRaidMembership(i.Device)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return i.ops.Wipefs(i.Device)
+}
+
+func (i *installer) cleanupDevice(device string) error {
+	vgName, err := i.ops.GetVGByPV(device)
 	if err != nil {
 		return err
 	}
@@ -747,23 +782,14 @@ func (i *installer) cleanupInstallDevice() error {
 			return err
 		}
 
-		err = i.ops.RemovePV(i.Device)
+		err = i.ops.RemovePV(device)
 
 		if err != nil {
 			return err
 		}
 	}
 
-	if i.ops.IsRaidDevice(i.Device) {
-		i.log.Infof("A raid was detected on the installation device (%s) - cleaning", i.Device)
-		err = i.ops.CleanRaidDevice(i.Device)
-
-		if err != nil {
-			return err
-		}
-	}
-
-	return i.ops.Wipefs(i.Device)
+	return nil
 }
 
 func (i *installer) verifyHostCanMoveToConfigurationStatus(inventoryHostsMapWithIp map[string]inventory_client.HostData) {
