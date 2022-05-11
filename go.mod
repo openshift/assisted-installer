@@ -22,8 +22,8 @@ require (
 	github.com/openshift/assisted-service/models v0.0.0
 	github.com/openshift/client-go v0.0.0-20220302123837-25b55b99bd24
 	github.com/openshift/machine-api-operator v0.2.1-0.20201002104344-6abfb5440597
-	github.com/operator-framework/api v0.14.0
-	github.com/operator-framework/operator-lifecycle-manager v0.18.0
+	github.com/operator-framework/api v0.14.1-0.20220413143725-33310d6154f3
+	github.com/operator-framework/operator-lifecycle-manager v0.21.1
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/thoas/go-funk v0.9.2
