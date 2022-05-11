@@ -784,9 +784,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockops.EXPECT().CreateRandomHostname(gomock.Any()).Return(nil).Times(1)
 			}
 		}
-		restartNetworkManager := func(err error) {
-			mockops.EXPECT().SystemctlAction("restart", "NetworkManager.service").Return(err).Times(1)
-		}
 		startServicesSuccess := func() {
 			services := []string{"bootkube.service", "progress.service", "approve-csr.service"}
 			for i := range services {
@@ -828,7 +825,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			// single node bootstrap flow
 			singleNodeBootstrapSetup()
 			checkLocalHostname("localhost", nil)
-			restartNetworkManager(nil)
 			prepareControllerSuccess()
 			startServicesSuccess()
 			waitForBootkubeSuccess()
@@ -852,9 +848,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			})
 			// single node bootstrap flow
 			singleNodeBootstrapSetup()
-			checkLocalHostname("not localhost", nil)
 			err := fmt.Errorf("Failed to restart NetworkManager")
-			restartNetworkManager(err)
+			checkLocalHostname("not localhost", err)
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
@@ -865,7 +860,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			// single node bootstrap flow
 			singleNodeBootstrapSetup()
 			checkLocalHostname("localhost", nil)
-			restartNetworkManager(nil)
 			prepareControllerSuccess()
 			startServicesSuccess()
 			waitForBootkubeSuccess()

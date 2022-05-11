@@ -306,10 +306,14 @@ func (i *installer) startBootstrap() error {
 	}
 
 	// restart NetworkManager to trigger NetworkManager/dispatcher.d/30-local-dns-prepender
-	err = i.ops.SystemctlAction("restart", "NetworkManager.service")
-	if err != nil {
-		i.log.Error(err)
-		return err
+	// we don't do it on SNO because the "local-dns-prepender" is not even
+	// available on none-platform
+	if i.HighAvailabilityMode != models.ClusterHighAvailabilityModeNone {
+		err = i.ops.SystemctlAction("restart", "NetworkManager.service")
+		if err != nil {
+			i.log.Error(err)
+			return err
+		}
 	}
 
 	if err = i.ops.PrepareController(); err != nil {
