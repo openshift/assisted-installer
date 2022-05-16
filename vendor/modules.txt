@@ -27,6 +27,9 @@ github.com/alecthomas/units
 # github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
 ## explicit; go 1.13
 github.com/asaskevich/govalidator
+# github.com/aws/aws-sdk-go v1.34.28
+## explicit; go 1.11
+github.com/aws/aws-sdk-go/aws/arn
 # github.com/aymerick/douceur v0.2.0
 ## explicit
 github.com/aymerick/douceur/css
@@ -55,7 +58,7 @@ github.com/coreos/go-semver/semver
 # github.com/coreos/go-systemd/v22 v22.3.2
 ## explicit; go 1.12
 github.com/coreos/go-systemd/v22/unit
-# github.com/coreos/ignition/v2 v2.13.0
+# github.com/coreos/ignition/v2 v2.14.0
 ## explicit; go 1.15
 github.com/coreos/ignition/v2/config
 github.com/coreos/ignition/v2/config/merge
@@ -530,7 +533,7 @@ github.com/sirupsen/logrus/hooks/test
 ## explicit; go 1.14
 github.com/slok/go-http-metrics/metrics
 github.com/slok/go-http-metrics/middleware
-# github.com/spf13/pflag v1.0.5
+# github.com/spf13/pflag v1.0.6-0.20210604193023-d5e0c0615ace
 ## explicit; go 1.12
 github.com/spf13/pflag
 # github.com/ssgreg/journald v1.0.0

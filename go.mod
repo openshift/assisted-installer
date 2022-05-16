@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/PuerkitoBio/rehttp v1.1.0
 	github.com/ReneKroon/ttlcache/v2 v2.11.0
-	github.com/coreos/ignition/v2 v2.13.0
+	github.com/coreos/ignition/v2 v2.14.0
 	github.com/go-openapi/runtime v0.24.1
 	github.com/go-openapi/strfmt v0.21.2
 	github.com/go-openapi/swag v0.21.1
@@ -38,6 +38,7 @@ require (
 )
 
 require (
+	github.com/aws/aws-sdk-go v1.34.28 // indirect
 	github.com/emicklei/go-restful v2.15.0+incompatible // indirect
 	github.com/google/gnostic v0.5.7-v3refs // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
@@ -125,7 +126,7 @@ require (
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/slok/go-http-metrics v0.8.0 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/spf13/pflag v1.0.6-0.20210604193023-d5e0c0615ace // indirect
 	github.com/ssgreg/journald v1.0.0 // indirect
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.7.1 // indirect
