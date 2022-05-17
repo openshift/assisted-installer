@@ -85,7 +85,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	cleanInstallDevice := func() {
 		mockops.EXPECT().GetVGByPV(device).Return("", nil).Times(1)
-		mockops.EXPECT().IsRaidDevice(device).Return(false).Times(1)
+		mockops.EXPECT().IsRaidMember(device).Return(false).Times(1)
 		mockops.EXPECT().Wipefs(device).Return(nil).Times(1)
 	}
 
@@ -503,6 +503,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	})
 	Context("Master role", func() {
 		installerArgs := []string{"-n", "--append-karg", "nameserver=8.8.8.8"}
+		raidDevice := "/dev/md0"
 		conf := config.Config{Role: string(models.HostRoleMaster),
 			ClusterID:        "cluster-id",
 			InfraEnvID:       "infra-env-id",
@@ -539,7 +540,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			cleanInstallDeviceClean := func() {
 				mockops.EXPECT().GetVGByPV(device).Return("vg1", nil).Times(1)
 				mockops.EXPECT().RemoveVG("vg1").Return(nil).Times(1)
-				mockops.EXPECT().IsRaidDevice(device).Return(false).Times(1)
+				mockops.EXPECT().IsRaidMember(device).Return(false).Times(1)
 				mockops.EXPECT().Wipefs(device).Return(nil).Times(1)
 				mockops.EXPECT().RemovePV(device).Return(nil).Times(1)
 			}
@@ -564,8 +565,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("HostRoleMaster role raid cleanup disk - happy flow", func() {
 			cleanInstallDeviceClean := func() {
 				mockops.EXPECT().GetVGByPV(device).Return("", nil).Times(1)
-				mockops.EXPECT().IsRaidDevice(device).Return(true).Times(1)
-				mockops.EXPECT().CleanRaidDevice(device).Return(nil).Times(1)
+				mockops.EXPECT().IsRaidMember(device).Return(true).Times(1)
+				mockops.EXPECT().GetRaidDevices(device).Return([]string{raidDevice}, nil).Times(1)
+				mockops.EXPECT().GetVGByPV(raidDevice).Return("", nil).Times(1)
+				mockops.EXPECT().CleanRaidMembership(device).Return(nil).Times(1)
 				mockops.EXPECT().Wipefs(device).Return(nil).Times(1)
 			}
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
@@ -580,8 +583,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 			cleanInstallDeviceClean := func() {
 				mockops.EXPECT().GetVGByPV(device).Return("", nil).Times(1)
-				mockops.EXPECT().IsRaidDevice(device).Return(true).Times(1)
-				mockops.EXPECT().CleanRaidDevice(device).Return(err).Times(1)
+				mockops.EXPECT().IsRaidMember(device).Return(true).Times(1)
+				mockops.EXPECT().GetRaidDevices(device).Return([]string{raidDevice}, nil).Times(1)
+				mockops.EXPECT().GetVGByPV(raidDevice).Return("", nil).Times(1)
+				mockops.EXPECT().CleanRaidMembership(device).Return(err).Times(1)
 			}
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
 			cleanInstallDeviceClean()

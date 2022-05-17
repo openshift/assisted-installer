@@ -46,8 +46,9 @@ type Ops interface {
 	RemoveLV(lvName, vgName string) error
 	RemovePV(pvName string) error
 	Wipefs(device string) error
-	IsRaidDevice(device string) bool
-	CleanRaidDevice(device string) error
+	IsRaidMember(device string) bool
+	GetRaidDevices(device string) ([]string, error)
+	CleanRaidMembership(device string) error
 	GetMCSLogs() (string, error)
 	UploadInstallationLogs(isBootstrap bool) (string, error)
 	ReloadHostFile(filepath string) error
@@ -528,8 +529,8 @@ func (o *ops) Wipefs(device string) error {
 	return err
 }
 
-func (o *ops) IsRaidDevice(device string) bool {
-	raidDevices, err := o.getRaidDevices()
+func (o *ops) IsRaidMember(device string) bool {
+	raidDevices, err := o.getRaidDevices2Members()
 
 	if err != nil {
 		o.log.WithError(err).Errorf("Error occurred while trying to get list of raid devices - continue without cleaning")
@@ -550,15 +551,15 @@ func (o *ops) IsRaidDevice(device string) bool {
 	return false
 }
 
-func (o *ops) CleanRaidDevice(device string) error {
-	raidDevices, err := o.getRaidDevices()
+func (o *ops) CleanRaidMembership(device string) error {
+	raidDevices, err := o.getRaidDevices2Members()
 
 	if err != nil {
 		return err
 	}
 
 	for raidDeviceName, raidArrayMembers := range raidDevices {
-		err = o.cleanDeviceFromRaidDevice(device, raidDeviceName, raidArrayMembers)
+		err = o.removeDeviceFromRaidArray(device, raidDeviceName, raidArrayMembers)
 
 		if err != nil {
 			return err
@@ -568,7 +569,30 @@ func (o *ops) CleanRaidDevice(device string) error {
 	return nil
 }
 
-func (o *ops) getRaidDevices() (map[string][]string, error) {
+func (o *ops) GetRaidDevices(deviceName string) ([]string, error) {
+	raidDevices, err := o.getRaidDevices2Members()
+	var result []string
+
+	if err != nil {
+		return result, err
+	}
+
+	for raidDeviceName, raidArrayMembers := range raidDevices {
+		expression, _ := regexp.Compile(deviceName + "[\\d]*")
+
+		for _, raidMember := range raidArrayMembers {
+			// A partition or the device itself is part of the raid array.
+			if expression.MatchString(raidMember) {
+				result = append(result, raidDeviceName)
+				break
+			}
+		}
+	}
+
+	return result, nil
+}
+
+func (o *ops) getRaidDevices2Members() (map[string][]string, error) {
 	output, err := o.ExecPrivilegeCommand(o.logWriter, "mdadm", "-v", "--query", "--detail", "--scan")
 
 	if err != nil {
@@ -615,7 +639,7 @@ func (o *ops) getRaidDevices() (map[string][]string, error) {
 	return result, nil
 }
 
-func (o *ops) cleanDeviceFromRaidDevice(deviceName string, raidDeviceName string, raidArrayMembers []string) error {
+func (o *ops) removeDeviceFromRaidArray(deviceName string, raidDeviceName string, raidArrayMembers []string) error {
 	raidStopped := false
 
 	expression, _ := regexp.Compile(deviceName + "[\\d]*")
