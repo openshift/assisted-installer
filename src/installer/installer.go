@@ -91,13 +91,11 @@ func (i *installer) InstallNode() error {
 
 	i.UpdateHostInstallProgress(models.HostStageStartingInstallation, i.Config.Role)
 	i.Config.Device = i.ops.EvaluateDiskSymlink(i.Config.Device)
-	i.log.Infof("Start cleaning up device %s", i.Device)
 	err := i.cleanupInstallDevice()
 	if err != nil {
 		i.log.Errorf("failed to prepare install device %s, err %s", i.Device, err)
 		return err
 	}
-	i.log.Infof("Finished cleaning up device %s", i.Device)
 
 	if err = i.ops.Mkdir(InstallDir); err != nil {
 		i.log.Errorf("Failed to create install dir: %s", err)
@@ -734,10 +732,12 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 }
 
 func (i *installer) cleanupInstallDevice() error {
-	if i.DryRunEnabled {
+
+	if i.DryRunEnabled || i.Config.SkipInstallationDiskCleanup {
 		return nil
 	}
 
+	i.log.Infof("Start cleaning up device %s", i.Device)
 	err := i.cleanupDevice(i.Device)
 
 	if err != nil {
@@ -767,6 +767,7 @@ func (i *installer) cleanupInstallDevice() error {
 		if err != nil {
 			return err
 		}
+		i.log.Infof("Finished cleaning up device %s", i.Device)
 	}
 
 	return i.ops.Wipefs(i.Device)

@@ -536,6 +536,32 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(BeNil())
 		})
+
+		It("HostRoleMaster role happy flow with skipping disk cleanup", func() {
+			installerObj.Config.SkipInstallationDiskCleanup = true
+			// verify none of cleanup function runs
+			mockops.EXPECT().GetVGByPV(device).Return("vg1", nil).Times(0)
+			mockops.EXPECT().RemoveVG("vg1").Return(nil).Times(0)
+			mockops.EXPECT().IsRaidMember(device).Return(false).Times(0)
+			mockops.EXPECT().Wipefs(device).Return(nil).Times(0)
+			mockops.EXPECT().RemovePV(device).Return(nil).Times(0)
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+				{string(models.HostStageInstalling), conf.Role},
+				{string(models.HostStageWritingImageToDisk)},
+				{string(models.HostStageRebooting)},
+			})
+			mkdirSuccess(InstallDir)
+			downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
+			writeToDiskSuccess(installerArgs)
+			setBootOrderSuccess(gomock.Any())
+			uploadLogsSuccess(false)
+			reportLogProgressSuccess()
+			ironicAgentDoesntExist()
+			rebootSuccess()
+			ret := installerObj.InstallNode()
+			Expect(ret).Should(BeNil())
+		})
+
 		It("HostRoleMaster role happy flow with disk cleanup", func() {
 			cleanInstallDeviceClean := func() {
 				mockops.EXPECT().GetVGByPV(device).Return("vg1", nil).Times(1)

@@ -11,29 +11,30 @@ import (
 
 type Config struct {
 	DryRunConfig
-	Role                 string
-	ClusterID            string
-	InfraEnvID           string
-	HostID               string
-	Device               string
-	URL                  string
-	Verbose              bool
-	OpenshiftVersion     string
-	MCOImage             string
-	ControllerImage      string
-	AgentImage           string
-	PullSecretToken      string `secret:"true"`
-	SkipCertVerification bool
-	CACertPath           string
-	HTTPProxy            string
-	HTTPSProxy           string
-	NoProxy              string
-	ServiceIPs           string
-	InstallerArgs        []string
-	HighAvailabilityMode string
-	CheckClusterVersion  bool
-	MustGatherImage      string
-	DisksToFormat        ArrayFlags
+	Role                        string
+	ClusterID                   string
+	InfraEnvID                  string
+	HostID                      string
+	Device                      string
+	URL                         string
+	Verbose                     bool
+	OpenshiftVersion            string
+	MCOImage                    string
+	ControllerImage             string
+	AgentImage                  string
+	PullSecretToken             string `secret:"true"`
+	SkipCertVerification        bool
+	CACertPath                  string
+	HTTPProxy                   string
+	HTTPSProxy                  string
+	NoProxy                     string
+	ServiceIPs                  string
+	InstallerArgs               []string
+	HighAvailabilityMode        string
+	CheckClusterVersion         bool
+	MustGatherImage             string
+	DisksToFormat               ArrayFlags
+	SkipInstallationDiskCleanup bool
 }
 
 func printHelpAndExit(err error) {
@@ -69,6 +70,7 @@ func ProcessArgs() *Config {
 	flag.BoolVar(&ret.CheckClusterVersion, "check-cluster-version", false, "Do not monitor CVO")
 	flag.StringVar(&ret.MustGatherImage, "must-gather-image", "", "Custom must-gather image")
 	flag.Var(&ret.DisksToFormat, "format-disk", "Disk to format. Can be specified multiple times")
+	flag.BoolVar(&ret.SkipInstallationDiskCleanup, "skip-installation-disk-cleanup", false, "Skip installation disk cleanup gives disk management to coreos-installer in case needed")
 
 	var installerArgs string
 	flag.StringVar(&installerArgs, "installer-args", "", "JSON array of additional coreos-installer arguments")
