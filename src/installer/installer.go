@@ -119,6 +119,10 @@ func (i *installer) InstallNode() error {
 
 	i.UpdateHostInstallProgress(models.HostStageInstalling, i.Config.Role)
 	var ignitionPath string
+
+	// i.HighAvailabilityMode is set as an empty string for workers
+	// regardless of the availability mode of the cluster they are joining
+	// as it is of no consequence to them.
 	if i.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone {
 		i.log.Info("Installing single node openshift")
 		ignitionPath, err = i.createSingleNodeMasterIgnition()
