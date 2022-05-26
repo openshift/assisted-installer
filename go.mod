@@ -31,9 +31,9 @@ require (
 	golang.org/x/net v0.0.0-20220524220425-1d687d428aca
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.24.0
+	k8s.io/api v0.24.1
 	k8s.io/apimachinery v0.24.1
-	k8s.io/client-go v0.24.0
+	k8s.io/client-go v0.24.1
 	sigs.k8s.io/controller-runtime v0.12.1
 )
 
