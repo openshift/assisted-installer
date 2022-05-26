@@ -9,8 +9,8 @@ import (
 )
 
 func main() {
-	installerConfig := config.ProcessArgs()
-	config.ProcessDryRunArgs(&installerConfig.DryRunConfig)
+	installerConfig := &config.Config{}
+	installerConfig.ProcessArgs(os.Args[1:])
 	logger := utils.InitLogger(installerConfig.Verbose, true, installerConfig.ForcedHostID, config.DefaultDryRunConfig.DryRunEnabled)
 	installerConfig.PullSecretToken = os.Getenv("PULL_SECRET_TOKEN")
 	if installerConfig.PullSecretToken == "" {
