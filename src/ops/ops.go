@@ -312,12 +312,31 @@ func (o *ops) SetBootOrder(device string) error {
 	o.log.Info("Setting efibootmgr to boot from disk")
 
 	// efi-system is installed onto partition 2
-	_, err = o.ExecPrivilegeCommand(o.logWriter, "efibootmgr", "-v", "-d", device, "-p", "2", "-c", "-L", "Red Hat Enterprise Linux", "-l", o.getEfiFilePath())
+	out, err := o.ExecPrivilegeCommand(o.logWriter, "efibootmgr", "-v", "-d", device, "-p", "2", "-c", "-L", "Red Hat Enterprise Linux", "-l", o.getEfiFilePath())
 	if err != nil {
 		o.log.Errorf("Failed to set efibootmgr to boot from disk %s, err: %s", device, err)
 		return err
 	}
+	o.handleDuplicateEntries(out)
 	return nil
+}
+
+func (o *ops) handleDuplicateEntries(output string) {
+	r := regexp.MustCompile(`Boot(.*) has same label Red Hat Enterprise Linux`)
+	for _, line := range(strings.Split(output, "\n")){
+		DupBootEntry := r.FindStringSubmatch(line)
+		if len(DupBootEntry) > 0 {
+			o.deleteBootEntry(DupBootEntry[len(DupBootEntry) -1])
+		}
+	}
+}
+
+func (o *ops) deleteBootEntry(bootNum string){
+	_, err := o.ExecPrivilegeCommand(o.logWriter, "efibootmgr", "-v", "--delete-bootnum", "--bootnum", bootNum, "-l", o.getEfiFilePath())
+	if err != nil {
+		o.log.Errorf("Failed to delete duplicate Red Hat Enterprise Linux label %s, err: %s", bootNum, err)
+	}
+
 }
 
 func (o *ops) getEfiFilePath() string {
