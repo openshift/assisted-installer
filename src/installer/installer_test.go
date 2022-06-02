@@ -265,7 +265,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				})
 				It("bootstrap role happy flow", func() {
 					updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
-						{string(models.HostStageWaitingForControlPlane)},
+						{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
+						{string(models.HostStageWaitingForControlPlane), waitingForMastersStatusInfo},
 						{string(models.HostStageInstalling), string(models.HostRoleMaster)},
 						{string(models.HostStageWritingImageToDisk)},
 						{string(models.HostStageRebooting)},
@@ -296,7 +297,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				})
 				It("bootstrap role happy flow ovn-kubernetes", func() {
 					updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
-						{string(models.HostStageWaitingForControlPlane)},
+						{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
+						{string(models.HostStageWaitingForControlPlane), waitingForMastersStatusInfo},
 						{string(models.HostStageInstalling), string(models.HostRoleMaster)},
 						{string(models.HostStageWritingImageToDisk)},
 						{string(models.HostStageRebooting)},
@@ -334,6 +336,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
 				{string(models.HostStageWritingImageToDisk)},
+				{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
 			})
 			cleanInstallDevice()
 			mkdirSuccess(InstallDir)
@@ -353,7 +356,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 		It("bootstrap role extract ignition retry", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
-				{string(models.HostStageWaitingForControlPlane)},
+				{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
+				{string(models.HostStageWaitingForControlPlane), waitingForMastersStatusInfo},
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
 				{string(models.HostStageWritingImageToDisk)},
 				{string(models.HostStageRebooting)},
@@ -384,6 +388,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
 				{string(models.HostStageWritingImageToDisk)},
+				{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
 			})
 			cleanInstallDevice()
 			mkdirSuccess(InstallDir)
@@ -404,6 +409,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
 				{string(models.HostStageWritingImageToDisk)},
+				{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
 			})
 			bootstrapSetup()
 			checkLocalHostname("not localhost", nil)
