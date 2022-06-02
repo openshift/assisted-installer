@@ -43,6 +43,8 @@ const (
 	ovnKubernetes                = "OVNKubernetes"
 	numMasterNodes               = 3
 	singleNodeMasterIgnitionPath = "/opt/openshift/master.ign"
+	waitingForMastersStatusInfo  = "Waiting for masters to join bootstrap control plane"
+	waitingForBootstrapToPrepare = "Waiting for bootstrap node preparation"
 )
 
 var generalWaitTimeout = 30 * time.Second
@@ -146,6 +148,7 @@ func (i *installer) InstallNode() error {
 	}
 
 	if isBootstrap {
+		i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, waitingForBootstrapToPrepare)
 		if err = bootstrapErrGroup.Wait(); err != nil {
 			i.log.Errorf("Bootstrap failed %s", err)
 			return err
@@ -413,7 +416,7 @@ func (i *installer) waitForControlPlane(ctx context.Context) error {
 		i.log.Error(err)
 		return err
 	}
-	i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, "")
+	i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, waitingForMastersStatusInfo)
 
 	if err = i.waitForMinMasterNodes(ctx, kc); err != nil {
 		return err
