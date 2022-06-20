@@ -1,6 +1,6 @@
-FROM quay.io/openshift/origin-cli:4.11.0 AS cli
+FROM registry.ci.openshift.org/ocp/4.11:cli AS cli
 
-FROM registry.ci.openshift.org/openshift/release:golang-1.17 AS builder
+FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11 AS builder
 
 WORKDIR /go/src/github.com/openshift/assisted-installer
 ENV GOFLAGS="-mod=vendor"
