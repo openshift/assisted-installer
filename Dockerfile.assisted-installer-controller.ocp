@@ -10,6 +10,8 @@ RUN make controller
 
 FROM registry.ci.openshift.org/ocp/4.11:base
 
+LABEL io.openshift.release.operator=true
+
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/assisted-installer-controller /usr/bin/assisted-installer-controller
 COPY --from=cli /usr/bin/oc /usr/bin/oc
 
