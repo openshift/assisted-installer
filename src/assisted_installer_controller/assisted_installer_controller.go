@@ -597,7 +597,7 @@ func (c controller) applyPostInstallManifests(arg interface{}) bool {
 		return false
 	}
 
-	// Create the manifests of the opreators, which are properly initialized:
+	// Create the manifests of the operators, which are properly initialized:
 	readyOperators, _, err := c.getReadyOperators(arg.([]models.MonitoredOperator))
 	if err != nil {
 		c.log.WithError(err).Errorf("Failed to fetch operators from assisted-service")
