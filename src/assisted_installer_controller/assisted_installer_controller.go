@@ -62,6 +62,7 @@ var (
 	GeneralWaitInterval      = generalWaitTimeoutInt * time.Second
 	GeneralProgressUpdateInt = 60 * time.Second
 	LogsUploadPeriod         = 5 * time.Minute
+	SummaryLogsPeriod        = 30 * time.Second
 	WaitTimeout              = 70 * time.Minute
 	CompleteTimeout          = 30 * time.Minute
 	DNSAddressRetryInterval  = 20 * time.Second
@@ -1200,6 +1201,11 @@ func (c controller) collectMustGatherLogs(ctx context.Context, images ...string)
 		return "", ferr
 	}
 
+	// We should not create must-gather logs if they already were created and upload failed
+	if _, err := os.Stat(path.Join(tempDir, ops.MustGatherFileName)); err == nil {
+		return path.Join(tempDir, ops.MustGatherFileName), nil
+	}
+
 	kubeconfigPath, err := c.downloadKubeconfigNoingress(ctx, tempDir)
 	if err != nil {
 		return "", err
@@ -1234,10 +1240,10 @@ func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup) {
 			if podName != "" {
 				c.log.Infof("Upload final controller and cluster logs before exit")
 				c.ic.ClusterLogProgressReport(progressCtx, c.ClusterID, models.LogsStateRequested)
-				_ = utils.WaitForPredicate(WaitTimeout, LogsUploadPeriod, func() bool {
+				_ = utils.WaitForPredicate(WaitTimeout, SummaryLogsPeriod, func() bool {
 					err := c.uploadSummaryLogs(podName, c.Namespace, controllerLogsSecondsAgo)
 					if err != nil {
-						c.log.Infof("retry uploading logs in 5 minutes...")
+						c.log.Infof("retry uploading logs in 30 seconds...")
 					}
 					return err == nil
 				})

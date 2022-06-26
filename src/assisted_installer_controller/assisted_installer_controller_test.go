@@ -1118,6 +1118,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 		BeforeEach(func() {
 			LogsUploadPeriod = 10 * time.Millisecond
+			SummaryLogsPeriod = 10 * time.Millisecond
 			pod = v1.Pod{TypeMeta: metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{Name: "test"}, Spec: v1.PodSpec{}, Status: v1.PodStatus{Phase: "Pending"}}
 

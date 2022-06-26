@@ -71,6 +71,7 @@ const (
 	controllerDeployPodTemplate    = "assisted-installer-controller-pod.yaml.template"
 	renderedControllerSecret       = "assisted-installer-controller-secret.yaml"
 	controllerDeploySecretTemplate = "assisted-installer-controller-secret.yaml.template"
+	MustGatherFileName             = "must-gather.tar.gz"
 )
 
 type ops struct {
@@ -834,14 +835,13 @@ func (o *ops) GetMustGatherLogs(workDir, kubeconfigPath string, images ...string
 	logsDir := filepath.Base(files[0])
 
 	//tar the log directory and return the path to the tarball
-	tarName := "must-gather.tar.gz"
-	command = fmt.Sprintf("cd %s && tar zcf %s %s", workDir, tarName, logsDir)
+	command = fmt.Sprintf("cd %s && tar zcf %s %s", workDir, MustGatherFileName, logsDir)
 	_, err = o.ExecCommand(o.logWriter, "bash", "-c", command)
 	if err != nil {
 		o.log.WithError(err).Errorf("Failed to tar must-gather logs\n")
 		return "", err
 	}
-	return path.Join(workDir, tarName), nil
+	return path.Join(workDir, MustGatherFileName), nil
 }
 
 func (o *ops) CreateRandomHostname(hostname string) error {
