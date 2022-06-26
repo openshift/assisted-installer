@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/openshift/assisted-installer/src/ops/execute"
+
 	"github.com/golang/mock/gomock"
 	"github.com/kelseyhightower/envconfig"
 	assistedinstallercontroller "github.com/openshift/assisted-installer/src/assisted_installer_controller"
@@ -66,7 +68,8 @@ func main() {
 
 	logger.Infof("Start running Assisted-Controller. Configuration is:\n %s", secretdump.DumpSecretStruct(Options.ControllerConfig))
 
-	o := ops.NewOps(logger, false)
+	executor := execute.NewExecutor(&config.Config{}, logger, false)
+	o := ops.NewOps(logger, executor)
 
 	var kc k8s_client.K8SClient
 	if !Options.ControllerConfig.DryRunEnabled {

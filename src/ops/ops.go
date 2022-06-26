@@ -10,12 +10,12 @@ import (
 	"strconv"
 	"text/template"
 
+	"github.com/openshift/assisted-installer/src/ops/execute"
+
 	"io/ioutil"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -32,8 +32,6 @@ const (
 
 //go:generate mockgen -source=ops.go -package=ops -destination=mock_ops.go
 type Ops interface {
-	ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error)
-	ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error)
 	Mkdir(dirName string) error
 	WriteImageToDisk(ignitionPath string, device string, progressReporter inventory_client.InventoryClient, extra []string) error
 	Reboot() error
@@ -60,6 +58,7 @@ type Ops interface {
 	FormatDisk(string) error
 	CreateManifests(string, []byte) error
 	DryRebootHappened(markerPath string) bool
+	ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error)
 }
 
 const (
@@ -77,140 +76,22 @@ const (
 type ops struct {
 	log             logrus.FieldLogger
 	logWriter       *utils.LogWriter
-	cmdEnv          []string
 	installerConfig *config.Config
+	executor        execute.Execute
 }
 
-func NewOps(logger *logrus.Logger, proxySet bool) Ops {
-	return NewOpsWithConfig(&config.Config{}, logger, proxySet)
+func NewOps(logger *logrus.Logger, executor execute.Execute) Ops {
+	return NewOpsWithConfig(&config.Config{}, logger, executor)
 }
 
 // NewOps return a new ops interface
-func NewOpsWithConfig(installerConfig *config.Config, logger logrus.FieldLogger, proxySet bool) Ops {
-	cmdEnv := os.Environ()
-	if proxySet && (installerConfig.HTTPProxy != "" || installerConfig.HTTPSProxy != "") {
-		if installerConfig.HTTPProxy != "" {
-			cmdEnv = append(cmdEnv, fmt.Sprintf("HTTP_PROXY=%s", installerConfig.HTTPProxy))
-		}
-		if installerConfig.HTTPSProxy != "" {
-			cmdEnv = append(cmdEnv, fmt.Sprintf("HTTPS_PROXY=%s", installerConfig.HTTPSProxy))
-		}
-		if installerConfig.NoProxy != "" {
-			cmdEnv = append(cmdEnv, fmt.Sprintf("NO_PROXY=%s", installerConfig.NoProxy))
-		}
-	}
+func NewOpsWithConfig(installerConfig *config.Config, logger logrus.FieldLogger, executor execute.Execute) Ops {
 	return &ops{
 		log:             logger,
 		logWriter:       utils.NewLogWriter(logger),
-		cmdEnv:          cmdEnv,
-		installerConfig: installerConfig}
-}
-
-// ExecPrivilegeCommand execute a command in the host environment via nsenter
-
-func (o *ops) ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
-	// nsenter is used here to launch processes inside the container in a way that makes said processes feel
-	// and behave as if they're running on the host directly rather than inside the container
-	commandBase := "nsenter"
-
-	arguments := []string{
-		"--target", "1",
-		// Entering the cgroup namespace is not required for podman on CoreOS (where the
-		// agent typically runs), but it's needed on some Fedora versions and
-		// some other systemd based systems. Those systems are used to run dry-mode
-		// agents for load testing. If this flag is not used, Podman will sometimes
-		// have trouble creating a systemd cgroup slice for new containers.
-		"--cgroup",
-		// The mount namespace is required for podman to access the host's container
-		// storage
-		"--mount",
-		// TODO: Document why we need the IPC namespace
-		"--ipc",
-		"--pid",
-		"--",
-		command,
+		installerConfig: installerConfig,
+		executor:        executor,
 	}
-
-	arguments = append(arguments, args...)
-	return o.ExecCommand(liveLogger, commandBase, arguments...)
-}
-
-type ExecCommandError struct {
-	Command         string
-	Args            []string
-	Env             []string
-	ExitErr         error
-	Output          string
-	WaitStatus      int
-	PullSecretToken string
-}
-
-func removePullSecret(s []string, pullSecretToken string) []string {
-	if pullSecretToken == "" {
-		return s
-	}
-
-	return strings.Split(strings.ReplaceAll(strings.Join(s, " "), pullSecretToken, "<SECRET>"), " ")
-}
-
-func (e *ExecCommandError) Error() string {
-	lastOutput := e.Output
-	if len(e.Output) > 200 {
-		lastOutput = "... " + e.Output[len(e.Output)-200:]
-	}
-	return fmt.Sprintf("failed executing %s %v, Error %s, LastOutput \"%s\"", e.Command, removePullSecret(e.Args, e.PullSecretToken), e.ExitErr, lastOutput)
-}
-
-func (e *ExecCommandError) DetailedError() string {
-	return fmt.Sprintf("failed executing %s %v, env vars %v, error %s, waitStatus %d, Output \"%s\"", e.Command, removePullSecret(e.Args, e.PullSecretToken), removePullSecret(e.Env, e.PullSecretToken), e.ExitErr, e.WaitStatus, e.Output)
-}
-
-// ExecCommand executes command.
-func (o *ops) ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
-
-	var stdoutBuf bytes.Buffer
-	cmd := exec.Command(command, args...)
-	if liveLogger != nil {
-		cmd.Stdout = io.MultiWriter(liveLogger, &stdoutBuf)
-		cmd.Stderr = io.MultiWriter(liveLogger, &stdoutBuf)
-	} else {
-		cmd.Stdout = &stdoutBuf
-		cmd.Stderr = &stdoutBuf
-	}
-	cmd.Env = o.cmdEnv
-	err := cmd.Run()
-	output := strings.TrimSpace(stdoutBuf.String())
-	if err != nil {
-
-		// Get all lines from Error message
-		errorIndex := strings.Index(output, "Error")
-		// if Error not found return all output
-		if errorIndex > -1 {
-			output = output[errorIndex:]
-		}
-
-		execErr := &ExecCommandError{
-			Command:         command,
-			Args:            args,
-			Env:             cmd.Env,
-			ExitErr:         err,
-			Output:          output,
-			PullSecretToken: o.installerConfig.PullSecretToken,
-		}
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
-				execErr.WaitStatus = status.ExitStatus()
-			}
-		}
-		if liveLogger != nil {
-			//If the caller didn't provide liveLogger the log isn't interesting and might spam
-			o.log.Info(execErr.DetailedError())
-		}
-		return output, execErr
-	}
-	o.log.Debug("Command executed:", " command", command, " arguments", removePullSecret(args, o.installerConfig.PullSecretToken), "env vars",
-		removePullSecret(cmd.Env, o.installerConfig.PullSecretToken), "output", output)
-	return output, err
 }
 
 func (o *ops) Mkdir(dirName string) error {
@@ -279,14 +160,6 @@ func (o *ops) FormatDisk(disk string) error {
 		return err
 	}
 	return nil
-}
-
-func installerArgs(ignitionPath string, device string, extra []string) []string {
-	allArgs := []string{"install", "--insecure", "-i", ignitionPath}
-	if extra != nil {
-		allArgs = append(allArgs, extra...)
-	}
-	return append(allArgs, device)
 }
 
 func (o *ops) Reboot() error {
@@ -813,7 +686,7 @@ func (o *ops) GetMustGatherLogs(workDir, kubeconfigPath string, images ...string
 	}
 
 	command := fmt.Sprintf("cd %s && oc --kubeconfig=%s adm must-gather%s", workDir, kubeconfigPath, imageOption)
-	output, err := o.ExecCommand(o.logWriter, "bash", "-c", command)
+	output, err := o.executor.ExecCommand(o.logWriter, "bash", "-c", command)
 	if err != nil {
 		return "", err
 	}
@@ -836,7 +709,7 @@ func (o *ops) GetMustGatherLogs(workDir, kubeconfigPath string, images ...string
 
 	//tar the log directory and return the path to the tarball
 	command = fmt.Sprintf("cd %s && tar zcf %s %s", workDir, MustGatherFileName, logsDir)
-	_, err = o.ExecCommand(o.logWriter, "bash", "-c", command)
+	_, err = o.executor.ExecCommand(o.logWriter, "bash", "-c", command)
 	if err != nil {
 		o.log.WithError(err).Errorf("Failed to tar must-gather logs\n")
 		return "", err
@@ -870,7 +743,7 @@ func (o *ops) CreateManifests(kubeconfig string, content []byte) error {
 
 	// Run oc command that creates the custom manifest:
 	command := fmt.Sprintf("oc --kubeconfig=%s apply -f %s", kubeconfig, file.Name())
-	output, err := o.ExecCommand(o.logWriter, "bash", "-c", command)
+	output, err := o.executor.ExecCommand(o.logWriter, "bash", "-c", command)
 	if err != nil {
 		return err
 	}
@@ -886,4 +759,40 @@ func (o *ops) DryRebootHappened(markerPath string) bool {
 	_, err := o.ExecPrivilegeCommand(nil, "stat", markerPath)
 
 	return err == nil
+}
+
+// ExecPrivilegeCommand execute a command in the host environment via nsenter
+func (o *ops) ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
+	// nsenter is used here to launch processes inside the container in a way that makes said processes feel
+	// and behave as if they're running on the host directly rather than inside the container
+	commandBase := "nsenter"
+
+	arguments := []string{
+		"--target", "1",
+		// Entering the cgroup namespace is not required for podman on CoreOS (where the
+		// agent typically runs), but it's needed on some Fedora versions and
+		// some other systemd based systems. Those systems are used to run dry-mode
+		// agents for load testing. If this flag is not used, Podman will sometimes
+		// have trouble creating a systemd cgroup slice for new containers.
+		"--cgroup",
+		// The mount namespace is required for podman to access the host's container
+		// storage
+		"--mount",
+		// TODO: Document why we need the IPC namespace
+		"--ipc",
+		"--pid",
+		"--",
+		command,
+	}
+
+	arguments = append(arguments, args...)
+	return o.executor.ExecCommand(liveLogger, commandBase, arguments...)
+}
+
+func installerArgs(ignitionPath string, device string, extra []string) []string {
+	allArgs := []string{"install", "--insecure", "-i", ignitionPath}
+	if extra != nil {
+		allArgs = append(allArgs, extra...)
+	}
+	return append(allArgs, device)
 }

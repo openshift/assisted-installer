@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/openshift/assisted-installer/src/ops/execute"
+
 	"github.com/go-openapi/swag"
 	"github.com/google/uuid"
 	"github.com/openshift/assisted-installer/src/main/drymock"
@@ -924,7 +926,8 @@ func RunInstaller(installerConfig *config.Config, logger logrus.FieldLogger) err
 		logger.Fatalf("Failed to create inventory client %e", err)
 	}
 
-	o := ops.NewOpsWithConfig(installerConfig, logger, true)
+	executor := execute.NewExecutor(installerConfig, logger, true)
+	o := ops.NewOpsWithConfig(installerConfig, logger, executor)
 
 	var k8sClientBuilder k8s_client.K8SClientBuilder
 	if !installerConfig.DryRunEnabled {
