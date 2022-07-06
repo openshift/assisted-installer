@@ -35,46 +35,6 @@ func (m *MockOps) EXPECT() *MockOpsMockRecorder {
 	return m.recorder
 }
 
-// ExecPrivilegeCommand mocks base method
-func (m *MockOps) ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
-	m.ctrl.T.Helper()
-	varargs := []interface{}{liveLogger, command}
-	for _, a := range args {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "ExecPrivilegeCommand", varargs...)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ExecPrivilegeCommand indicates an expected call of ExecPrivilegeCommand
-func (mr *MockOpsMockRecorder) ExecPrivilegeCommand(liveLogger, command interface{}, args ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{liveLogger, command}, args...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecPrivilegeCommand", reflect.TypeOf((*MockOps)(nil).ExecPrivilegeCommand), varargs...)
-}
-
-// ExecCommand mocks base method
-func (m *MockOps) ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
-	m.ctrl.T.Helper()
-	varargs := []interface{}{liveLogger, command}
-	for _, a := range args {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "ExecCommand", varargs...)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ExecCommand indicates an expected call of ExecCommand
-func (mr *MockOpsMockRecorder) ExecCommand(liveLogger, command interface{}, args ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{liveLogger, command}, args...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecCommand", reflect.TypeOf((*MockOps)(nil).ExecCommand), varargs...)
-}
-
 // Mkdir mocks base method
 func (m *MockOps) Mkdir(dirName string) error {
 	m.ctrl.T.Helper()
@@ -453,4 +413,24 @@ func (m *MockOps) DryRebootHappened(markerPath string) bool {
 func (mr *MockOpsMockRecorder) DryRebootHappened(markerPath interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DryRebootHappened", reflect.TypeOf((*MockOps)(nil).DryRebootHappened), markerPath)
+}
+
+// ExecPrivilegeCommand mocks base method
+func (m *MockOps) ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{liveLogger, command}
+	for _, a := range args {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ExecPrivilegeCommand", varargs...)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ExecPrivilegeCommand indicates an expected call of ExecPrivilegeCommand
+func (mr *MockOpsMockRecorder) ExecPrivilegeCommand(liveLogger, command interface{}, args ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{liveLogger, command}, args...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecPrivilegeCommand", reflect.TypeOf((*MockOps)(nil).ExecPrivilegeCommand), varargs...)
 }
