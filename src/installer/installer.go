@@ -177,16 +177,14 @@ func (i *installer) InstallNode() error {
 }
 
 func (i *installer) finalize() error {
-	//update installation progress
-	i.UpdateHostInstallProgress(models.HostStageRebooting, "")
 	if i.DryRunEnabled {
+		i.UpdateHostInstallProgress(models.HostStageRebooting, "")
 		_, err := i.ops.ExecPrivilegeCommand(nil, "touch", i.Config.FakeRebootMarkerPath)
 		return errors.Wrap(err, "failed to touch fake reboot marker")
 	}
 
 	// in case ironic-agent exists on the host we should stop the assisted-agent service instead of rebooting the node.
 	// the assisted agent service stop will signal the ironic agent that we are done so that IPA can continue with its flow.
-	// regardless, we update the host install progress to `rebooting` since the node will get rebooted shortly after.
 	ironicAgentServiceName := "ironic-agent.service"
 	out, err := i.ops.ExecPrivilegeCommand(nil, "systemctl", "list-units", "--no-legend", ironicAgentServiceName)
 	if err != nil {
@@ -194,12 +192,12 @@ func (i *installer) finalize() error {
 		return err
 	}
 	if strings.Contains(out, ironicAgentServiceName) {
-		// in case the ironic-agent exists the installer should stop the assisted agent.service
+		i.UpdateHostInstallProgress(models.HostStageRebooting, "Ironic will reboot the node shortly")
 		if err = i.ops.SystemctlAction("stop", "agent.service"); err != nil {
 			return err
 		}
 	} else {
-		//reboot
+		i.UpdateHostInstallProgress(models.HostStageRebooting, "")
 		if err = i.ops.Reboot(); err != nil {
 			return err
 		}

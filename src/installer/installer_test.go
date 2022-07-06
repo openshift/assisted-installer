@@ -629,7 +629,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageInstalling), conf.Role},
 				{string(models.HostStageWritingImageToDisk)},
-				{string(models.HostStageRebooting)},
+				{string(models.HostStageRebooting), "Ironic will reboot the node shortly"},
 			})
 			cleanInstallDevice()
 			mkdirSuccess(InstallDir)
