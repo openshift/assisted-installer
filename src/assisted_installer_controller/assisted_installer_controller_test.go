@@ -90,6 +90,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		"node2": "57df89ee-3546-48a5-859a-0f1459485a66"}
 
 	BeforeEach(func() {
+		dnsValidationTimeout = 1 * time.Millisecond
 		ctrl = gomock.NewController(GinkgoT())
 		mockops = ops.NewMockOps(ctrl)
 		mockbmclient = inventory_client.NewMockInventoryClient(ctrl)
@@ -1036,6 +1037,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		var pod v1.Pod
 		BeforeEach(func() {
 			LogsUploadPeriod = 100 * time.Millisecond
+			dnsValidationTimeout = 1 * time.Millisecond
 			pod = v1.Pod{TypeMeta: metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{Name: "test"}, Spec: v1.PodSpec{}, Status: v1.PodStatus{Phase: "Pending"}}
 		})
@@ -1161,6 +1163,37 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockbmclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 			assistedController.Status.Error()
 			callUploadLogs(50 * time.Millisecond)
+		})
+
+		It("Validate router check will not run with no error", func() {
+			assistedController.HighAvailabilityMode = models.ClusterHighAvailabilityModeNone
+			successUpload()
+			logClusterOperatorsSuccess()
+			mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Times(0).Return(&models.Cluster{Name: "test", BaseDNSDomain: "test.com"}, nil)
+			mockk8sclient.EXPECT().EnableRouterAccessLogs().Times(0).Return(nil)
+			callUploadLogs(50 * time.Millisecond)
+		})
+		It("Validate upload logs not blocked by router validation failure (with must-gather logs)", func() {
+			assistedController.HighAvailabilityMode = models.ClusterHighAvailabilityModeNone
+			successUpload()
+			logClusterOperatorsSuccess()
+			mockbmclient.EXPECT().GetCluster(gomock.Any(), false).MinTimes(1).Return(nil, fmt.Errorf("dummy"))
+			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any(), assistedController.MustGatherImage).Return("../../test_files/tartest.tar.gz", nil).Times(1)
+			mockbmclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
+			assistedController.Status.Error()
+			callUploadLogs(300 * time.Millisecond)
+		})
+		It("Validate upload logs (with must-gather logs) with router status on sno", func() {
+			assistedController.HighAvailabilityMode = models.ClusterHighAvailabilityModeNone
+			successUpload()
+			mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Times(1).Return(&models.Cluster{Name: "test", BaseDNSDomain: "test.com"}, nil)
+			mockk8sclient.EXPECT().EnableRouterAccessLogs().Times(1).Return(nil)
+			logClusterOperatorsSuccess()
+			mockbmclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("dummy")).Times(1)
+			mockbmclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
+			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any(), assistedController.MustGatherImage).Return("../../test_files/tartest.tar.gz", nil).Times(1)
+			assistedController.Status.Error()
+			callUploadLogs(300 * time.Millisecond)
 		})
 	})
 

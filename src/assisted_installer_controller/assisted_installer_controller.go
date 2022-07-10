@@ -2,6 +2,7 @@ package assisted_installer_controller
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"io/ioutil"
 	"math"
 	"net"
+	"net/http"
 	"os"
 	"path"
 	"strings"
@@ -70,6 +72,7 @@ var (
 	FetchRetryInterval       = 10 * time.Second
 	LongWaitTimeout          = 10 * time.Hour
 	CVOMaxTimeout            = 3 * time.Hour
+	dnsValidationTimeout     = 10 * time.Second
 )
 
 // assisted installer controller is added to control installation process after  bootstrap pivot
@@ -1075,6 +1078,71 @@ func (c controller) logClusterOperatorsStatus() {
 	}
 }
 
+// This is temporary function, till https://bugzilla.redhat.com/show_bug.cgi?id=2097041 will not be resolved,
+//that should validate router state only in case of failure
+// It will patch router to add access logs
+// It will run http router health check to see if router is healthy on host network
+func (c controller) logRouterStatus() {
+	if !c.Status.HasError() || c.HighAvailabilityMode != models.ClusterHighAvailabilityModeNone {
+		return
+	}
+	c.log.Infof("Start checking router status")
+	var cl *models.Cluster
+	var err error
+	patched := false
+	//nolint:gosec // need insecure TLS option for testing and development
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr, Timeout: dnsValidationTimeout}
+	localIp, _ := utils.GetOutboundIP()
+	if localIp == "" {
+		localIp = "localhost"
+	}
+
+	var consoleUrl string
+	// run every 30 seconds router check and log the result
+	go func() {
+		_ = utils.WaitForPredicate(WaitTimeout, SummaryLogsPeriod, func() bool {
+			if consoleUrl == "" {
+				cl, err = c.ic.GetCluster(context.Background(), false)
+				if err != nil {
+					c.log.WithError(err).Errorf("Failed to get cluster %s from assisted-service", c.ClusterID)
+					return false
+				}
+			}
+
+			consoleUrl = fmt.Sprintf("https://console-openshift-console.apps.%s.%s/health", cl.Name, cl.BaseDNSDomain)
+			r, err := client.Get(consoleUrl)
+			if err != nil {
+				c.log.WithError(err).Warning("Failed to reach console")
+			} else {
+				c.log.Infof("console url status %s", r.Status)
+			}
+
+			url := fmt.Sprintf("http://%s/_______internal_router_healthz", localIp)
+			r, err = client.Get(url)
+			if err != nil {
+				c.log.WithError(err).Warning("Failed to reach internal router health")
+			} else {
+				c.log.Infof("route internal health status %s", r.Status)
+			}
+
+			if !patched {
+
+				c.log.Infof("Enabling router access logs, router call can fail after it")
+				err = c.kc.EnableRouterAccessLogs()
+				if err != nil {
+					c.log.WithError(err).Errorf("Failed to enable router logs")
+				} else {
+					patched = true
+				}
+			}
+			return false
+		})
+	}()
+}
+
 /**
  * This function upload the following logs at once to the service at the end of the installation process
  * It takes a lenient approach so if some logs are not available it ignores them and moves on
@@ -1240,6 +1308,7 @@ func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup) {
 			if podName != "" {
 				c.log.Infof("Upload final controller and cluster logs before exit")
 				c.ic.ClusterLogProgressReport(progressCtx, c.ClusterID, models.LogsStateRequested)
+				c.logRouterStatus()
 				_ = utils.WaitForPredicate(WaitTimeout, SummaryLogsPeriod, func() bool {
 					err := c.uploadSummaryLogs(podName, c.Namespace, controllerLogsSecondsAgo)
 					if err != nil {

@@ -49,6 +49,7 @@ type K8SClient interface {
 	ListMasterNodes() (*v1.NodeList, error)
 	PatchEtcd() error
 	UnPatchEtcd() error
+	EnableRouterAccessLogs() error
 	PatchControlPlaneReplicas() error
 	UnPatchControlPlaneReplicas() error
 	ListNodes() (*v1.NodeList, error)
@@ -221,6 +222,18 @@ func (c *k8sClient) UnPatchEtcd() error {
 	result, err := c.ocClient.OperatorV1().Etcds().Patch(context.Background(), "cluster", types.MergePatchType, data, metav1.PatchOptions{})
 	if err != nil {
 		return errors.Wrap(err, "Failed to unpatch etcd")
+	}
+	c.log.Info(result)
+	return nil
+}
+
+func (c *k8sClient) EnableRouterAccessLogs() error {
+	c.log.Info("Enabling router logs")
+	data := []byte(`{"spec":{"logging":{"access":{"destination":{"type":"Container"}}}}}`)
+	result, err := c.ocClient.OperatorV1().IngressControllers("openshift-ingress-operator").Patch(context.Background(),
+		"default", types.MergePatchType, data, metav1.PatchOptions{})
+	if err != nil {
+		return errors.Wrap(err, "Failed to patch router")
 	}
 	c.log.Info(result)
 	return nil
