@@ -310,3 +310,19 @@ func ClusterOperatorConditionsToMonitoredOperatorStatus(conditions []configv1.Cl
 
 	return models.OperatorStatusProgressing, ""
 }
+
+// Get preferred outbound ip of this machine
+func GetOutboundIP() (string, error) {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr()
+	if localAddr == nil {
+		return "", fmt.Errorf("no address was found")
+	}
+
+	return localAddr.(*net.UDPAddr).IP.String(), nil
+}
