@@ -147,7 +147,8 @@ func CreateInventoryClientWithDelay(clusterId string, inventoryURL string, pullS
 	clientConfig.AuthInfo = auth.AgentAuthHeaderWriter(pullSecret)
 	assistedInstallClient := client.New(clientConfig)
 	cache := ttlCache.NewCache()
-	cache.SetTTL(30 * time.Second)
+	cache.SetTTL(20 * time.Second)
+	cache.SkipTTLExtensionOnHit(true)
 
 	return &inventoryClient{assistedInstallClient, strfmt.UUID(clusterId), logger, cache}, nil
 }
@@ -281,7 +282,6 @@ func (c *inventoryClient) getMonitoredOperators(ctx context.Context, clusterId s
 	if err != nil {
 		return nil, aserror.GetAssistedError(err)
 	}
-
 	c.cache.Set(cacheKey, monitoredOperators.Payload)
 	return monitoredOperators.Payload, nil
 }
