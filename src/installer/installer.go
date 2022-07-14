@@ -67,6 +67,7 @@ type installer struct {
 	inventoryClient inventory_client.InventoryClient
 	kcBuilder       k8s_client.K8SClientBuilder
 	ign             ignition.Ignition
+	inTest          bool
 }
 
 func NewAssistedInstaller(log logrus.FieldLogger, cfg config.Config, ops ops.Ops, ic inventory_client.InventoryClient, kcb k8s_client.K8SClientBuilder, ign ignition.Ignition) *installer {
@@ -77,6 +78,7 @@ func NewAssistedInstaller(log logrus.FieldLogger, cfg config.Config, ops ops.Ops
 		inventoryClient: ic,
 		kcBuilder:       kcb,
 		ign:             ign,
+		inTest:          true,
 	}
 }
 
@@ -176,6 +178,16 @@ func (i *installer) InstallNode() error {
 	return i.finalize()
 }
 
+func (i *installer) randomSleep() {
+	bId := []byte(i.HostID)
+	var sum uint64
+	for _, b := range bId {
+		sum = sum*2 + uint64(b)
+	}
+	sleepSecs := sum % (30 * 60)
+	time.Sleep(time.Duration(sleepSecs) * time.Second)
+}
+
 func (i *installer) finalize() error {
 	if i.DryRunEnabled {
 		i.UpdateHostInstallProgress(models.HostStageRebooting, "")
@@ -183,6 +195,9 @@ func (i *installer) finalize() error {
 		return errors.Wrap(err, "failed to touch fake reboot marker")
 	}
 
+	if i.Config.Role == string(models.HostRoleWorker) && !i.inTest {
+		i.randomSleep()
+	}
 	// in case ironic-agent exists on the host we should stop the assisted-agent service instead of rebooting the node.
 	// the assisted agent service stop will signal the ironic agent that we are done so that IPA can continue with its flow.
 	ironicAgentServiceName := "ironic-agent.service"
@@ -941,6 +956,7 @@ func RunInstaller(installerConfig *config.Config, logger logrus.FieldLogger) err
 		k8sClientBuilder,
 		ignition.NewIgnition(),
 	)
+	ai.inTest = false
 
 	// Try to format requested disks. May fail formatting some disks, this is not an error.
 	ai.FormatDisks()
