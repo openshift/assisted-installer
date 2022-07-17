@@ -39,11 +39,15 @@ var _ = Describe("verify common", func() {
 			node0Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f238")
 			node1Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f239")
 			node2Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f240")
-			testInventoryIdsIps := map[string]inventory_client.HostData{"node0": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node0Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}, Role: models.HostRoleMaster},
-				IPs: []string{"192.168.126.10", "192.168.11.122", "fe80::5054:ff:fe9a:4738"}},
-				"node1": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node1Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}, Role: models.HostRoleMaster}, IPs: []string{"192.168.126.11", "192.168.11.123", "fe80::5054:ff:fe9a:4739"}},
-				"node2": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node2Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}, Role: models.HostRoleWorker}, IPs: []string{"192.168.126.12", "192.168.11.124", "fe80::5054:ff:fe9a:4740"}}}
+			testInventoryIdsIps := map[string]inventory_client.HostData{
+				"node0": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node0Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}, Role: models.HostRoleMaster},
+					IPs: []string{"192.168.126.10", "192.168.11.122", "fe80::5054:ff:fe9a:4738"}},
+				"node1": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node1Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting}, Role: models.HostRoleMaster},
+					IPs: []string{"192.168.126.11", "192.168.11.123", "fe80::5054:ff:fe9a:4739"}},
+				"node2": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node2Id, Progress: &models.HostProgressInfo{CurrentStage: models.HostStageRebooting},
+					Role: models.HostRoleWorker}, IPs: []string{"192.168.126.12", "192.168.11.124", "fe80::5054:ff:fe9a:4740"}}}
 			// note that in the MCS log we use node 1 IPv6 address
+			// note that node0 IP address (192.168.126.10) is a substring of 192.168.126.100 in the MCS log
 			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), infraEnvId.String(), node1Id.String(), models.HostStageConfiguring, gomock.Any()).Return(fmt.Errorf("dummy")).Times(1)
 			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), infraEnvId.String(), node2Id.String(), models.HostStageWaitingForIgnition, gomock.Any()).Return(nil).Times(1)
 			SetConfiguringStatusForHosts(mockbmclient, testInventoryIdsIps, logs, true, l)
@@ -54,9 +58,9 @@ var _ = Describe("verify common", func() {
 			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), infraEnvId.String(), node1Id.String(), models.HostStageConfiguring, gomock.Any()).Return(nil).Times(1)
 			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), infraEnvId.String(), node2Id.String(), models.HostStageConfiguring, gomock.Any()).Return(nil).Times(1)
 			SetConfiguringStatusForHosts(mockbmclient, testInventoryIdsIps, logs, false, l)
+			Expect(testInventoryIdsIps["node0"].Host.Progress.CurrentStage).Should(Equal(models.HostStageRebooting))
 			Expect(testInventoryIdsIps["node1"].Host.Progress.CurrentStage).Should(Equal(models.HostStageConfiguring))
 			Expect(testInventoryIdsIps["node2"].Host.Progress.CurrentStage).Should(Equal(models.HostStageConfiguring))
-			Expect(testInventoryIdsIps["node0"].Host.Progress.CurrentStage).Should(Equal(models.HostStageRebooting))
 		})
 	})
 
