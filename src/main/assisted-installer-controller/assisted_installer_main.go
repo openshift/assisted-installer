@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"io"
 	"log"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/openshift/assisted-installer/src/common"
 
 	"github.com/openshift/assisted-installer/src/ops/execute"
 
@@ -65,6 +68,13 @@ func main() {
 			time.Sleep(time.Second * 1)
 		}
 	}
+
+	logFile, err := os.OpenFile(common.ControllerLogFIle, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	mw := io.MultiWriter(os.Stdout, logFile)
+	logger.SetOutput(mw)
 
 	logger.Infof("Start running Assisted-Controller. Configuration is:\n %s", secretdump.DumpSecretStruct(Options.ControllerConfig))
 
