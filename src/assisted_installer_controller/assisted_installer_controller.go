@@ -1305,33 +1305,27 @@ func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup) {
 	for {
 		select {
 		case <-ctx.Done():
-			if podName != "" {
-				c.log.Infof("Upload final controller and cluster logs before exit")
-				c.ic.ClusterLogProgressReport(progressCtx, c.ClusterID, models.LogsStateRequested)
-				c.logRouterStatus()
-				_ = utils.WaitForPredicate(WaitTimeout, SummaryLogsPeriod, func() bool {
-					err := c.uploadSummaryLogs(podName, c.Namespace, controllerLogsSecondsAgo)
-					if err != nil {
-						c.log.Infof("retry uploading logs in 30 seconds...")
-					}
-					return err == nil
-				})
-			}
+			c.log.Infof("Upload final controller and cluster logs before exit")
+			c.ic.ClusterLogProgressReport(progressCtx, c.ClusterID, models.LogsStateRequested)
+			c.logRouterStatus()
+			_ = utils.WaitForPredicate(WaitTimeout, SummaryLogsPeriod, func() bool {
+				err := c.uploadSummaryLogs(podName, c.Namespace, controllerLogsSecondsAgo)
+				if err != nil {
+					c.log.Infof("retry uploading logs in 30 seconds...")
+				}
+				return err == nil
+			})
 			c.ic.ClusterLogProgressReport(progressCtx, c.ClusterID, models.LogsStateCompleted)
 			return
 		case <-ticker.C:
 			if podName == "" {
 				pods, err := c.kc.GetPods(c.Namespace, map[string]string{"job-name": "assisted-installer-controller"},
 					fmt.Sprintf("status.phase=%s", v1.PodRunning))
-				if err != nil {
+				if err != nil || len(pods) < 1 {
 					c.log.WithError(err).Warnf("Failed to get controller pod name")
-					continue
+				} else {
+					podName = pods[0].Name
 				}
-				if len(pods) < 1 {
-					c.log.Infof("Didn't find myself, something strange had happened")
-					continue
-				}
-				podName = pods[0].Name
 			}
 
 			//on normal flow, keep updating the controller log output every 5 minutes

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -1036,15 +1037,18 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	Context("Upload logs", func() {
 		var pod v1.Pod
 		BeforeEach(func() {
+			_, err := os.OpenFile(common.ControllerLogFIle, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+			Expect(err).ShouldNot(HaveOccurred())
 			LogsUploadPeriod = 100 * time.Millisecond
 			dnsValidationTimeout = 1 * time.Millisecond
 			pod = v1.Pod{TypeMeta: metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{Name: "test"}, Spec: v1.PodSpec{}, Status: v1.PodStatus{Phase: "Pending"}}
 		})
-		It("Validate upload logs, get pod fails", func() {
+		It("Validate upload logs, upload from file if get pods fails", func() {
 			logClusterOperatorsSuccess()
 			reportLogProgressSuccess()
 			mockk8sclient.EXPECT().GetPods(assistedController.Namespace, gomock.Any(), fmt.Sprintf("status.phase=%s", v1.PodRunning)).Return(nil, fmt.Errorf("dummy")).MinTimes(2).MaxTimes(10)
+			mockbmclient.EXPECT().UploadLogs(gomock.Any(), assistedController.ClusterID, models.LogsTypeController, gomock.Any()).Return(nil).MinTimes(1)
 			ctx, cancel := context.WithCancel(context.Background())
 			wg.Add(1)
 			go assistedController.UploadLogs(ctx, &wg)
@@ -1052,7 +1056,22 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			cancel()
 			wg.Wait()
 		})
-		It("Validate upload logs, Get pods logs failed", func() {
+		It("Validate upload log still sent even if GetPodLogsAsBuffer fails and log file doesn't exists", func() {
+			logClusterOperatorsSuccess()
+			reportLogProgressSuccess()
+			err := os.Remove(common.ControllerLogFIle)
+			Expect(err).ShouldNot(HaveOccurred())
+			mockk8sclient.EXPECT().GetPods(assistedController.Namespace, gomock.Any(), fmt.Sprintf("status.phase=%s", v1.PodRunning)).Return([]v1.Pod{pod}, nil).MinTimes(1)
+			mockk8sclient.EXPECT().GetPodLogsAsBuffer(assistedController.Namespace, "test", gomock.Any()).Return(nil, fmt.Errorf("dummy")).MinTimes(1)
+			mockbmclient.EXPECT().UploadLogs(gomock.Any(), assistedController.ClusterID, models.LogsTypeController, gomock.Any()).Return(nil).MinTimes(1)
+			ctx, cancel := context.WithCancel(context.Background())
+			wg.Add(1)
+			go assistedController.UploadLogs(ctx, &wg)
+			time.Sleep(500 * time.Millisecond)
+			cancel()
+			wg.Wait()
+		})
+		It("Validate upload logs, upload from file if GetPodLogsAsBuffer fails", func() {
 			logClusterOperatorsSuccess()
 			reportLogProgressSuccess()
 			mockk8sclient.EXPECT().GetPods(assistedController.Namespace, gomock.Any(), fmt.Sprintf("status.phase=%s", v1.PodRunning)).Return([]v1.Pod{pod}, nil).MinTimes(1)
@@ -1065,7 +1084,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			cancel()
 			wg.Wait()
 		})
-
 		It("Validate upload logs (controllers logs only), Upload failed", func() {
 			r := bytes.NewBuffer([]byte("test"))
 			mockk8sclient.EXPECT().GetPodLogsAsBuffer(assistedController.Namespace, "test", gomock.Any()).Return(r, nil).Times(1)

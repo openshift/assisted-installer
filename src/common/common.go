@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"regexp"
 	"strings"
 
@@ -21,6 +22,7 @@ const (
 	ControllerLogsSecondsAgo       = 60 * 60
 	AssistedControllerIsReadyEvent = "AssistedControllerIsReady"
 	AssistedControllerPrefix       = "assisted-installer-controller"
+	ControllerLogFIle              = "/tmp/contoller_logs.log"
 )
 
 func GetHostsInStatus(hosts map[string]inventory_client.HostData, status []string, isMatch bool) map[string]inventory_client.HostData {
@@ -93,14 +95,28 @@ func GetPodInStatus(k8Client k8s_client.K8SClient, podNamePrefix string, namespa
 // write tar.gz to pipe in a routine
 // upload tar.gz from pipe to assisted service.
 // close read and write pipes
+// if podName is empty, the controller will upload its own logs from the local controller log file
 func UploadPodLogs(kc k8s_client.K8SClient, ic inventory_client.InventoryClient, clusterId string, podName string, namespace string,
 	sinceSeconds int64, log logrus.FieldLogger) error {
 	log.Infof("Uploading logs for %s in %s", podName, namespace)
-	podLogs, err := kc.GetPodLogsAsBuffer(namespace, podName, sinceSeconds)
-	if err != nil {
-		podLogs = &bytes.Buffer{}
-		podLogs.WriteString(errors.Wrapf(err, "Failed to get logs of pod %s", podName).Error())
+	var podLogs *bytes.Buffer
+	var err error
+	if podName != "" {
+		podLogs, err = kc.GetPodLogsAsBuffer(namespace, podName, sinceSeconds)
+		if err != nil {
+			log.WithError(err).Error("Failed to get logs from kube-api, reading from file")
+		}
 	}
+	if podName == "" || err != nil {
+		log.Infof("Reading logs from file")
+		logs, errF := ioutil.ReadFile(ControllerLogFIle)
+		if errF != nil {
+			log.WithError(errF).Warnf("Failed to read %s", ControllerLogFIle)
+			logs = []byte(fmt.Sprintf("Failed to get logs from kube-api and from file. Read file err %e, kube-api err %e", errF, err))
+		}
+		podLogs = bytes.NewBuffer(logs)
+	}
+
 	pr, pw := io.Pipe()
 	defer pr.Close()
 
