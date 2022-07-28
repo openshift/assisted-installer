@@ -810,6 +810,7 @@ func (o *ops) CreateManifests(kubeconfig string, content []byte) error {
 	defer os.Remove(file.Name())
 
 	// Write the content to the temporary file:
+	// #nosec
 	if err = ioutil.WriteFile(file.Name(), content, 0644); err != nil {
 		return err
 	}

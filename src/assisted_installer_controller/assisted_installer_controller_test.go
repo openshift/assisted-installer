@@ -236,7 +236,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockbmclient.EXPECT().GetClusterMonitoredOLMOperators(gomock.Any(), gomock.Any(), gomock.Any()).Return(operators, nil).Times(1)
 		mockbmclient.EXPECT().DownloadFile(gomock.Any(), customManifestsFile, gomock.Any()).DoAndReturn(
 			func(ctx context.Context, filename, dest string) error {
-				if err := ioutil.WriteFile(dest, []byte("[]"), 0644); err != nil {
+				if err := ioutil.WriteFile(dest, []byte("[]"), 0600); err != nil {
 					return err
 				}
 				return nil
