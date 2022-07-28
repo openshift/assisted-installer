@@ -238,7 +238,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockbmclient.EXPECT().GetClusterMonitoredOLMOperators(gomock.Any(), gomock.Any(), gomock.Any()).Return(operators, nil).Times(1)
 		mockbmclient.EXPECT().DownloadFile(gomock.Any(), customManifestsFile, gomock.Any()).DoAndReturn(
 			func(ctx context.Context, filename, dest string) error {
-				if err := ioutil.WriteFile(dest, []byte("[]"), 0644); err != nil {
+				if err := ioutil.WriteFile(dest, []byte("[]"), 0600); err != nil {
 					return err
 				}
 				return nil
@@ -903,8 +903,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled, models.HostStatusError}).
 					Return(hosts, nil).Times(1)
 				nodes := GetKubeNodes(kubeNamesIds)
-				for _, node := range nodes.Items {
-					mockk8sclient.EXPECT().GetNode(node.Name).Return(&node, nil).Times(1)
+				for i := range nodes.Items {
+					mockk8sclient.EXPECT().GetNode(nodes.Items[i].Name).Return(&nodes.Items[i], nil).Times(1)
 				}
 				mockk8sclient.EXPECT().PatchNodeLabels(gomock.Any(), nodeLabels).Return(nil).Times(3)
 
