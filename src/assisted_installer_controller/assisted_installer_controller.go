@@ -1112,7 +1112,7 @@ func (c controller) logRouterStatus() {
 				}
 			}
 
-			consoleUrl = fmt.Sprintf("https://console-openshift-console.apps.%s.%s/health", cl.Name, cl.BaseDNSDomain)
+			consoleUrl = fmt.Sprintf("https://canary-openshift-ingress-canary.apps.%s.%s/health", cl.Name, cl.BaseDNSDomain)
 			r, err := client.Get(consoleUrl)
 			if err != nil {
 				c.log.WithError(err).Warning("Failed to reach console")
