@@ -65,7 +65,7 @@ func (c *Config) ProcessArgs(args []string) {
 	flagSet.StringVar(&c.AgentImage, "agent-image", "quay.io/ocpmetal/assisted-installer-agent:latest",
 		"Assisted Installer Agent image URL that will be used to send logs on successful installation")
 	flagSet.BoolVar(&c.SkipCertVerification, "insecure", false, "Do not validate TLS certificate")
-	flagSet.StringVar(&c.CACertPath, "cacert", "", "Path to custom CA certificate in PEM format")
+	flagSet.StringVar(&c.CACertPath, "cacert", "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem", "Path to custom CA certificate in PEM format")
 	flagSet.StringVar(&c.HTTPProxy, "http-proxy", "", "A proxy URL to use for creating HTTP connections outside the cluster")
 	flagSet.StringVar(&c.HTTPSProxy, "https-proxy", "", "A proxy URL to use for creating HTTPS connections outside the cluster")
 	flagSet.StringVar(&c.NoProxy, "no-proxy", "", "A comma-separated list of destination domain names, domains, IP addresses, or other network CIDRs to exclude proxying")
