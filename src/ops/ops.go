@@ -510,7 +510,12 @@ func (o *ops) getRaidDevices2Members() (map[string][]string, error) {
 		}
 
 		fields := strings.Fields(lines[i])
-		raidDeviceName := fields[1]
+		// In case of symlink, get real file path
+		raidDeviceName, err := filepath.EvalSymlinks(fields[1])
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to evaluate raid symlink")
+		}
+
 		i++
 
 		// Ensuring that we have at least two lines per device.
