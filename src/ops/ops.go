@@ -39,7 +39,7 @@ type Ops interface {
 	ExtractFromIgnition(ignitionPath string, fileToExtract string) error
 	SystemctlAction(action string, args ...string) error
 	PrepareController() error
-	GetVGByPV(pvName string) (string, error)
+	GetVolumeGroupsByDisk(diskName string) ([]string, error)
 	RemoveVG(vgName string) error
 	RemoveLV(lvName, vgName string) error
 	RemovePV(pvName string) error
@@ -368,11 +368,13 @@ func (o *ops) renderDeploymentFiles(srcTemplate string, params map[string]interf
 	return nil
 }
 
-func (o *ops) GetVGByPV(pvName string) (string, error) {
+func (o *ops) GetVolumeGroupsByDisk(diskName string) ([]string, error) {
+	var vgs []string
+
 	output, err := o.ExecPrivilegeCommand(o.logWriter, "vgs", "--noheadings", "-o", "vg_name,pv_name")
 	if err != nil {
 		o.log.Errorf("Failed to list VGs in the system")
-		return "", err
+		return vgs, err
 	}
 
 	lines := strings.Split(output, "\n")
@@ -382,11 +384,11 @@ func (o *ops) GetVGByPV(pvName string) (string, error) {
 			continue
 		}
 
-		if strings.Contains(res[1], pvName) {
-			return res[0], nil
+		if strings.Contains(res[1], diskName) {
+			vgs = append(vgs, res[0])
 		}
 	}
-	return "", nil
+	return vgs, nil
 }
 
 func (o *ops) RemoveVG(vgName string) error {
