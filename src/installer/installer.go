@@ -697,7 +697,7 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 }
 
 func (i *installer) cleanupInstallDevice() error {
-	if config.GlobalDryRunConfig.DryRunEnabled {
+	if config.GlobalDryRunConfig.DryRunEnabled || i.Config.SkipInstallationDiskCleanup {
 		return nil
 	}
 
