@@ -63,6 +63,10 @@ type K8SClient interface {
 	GetPods(namespace string, labelMatch map[string]string, fieldSelector string) ([]corev1.Pod, error)
 	GetCSV(namespace string, name string) (*olmv1alpha1.ClusterServiceVersion, error)
 	GetCSVFromSubscription(namespace string, name string) (string, error)
+	GetSubscription(subscription types.NamespacedName) (*olmv1alpha1.Subscription, error)
+	GetAllInstallPlansOfSubscription(subscription types.NamespacedName) ([]types.NamespacedName, error)
+	MakeSubscriptionAutomatic(subscription types.NamespacedName) error
+	DeleteInstallPlan(installPlan types.NamespacedName) error
 	IsMetalProvisioningExists() (bool, error)
 	ListBMHs() (metal3v1alpha1.BareMetalHostList, error)
 	GetBMH(name string) (*metal3v1alpha1.BareMetalHost, error)
@@ -600,7 +604,56 @@ func (c *k8sClient) GetCSVFromSubscription(namespace string, name string) (strin
 	return result.Status.CurrentCSV, nil
 }
 
-func (c *k8sClient) GetNode(name string) (*v1.Node, error) {
+func (c *k8sClient) GetSubscription(subscription types.NamespacedName) (*olmv1alpha1.Subscription, error) {
+	result, err := c.olmClient.Subscriptions(subscription.Namespace).Get(context.TODO(), subscription.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (c *k8sClient) GetAllInstallPlansOfSubscription(subscription types.NamespacedName) ([]types.NamespacedName, error) {
+	allInstallPlans, err := c.olmClient.InstallPlans(subscription.Namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	installPlansOwnedBySubscription := []types.NamespacedName{}
+	for _, plan := range allInstallPlans.Items {
+		for _, owner := range plan.OwnerReferences {
+			if owner.Name == subscription.Name {
+				installPlansOwnedBySubscription = append(installPlansOwnedBySubscription,
+					types.NamespacedName{
+						Namespace: plan.Namespace,
+						Name:      plan.Name,
+					},
+				)
+			}
+		}
+	}
+
+	return installPlansOwnedBySubscription, nil
+}
+
+func (c *k8sClient) MakeSubscriptionAutomatic(subscription types.NamespacedName) error {
+	subscriptionResource, err := c.GetSubscription(subscription)
+	if err != nil {
+		return err
+	}
+
+	subscriptionResource.Spec.InstallPlanApproval = olmv1alpha1.ApprovalAutomatic
+
+	_, err = c.olmClient.Subscriptions(subscription.Namespace).Update(context.TODO(), subscriptionResource, metav1.UpdateOptions{})
+	return err
+}
+
+func (c *k8sClient) DeleteInstallPlan(installPlan types.NamespacedName) error {
+	return c.olmClient.InstallPlans(installPlan.Namespace).Delete(context.TODO(),
+		installPlan.Name, metav1.DeleteOptions{})
+}
+
+func (c *k8sClient) GetNode(name string) (*corev1.Node, error) {
 	node, err := c.client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return &corev1.Node{}, err

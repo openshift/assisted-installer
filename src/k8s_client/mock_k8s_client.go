@@ -16,6 +16,8 @@ import (
 	v1alpha10 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	v10 "k8s.io/api/certificates/v1"
 	v11 "k8s.io/api/core/v1"
+	types "k8s.io/apimachinery/pkg/types"
+	reflect "reflect"
 )
 
 // MockK8SClient is a mock of K8SClient interface
@@ -288,6 +290,64 @@ func (m *MockK8SClient) GetCSVFromSubscription(namespace, name string) (string, 
 func (mr *MockK8SClientMockRecorder) GetCSVFromSubscription(namespace, name interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCSVFromSubscription", reflect.TypeOf((*MockK8SClient)(nil).GetCSVFromSubscription), namespace, name)
+}
+
+// GetSubscription mocks base method
+func (m *MockK8SClient) GetSubscription(subscription types.NamespacedName) (*v1alpha10.Subscription, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSubscription", subscription)
+	ret0, _ := ret[0].(*v1alpha10.Subscription)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSubscription indicates an expected call of GetSubscription
+func (mr *MockK8SClientMockRecorder) GetSubscription(subscription interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubscription", reflect.TypeOf((*MockK8SClient)(nil).GetSubscription), subscription)
+}
+
+// GetAllInstallPlansOfSubscription mocks base method
+func (m *MockK8SClient) GetAllInstallPlansOfSubscription(subscription types.NamespacedName) ([]types.NamespacedName, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAllInstallPlansOfSubscription", subscription)
+	ret0, _ := ret[0].([]types.NamespacedName)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAllInstallPlansOfSubscription indicates an expected call of GetAllInstallPlansOfSubscription
+func (mr *MockK8SClientMockRecorder) GetAllInstallPlansOfSubscription(subscription interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllInstallPlansOfSubscription", reflect.TypeOf((*MockK8SClient)(nil).GetAllInstallPlansOfSubscription), subscription)
+}
+
+// MakeSubscriptionAutomatic mocks base method
+func (m *MockK8SClient) MakeSubscriptionAutomatic(subscription types.NamespacedName) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MakeSubscriptionAutomatic", subscription)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MakeSubscriptionAutomatic indicates an expected call of MakeSubscriptionAutomatic
+func (mr *MockK8SClientMockRecorder) MakeSubscriptionAutomatic(subscription interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MakeSubscriptionAutomatic", reflect.TypeOf((*MockK8SClient)(nil).MakeSubscriptionAutomatic), subscription)
+}
+
+// DeleteInstallPlan mocks base method
+func (m *MockK8SClient) DeleteInstallPlan(installPlan types.NamespacedName) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteInstallPlan", installPlan)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteInstallPlan indicates an expected call of DeleteInstallPlan
+func (mr *MockK8SClientMockRecorder) DeleteInstallPlan(installPlan interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteInstallPlan", reflect.TypeOf((*MockK8SClient)(nil).DeleteInstallPlan), installPlan)
 }
 
 // IsMetalProvisioningExists mocks base method

@@ -143,14 +143,85 @@ func (handler OLMOperatorHandler) HasCSVBeenCreated() bool {
 		return false
 	}
 
-	if csvName == "" {
+	if _, err := handler.kc.GetCSV(handler.operator.Namespace, csvName); err != nil {
+		_ = handler.handleOLMEarlySetupBug()
 		return false
 	}
 
 	return true
 }
 
-func (handler ClusterServiceVersionHandler) GetStatus() (models.OperatorStatus, string, error) {
+// handleOLMEarlySetupBug converts all manual subscriptions created by the
+// Assisted Service into automatic ones. Some versions of the Assisted Service
+// apply the subscription as manual (as opposed to automatic), expecting the
+// Assisted Controller to take care of it once the cluster is up. The service
+// does this because subscriptions created too early in the installation
+// process might fail operator installation, and OLM will not retry installing
+// them. That's why we prefer to initially create them as manual and only once
+// the cluster is at a later stage of the installation and our Assisted
+// Controller is up, we convert them to automatic to trigger their installation
+// which at this point is more likely to succeed.
+func (handler OLMOperatorHandler) handleOLMEarlySetupBug() error {
+	isManual, err := handler.IsSubscriptionManual()
+	if err != nil {
+		return err
+	}
+
+	if isManual {
+		err := handler.kc.MakeSubscriptionAutomatic(types.NamespacedName{
+			Name:      handler.operator.SubscriptionName,
+			Namespace: handler.operator.Namespace,
+		})
+		if err != nil {
+			return err
+		}
+
+		// OLM for some reason doesn't reconcile the subscription becoming
+		// automatic, so we have to delete all the install plans to force OLM
+		// to re-create them as automatic install plans
+		err = handler.deleteSubscriptionInstallPlans()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (handler OLMOperatorHandler) deleteSubscriptionInstallPlans() error {
+	subscriptionInstallPlans, err := handler.kc.GetAllInstallPlansOfSubscription(types.NamespacedName{
+		Name:      handler.operator.SubscriptionName,
+		Namespace: handler.operator.Namespace,
+	})
+	if err != nil {
+		return err
+	}
+
+	for _, installPlan := range subscriptionInstallPlans {
+		if err := handler.kc.DeleteInstallPlan(types.NamespacedName{
+			Name:      installPlan.Name,
+			Namespace: installPlan.Namespace,
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (handler OLMOperatorHandler) IsSubscriptionManual() (bool, error) {
+	subscription, err := handler.kc.GetSubscription(types.NamespacedName{
+		Namespace: handler.operator.Namespace,
+		Name:      handler.operator.SubscriptionName,
+	})
+	if err != nil {
+		return false, err
+	}
+
+	return subscription.Spec.InstallPlanApproval == olmv1alpha1.ApprovalManual, nil
+}
+
+func (handler OLMOperatorHandler) GetStatus() (models.OperatorStatus, string, error) {
 	csvName, err := handler.kc.GetCSVFromSubscription(handler.operator.Namespace, handler.operator.SubscriptionName)
 	if err != nil {
 		return "", "", err
