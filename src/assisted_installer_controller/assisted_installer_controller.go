@@ -547,8 +547,10 @@ func (c controller) waitForOLMOperators(ctx context.Context) error {
 func (c controller) getReadyOperators(operators []models.MonitoredOperator) ([]string, []models.MonitoredOperator, error) {
 	var readyOperators []string
 	for index := range operators {
-		handler := NewClusterServiceVersionHandler(c.kc, &operators[index], c.Status)
+		handler := NewClusterServiceVersionHandler(c.log, c.kc, &operators[index], c.Status)
+		c.log.Infof("Checking if %s operator is initialized", operators[index].Name)
 		if handler.IsInitialized() {
+			c.log.Infof("%s operator is initialized", operators[index].Name)
 			readyOperators = append(readyOperators, handler.GetName())
 		}
 	}
@@ -556,6 +558,7 @@ func (c controller) getReadyOperators(operators []models.MonitoredOperator) ([]s
 }
 
 func (c controller) waitForCSVBeCreated(arg interface{}) bool {
+	c.log.Infof("Waiting for csv to be created")
 	operators := arg.([]models.MonitoredOperator)
 	readyOperators, operators, err := c.getReadyOperators(operators)
 	if err != nil {
@@ -609,19 +612,19 @@ func (c controller) applyPostInstallManifests(arg interface{}) bool {
 	}
 
 	c.log.Infof("Ready operators to be applied: %v", readyOperators)
+	applyErrOccured := false
+	ocpVer, err := version.NewVersion(c.OpenshiftVersion)
+	if err != nil {
+		return false
+	}
+	constraints, err := version.NewConstraint(">= 4.8, < 4.9")
+	if err != nil {
+		return false
+	}
 
 	for _, manifest := range manifests {
-		v1, err := version.NewVersion(c.OpenshiftVersion)
-		if err != nil {
-			return false
-		}
-		constraints, err := version.NewConstraint(">= 4.8, < 4.9")
-		if err != nil {
-			return false
-		}
-
 		// renaming odf if ocs as manifest is applied based on the ready operators list
-		if manifest.Name == "odf" && constraints.Check(v1) {
+		if manifest.Name == "odf" && constraints.Check(ocpVer) {
 			manifest.Name = "ocs"
 		}
 		c.log.Infof("Applying manifest %s: %s", manifest.Name, manifest.Content)
@@ -641,19 +644,21 @@ func (c controller) applyPostInstallManifests(arg interface{}) bool {
 		content, err := base64.StdEncoding.DecodeString(manifest.Content)
 		if err != nil {
 			c.log.WithError(err).Errorf("Failed to decode content of operator CR %s.", manifest.Name)
-			return false
+			applyErrOccured = true
+			continue
 		}
 
 		err = c.ops.CreateManifests(kubeconfigName, content)
 		if err != nil {
 			c.log.WithError(err).Error("Failed to apply manifest file.")
-			return false
+			applyErrOccured = true
+			continue
 		}
 
 		c.log.Infof("Manifest %s applied.", manifest.Name)
 	}
 
-	return true
+	return !applyErrOccured
 }
 
 func (c controller) UpdateBMHs(ctx context.Context, wg *sync.WaitGroup) {
@@ -957,7 +962,7 @@ func (c controller) waitForCSV(ctx context.Context, waitTimeout time.Duration) e
 	handlers := make(map[string]*ClusterServiceVersionHandler)
 
 	for index := range operators {
-		handlers[operators[index].Name] = NewClusterServiceVersionHandler(c.kc, operators[index], c.Status)
+		handlers[operators[index].Name] = NewClusterServiceVersionHandler(c.log, c.kc, operators[index], c.Status)
 	}
 	areOLMOperatorsAvailable := func() bool {
 		if len(handlers) == 0 {
@@ -988,7 +993,7 @@ func (c controller) waitingForClusterOperators(ctx context.Context) error {
 		result := c.isOperatorAvailable(NewClusterOperatorHandler(c.kc, consoleOperatorName))
 
 		if c.WaitForClusterVersion {
-			result = c.isOperatorAvailable(NewClusterVersionHandler(c.kc, timer)) && result
+			result = c.isOperatorAvailable(NewClusterVersionHandler(c.log, c.kc, timer)) && result
 		}
 
 		return result

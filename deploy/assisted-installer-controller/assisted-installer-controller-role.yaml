@@ -45,6 +45,14 @@ rules:
       - list
       - watch
   - apiGroups:
+      - batch
+    resources:
+      - jobs
+    verbs:
+      - get
+      - list
+      - delete
+  - apiGroups:
       - certificates.k8s.io
     resources:
       - certificatesigningrequests/approval
@@ -145,11 +153,20 @@ rules:
   - apiGroups:
       - operators.coreos.com
     resources:
-      - subscriptions
       - clusterserviceversions
     verbs:
       - get
       - list
+  - apiGroups:
+      - operators.coreos.com
+    resources:
+      - subscriptions
+      - installplans
+    verbs:
+      - get
+      - list
+      - update
+      - delete
   - apiGroups:
       - ""
     resources:
