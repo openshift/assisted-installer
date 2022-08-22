@@ -23,7 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	certificatesv1 "k8s.io/api/certificates/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -46,21 +46,21 @@ import (
 
 //go:generate mockgen -source=k8s_client.go -package=k8s_client -destination=mock_k8s_client.go
 type K8SClient interface {
-	ListMasterNodes() (*v1.NodeList, error)
+	ListMasterNodes() (*corev1.NodeList, error)
 	PatchEtcd() error
 	UnPatchEtcd() error
 	EnableRouterAccessLogs() error
 	PatchControlPlaneReplicas() error
 	UnPatchControlPlaneReplicas() error
-	ListNodes() (*v1.NodeList, error)
+	ListNodes() (*corev1.NodeList, error)
 	ListMachines() (*machinev1beta1.MachineList, error)
 	RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error)
 	ApproveCsr(csr *certificatesv1.CertificateSigningRequest) error
 	ListCsrs() (*certificatesv1.CertificateSigningRequestList, error)
-	GetConfigMap(namespace string, name string) (*v1.ConfigMap, error)
+	GetConfigMap(namespace string, name string) (*corev1.ConfigMap, error)
 	GetPodLogs(namespace string, podName string, sinceSeconds int64) (string, error)
 	GetPodLogsAsBuffer(namespace string, podName string, sinceSeconds int64) (*bytes.Buffer, error)
-	GetPods(namespace string, labelMatch map[string]string, fieldSelector string) ([]v1.Pod, error)
+	GetPods(namespace string, labelMatch map[string]string, fieldSelector string) ([]corev1.Pod, error)
 	GetCSV(namespace string, name string) (*olmv1alpha1.ClusterServiceVersion, error)
 	GetCSVFromSubscription(namespace string, name string) (string, error)
 	IsMetalProvisioningExists() (bool, error)
@@ -73,15 +73,15 @@ type K8SClient interface {
 	GetNetworkType() (string, error)
 	GetServiceNetworks() ([]string, error)
 	GetControlPlaneReplicas() (int, error)
-	ListServices(namespace string) (*v1.ServiceList, error)
-	ListEvents(namespace string) (*v1.EventList, error)
+	ListServices(namespace string) (*corev1.ServiceList, error)
+	ListEvents(namespace string) (*corev1.EventList, error)
 	ListClusterOperators() (*configv1.ClusterOperatorList, error)
 	GetClusterOperator(name string) (*configv1.ClusterOperator, error)
-	CreateEvent(namespace, name, message, component string) (*v1.Event, error)
+	CreateEvent(namespace, name, message, component string) (*corev1.Event, error)
 	DeleteService(namespace, name string) error
 	DeletePods(namespace string) error
 	PatchNamespace(namespace string, data []byte) error
-	GetNode(name string) (*v1.Node, error)
+	GetNode(name string) (*corev1.Node, error)
 	PatchNodeLabels(nodeName string, nodeLabels string) error
 }
 
@@ -153,26 +153,26 @@ func NewK8SClient(configPath string, logger logrus.FieldLogger) (K8SClient, erro
 		configClient.Proxies(), configClient}, nil
 }
 
-func (c *k8sClient) ListMasterNodes() (*v1.NodeList, error) {
+func (c *k8sClient) ListMasterNodes() (*corev1.NodeList, error) {
 	nodes, err := c.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: "node-role.kubernetes.io/master"})
 	if err != nil {
-		return &v1.NodeList{}, err
+		return &corev1.NodeList{}, err
 	}
 	return nodes, nil
 }
 
-func (c *k8sClient) ListNodes() (*v1.NodeList, error) {
+func (c *k8sClient) ListNodes() (*corev1.NodeList, error) {
 	nodes, err := c.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return &v1.NodeList{}, err
+		return &corev1.NodeList{}, err
 	}
 	return nodes, nil
 }
 
-func (c *k8sClient) ListServices(namespace string) (*v1.ServiceList, error) {
+func (c *k8sClient) ListServices(namespace string) (*corev1.ServiceList, error) {
 	services, err := c.client.CoreV1().Services(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return &v1.ServiceList{}, err
+		return &corev1.ServiceList{}, err
 	}
 	return services, nil
 }
@@ -400,7 +400,7 @@ func (c k8sClient) ApproveCsr(csr *certificatesv1.CertificateSigningRequest) err
 		Type:           certificatesv1.CertificateApproved,
 		Reason:         "NodeCSRApprove",
 		Message:        "This CSR was approved by the assisted-installer-controller",
-		Status:         v1.ConditionTrue,
+		Status:         corev1.ConditionTrue,
 		LastUpdateTime: metav1.Now(),
 	})
 	if _, err := c.csrClient.UpdateApproval(context.TODO(), csr.Name, csr, metav1.UpdateOptions{}); err != nil {
@@ -410,7 +410,7 @@ func (c k8sClient) ApproveCsr(csr *certificatesv1.CertificateSigningRequest) err
 	return nil
 }
 
-func (c *k8sClient) GetConfigMap(namespace string, name string) (*v1.ConfigMap, error) {
+func (c *k8sClient) GetConfigMap(namespace string, name string) (*corev1.ConfigMap, error) {
 	cm, err := c.client.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -445,7 +445,7 @@ func (c *k8sClient) GetCSV(namespace string, name string) (*operatorsv1alpha1.Cl
 	return csv, nil
 }
 
-func (c *k8sClient) GetPods(namespace string, labelMatch map[string]string, fieldSelector string) ([]v1.Pod, error) {
+func (c *k8sClient) GetPods(namespace string, labelMatch map[string]string, fieldSelector string) ([]corev1.Pod, error) {
 	listOptions := metav1.ListOptions{}
 	if labelMatch != nil {
 		labelSelector := metav1.LabelSelector{MatchLabels: labelMatch}
@@ -462,7 +462,7 @@ func (c *k8sClient) GetPods(namespace string, labelMatch map[string]string, fiel
 	return pod.Items, nil
 }
 
-func (c *k8sClient) ListEvents(namespace string) (*v1.EventList, error) {
+func (c *k8sClient) ListEvents(namespace string) (*corev1.EventList, error) {
 	return c.client.CoreV1().Events(namespace).List(context.TODO(), metav1.ListOptions{})
 }
 
@@ -475,7 +475,7 @@ func (c *k8sClient) GetPodLogs(namespace string, podName string, sinceSeconds in
 }
 
 func (c *k8sClient) GetPodLogsAsBuffer(namespace string, podName string, sinceSeconds int64) (*bytes.Buffer, error) {
-	podLogOpts := v1.PodLogOptions{}
+	podLogOpts := corev1.PodLogOptions{}
 	if sinceSeconds > 0 {
 		podLogOpts.SinceSeconds = &sinceSeconds
 	}
@@ -570,14 +570,14 @@ func (c *k8sClient) GetClusterOperator(name string) (*configv1.ClusterOperator, 
 	return c.configClient.ClusterOperators().Get(context.TODO(), name, metav1.GetOptions{})
 }
 
-func (c *k8sClient) CreateEvent(namespace, name, message, component string) (*v1.Event, error) {
+func (c *k8sClient) CreateEvent(namespace, name, message, component string) (*corev1.Event, error) {
 	currentTime := metav1.Time{Time: time.Now()}
-	event := &v1.Event{
+	event := &corev1.Event{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
-		InvolvedObject: v1.ObjectReference{
+		InvolvedObject: corev1.ObjectReference{
 			Namespace: namespace,
 			Name:      component,
 		},
@@ -585,7 +585,7 @@ func (c *k8sClient) CreateEvent(namespace, name, message, component string) (*v1
 		Count:          1,
 		FirstTimestamp: currentTime,
 		LastTimestamp:  currentTime,
-		Type:           v1.EventTypeNormal,
+		Type:           corev1.EventTypeNormal,
 		Reason:         name,
 	}
 
@@ -603,7 +603,7 @@ func (c *k8sClient) GetCSVFromSubscription(namespace string, name string) (strin
 func (c *k8sClient) GetNode(name string) (*v1.Node, error) {
 	node, err := c.client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
-		return &v1.Node{}, err
+		return &corev1.Node{}, err
 	}
 	return node, nil
 }

@@ -545,7 +545,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			GeneralWaitInterval = 1 * time.Millisecond
 		})
 		It("empty operators", func() {
-			Expect(assistedController.waitForCSVBeCreated([]models.MonitoredOperator{})).Should(Equal(true))
+			Expect(assistedController.waitForCSVsToBeCreated([]models.MonitoredOperator{})).Should(Equal(true))
 		})
 		It("wrong subscription", func() {
 			operators := []models.MonitoredOperator{
@@ -556,7 +556,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			}
 
 			mockk8sclient.EXPECT().GetCSVFromSubscription(operators[0].Namespace, operators[0].SubscriptionName).Return("", fmt.Errorf("dummy")).Times(1)
-			Expect(assistedController.waitForCSVBeCreated(operators)).Should(Equal(false))
+			Expect(assistedController.waitForCSVsToBeCreated(operators)).Should(Equal(false))
 		})
 		It("non-initialized operator", func() {
 			operators := []models.MonitoredOperator{
@@ -567,7 +567,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			}
 
 			mockk8sclient.EXPECT().GetCSVFromSubscription(operators[0].Namespace, operators[0].SubscriptionName).Return("", nil).Times(1)
-			Expect(assistedController.waitForCSVBeCreated(operators)).Should(Equal(false))
+			Expect(assistedController.waitForCSVsToBeCreated(operators)).Should(Equal(false))
 		})
 		It("initialized operator", func() {
 			operators := []models.MonitoredOperator{
@@ -578,7 +578,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			}
 
 			mockk8sclient.EXPECT().GetCSVFromSubscription(operators[0].Namespace, operators[0].SubscriptionName).Return("randomCSV", nil).Times(1)
-			Expect(assistedController.waitForCSVBeCreated(operators)).Should(Equal(true))
+			Expect(assistedController.waitForCSVsToBeCreated(operators)).Should(Equal(true))
 		})
 	})
 
@@ -853,7 +853,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				assistedController.PostInstallConfigs(context.TODO(), &wg)
 				wg.Wait()
 				Expect(assistedController.Status.HasError()).Should(Equal(false))
-				Expect(assistedController.Status.HasOperatorError()).Should(Equal(false))
+				Expect(assistedController.Status.AnyOperatorsInError()).Should(Equal(false))
 			})
 
 			It("waiting for single OLM operator which timeouts", func() {

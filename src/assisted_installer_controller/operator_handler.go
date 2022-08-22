@@ -7,6 +7,8 @@ import (
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/models"
+	olmv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -18,11 +20,10 @@ type OperatorHandler interface {
 	GetName() string
 	GetStatus() (models.OperatorStatus, string, error)
 	OnChange(newStatus models.OperatorStatus) bool
-	IsInitialized() bool
 }
 
-func (c controller) isOperatorAvailable(handler OperatorHandler) bool {
-	operatorName := handler.GetName()
+func (c controller) isOperatorAvailable(operatorHandler OperatorHandler) bool {
+	operatorName := operatorHandler.GetName()
 	c.log.Infof("Checking <%s> operator availability status", operatorName)
 
 	operatorStatusInService, isAvailable := c.isOperatorAvailableInService(operatorName, c.OpenshiftVersion)
@@ -30,7 +31,7 @@ func (c controller) isOperatorAvailable(handler OperatorHandler) bool {
 		return true
 	}
 
-	operatorStatus, operatorMessage, err := handler.GetStatus()
+	operatorStatus, operatorMessage, err := operatorHandler.GetStatus()
 	if err != nil {
 		c.log.WithError(err).Warnf("Failed to get <%s> operator", operatorName)
 		return false
@@ -38,7 +39,7 @@ func (c controller) isOperatorAvailable(handler OperatorHandler) bool {
 
 	if operatorStatusInService.Status != operatorStatus || (operatorStatusInService.StatusInfo != operatorMessage && operatorMessage != "") {
 		c.log.Infof("Operator <%s> updated, status: %s -> %s, message: %s -> %s.", operatorName, operatorStatusInService.Status, operatorStatus, operatorStatusInService.StatusInfo, operatorMessage)
-		if !handler.OnChange(operatorStatus) {
+		if !operatorHandler.OnChange(operatorStatus) {
 			c.log.WithError(err).Warnf("<%s> operator's OnChange() returned false. Will skip an update.", operatorName)
 			return false
 		}
@@ -79,8 +80,6 @@ func NewClusterOperatorHandler(kc k8s_client.K8SClient, operatorName string) *Cl
 
 func (handler ClusterOperatorHandler) GetName() string { return handler.operatorName }
 
-func (handler ClusterOperatorHandler) IsInitialized() bool { return true }
-
 func (handler ClusterOperatorHandler) GetStatus() (models.OperatorStatus, string, error) {
 	co, err := handler.kc.GetClusterOperator(handler.operatorName)
 	if err != nil {
@@ -104,8 +103,6 @@ func NewClusterVersionHandler(kc k8s_client.K8SClient, timer *time.Timer) *Clust
 
 func (handler ClusterVersionHandler) GetName() string { return cvoOperatorName }
 
-func (handler ClusterVersionHandler) IsInitialized() bool { return true }
-
 func (handler ClusterVersionHandler) GetStatus() (models.OperatorStatus, string, error) {
 	co, err := handler.kc.GetClusterVersion(clusterVersionName)
 	if err != nil {
@@ -127,20 +124,20 @@ func (handler ClusterVersionHandler) OnChange(_ models.OperatorStatus) bool {
 	return true
 }
 
-type ClusterServiceVersionHandler struct {
+type OLMOperatorHandler struct {
 	kc       k8s_client.K8SClient
 	operator *models.MonitoredOperator
 	status   *ControllerStatus
 	retries  int
 }
 
-func NewClusterServiceVersionHandler(kc k8s_client.K8SClient, operator *models.MonitoredOperator, status *ControllerStatus) *ClusterServiceVersionHandler {
-	return &ClusterServiceVersionHandler{kc: kc, operator: operator, status: status, retries: 0}
+func NewOLMOperatorHandler(kc k8s_client.K8SClient, operator *models.MonitoredOperator, status *ControllerStatus) *OLMOperatorHandler {
+	return &OLMOperatorHandler{kc: kc, operator: operator, status: status, retries: 0}
 }
 
-func (handler ClusterServiceVersionHandler) GetName() string { return handler.operator.Name }
+func (handler OLMOperatorHandler) GetName() string { return handler.operator.Name }
 
-func (handler ClusterServiceVersionHandler) IsInitialized() bool {
+func (handler OLMOperatorHandler) HasCSVBeenCreated() bool {
 	csvName, err := handler.kc.GetCSVFromSubscription(handler.operator.Namespace, handler.operator.SubscriptionName)
 	if err != nil {
 		return false
@@ -158,6 +155,7 @@ func (handler ClusterServiceVersionHandler) GetStatus() (models.OperatorStatus, 
 	if err != nil {
 		return "", "", err
 	}
+
 	csv, err := handler.kc.GetCSV(handler.operator.Namespace, csvName)
 	if err != nil {
 		return "", "", err
@@ -166,7 +164,7 @@ func (handler ClusterServiceVersionHandler) GetStatus() (models.OperatorStatus, 
 	return operatorStatus, csv.Status.Message, nil
 }
 
-func (handler ClusterServiceVersionHandler) OnChange(newStatus models.OperatorStatus) bool {
+func (handler OLMOperatorHandler) OnChange(newStatus models.OperatorStatus) bool {
 	if IsStatusFailed(newStatus) {
 		if handler.retries < failedOperatorRetry {
 			// FIXME: We retry the check of the operator status in case it's in failed state to WA bug 1968606

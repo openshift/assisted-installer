@@ -101,9 +101,9 @@ type Controller interface {
 }
 
 type ControllerStatus struct {
-	errCounter uint32
-	components map[string]bool
-	lock       sync.Mutex
+	errCounter     uint32
+	operatorErrors map[string]bool
+	lock           sync.Mutex
 }
 
 type controller struct {
@@ -115,11 +115,11 @@ type controller struct {
 	kc     k8s_client.K8SClient
 }
 
-// manifest store the operator manifest used by assisted-installer to create CRs of the OLM:
+// This struct needs to be exactly the same as the package
+// github.com/openshift/assisted-service/internal/operators "Manifest" struct,
+// as it's used to read a JSON file generated from that struct
 type manifest struct {
-	// name of the operator the CR manifest we want create
-	Name string
-	// content of the manifest of the opreator
+	Name    string
 	Content string
 }
 
@@ -136,7 +136,7 @@ func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inv
 
 func NewControllerStatus() *ControllerStatus {
 	return &ControllerStatus{
-		components: make(map[string]bool),
+		operatorErrors: make(map[string]bool),
 	}
 }
 
@@ -148,23 +148,23 @@ func (status *ControllerStatus) HasError() bool {
 	return atomic.LoadUint32(&status.errCounter) > 0
 }
 
-func (status *ControllerStatus) OperatorError(component string) {
+func (status *ControllerStatus) OperatorError(operatorName string) {
 	status.lock.Lock()
 	defer status.lock.Unlock()
-	status.components[component] = true
+	status.operatorErrors[operatorName] = true
 }
 
-func (status *ControllerStatus) HasOperatorError() bool {
+func (status *ControllerStatus) AnyOperatorsInError() bool {
 	status.lock.Lock()
 	defer status.lock.Unlock()
-	return len(status.components) > 0
+	return len(status.operatorErrors) > 0
 }
 
 func (status *ControllerStatus) GetOperatorsInError() []string {
 	result := make([]string, 0)
 	status.lock.Lock()
 	defer status.lock.Unlock()
-	for op := range status.components {
+	for op := range status.operatorErrors {
 		result = append(result, op)
 	}
 	return result
@@ -415,15 +415,8 @@ func (c controller) PostInstallConfigs(ctx context.Context, wg *sync.WaitGroup) 
 		c.log.Infof("Finished PostInstallConfigs")
 		wg.Done()
 	}()
-	err := utils.WaitForPredicateWithContext(ctx, LongWaitTimeout, GeneralWaitInterval, func() bool {
-		ctxReq := utils.GenerateRequestContext()
-		cluster, err := c.ic.GetCluster(ctx, false)
-		if err != nil {
-			utils.RequestIDLogger(ctxReq, c.log).WithError(err).Errorf("Failed to get cluster %s from assisted-service", c.ClusterID)
-			return false
-		}
-		return *cluster.Status == models.ClusterStatusFinalizing
-	})
+
+	err := c.waitForClusterFinalizing(ctx)
 	if err != nil {
 		return
 	}
@@ -442,6 +435,19 @@ func (c controller) PostInstallConfigs(ctx context.Context, wg *sync.WaitGroup) 
 	}
 	success := err == nil
 	c.sendCompleteInstallation(ctx, success, errMessage)
+}
+
+func (c controller) waitForClusterFinalizing(ctx context.Context) error {
+	err := utils.WaitForPredicateWithContext(ctx, LongWaitTimeout, GeneralWaitInterval, func() bool {
+		ctxReq := utils.GenerateRequestContext()
+		cluster, err := c.ic.GetCluster(ctx, false)
+		if err != nil {
+			utils.RequestIDLogger(ctxReq, c.log).WithError(err).Errorf("Failed to get cluster %s from assisted-service", c.ClusterID)
+			return false
+		}
+		return *cluster.Status == models.ClusterStatusFinalizing
+	})
+	return err
 }
 
 func (c controller) postInstallConfigs(ctx context.Context) error {
@@ -523,8 +529,8 @@ func (c controller) waitForOLMOperators(ctx context.Context) error {
 	waitTimeout := c.getMaximumOLMTimeout(operators)
 	c.log.Infof("OLM operators %v wait timeout %v", waitTimeout, operators)
 
-	// Wait for the CSV state of the OLM operators, before applying OLM CRs
-	err = utils.WaitForPredicateParamsWithContext(ctx, waitTimeout, GeneralWaitInterval, c.waitForCSVBeCreated, operators)
+	// Wait for all OLM operators to have a CSV, before applying OLM CRs
+	err = utils.WaitForPredicateParamsWithContext(ctx, waitTimeout, GeneralWaitInterval, c.waitForCSVsToBeCreated, operators)
 	if err != nil {
 		// We continue in case of failure, because we want to try to apply manifest at least for operators which are ready.
 		c.log.WithError(err).Warnf("Failed to wait for some of the OLM operators to be initilized")
@@ -544,20 +550,20 @@ func (c controller) waitForOLMOperators(ctx context.Context) error {
 	return nil
 }
 
-func (c controller) getReadyOperators(operators []models.MonitoredOperator) ([]string, []models.MonitoredOperator, error) {
+func (c controller) getOLMOperatorsThatHaveCSVs(operators []models.MonitoredOperator) ([]string, []models.MonitoredOperator, error) {
 	var readyOperators []string
 	for index := range operators {
-		handler := NewClusterServiceVersionHandler(c.kc, &operators[index], c.Status)
-		if handler.IsInitialized() {
-			readyOperators = append(readyOperators, handler.GetName())
+		olmOperatorHandler := NewOLMOperatorHandler(c.kc, &operators[index], c.Status)
+		if olmOperatorHandler.HasCSVBeenCreated() {
+			readyOperators = append(readyOperators, olmOperatorHandler.GetName())
 		}
 	}
 	return readyOperators, operators, nil
 }
 
-func (c controller) waitForCSVBeCreated(arg interface{}) bool {
+func (c controller) waitForCSVsToBeCreated(arg interface{}) bool {
 	operators := arg.([]models.MonitoredOperator)
-	readyOperators, operators, err := c.getReadyOperators(operators)
+	readyOperators, operators, err := c.getOLMOperatorsThatHaveCSVs(operators)
 	if err != nil {
 		c.log.WithError(err).Warn("Error while fetch the operators state.")
 		return false
@@ -589,28 +595,28 @@ func (c controller) applyPostInstallManifests(arg interface{}) bool {
 		return false
 	}
 
-	// Unmarshall the content of the operators manifests:
-	var manifests []manifest
-	data, err := ioutil.ReadFile(customManifestPath)
+	// Unmarshall the content of the operators customManifests:
+	var customManifests []manifest
+	rawCustomManifestsJSON, err := ioutil.ReadFile(customManifestPath)
 	if err != nil {
 		c.log.WithError(err).Errorf("Failed to read the custom manifests file.")
 		return false
 	}
-	if err = json.Unmarshal(data, &manifests); err != nil {
-		c.log.WithError(err).Errorf("Failed to unmarshall custom manifest file content %s.", data)
+	if err = json.Unmarshal(rawCustomManifestsJSON, &customManifests); err != nil {
+		c.log.WithError(err).Errorf("Failed to unmarshall custom manifest file content %s.", rawCustomManifestsJSON)
 		return false
 	}
 
 	// Create the manifests of the operators, which are properly initialized:
-	readyOperators, _, err := c.getReadyOperators(arg.([]models.MonitoredOperator))
+	operatorsThatHaveCSVs, _, err := c.getOLMOperatorsThatHaveCSVs(arg.([]models.MonitoredOperator))
 	if err != nil {
 		c.log.WithError(err).Errorf("Failed to fetch operators from assisted-service")
 		return false
 	}
 
-	c.log.Infof("Ready operators to be applied: %v", readyOperators)
+	c.log.Infof("Ready operators to be applied: %v", operatorsThatHaveCSVs)
 
-	for _, manifest := range manifests {
+	for _, manifest := range customManifests {
 		v1, err := version.NewVersion(c.OpenshiftVersion)
 		if err != nil {
 			return false
@@ -628,7 +634,7 @@ func (c controller) applyPostInstallManifests(arg interface{}) bool {
 
 		// Check if the operator is properly initialized by CSV:
 		if !func() bool {
-			for _, readyOperator := range readyOperators {
+			for _, readyOperator := range operatorsThatHaveCSVs {
 				if readyOperator == manifest.Name {
 					return true
 				}
@@ -913,18 +919,18 @@ func (c controller) getMaximumOLMTimeout(operators []models.MonitoredOperator) t
 }
 
 func (c controller) getProgressingOLMOperators() ([]*models.MonitoredOperator, error) {
-	ret := make([]*models.MonitoredOperator, 0)
+	progressingOperators := make([]*models.MonitoredOperator, 0)
 	operators, err := c.ic.GetClusterMonitoredOLMOperators(context.TODO(), c.ClusterID, c.OpenshiftVersion)
 	if err != nil {
 		c.log.WithError(err).Warningf("Failed to connect to assisted service")
-		return ret, err
+		return progressingOperators, err
 	}
 	for index := range operators {
-		if operators[index].Status != models.OperatorStatusAvailable && operators[index].Status != models.OperatorStatusFailed {
-			ret = append(ret, &operators[index])
+		if operators[index].Status == models.OperatorStatusProgressing {
+			progressingOperators = append(progressingOperators, &operators[index])
 		}
 	}
-	return ret, nil
+	return progressingOperators, nil
 }
 
 func (c controller) updatePendingOLMOperators(ctx context.Context) error {
@@ -954,19 +960,19 @@ func (c controller) waitForCSV(ctx context.Context, waitTimeout time.Duration) e
 		return nil
 	}
 
-	handlers := make(map[string]*ClusterServiceVersionHandler)
+	operatorHandlers := make(map[string]*OLMOperatorHandler)
 
 	for index := range operators {
-		handlers[operators[index].Name] = NewClusterServiceVersionHandler(c.kc, operators[index], c.Status)
+		operatorHandlers[operators[index].Name] = NewOLMOperatorHandler(c.kc, operators[index], c.Status)
 	}
 	areOLMOperatorsAvailable := func() bool {
-		if len(handlers) == 0 {
+		if len(operatorHandlers) == 0 {
 			return true
 		}
 
-		for index := range handlers {
-			if c.isOperatorAvailable(handlers[index]) {
-				delete(handlers, index)
+		for index := range operatorHandlers {
+			if c.isOperatorAvailable(operatorHandlers[index]) {
+				delete(operatorHandlers, index)
 			}
 		}
 		return false
@@ -1079,7 +1085,7 @@ func (c controller) logClusterOperatorsStatus() {
 }
 
 // This is temporary function, till https://bugzilla.redhat.com/show_bug.cgi?id=2097041 will not be resolved,
-//that should validate router state only in case of failure
+// that should validate router state only in case of failure
 // It will patch router to add access logs
 // It will run http router health check to see if router is healthy on host network
 func (c controller) logRouterStatus() {
@@ -1157,7 +1163,7 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 
 	// Send upload operator logs before must-gather
 	c.logClusterOperatorsStatus()
-	if c.Status.HasError() || c.Status.HasOperatorError() {
+	if c.Status.HasError() || c.Status.AnyOperatorsInError() {
 		c.log.Infof("Uploading cluster operator status logs before must-gather")
 		err := common.UploadPodLogs(c.kc, c.ic, c.ClusterID, podName, c.Namespace, controllerLogsSecondsAgo, c.log)
 		if err != nil {
