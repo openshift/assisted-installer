@@ -52,6 +52,7 @@ func DryRebootComplete() bool {
 
 func main() {
 	logger := logrus.New()
+	logger.SetReportCaller(true)
 
 	err := envconfig.Process("myapp", &Options)
 	if err != nil {
