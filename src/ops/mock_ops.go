@@ -138,19 +138,19 @@ func (mr *MockOpsMockRecorder) PrepareController() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrepareController", reflect.TypeOf((*MockOps)(nil).PrepareController))
 }
 
-// GetVGByPV mocks base method
-func (m *MockOps) GetVGByPV(pvName string) (string, error) {
+// GetVolumeGroupsByDisk mocks base method
+func (m *MockOps) GetVolumeGroupsByDisk(diskName string) ([]string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetVGByPV", pvName)
-	ret0, _ := ret[0].(string)
+	ret := m.ctrl.Call(m, "GetVolumeGroupsByDisk", diskName)
+	ret0, _ := ret[0].([]string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetVGByPV indicates an expected call of GetVGByPV
-func (mr *MockOpsMockRecorder) GetVGByPV(pvName interface{}) *gomock.Call {
+// GetVolumeGroupsByDisk indicates an expected call of GetVolumeGroupsByDisk
+func (mr *MockOpsMockRecorder) GetVolumeGroupsByDisk(diskName interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVGByPV", reflect.TypeOf((*MockOps)(nil).GetVGByPV), pvName)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVolumeGroupsByDisk", reflect.TypeOf((*MockOps)(nil).GetVolumeGroupsByDisk), diskName)
 }
 
 // RemoveVG mocks base method

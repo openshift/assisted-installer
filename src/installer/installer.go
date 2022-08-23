@@ -780,22 +780,33 @@ func (i *installer) cleanupInstallDevice() error {
 	return i.ops.Wipefs(i.Device)
 }
 
+func (i *installer) removeVolumeGroupsFromDevice(vgNames []string, device string) error {
+	for _, vgName := range vgNames {
+		i.log.Infof("A volume group (%s) was detected on the installation device (%s) - cleaning", vgName, device)
+		err := i.ops.RemoveVG(vgName)
+
+		if err != nil {
+			i.log.Errorf("Could not delete volume group (%s) due to error: %w", vgName, err)
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (i *installer) cleanupDevice(device string) error {
-	vgName, err := i.ops.GetVGByPV(device)
+	vgNames, err := i.ops.GetVolumeGroupsByDisk(device)
 	if err != nil {
 		return err
 	}
 
-	if vgName != "" {
-		i.log.Infof("A virtual group was detected on the installation device (%s) - cleaning", i.Device)
-		err = i.ops.RemoveVG(vgName)
-
+	if len(vgNames) > 0 {
+		err = i.removeVolumeGroupsFromDevice(vgNames, device)
 		if err != nil {
 			return err
 		}
 
 		err = i.ops.RemovePV(device)
-
 		if err != nil {
 			return err
 		}

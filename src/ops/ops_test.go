@@ -3,6 +3,8 @@ package ops
 import (
 	"reflect"
 
+	"errors"
+
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -97,5 +99,55 @@ var _ = Describe("Upload logs", func() {
 		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m).Times(1)
 		_, err := o.UploadInstallationLogs(true)
 		Expect(err).ToNot(HaveOccurred())
+	})
+})
+
+var _ = Describe("GetVolumeGroupsByDisk", func() {
+
+	var (
+		l        = logrus.New()
+		ctrl     *gomock.Controller
+		execMock *execute.MockExecute
+		conf     *config.Config
+		o        Ops
+	)
+
+	BeforeEach(func() {
+		ctrl = gomock.NewController(GinkgoT())
+		execMock = execute.NewMockExecute(ctrl)
+		conf = &config.Config{}
+		o = NewOpsWithConfig(conf, l, execMock)
+	})
+
+	It("When volume groups are available for a given disk, they should be returned", func() {
+		m := MatcherContainsStringElements{[]string{"vgs", "--noheadings", "-o", "vg_name,pv_name"}, true}
+		mockedVgsResult := `vg0 /dev/sda
+		vg1 /dev/sdb
+		vg2 /dev/sdx
+		vg3 /dev/sdx`
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m).Times(1).Return(mockedVgsResult, nil)
+		result, err := o.GetVolumeGroupsByDisk("/dev/sdx")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(len(result)).To(Equal(2))
+		Expect(result[0]).To(Equal("vg2"))
+		Expect(result[1]).To(Equal("vg3"))
+	})
+
+	It("When no volume groups are available for a given group, none should be returned", func() {
+		m := MatcherContainsStringElements{[]string{"vgs", "--noheadings", "-o", "vg_name,pv_name"}, true}
+		mockedVgsResult := `vg0 /dev/sda
+		vg1 /dev/sdb`
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m).Times(1).Return(mockedVgsResult, nil)
+		result, err := o.GetVolumeGroupsByDisk("/dev/sdx")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(len(result)).To(Equal(0))
+	})
+
+	It("When the command to fetch volume groups returns an error, no groups should be returned", func() {
+		m := MatcherContainsStringElements{[]string{"vgs", "--noheadings", "-o", "vg_name,pv_name"}, true}
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m).Times(1).Return("", errors.New("Some arbitrary error occurred!"))
+		result, err := o.GetVolumeGroupsByDisk("/dev/sdx")
+		Expect(err).To(HaveOccurred())
+		Expect(len(result)).To(Equal(0))
 	})
 })
