@@ -499,7 +499,7 @@ func (c controller) waitForOLMOperators(ctx context.Context) error {
 			return ExitWaiting
 		}
 		err = utils.WaitForPredicateWithContext(ctx, WaitTimeout, GeneralWaitInterval, updateFunc)
-		if err != nil {
+		if err != nil && ctx.Err() == nil {
 			c.log.WithError(err).Error("Timeout while waiting for some of the operators and not able to update its state")
 		}
 	}()
