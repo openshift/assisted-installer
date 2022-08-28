@@ -677,14 +677,21 @@ func (o *ops) GetMCSLogs() (string, error) {
 // if needed
 func (o *ops) UploadInstallationLogs(isBootstrap bool) (string, error) {
 	command := "podman"
-	args := []string{"run", "--rm", "--privileged", "--net=host", "--pid=host", "-v", "/run/systemd/journal/socket:/run/systemd/journal/socket",
-		"-v", "/var/log:/var/log", config.GlobalConfig.AgentImage, "logs_sender",
+
+	args := []string{"run", "--rm", "--privileged", "--net=host", "--pid=host", "-v",
+		"/run/systemd/journal/socket:/run/systemd/journal/socket",
+		"-v", "/var/log:/var/log"}
+
+	if config.GlobalConfig.CACertPath != "" {
+		args = append(args, "-v", fmt.Sprintf("%[1]s:%[1]s", config.GlobalConfig.CACertPath))
+	}
+
+	args = append(args, config.GlobalConfig.AgentImage, "logs_sender",
 		"-cluster-id", config.GlobalConfig.ClusterID, "-url", config.GlobalConfig.URL,
 		"-host-id", config.GlobalConfig.HostID, "-infra-env-id", config.GlobalConfig.InfraEnvID,
 		"-pull-secret-token", config.GlobalConfig.PullSecretToken,
 		fmt.Sprintf("-insecure=%s", strconv.FormatBool(config.GlobalConfig.SkipCertVerification)),
-		fmt.Sprintf("-bootstrap=%s", strconv.FormatBool(isBootstrap)),
-	}
+		fmt.Sprintf("-bootstrap=%s", strconv.FormatBool(isBootstrap)))
 
 	if config.GlobalConfig.CACertPath != "" {
 		args = append(args, fmt.Sprintf("-cacert=%s", config.GlobalConfig.CACertPath))
