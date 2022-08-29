@@ -457,7 +457,7 @@ github.com/openshift/machine-api-operator/pkg/apis/vsphereprovider/v1beta1
 github.com/opentracing/opentracing-go
 github.com/opentracing/opentracing-go/ext
 github.com/opentracing/opentracing-go/log
-# github.com/operator-framework/api v0.16.0
+# github.com/operator-framework/api v0.17.0
 ## explicit; go 1.18
 github.com/operator-framework/api/pkg/lib/version
 github.com/operator-framework/api/pkg/operators
