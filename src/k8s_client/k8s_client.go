@@ -22,6 +22,7 @@ import (
 	olmv1client "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/typed/operators/v1alpha1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	batchV1 "k8s.io/api/batch/v1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -63,6 +64,9 @@ type K8SClient interface {
 	GetPods(namespace string, labelMatch map[string]string, fieldSelector string) ([]v1.Pod, error)
 	GetCSV(namespace string, name string) (*olmv1alpha1.ClusterServiceVersion, error)
 	GetCSVFromSubscription(namespace string, name string) (string, error)
+	GetSubscription(subscription types.NamespacedName) (*olmv1alpha1.Subscription, error)
+	GetAllInstallPlansOfSubscription(subscription types.NamespacedName) ([]olmv1alpha1.InstallPlan, error)
+	DeleteInstallPlan(installPlan types.NamespacedName) error
 	IsMetalProvisioningExists() (bool, error)
 	ListBMHs() (metal3v1alpha1.BareMetalHostList, error)
 	GetBMH(name string) (*metal3v1alpha1.BareMetalHost, error)
@@ -83,6 +87,8 @@ type K8SClient interface {
 	PatchNamespace(namespace string, data []byte) error
 	GetNode(name string) (*v1.Node, error)
 	PatchNodeLabels(nodeName string, nodeLabels string) error
+	ListJobs(namespace string) (*batchV1.JobList, error)
+	DeleteJob(job types.NamespacedName) error
 }
 
 type K8SClientBuilder func(configPath string, logger logrus.FieldLogger) (K8SClient, error)
@@ -179,6 +185,18 @@ func (c *k8sClient) ListServices(namespace string) (*v1.ServiceList, error) {
 
 func (c *k8sClient) DeleteService(name, namespace string) error {
 	return c.client.CoreV1().Services(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+}
+
+func (c *k8sClient) ListJobs(namespace string) (*batchV1.JobList, error) {
+	jobs, err := c.client.BatchV1().Jobs(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return &batchV1.JobList{}, err
+	}
+	return jobs, nil
+}
+
+func (c *k8sClient) DeleteJob(job types.NamespacedName) error {
+	return c.client.BatchV1().Jobs(job.Namespace).Delete(context.TODO(), job.Name, metav1.DeleteOptions{})
 }
 
 func (c *k8sClient) DeletePods(namespace string) error {
@@ -595,9 +613,41 @@ func (c *k8sClient) CreateEvent(namespace, name, message, component string) (*v1
 func (c *k8sClient) GetCSVFromSubscription(namespace string, name string) (string, error) {
 	result, err := c.olmClient.Subscriptions(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
+		c.log.WithError(err).Warnf("Failed to get subscription %s in %s", name, namespace)
 		return "", err
 	}
 	return result.Status.CurrentCSV, nil
+}
+
+func (c *k8sClient) GetSubscription(subscription types.NamespacedName) (*olmv1alpha1.Subscription, error) {
+	result, err := c.olmClient.Subscriptions(subscription.Namespace).Get(context.TODO(), subscription.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (c *k8sClient) GetAllInstallPlansOfSubscription(subscription types.NamespacedName) ([]olmv1alpha1.InstallPlan, error) {
+	allInstallPlans, err := c.olmClient.InstallPlans(subscription.Namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	var installPlansOwnedBySubscription []olmv1alpha1.InstallPlan
+	for _, plan := range allInstallPlans.Items {
+		for _, owner := range plan.OwnerReferences {
+			if owner.Name == subscription.Name {
+				installPlansOwnedBySubscription = append(installPlansOwnedBySubscription, plan)
+			}
+		}
+	}
+
+	return installPlansOwnedBySubscription, nil
+}
+
+func (c *k8sClient) DeleteInstallPlan(installPlan types.NamespacedName) error {
+	return c.olmClient.InstallPlans(installPlan.Namespace).Delete(context.TODO(),
+		installPlan.Name, metav1.DeleteOptions{})
 }
 
 func (c *k8sClient) GetNode(name string) (*v1.Node, error) {

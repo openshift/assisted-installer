@@ -14,8 +14,10 @@ import (
 	ops "github.com/openshift/assisted-installer/src/ops"
 	v1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	v1alpha10 "github.com/operator-framework/api/pkg/operators/v1alpha1"
-	v10 "k8s.io/api/certificates/v1"
-	v11 "k8s.io/api/core/v1"
+	v10 "k8s.io/api/batch/v1"
+	v11 "k8s.io/api/certificates/v1"
+	v12 "k8s.io/api/core/v1"
+	types "k8s.io/apimachinery/pkg/types"
 )
 
 // MockK8SClient is a mock of K8SClient interface
@@ -42,10 +44,10 @@ func (m *MockK8SClient) EXPECT() *MockK8SClientMockRecorder {
 }
 
 // ListMasterNodes mocks base method
-func (m *MockK8SClient) ListMasterNodes() (*v11.NodeList, error) {
+func (m *MockK8SClient) ListMasterNodes() (*v12.NodeList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListMasterNodes")
-	ret0, _ := ret[0].(*v11.NodeList)
+	ret0, _ := ret[0].(*v12.NodeList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -127,10 +129,10 @@ func (mr *MockK8SClientMockRecorder) UnPatchControlPlaneReplicas() *gomock.Call 
 }
 
 // ListNodes mocks base method
-func (m *MockK8SClient) ListNodes() (*v11.NodeList, error) {
+func (m *MockK8SClient) ListNodes() (*v12.NodeList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListNodes")
-	ret0, _ := ret[0].(*v11.NodeList)
+	ret0, _ := ret[0].(*v12.NodeList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -172,7 +174,7 @@ func (mr *MockK8SClientMockRecorder) RunOCctlCommand(args, kubeconfigPath, o int
 }
 
 // ApproveCsr mocks base method
-func (m *MockK8SClient) ApproveCsr(csr *v10.CertificateSigningRequest) error {
+func (m *MockK8SClient) ApproveCsr(csr *v11.CertificateSigningRequest) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ApproveCsr", csr)
 	ret0, _ := ret[0].(error)
@@ -186,10 +188,10 @@ func (mr *MockK8SClientMockRecorder) ApproveCsr(csr interface{}) *gomock.Call {
 }
 
 // ListCsrs mocks base method
-func (m *MockK8SClient) ListCsrs() (*v10.CertificateSigningRequestList, error) {
+func (m *MockK8SClient) ListCsrs() (*v11.CertificateSigningRequestList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListCsrs")
-	ret0, _ := ret[0].(*v10.CertificateSigningRequestList)
+	ret0, _ := ret[0].(*v11.CertificateSigningRequestList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -201,10 +203,10 @@ func (mr *MockK8SClientMockRecorder) ListCsrs() *gomock.Call {
 }
 
 // GetConfigMap mocks base method
-func (m *MockK8SClient) GetConfigMap(namespace, name string) (*v11.ConfigMap, error) {
+func (m *MockK8SClient) GetConfigMap(namespace, name string) (*v12.ConfigMap, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetConfigMap", namespace, name)
-	ret0, _ := ret[0].(*v11.ConfigMap)
+	ret0, _ := ret[0].(*v12.ConfigMap)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -246,10 +248,10 @@ func (mr *MockK8SClientMockRecorder) GetPodLogsAsBuffer(namespace, podName, sinc
 }
 
 // GetPods mocks base method
-func (m *MockK8SClient) GetPods(namespace string, labelMatch map[string]string, fieldSelector string) ([]v11.Pod, error) {
+func (m *MockK8SClient) GetPods(namespace string, labelMatch map[string]string, fieldSelector string) ([]v12.Pod, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPods", namespace, labelMatch, fieldSelector)
-	ret0, _ := ret[0].([]v11.Pod)
+	ret0, _ := ret[0].([]v12.Pod)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -288,6 +290,50 @@ func (m *MockK8SClient) GetCSVFromSubscription(namespace, name string) (string, 
 func (mr *MockK8SClientMockRecorder) GetCSVFromSubscription(namespace, name interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCSVFromSubscription", reflect.TypeOf((*MockK8SClient)(nil).GetCSVFromSubscription), namespace, name)
+}
+
+// GetSubscription mocks base method
+func (m *MockK8SClient) GetSubscription(subscription types.NamespacedName) (*v1alpha10.Subscription, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSubscription", subscription)
+	ret0, _ := ret[0].(*v1alpha10.Subscription)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSubscription indicates an expected call of GetSubscription
+func (mr *MockK8SClientMockRecorder) GetSubscription(subscription interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubscription", reflect.TypeOf((*MockK8SClient)(nil).GetSubscription), subscription)
+}
+
+// GetAllInstallPlansOfSubscription mocks base method
+func (m *MockK8SClient) GetAllInstallPlansOfSubscription(subscription types.NamespacedName) ([]v1alpha10.InstallPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAllInstallPlansOfSubscription", subscription)
+	ret0, _ := ret[0].([]v1alpha10.InstallPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAllInstallPlansOfSubscription indicates an expected call of GetAllInstallPlansOfSubscription
+func (mr *MockK8SClientMockRecorder) GetAllInstallPlansOfSubscription(subscription interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllInstallPlansOfSubscription", reflect.TypeOf((*MockK8SClient)(nil).GetAllInstallPlansOfSubscription), subscription)
+}
+
+// DeleteInstallPlan mocks base method
+func (m *MockK8SClient) DeleteInstallPlan(installPlan types.NamespacedName) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteInstallPlan", installPlan)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteInstallPlan indicates an expected call of DeleteInstallPlan
+func (mr *MockK8SClientMockRecorder) DeleteInstallPlan(installPlan interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteInstallPlan", reflect.TypeOf((*MockK8SClient)(nil).DeleteInstallPlan), installPlan)
 }
 
 // IsMetalProvisioningExists mocks base method
@@ -438,10 +484,10 @@ func (mr *MockK8SClientMockRecorder) GetControlPlaneReplicas() *gomock.Call {
 }
 
 // ListServices mocks base method
-func (m *MockK8SClient) ListServices(namespace string) (*v11.ServiceList, error) {
+func (m *MockK8SClient) ListServices(namespace string) (*v12.ServiceList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListServices", namespace)
-	ret0, _ := ret[0].(*v11.ServiceList)
+	ret0, _ := ret[0].(*v12.ServiceList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -453,10 +499,10 @@ func (mr *MockK8SClientMockRecorder) ListServices(namespace interface{}) *gomock
 }
 
 // ListEvents mocks base method
-func (m *MockK8SClient) ListEvents(namespace string) (*v11.EventList, error) {
+func (m *MockK8SClient) ListEvents(namespace string) (*v12.EventList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListEvents", namespace)
-	ret0, _ := ret[0].(*v11.EventList)
+	ret0, _ := ret[0].(*v12.EventList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -498,10 +544,10 @@ func (mr *MockK8SClientMockRecorder) GetClusterOperator(name interface{}) *gomoc
 }
 
 // CreateEvent mocks base method
-func (m *MockK8SClient) CreateEvent(namespace, name, message, component string) (*v11.Event, error) {
+func (m *MockK8SClient) CreateEvent(namespace, name, message, component string) (*v12.Event, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateEvent", namespace, name, message, component)
-	ret0, _ := ret[0].(*v11.Event)
+	ret0, _ := ret[0].(*v12.Event)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -555,10 +601,10 @@ func (mr *MockK8SClientMockRecorder) PatchNamespace(namespace, data interface{})
 }
 
 // GetNode mocks base method
-func (m *MockK8SClient) GetNode(name string) (*v11.Node, error) {
+func (m *MockK8SClient) GetNode(name string) (*v12.Node, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetNode", name)
-	ret0, _ := ret[0].(*v11.Node)
+	ret0, _ := ret[0].(*v12.Node)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -581,4 +627,33 @@ func (m *MockK8SClient) PatchNodeLabels(nodeName, nodeLabels string) error {
 func (mr *MockK8SClientMockRecorder) PatchNodeLabels(nodeName, nodeLabels interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchNodeLabels", reflect.TypeOf((*MockK8SClient)(nil).PatchNodeLabels), nodeName, nodeLabels)
+}
+
+// ListJobs mocks base method
+func (m *MockK8SClient) ListJobs(namespace string) (*v10.JobList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListJobs", namespace)
+	ret0, _ := ret[0].(*v10.JobList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListJobs indicates an expected call of ListJobs
+func (mr *MockK8SClientMockRecorder) ListJobs(namespace interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListJobs", reflect.TypeOf((*MockK8SClient)(nil).ListJobs), namespace)
+}
+
+// DeleteJob mocks base method
+func (m *MockK8SClient) DeleteJob(job types.NamespacedName) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteJob", job)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteJob indicates an expected call of DeleteJob
+func (mr *MockK8SClientMockRecorder) DeleteJob(job interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteJob", reflect.TypeOf((*MockK8SClient)(nil).DeleteJob), job)
 }

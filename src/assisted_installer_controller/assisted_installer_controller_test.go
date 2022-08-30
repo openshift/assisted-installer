@@ -13,6 +13,13 @@ import (
 	"testing"
 	"time"
 
+	batchV1 "k8s.io/api/batch/v1"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apischema "k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+
 	"github.com/google/uuid"
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/apis/metal3.io/v1alpha1"
 	"github.com/openshift/assisted-installer/src/common"
@@ -25,8 +32,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/assisted-installer/src/inventory_client"
@@ -565,8 +570,35 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					Name: operatorName, Status: models.OperatorStatusProgressing, OperatorType: models.OperatorTypeOlm,
 				},
 			}
-
 			mockk8sclient.EXPECT().GetCSVFromSubscription(operators[0].Namespace, operators[0].SubscriptionName).Return("", nil).Times(1)
+			mockk8sclient.EXPECT().GetCSV(operators[0].Namespace, gomock.Any()).Return(nil, fmt.Errorf("dummy")).Times(1)
+			Expect(assistedController.waitForCSVBeCreated(operators)).Should(Equal(false))
+		})
+		It("non-initialized operator fixing olm early setup issue by deleting failed jobs", func() {
+			operators := []models.MonitoredOperator{
+				{
+					SubscriptionName: subscriptionName, Namespace: namespaceName,
+					Name: operatorName, Status: models.OperatorStatusProgressing, OperatorType: models.OperatorTypeOlm,
+				},
+			}
+			failedJob := batchV1.Job{ObjectMeta: metav1.ObjectMeta{Name: "failed1", Namespace: olmNamespace}, Status: batchV1.JobStatus{Failed: 1}}
+			failedJob1 := batchV1.Job{ObjectMeta: metav1.ObjectMeta{Name: "failed1", Namespace: olmNamespace},
+				Status: batchV1.JobStatus{Failed: 0, Conditions: []batchV1.JobCondition{{Type: batchV1.JobFailed, Status: v1.ConditionTrue}}}}
+			succeededJob := batchV1.Job{ObjectMeta: metav1.ObjectMeta{Name: "succeed", Namespace: olmNamespace}, Status: batchV1.JobStatus{Failed: 0}}
+			mockk8sclient.EXPECT().GetCSVFromSubscription(operators[0].Namespace, operators[0].SubscriptionName).Return("", nil).Times(1)
+			mockk8sclient.EXPECT().GetCSV(operators[0].Namespace, gomock.Any()).Return(nil, apierrors.NewNotFound(apischema.GroupResource{}, failedJob.Name)).Times(1)
+			mockk8sclient.EXPECT().ListJobs(olmNamespace).Return(&batchV1.JobList{Items: []batchV1.Job{failedJob, succeededJob, failedJob1}}, nil).Times(1)
+			mockk8sclient.EXPECT().DeleteJob(types.NamespacedName{Name: failedJob.Name, Namespace: failedJob.Namespace}).Return(nil).Times(1)
+			mockk8sclient.EXPECT().DeleteJob(types.NamespacedName{Name: failedJob1.Name, Namespace: failedJob1.Namespace}).Return(nil).Times(1)
+
+			mockk8sclient.EXPECT().GetAllInstallPlansOfSubscription(types.NamespacedName{
+				Name:      operators[0].SubscriptionName,
+				Namespace: operators[0].Namespace,
+			}).Return([]olmv1alpha1.InstallPlan{{ObjectMeta: metav1.ObjectMeta{Name: "test-name", Namespace: "test"}, Status: olmv1alpha1.InstallPlanStatus{Phase: olmv1alpha1.InstallPlanPhaseFailed}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "test-name-2", Namespace: "test-2"}, Status: olmv1alpha1.InstallPlanStatus{Phase: olmv1alpha1.InstallPlanPhaseComplete}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "test-name-2", Namespace: "test-2"}, Status: olmv1alpha1.InstallPlanStatus{Phase: olmv1alpha1.InstallPlanPhaseInstalling}}}, nil).Times(1)
+			mockk8sclient.EXPECT().DeleteInstallPlan(types.NamespacedName{Name: "test-name", Namespace: "test"}).Return(nil).Times(1)
+
 			Expect(assistedController.waitForCSVBeCreated(operators)).Should(Equal(false))
 		})
 		It("initialized operator", func() {
@@ -578,6 +610,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			}
 
 			mockk8sclient.EXPECT().GetCSVFromSubscription(operators[0].Namespace, operators[0].SubscriptionName).Return("randomCSV", nil).Times(1)
+			mockk8sclient.EXPECT().GetCSV(operators[0].Namespace, gomock.Any()).Return(nil, nil).Times(1)
 			Expect(assistedController.waitForCSVBeCreated(operators)).Should(Equal(true))
 		})
 	})
@@ -812,6 +845,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					mockGetOLMOperators(operators)
 					mockApplyPostInstallManifests(operators)
 					mockk8sclient.EXPECT().GetCSVFromSubscription(operators[0].Namespace, operators[0].SubscriptionName).Return("local-storage-operator", nil).Times(2)
+					mockk8sclient.EXPECT().GetCSV(operators[0].Namespace, operators[0].SubscriptionName).Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseNone}}, nil).Times(2)
 				})
 
 				By("empty status", func() {
