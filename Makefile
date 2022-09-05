@@ -13,6 +13,10 @@ TEST_FORMAT ?= standard-verbose
 GOTEST_FLAGS = --format=$(TEST_FORMAT) -- -count=1 -cover -coverprofile=$(REPORTS)/$(TEST_SCENARIO)_coverage.out
 GINKGO_FLAGS = -ginkgo.focus="$(FOCUS)" -ginkgo.v -ginkgo.skip="$(SKIP)" -ginkgo.reportFile=./junit_$(TEST_SCENARIO)_test.xml
 
+# Multiarch support.  Transform argument passed from docker buidx tool to go build arguments to support cross compiling
+GO_BUILD_ARCHITECTURE_VARS := $(if ${TARGETPLATFORM},$(shell echo ${TARGETPLATFORM} | awk -F / '{printf("GOOS=%s GOARCH=%s", $$1, $$2)}'),)
+GO_BUILD_VARS := CGO_ENABLED=0 $(GO_BUILD_ARCHITECTURE_VARS)
+
 all: lint format-check build-images unit-test
 
 ci-lint: vendor-diff
@@ -58,10 +62,10 @@ endif
 build: installer controller
 
 installer:
-	CGO_ENABLED=0 go build -o build/installer src/main/main.go
+	$(GO_BUILD_VARS) go build -o build/installer src/main/main.go
 
 controller:
-	CGO_ENABLED=0 go build -o build/assisted-installer-controller src/main/assisted-installer-controller/assisted_installer_main.go
+	$(GO_BUILD_VARS) go build -o build/assisted-installer-controller src/main/assisted-installer-controller/assisted_installer_main.go
 
 build-images: installer-image controller-image
 
