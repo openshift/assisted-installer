@@ -192,6 +192,10 @@ func (o *ops) SetBootOrder(device string) error {
 		return err
 	}
 	o.handleDuplicateEntries(out)
+	_, err = o.ExecPrivilegeCommand(o.logWriter, "efibootmgr", "-l", o.getEfiFilePath())
+	if err != nil {
+		o.log.WithError(err).Errorf("Failed to show current boot order with efibootmgr")
+	}
 	return nil
 }
 
