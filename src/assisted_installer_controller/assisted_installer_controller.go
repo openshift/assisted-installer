@@ -1180,16 +1180,9 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 	}
 
 	c.log.Infof("Uploading logs for %s in %s", podName, namespace)
-	if podLogs, err := c.kc.GetPodLogsAsBuffer(namespace, podName, sinceSeconds); err == nil {
-		tarentries = append(tarentries,
-			*utils.NewTarEntry(podLogs, nil, int64(podLogs.Len()), fmt.Sprintf("%s.logs", podName)))
-	} else {
-		ok = false
-	}
-
-	if len(tarentries) == 0 {
-		return errors.New("No logs are available for sending summary logs")
-	}
+	podLogs := common.GetControllerPodLogs(c.kc, podName, namespace, sinceSeconds, c.log)
+	tarentries = append(tarentries,
+		*utils.NewTarEntry(podLogs, nil, int64(podLogs.Len()), fmt.Sprintf("%s.logs", podName)))
 
 	//write the combined input of the summary sources into a pipe and offload it
 	//to the UploadLogs request to the assisted-service
