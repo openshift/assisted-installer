@@ -70,7 +70,7 @@ func main() {
 		}
 	}
 
-	logFile, err := os.OpenFile(common.ControllerLogFIle, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	logFile, err := os.OpenFile(common.ControllerLogFile, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 	if err != nil {
 		log.Fatal(err.Error())
 	}

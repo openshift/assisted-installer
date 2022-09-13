@@ -1071,7 +1071,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	Context("Upload logs", func() {
 		var pod v1.Pod
 		BeforeEach(func() {
-			_, err := os.OpenFile(common.ControllerLogFIle, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+			_, err := os.OpenFile(common.ControllerLogFile, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 			Expect(err).ShouldNot(HaveOccurred())
 			LogsUploadPeriod = 100 * time.Millisecond
 			dnsValidationTimeout = 1 * time.Millisecond
@@ -1093,7 +1093,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("Validate upload log still sent even if GetPodLogsAsBuffer fails and log file doesn't exists", func() {
 			logClusterOperatorsSuccess()
 			reportLogProgressSuccess()
-			err := os.Remove(common.ControllerLogFIle)
+			err := os.Remove(common.ControllerLogFile)
 			Expect(err).ShouldNot(HaveOccurred())
 			mockk8sclient.EXPECT().GetPods(assistedController.Namespace, gomock.Any(), fmt.Sprintf("status.phase=%s", v1.PodRunning)).Return([]v1.Pod{pod}, nil).MinTimes(1)
 			mockk8sclient.EXPECT().GetPodLogsAsBuffer(assistedController.Namespace, "test", gomock.Any()).Return(nil, fmt.Errorf("dummy")).MinTimes(1)
