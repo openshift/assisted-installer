@@ -1222,7 +1222,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			successUpload()
 			logClusterOperatorsSuccess()
 			mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Times(0).Return(&models.Cluster{Name: "test", BaseDNSDomain: "test.com"}, nil)
-			mockk8sclient.EXPECT().EnableRouterAccessLogs().Times(0).Return(nil)
 			callUploadLogs(50 * time.Millisecond)
 		})
 		It("Validate upload logs not blocked by router validation failure (with must-gather logs)", func() {
@@ -1239,7 +1238,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			assistedController.HighAvailabilityMode = models.ClusterHighAvailabilityModeNone
 			successUpload()
 			mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Times(1).Return(&models.Cluster{Name: "test", BaseDNSDomain: "test.com"}, nil)
-			mockk8sclient.EXPECT().EnableRouterAccessLogs().Times(1).Return(nil)
 			logClusterOperatorsSuccess()
 			mockbmclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("dummy")).Times(1)
 			mockbmclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)

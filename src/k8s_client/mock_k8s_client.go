@@ -86,20 +86,6 @@ func (mr *MockK8SClientMockRecorder) UnPatchEtcd() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnPatchEtcd", reflect.TypeOf((*MockK8SClient)(nil).UnPatchEtcd))
 }
 
-// EnableRouterAccessLogs mocks base method
-func (m *MockK8SClient) EnableRouterAccessLogs() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnableRouterAccessLogs")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// EnableRouterAccessLogs indicates an expected call of EnableRouterAccessLogs
-func (mr *MockK8SClientMockRecorder) EnableRouterAccessLogs() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnableRouterAccessLogs", reflect.TypeOf((*MockK8SClient)(nil).EnableRouterAccessLogs))
-}
-
 // PatchControlPlaneReplicas mocks base method
 func (m *MockK8SClient) PatchControlPlaneReplicas() error {
 	m.ctrl.T.Helper()

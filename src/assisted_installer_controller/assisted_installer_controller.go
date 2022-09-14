@@ -1094,7 +1094,6 @@ func (c controller) logRouterStatus() {
 	c.log.Infof("Start checking router status")
 	var cl *models.Cluster
 	var err error
-	patched := false
 	//nolint:gosec // need insecure TLS option for testing and development
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -1122,7 +1121,7 @@ func (c controller) logRouterStatus() {
 			if err != nil {
 				c.log.WithError(err).Warning("Failed to reach console")
 			} else {
-				c.log.Infof("console url status %s", r.Status)
+				c.log.Infof("canary url status %s", r.Status)
 			}
 
 			url := fmt.Sprintf("http://%s/_______internal_router_healthz", localIp)
@@ -1131,17 +1130,6 @@ func (c controller) logRouterStatus() {
 				c.log.WithError(err).Warning("Failed to reach internal router health")
 			} else {
 				c.log.Infof("route internal health status %s", r.Status)
-			}
-
-			if !patched {
-
-				c.log.Infof("Enabling router access logs, router call can fail after it")
-				err = c.kc.EnableRouterAccessLogs()
-				if err != nil {
-					c.log.WithError(err).Errorf("Failed to enable router logs")
-				} else {
-					patched = true
-				}
 			}
 			return false
 		})
