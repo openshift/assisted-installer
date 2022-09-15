@@ -337,6 +337,19 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			exit := assistedController.waitAndUpdateNodesStatus()
 			Expect(exit).Should(Equal(false))
 		})
+		It("waitAndUpdateNodesStatus don't update progress for hosts in stage done", func() {
+
+			hosts := create3Hosts(models.HostStatusInstalling, models.HostStageDone, "")
+			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
+				Return(hosts, nil).Times(2)
+			nodes := GetKubeNodes(kubeNamesIds)
+			mockk8sclient.EXPECT().ListNodes().Return(nodes, nil).Times(1)
+			configuringSuccess()
+
+			exit := assistedController.waitAndUpdateNodesStatus()
+			Expect(exit).Should(Equal(false))
+
+		})
 
 		It("2aitAndUpdateNodesStatus getHost failure", func() {
 			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
