@@ -241,6 +241,7 @@ func (c *controller) waitAndUpdateNodesStatus() bool {
 			log.Warnf("Node %s is not in inventory hosts", strings.ToLower(node.Name))
 			continue
 		}
+		common.LogIfHostIpChanged(c.log, node, knownIpAddresses)
 
 		if host.Host.Progress.CurrentStage == models.HostStageConfiguring {
 			log.Infof("Found new joined node %s with inventory id %s, kubernetes id %s, updating its status to %s",
@@ -254,6 +255,7 @@ func (c *controller) waitAndUpdateNodesStatus() bool {
 		if common.IsK8sNodeIsReady(node) && host.Host.Progress.CurrentStage != models.HostStageDone {
 			log.Infof("Found new ready node %s with inventory id %s, kubernetes id %s, updating its status to %s",
 				node.Name, host.Host.ID.String(), node.Status.NodeInfo.SystemUUID, models.HostStageDone)
+
 			if err := c.ic.UpdateHostInstallProgress(ctxReq, host.Host.InfraEnvID.String(), host.Host.ID.String(), models.HostStageDone, ""); err != nil {
 				log.WithError(err).Errorf("Failed to update node %s installation status", node.Name)
 				continue
