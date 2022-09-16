@@ -84,7 +84,7 @@ type ControllerConfig struct {
 	URL                     string `envconfig:"INVENTORY_URL" required:"true"`
 	PullSecretToken         string `envconfig:"PULL_SECRET_TOKEN" required:"true" secret:"true"`
 	SkipCertVerification    bool   `envconfig:"SKIP_CERT_VERIFICATION" required:"false" default:"false"`
-	CACertPath              string `envconfig:"CA_CERT_PATH" required:"false" default:"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"`
+	CACertPath              string `envconfig:"CA_CERT_PATH" required:"false" default:""`
 	Namespace               string `envconfig:"NAMESPACE" required:"false" default:"assisted-installer"`
 	OpenshiftVersion        string `envconfig:"OPENSHIFT_VERSION" required:"true"`
 	HighAvailabilityMode    string `envconfig:"HIGH_AVAILABILITY_MODE" required:"false" default:"Full"`
