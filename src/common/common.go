@@ -168,6 +168,17 @@ func BuildHostsMapIPAddressBased(inventoryHostsMap map[string]inventory_client.H
 	return knownIpAddresses
 }
 
+func LogIfHostIpChanged(log logrus.FieldLogger, node v1.Node, IPAddressMap map[string]inventory_client.HostData) {
+	for _, ip := range node.Status.Addresses {
+		if ip.Type == v1.NodeInternalIP {
+			if _, exists := IPAddressMap[ip.Address]; !exists {
+				log.Warnf("Please be aware: host %s got ip change to %s", node.Name, ip)
+			}
+			break
+		}
+	}
+}
+
 // Matching of the host happens based on 2 rules
 //   * if the name of the host and in the inventory is exactly the same, use use it
 //   * if the name is not known in the inventory, we check if the IP address of the
