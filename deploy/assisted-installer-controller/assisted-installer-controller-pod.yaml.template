@@ -68,8 +68,11 @@ spec:
                   name: assisted-installer-controller-config
                   key: must-gather-image
                   optional: true
-          {{if .CACertPath}}
+
           volumeMounts:
+           - name: host-ca-bundle
+             mountPath: /etc/pki
+          {{if .CACertPath}}
           - name: service-ca-cert-config
             mountPath: {{.CACertPath}}
           {{end}}
@@ -82,9 +85,12 @@ spec:
       - key: node-role.kubernetes.io/master
         effect: NoSchedule
         operator: Exists
-      {{if .CACertPath}}
       volumes:
-      - name: service-ca-cert-config
-        hostPath:
-          path: {{.CACertPath}}
-      {{end}}
+        - name: host-ca-bundle
+          hostPath:
+            path: /etc/pki
+        {{if .CACertPath}}
+        - name: service-ca-cert-config
+          hostPath:
+            path: {{.CACertPath}}
+        {{end}}
