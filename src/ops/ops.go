@@ -41,7 +41,6 @@ type Ops interface {
 	PrepareController() error
 	GetVolumeGroupsByDisk(diskName string) ([]string, error)
 	RemoveVG(vgName string) error
-	RemoveLV(lvName, vgName string) error
 	RemovePV(pvName string) error
 	Wipefs(device string) error
 	IsRaidMember(device string) bool
@@ -399,14 +398,6 @@ func (o *ops) RemoveVG(vgName string) error {
 	output, err := o.ExecPrivilegeCommand(o.logWriter, "vgremove", vgName, "-y")
 	if err != nil {
 		o.log.Errorf("Failed to remove VG %s, output %s, error %s", vgName, output, err)
-	}
-	return err
-}
-
-func (o *ops) RemoveLV(lvName, vgName string) error {
-	output, err := o.ExecPrivilegeCommand(o.logWriter, "lvremove", fmt.Sprintf("/dev/%s/%s", vgName, lvName), "-y")
-	if err != nil {
-		o.log.Errorf("Failed to remove LVM %s, output %s, error %s", fmt.Sprintf("/dev/%s/%s", vgName, lvName), output, err)
 	}
 	return err
 }
