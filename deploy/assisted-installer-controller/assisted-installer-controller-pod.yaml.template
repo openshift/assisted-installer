@@ -68,13 +68,12 @@ spec:
                   name: assisted-installer-controller-config
                   key: must-gather-image
                   optional: true
-
           volumeMounts:
-           - name: host-ca-bundle
-             mountPath: /etc/pki
+            - name: host-ca-bundle
+              mountPath: /etc/pki
           {{if .CACertPath}}
-          - name: service-ca-cert-config
-            mountPath: {{.CACertPath}}
+            - name: service-ca-cert-config
+              mountPath: {{.CACertPath}}
           {{end}}
       restartPolicy: OnFailure
       hostNetwork: true
