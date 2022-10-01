@@ -1,6 +1,6 @@
-FROM registry.ci.openshift.org/ocp/4.11:cli AS cli
+FROM registry.ci.openshift.org/ocp/4.12:cli AS cli
 
-FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11 AS builder
+FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12 AS builder
 
 WORKDIR /go/src/github.com/openshift/assisted-installer
 ENV GOFLAGS="-mod=vendor"
@@ -8,7 +8,7 @@ ENV GOFLAGS="-mod=vendor"
 COPY . .
 RUN make controller
 
-FROM registry.ci.openshift.org/ocp/4.11:base
+FROM registry.ci.openshift.org/ocp/4.12:base
 
 LABEL io.openshift.release.operator=true
 
