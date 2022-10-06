@@ -85,6 +85,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	cleanInstallDevice := func() {
 		mockops.EXPECT().GetVolumeGroupsByDisk(device).Return([]string{}, nil).Times(1)
+		mockops.EXPECT().RemoveAllPVsOnDevice(device).Return(nil).Times(1)
 		mockops.EXPECT().IsRaidMember(device).Return(false).Times(1)
 		mockops.EXPECT().Wipefs(device).Return(nil).Times(1)
 	}
@@ -173,7 +174,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockops.EXPECT().GetVolumeGroupsByDisk("/dev/vda").Times(1).Return(mockedVgsResult, nil)
 			mockops.EXPECT().RemoveVG("vg1").Times(1)
 			mockops.EXPECT().RemoveVG("vg2").Times(1)
-			mockops.EXPECT().RemovePV("/dev/vda").Times(1)
+			mockops.EXPECT().RemoveAllPVsOnDevice("/dev/vda").Return(nil).Times(1)
 			err := installerObj.cleanupDevice("/dev/vda")
 			Expect(err).ToNot(HaveOccurred())
 		})
@@ -188,7 +189,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockops.EXPECT().RemoveVG("vg1").Times(1)
 			mockops.EXPECT().RemoveVG("vg2").Times(1).Return(errors.New(fmt.Sprintf("Failed to remove VG %s, output %s, error %s", "vg2", "some arbitrary output", "some arbitrary error")))
 			mockops.EXPECT().RemoveVG("vg3").Times(0)
-			mockops.EXPECT().RemovePV("/dev/vda").Times(0)
+			mockops.EXPECT().RemoveAllPVsOnDevice("/dev/vda").Return(nil).Times(0)
 			err := installerObj.cleanupDevice("/dev/vda")
 			Expect(err).To(HaveOccurred())
 		})
@@ -618,7 +619,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockops.EXPECT().RemoveVG("vg1").Return(nil).Times(1)
 				mockops.EXPECT().IsRaidMember(device).Return(false).Times(1)
 				mockops.EXPECT().Wipefs(device).Return(nil).Times(1)
-				mockops.EXPECT().RemovePV(device).Return(nil).Times(1)
+				mockops.EXPECT().RemoveAllPVsOnDevice(device).Return(nil).Times(1)
 			}
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
 			cleanInstallDeviceClean()
@@ -641,9 +642,11 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("HostRoleMaster role raid cleanup disk - happy flow", func() {
 			cleanInstallDeviceClean := func() {
 				mockops.EXPECT().GetVolumeGroupsByDisk(device).Return([]string{}, nil).Times(1)
+				mockops.EXPECT().RemoveAllPVsOnDevice(device).Return(nil).Times(1)
 				mockops.EXPECT().IsRaidMember(device).Return(true).Times(1)
 				mockops.EXPECT().GetRaidDevices(device).Return([]string{raidDevice}, nil).Times(1)
 				mockops.EXPECT().GetVolumeGroupsByDisk(raidDevice).Return([]string{}, nil).Times(1)
+				mockops.EXPECT().RemoveAllPVsOnDevice(raidDevice).Return(nil).Times(1)
 				mockops.EXPECT().CleanRaidMembership(device).Return(nil).Times(1)
 				mockops.EXPECT().Wipefs(device).Return(nil).Times(1)
 			}
@@ -659,9 +662,11 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 			cleanInstallDeviceClean := func() {
 				mockops.EXPECT().GetVolumeGroupsByDisk(device).Return([]string{}, nil).Times(1)
+				mockops.EXPECT().RemoveAllPVsOnDevice(device).Return(nil).Times(1)
 				mockops.EXPECT().IsRaidMember(device).Return(true).Times(1)
 				mockops.EXPECT().GetRaidDevices(device).Return([]string{raidDevice}, nil).Times(1)
 				mockops.EXPECT().GetVolumeGroupsByDisk(raidDevice).Return([]string{}, nil).Times(1)
+				mockops.EXPECT().RemoveAllPVsOnDevice(raidDevice).Return(nil).Times(1)
 				mockops.EXPECT().CleanRaidMembership(device).Return(err).Times(1)
 			}
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
