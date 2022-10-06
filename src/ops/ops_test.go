@@ -151,3 +151,73 @@ var _ = Describe("GetVolumeGroupsByDisk", func() {
 		Expect(len(result)).To(Equal(0))
 	})
 })
+
+var _ = Describe("RemoveAllPVsOnDevice", func() {
+
+	var (
+		l        = logrus.New()
+		ctrl     *gomock.Controller
+		execMock *execute.MockExecute
+		conf     *config.Config
+		o        Ops
+	)
+
+	BeforeEach(func() {
+		ctrl = gomock.NewController(GinkgoT())
+		execMock = execute.NewMockExecute(ctrl)
+		conf = &config.Config{}
+		o = NewOpsWithConfig(conf, l, execMock)
+	})
+
+	It("When volume pvs are available for a given disk, they should be removed", func() {
+		m := MatcherContainsStringElements{[]string{"pvs", "--noheadings", "-o", "pv_name"}, true}
+		mockedVgsResult := `/dev/sda1
+		/dev/sdb1
+		/dev/sdx1
+		/dev/sdx2`
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m).Times(1).Return(mockedVgsResult, nil)
+
+		removeMatcher := MatcherContainsStringElements{[]string{"pvremove", "/dev/sdx1", "-y", "-ff"}, true}
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), removeMatcher).Times(1).Return("", nil)
+
+		removeMatcher = MatcherContainsStringElements{[]string{"pvremove", "/dev/sdx2", "-y", "-ff"}, true}
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), removeMatcher).Times(1).Return("", nil)
+
+		err := o.RemoveAllPVsOnDevice("/dev/sdx")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("When no pvs are available for a given disk, nothing should be deleted", func() {
+		m := MatcherContainsStringElements{[]string{"pvs", "--noheadings", "-o", "pv_name"}, true}
+		mockedVgsResult := `/dev/sda1
+		/dev/sdb`
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m).Times(1).Return(mockedVgsResult, nil)
+		err := o.RemoveAllPVsOnDevice("/dev/sdx")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("When the command to fetch pvs returns an error, error should be returned", func() {
+		m := MatcherContainsStringElements{[]string{"pvs", "--noheadings", "-o", "pv_name"}, true}
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m).Times(1).Return("", errors.New("Some arbitrary error occurred!"))
+		err := o.RemoveAllPVsOnDevice("/dev/sdx")
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("When remove pvs returns an error, error should be returned", func() {
+		m := MatcherContainsStringElements{[]string{"pvs", "--noheadings", "-o", "pv_name"}, true}
+		mockedVgsResult := `/dev/sda1
+		/dev/sdb1
+		/dev/sdx1
+		/dev/sdx2`
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m).Times(1).Return(mockedVgsResult, nil)
+
+		removeMatcher := MatcherContainsStringElements{[]string{"pvremove", "/dev/sdx1", "-y", "-ff"}, true}
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), removeMatcher).Times(1).Return("", nil)
+
+		removeMatcher = MatcherContainsStringElements{[]string{"pvremove", "/dev/sdx2", "-y", "-ff"}, true}
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), removeMatcher).Times(1).Return("", errors.New("Some arbitrary error occurred!"))
+
+		err := o.RemoveAllPVsOnDevice("/dev/sdx")
+		Expect(err).To(HaveOccurred())
+	})
+})

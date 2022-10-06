@@ -153,6 +153,20 @@ func (mr *MockOpsMockRecorder) GetVolumeGroupsByDisk(diskName interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVolumeGroupsByDisk", reflect.TypeOf((*MockOps)(nil).GetVolumeGroupsByDisk), diskName)
 }
 
+// RemoveAllPVsOnDevice mocks base method
+func (m *MockOps) RemoveAllPVsOnDevice(diskName string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveAllPVsOnDevice", diskName)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveAllPVsOnDevice indicates an expected call of RemoveAllPVsOnDevice
+func (mr *MockOpsMockRecorder) RemoveAllPVsOnDevice(diskName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveAllPVsOnDevice", reflect.TypeOf((*MockOps)(nil).RemoveAllPVsOnDevice), diskName)
+}
+
 // RemoveVG mocks base method
 func (m *MockOps) RemoveVG(vgName string) error {
 	m.ctrl.T.Helper()

@@ -805,14 +805,9 @@ func (i *installer) cleanupDevice(device string) error {
 		if err != nil {
 			return err
 		}
-
-		err = i.ops.RemovePV(device)
-		if err != nil {
-			return err
-		}
 	}
 
-	return nil
+	return i.ops.RemoveAllPVsOnDevice(device)
 }
 
 func (i *installer) verifyHostCanMoveToConfigurationStatus(inventoryHostsMapWithIp map[string]inventory_client.HostData) {

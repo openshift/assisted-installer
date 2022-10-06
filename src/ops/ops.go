@@ -40,6 +40,7 @@ type Ops interface {
 	SystemctlAction(action string, args ...string) error
 	PrepareController() error
 	GetVolumeGroupsByDisk(diskName string) ([]string, error)
+	RemoveAllPVsOnDevice(diskName string) error
 	RemoveVG(vgName string) error
 	RemovePV(pvName string) error
 	Wipefs(device string) error
@@ -392,6 +393,38 @@ func (o *ops) GetVolumeGroupsByDisk(diskName string) ([]string, error) {
 		}
 	}
 	return vgs, nil
+}
+
+func (o *ops) getDiskPVs(diskName string) ([]string, error) {
+	var pvs []string
+	output, err := o.ExecPrivilegeCommand(o.logWriter, "pvs", "--noheadings", "-o", "pv_name")
+	if err != nil {
+		o.log.Errorf("Failed to list PVs in the system")
+		return pvs, err
+	}
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, diskName) {
+			pvs = append(pvs, strings.TrimSpace(line))
+		}
+	}
+	return pvs, nil
+}
+
+func (o *ops) RemoveAllPVsOnDevice(diskName string) error {
+	pvs, err := o.getDiskPVs(diskName)
+	if err != nil {
+		return err
+	}
+	for _, pv := range pvs {
+		o.log.Infof("Removing pv %s from disk %s", pv, diskName)
+		err = o.RemovePV(pv)
+		if err != nil {
+			o.log.Errorf("Failed remove pv %s from disk %s", pv, diskName)
+			return err
+		}
+	}
+	return nil
 }
 
 func (o *ops) RemoveVG(vgName string) error {
