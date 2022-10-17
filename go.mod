@@ -6,7 +6,7 @@ require (
 	github.com/PuerkitoBio/rehttp v1.1.0
 	github.com/ReneKroon/ttlcache/v2 v2.11.0
 	github.com/coreos/ignition/v2 v2.14.0
-	github.com/go-openapi/runtime v0.24.1
+	github.com/go-openapi/runtime v0.24.2
 	github.com/go-openapi/strfmt v0.21.3
 	github.com/go-openapi/swag v0.22.3
 	github.com/golang/mock v1.6.0
