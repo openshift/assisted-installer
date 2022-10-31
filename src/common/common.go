@@ -102,7 +102,7 @@ func GetControllerPodLogs(kc k8s_client.K8SClient, podName string, namespace str
 	}
 	// This is fallback in case we don't have kube-api and we failed to get controller podname or logs
 	// we will fallback to reading from file
-	if podName == "" || err != nil {
+	if err != nil || podLogs == nil || podLogs.Len() == 0 {
 		log.Infof("Reading logs from file")
 		logs, errF := ioutil.ReadFile(ControllerLogFile)
 		if errF != nil {
