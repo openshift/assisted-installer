@@ -434,3 +434,18 @@ func (mr *MockOpsMockRecorder) ExecPrivilegeCommand(liveLogger, command interfac
 	varargs := append([]interface{}{liveLogger, command}, args...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecPrivilegeCommand", reflect.TypeOf((*MockOps)(nil).ExecPrivilegeCommand), varargs...)
 }
+
+// ReadFile mocks base method
+func (m *MockOps) ReadFile(filePath string) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadFile", filePath)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadFile indicates an expected call of ReadFile
+func (mr *MockOpsMockRecorder) ReadFile(filePath interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadFile", reflect.TypeOf((*MockOps)(nil).ReadFile), filePath)
+}

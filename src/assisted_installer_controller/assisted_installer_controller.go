@@ -1085,6 +1085,17 @@ func (c controller) logClusterOperatorsStatus() {
 	}
 }
 
+func (c controller) logHostResolvConf() {
+	for _, filePath := range []string{"/etc/resolv.conf", "/tmp/var-run-resolv.conf", "/tmp/host-resolv.conf"} {
+		content, err := c.ops.ReadFile(filePath)
+		if err != nil {
+			c.log.WithError(err).Warnf("Failed to read %s", filePath)
+			continue
+		}
+		c.log.Infof("Content of %s is %s", filePath, string(content))
+	}
+}
+
 // This is temporary function, till https://bugzilla.redhat.com/show_bug.cgi?id=2097041 will not be resolved,
 //that should validate router state only in case of failure
 // It will patch router to add access logs
@@ -1123,7 +1134,12 @@ func (c controller) logRouterStatus() {
 			if err != nil {
 				c.log.WithError(err).Warning("Failed to reach console")
 			} else {
-				c.log.Infof("canary url status %s", r.Status)
+				defer r.Body.Close()
+				response, errR := io.ReadAll(r.Body)
+				if errR != nil {
+					response = []byte("Failed to read response")
+				}
+				c.log.Infof("canary url status %s, response %s", r.Status, string(response))
 			}
 
 			url := fmt.Sprintf("http://%s/_______internal_router_healthz", localIp)
@@ -1153,6 +1169,7 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 	// Send upload operator logs before must-gather
 	c.logClusterOperatorsStatus()
 	if c.Status.HasError() || c.Status.HasOperatorError() {
+		c.logHostResolvConf()
 		c.log.Infof("Uploading cluster operator status logs before must-gather")
 		err := common.UploadPodLogs(c.kc, c.ic, c.ClusterID, podName, c.Namespace, controllerLogsSecondsAgo, c.log)
 		if err != nil {
