@@ -598,12 +598,17 @@ func (c *k8sClient) CreateEvent(namespace, name, message, component string) (*v1
 }
 
 func (c *k8sClient) GetCSVFromSubscription(namespace string, name string) (string, error) {
-	result, err := c.olmClient.Subscriptions(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	subscription, err := c.olmClient.Subscriptions(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		c.log.WithError(err).Warnf("Failed to get subscription %s in %s", name, namespace)
 		return "", err
 	}
-	return result.Status.CurrentCSV, nil
+	if subscription.Status.CurrentCSV == "" {
+		c.log.Warnf("subscription CurrentCSV is empty, subscription status: %+v", subscription.Status)
+		return subscription.Status.CurrentCSV, fmt.Errorf("subscription CurrentCSV is empty")
+	}
+
+	return subscription.Status.CurrentCSV, nil
 }
 
 func (c *k8sClient) GetSubscription(subscription types.NamespacedName) (*olmv1alpha1.Subscription, error) {
