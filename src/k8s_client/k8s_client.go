@@ -20,6 +20,7 @@ import (
 	olmv1client "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/typed/operators/v1alpha1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/thoas/go-funk"
 	"gopkg.in/yaml.v2"
 	batchV1 "k8s.io/api/batch/v1"
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -68,7 +69,7 @@ type K8SClient interface {
 	UpdateBMHStatus(bmh *metal3v1alpha1.BareMetalHost) error
 	UpdateBMH(bmh *metal3v1alpha1.BareMetalHost) error
 	SetProxyEnvVars() error
-	GetClusterVersion(name string) (*configv1.ClusterVersion, error)
+	GetClusterVersion() (*configv1.ClusterVersion, error)
 	GetServiceNetworks() ([]string, error)
 	GetControlPlaneReplicas() (int, error)
 	ListServices(namespace string) (*v1.ServiceList, error)
@@ -83,6 +84,7 @@ type K8SClient interface {
 	PatchNodeLabels(nodeName string, nodeLabels string) error
 	ListJobs(namespace string) (*batchV1.JobList, error)
 	DeleteJob(job types.NamespacedName) error
+	IsClusterCapabilityEnabled(configv1.ClusterVersionCapability) (bool, error)
 }
 
 type K8SClientBuilder func(configPath string, logger logrus.FieldLogger) (K8SClient, error)
@@ -516,12 +518,12 @@ func (c *k8sClient) UpdateBMH(bmh *metal3v1alpha1.BareMetalHost) error {
 	return c.runtimeClient.Update(context.TODO(), bmh)
 }
 
-func (c *k8sClient) GetClusterVersion(name string) (*configv1.ClusterVersion, error) {
+func (c *k8sClient) GetClusterVersion() (*configv1.ClusterVersion, error) {
 	result := &configv1.ClusterVersion{}
 	err := c.client.RESTClient().Get().
 		AbsPath("/apis/config.openshift.io/v1").
 		Resource("clusterversions").
-		Name(name).
+		Name("version").
 		Do(context.Background()).
 		Into(result)
 	return result, err
@@ -614,4 +616,14 @@ func (c *k8sClient) PatchNodeLabels(nodeName string, nodeLabels string) error {
 	data := []byte(`{"metadata": {"labels": ` + nodeLabels + `}}`)
 	_, err := c.client.CoreV1().Nodes().Patch(context.Background(), nodeName, types.MergePatchType, data, metav1.PatchOptions{})
 	return err
+}
+
+func (c *k8sClient) IsClusterCapabilityEnabled(capability configv1.ClusterVersionCapability) (bool, error) {
+	version, err := c.GetClusterVersion()
+	if err != nil {
+		return false, err
+	}
+	isExplicitlyEnabled := funk.Contains(version.Status.Capabilities.EnabledCapabilities, capability)
+	isKnown := funk.Contains(version.Status.Capabilities.KnownCapabilities, capability)
+	return isExplicitlyEnabled || !isKnown, nil
 }
