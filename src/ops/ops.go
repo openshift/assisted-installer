@@ -59,6 +59,7 @@ type Ops interface {
 	CreateManifests(string, []byte) error
 	DryRebootHappened(markerPath string) bool
 	ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error)
+	ReadFile(filePath string) ([]byte, error)
 }
 
 const (
@@ -830,6 +831,10 @@ func (o *ops) ExecPrivilegeCommand(liveLogger io.Writer, command string, args ..
 
 	arguments = append(arguments, args...)
 	return o.executor.ExecCommand(liveLogger, commandBase, arguments...)
+}
+
+func (o *ops) ReadFile(filePath string) ([]byte, error) {
+	return os.ReadFile(filePath)
 }
 
 func installerArgs(ignitionPath string, device string, extra []string) []string {

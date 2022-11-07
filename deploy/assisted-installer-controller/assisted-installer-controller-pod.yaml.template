@@ -71,6 +71,10 @@ spec:
           volumeMounts:
             - name: host-ca-bundle
               mountPath: /etc/pki
+            - name: host-var-run-resolv-conf
+              mountPath: /tmp/var-run-resolv.conf
+            - name: host-resolv-conf
+              mountPath: /tmp/host-resolv.conf
           {{if .CACertPath}}
             - name: service-ca-cert-config
               mountPath: {{.CACertPath}}
@@ -88,6 +92,12 @@ spec:
         - name: host-ca-bundle
           hostPath:
             path: /etc/pki
+        - name: host-var-run-resolv-conf
+          hostPath:
+            path: /var/run/NetworkManager/resolv.conf
+        - name: host-resolv-conf
+          hostPath:
+            path: /etc/resolv.conf
         {{if .CACertPath}}
         - name: service-ca-cert-config
           hostPath:

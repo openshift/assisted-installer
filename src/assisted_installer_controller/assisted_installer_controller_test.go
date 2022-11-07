@@ -156,6 +156,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockk8sclient.EXPECT().ListClusterOperators().Return(&operators, nil).AnyTimes()
 	}
 
+	logResolvConfSuccess := func() {
+		mockops.EXPECT().ReadFile(gomock.Any()).Return([]byte("test"), nil).MinTimes(3)
+	}
+
 	reportLogProgressSuccess := func() {
 		mockbmclient.EXPECT().ClusterLogProgressReport(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	}
@@ -1103,6 +1107,18 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			cancel()
 			wg.Wait()
 		})
+		It("Validate upload logs, upload from file if get pods fails and resolv_confs fails too", func() {
+			logClusterOperatorsSuccess()
+			reportLogProgressSuccess()
+			mockk8sclient.EXPECT().GetPods(assistedController.Namespace, gomock.Any(), fmt.Sprintf("status.phase=%s", v1.PodRunning)).Return(nil, fmt.Errorf("dummy")).MinTimes(2).MaxTimes(10)
+			mockbmclient.EXPECT().UploadLogs(gomock.Any(), assistedController.ClusterID, models.LogsTypeController, gomock.Any()).Return(nil).MinTimes(1)
+			ctx, cancel := context.WithCancel(context.Background())
+			wg.Add(1)
+			go assistedController.UploadLogs(ctx, &wg)
+			time.Sleep(1 * time.Second)
+			cancel()
+			wg.Wait()
+		})
 		It("Validate upload log still sent even if GetPodLogsAsBuffer fails and log file doesn't exists", func() {
 			logClusterOperatorsSuccess()
 			reportLogProgressSuccess()
@@ -1198,6 +1214,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("Validate upload logs (with must-gather logs)", func() {
 			successUpload()
 			logClusterOperatorsSuccess()
+			logResolvConfSuccess()
 			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any(), assistedController.MustGatherImage).Return("../../test_files/tartest.tar.gz", nil).Times(1)
 			mockbmclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
 			assistedController.Status.Error()
@@ -1223,6 +1240,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		It("Validate must-gather logs are retried on error - while cluster error occurred", func() {
 			successUpload()
 			logClusterOperatorsSuccess()
+			logResolvConfSuccess()
 			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any(), gomock.Any()).Return("", fmt.Errorf("failed"))
 			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any(), gomock.Any()).Return("../../test_files/tartest.tar.gz", nil)
 			mockbmclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
@@ -1237,24 +1255,38 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Times(0).Return(&models.Cluster{Name: "test", BaseDNSDomain: "test.com"}, nil)
 			callUploadLogs(50 * time.Millisecond)
 		})
+
 		It("Validate upload logs not blocked by router validation failure (with must-gather logs)", func() {
 			assistedController.HighAvailabilityMode = models.ClusterHighAvailabilityModeNone
 			successUpload()
 			logClusterOperatorsSuccess()
+			logResolvConfSuccess()
 			mockbmclient.EXPECT().GetCluster(gomock.Any(), false).MinTimes(1).Return(nil, fmt.Errorf("dummy"))
 			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any(), assistedController.MustGatherImage).Return("../../test_files/tartest.tar.gz", nil).Times(1)
 			mockbmclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
 			assistedController.Status.Error()
 			callUploadLogs(300 * time.Millisecond)
 		})
+
 		It("Validate upload logs (with must-gather logs) with router status on sno", func() {
 			assistedController.HighAvailabilityMode = models.ClusterHighAvailabilityModeNone
 			successUpload()
 			mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Times(1).Return(&models.Cluster{Name: "test", BaseDNSDomain: "test.com"}, nil)
 			logClusterOperatorsSuccess()
+			logResolvConfSuccess()
 			mockbmclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("dummy")).Times(1)
 			mockbmclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
 			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any(), assistedController.MustGatherImage).Return("../../test_files/tartest.tar.gz", nil).Times(1)
+			assistedController.Status.Error()
+			callUploadLogs(300 * time.Millisecond)
+		})
+
+		It("Validate resolv conf failure will not block must-gather", func() {
+			successUpload()
+			logClusterOperatorsSuccess()
+			mockops.EXPECT().ReadFile(gomock.Any()).Return(nil, fmt.Errorf("fummy")).MinTimes(3)
+			mockops.EXPECT().GetMustGatherLogs(gomock.Any(), gomock.Any(), assistedController.MustGatherImage).Return("../../test_files/tartest.tar.gz", nil).Times(1)
+			mockbmclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
 			assistedController.Status.Error()
 			callUploadLogs(300 * time.Millisecond)
 		})
