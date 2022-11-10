@@ -42,8 +42,6 @@ const (
 	assistedControllerNamespace  = "assisted-installer"
 	extractRetryCount            = 3
 	waitForeverTimeout           = time.Duration(1<<63 - 1) // wait forever ~ 292 years
-	ovnKubernetes                = "OVNKubernetes"
-	numMasterNodes               = 3
 	singleNodeMasterIgnitionPath = "/opt/openshift/master.ign"
 	waitingForMastersStatusInfo  = "Waiting for masters to join bootstrap control plane"
 	waitingForBootstrapToPrepare = "Waiting for bootstrap node preparation"
@@ -399,16 +397,6 @@ func (i *installer) downloadHostIgnition() (string, error) {
 	return dest, err
 }
 
-func (i *installer) waitForNetworkType(kc k8s_client.K8SClient) error {
-	return utils.WaitForPredicate(waitForeverTimeout, 5*time.Second, func() bool {
-		_, err := kc.GetNetworkType()
-		if err != nil {
-			i.log.WithError(err).Error("Failed to get network type")
-		}
-		return err == nil
-	})
-}
-
 func (i *installer) waitForControlPlane(ctx context.Context) error {
 	err := i.ops.ReloadHostFile("/etc/resolv.conf")
 	if err != nil {
@@ -426,24 +414,10 @@ func (i *installer) waitForControlPlane(ctx context.Context) error {
 		return err
 	}
 
-	patch, err := utils.EtcdPatchRequired(i.Config.OpenshiftVersion)
-	if err != nil {
-		i.log.Error(err)
-		return err
-	}
-	if patch {
-		if err := kc.PatchEtcd(); err != nil {
-			i.log.Error(err)
-			return err
-		}
-	} else {
-		i.log.Infof("Skipping etcd patch for cluster version %s", i.Config.OpenshiftVersion)
-	}
-
 	i.waitForBootkube(ctx)
 
 	// waiting for controller pod to be running
-	if err := i.waitForController(kc); err != nil {
+	if err = i.waitForController(kc); err != nil {
 		i.log.Error(err)
 		return err
 	}
@@ -491,67 +465,8 @@ func (i *installer) workerWaitFor2ReadyMasters(ctx context.Context) error {
 	return nil
 }
 
-func (i *installer) shouldControlPlaneReplicasPatchApplied(kc k8s_client.K8SClient) (bool, error) {
-	controlPlanePatchRequired, err := utils.IsVersionLessThan47(i.Config.OpenshiftVersion)
-	if err != nil {
-		i.log.WithError(err).Errorf("Failed to get compare OCP version")
-		return false, err
-	}
-	if !controlPlanePatchRequired {
-		i.log.Info("Control plane replicas patch not required due to Openshift version not less than 4.7")
-		return false, nil
-	}
-	if err = i.waitForNetworkType(kc); err != nil {
-		i.log.WithError(err).Error("failed to wait for network type")
-		return false, err
-	}
-	nt, err := kc.GetNetworkType()
-	if err != nil {
-		i.log.WithError(err).Error("failed to get network type")
-		return false, err
-	}
-	if nt != ovnKubernetes {
-		i.log.Info("Control plane replicas patch not required due to network type not OVNKubernetes")
-		return false, nil
-	}
-	// OVNKubernetes waits the number that is defined in controlPlane.Replicas to be
-	// available before starting OVN.  Since assisted installer has a bootstrap node
-	// that later becomes a master, there is a need to patch the install-config to
-	// set the controlPlane.replicas to 2 until all masters which are not the
-	// bootstrap are ready.
-	// On single node this is not the case since bootstrap in place is used.
-	// Therefore, the patch is not relevant to single node.
-	origControlPlaneReplicas, err := kc.GetControlPlaneReplicas()
-	if err != nil {
-		i.log.WithError(err).Error("Failed to get control plane replicas")
-		return false, err
-	}
-	if origControlPlaneReplicas != numMasterNodes {
-		i.log.Infof("Control plane replicas patch not required due to control plane replicas %d not equal to %d", origControlPlaneReplicas, numMasterNodes)
-		return false, nil
-	}
-	i.log.Info("Applying control plane replicas patch")
-	return true, nil
-}
-
 func (i *installer) waitForMinMasterNodes(ctx context.Context, kc k8s_client.K8SClient) error {
-	shouldPatchControlPlaneReplicas, err := i.shouldControlPlaneReplicasPatchApplied(kc)
-	if err != nil {
-		return err
-	}
-	if shouldPatchControlPlaneReplicas {
-		if err = kc.PatchControlPlaneReplicas(); err != nil {
-			i.log.WithError(err).Error("Failed to patch control plane replicas")
-			return err
-		}
-	}
 	i.waitForMasterNodes(ctx, minMasterNodes, kc)
-	if shouldPatchControlPlaneReplicas {
-		if err = kc.UnPatchControlPlaneReplicas(); err != nil {
-			i.log.WithError(err).Error("Failed to unPatch control plane replicas")
-			return err
-		}
-	}
 	return nil
 }
 

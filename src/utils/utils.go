@@ -21,7 +21,6 @@ import (
 	ignition "github.com/coreos/ignition/v2/config"
 	"github.com/openshift/assisted-service/models"
 
-	"github.com/hashicorp/go-version"
 	configv1 "github.com/openshift/api/config/v1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/sirupsen/logrus"
@@ -265,23 +264,6 @@ func GenerateRequestContext() context.Context {
 
 func RequestIDLogger(ctx context.Context, log logrus.FieldLogger) logrus.FieldLogger {
 	return requestid.RequestIDLogger(log, requestid.FromContext(ctx))
-}
-
-func IsVersionLessThan47(openshiftVersion string) (bool, error) {
-	clusterVersion, err := version.NewVersion(openshiftVersion)
-	if err != nil {
-		return false, err
-	}
-	v47, err := version.NewVersion("4.7")
-	if err != nil {
-		return false, err
-	}
-
-	return clusterVersion.LessThan(v47), nil
-}
-
-func EtcdPatchRequired(openshiftVersion string) (bool, error) {
-	return IsVersionLessThan47(openshiftVersion)
 }
 
 func CsvStatusToOperatorStatus(csvStatus string) models.OperatorStatus {

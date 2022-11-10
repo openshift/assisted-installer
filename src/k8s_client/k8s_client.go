@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/yaml.v2"
-
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/apis/metal3.io/v1alpha1"
 	configv1 "github.com/openshift/api/config/v1"
 	configv1client "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
@@ -22,6 +20,7 @@ import (
 	olmv1client "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/typed/operators/v1alpha1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v2"
 	batchV1 "k8s.io/api/batch/v1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	v1 "k8s.io/api/core/v1"
@@ -48,10 +47,7 @@ import (
 //go:generate mockgen -source=k8s_client.go -package=k8s_client -destination=mock_k8s_client.go
 type K8SClient interface {
 	ListMasterNodes() (*v1.NodeList, error)
-	PatchEtcd() error
-	UnPatchEtcd() error
-	PatchControlPlaneReplicas() error
-	UnPatchControlPlaneReplicas() error
+	EnableRouterAccessLogs() error
 	ListNodes() (*v1.NodeList, error)
 	ListMachines() (*machinev1beta1.MachineList, error)
 	RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error)
@@ -73,7 +69,6 @@ type K8SClient interface {
 	UpdateBMH(bmh *metal3v1alpha1.BareMetalHost) error
 	SetProxyEnvVars() error
 	GetClusterVersion(name string) (*configv1.ClusterVersion, error)
-	GetNetworkType() (string, error)
 	GetServiceNetworks() ([]string, error)
 	GetControlPlaneReplicas() (int, error)
 	ListServices(namespace string) (*v1.ServiceList, error)
@@ -222,23 +217,13 @@ func (c *k8sClient) ListMachines() (*machinev1beta1.MachineList, error) {
 	return &machines, nil
 }
 
-func (c *k8sClient) PatchEtcd() error {
-	c.log.Info("Patching etcd")
-	data := []byte(`{"spec": {"unsupportedConfigOverrides": {"useUnsupportedUnsafeNonHANonProductionUnstableEtcd": true}}}`)
-	result, err := c.ocClient.OperatorV1().Etcds().Patch(context.Background(), "cluster", types.MergePatchType, data, metav1.PatchOptions{})
+func (c *k8sClient) EnableRouterAccessLogs() error {
+	c.log.Info("Enabling router logs")
+	data := []byte(`{"spec":{"logging":{"access":{"destination":{"type":"Container"}}}}}`)
+	result, err := c.ocClient.OperatorV1().IngressControllers("openshift-ingress-operator").Patch(context.Background(),
+		"default", types.MergePatchType, data, metav1.PatchOptions{})
 	if err != nil {
-		return errors.Wrap(err, "Failed to patch etcd")
-	}
-	c.log.Info(result)
-	return nil
-}
-
-func (c *k8sClient) UnPatchEtcd() error {
-	c.log.Info("UnPatching etcd")
-	data := []byte(`{"spec": {"unsupportedConfigOverrides": null}}`)
-	result, err := c.ocClient.OperatorV1().Etcds().Patch(context.Background(), "cluster", types.MergePatchType, data, metav1.PatchOptions{})
-	if err != nil {
-		return errors.Wrap(err, "Failed to unpatch etcd")
+		return errors.Wrap(err, "Failed to patch router")
 	}
 	c.log.Info(result)
 	return nil
@@ -254,23 +239,6 @@ func (c *k8sClient) getInstallConfig() (string, error) {
 		return "", errors.New("Failed to get install config")
 	}
 	return installConfig, nil
-}
-
-func (c *k8sClient) GetNetworkType() (string, error) {
-	installConfig, err := c.getInstallConfig()
-	if err != nil {
-		return "", err
-	}
-	var networkingDecoder struct {
-		Networking struct {
-			NetworkType string `yaml:"networkType"`
-		} `yaml:"networking"`
-	}
-	err = yaml.Unmarshal([]byte(installConfig), &networkingDecoder)
-	if err != nil {
-		return "", errors.Wrapf(err, "Failed to unmarshal %s", installConfig)
-	}
-	return networkingDecoder.Networking.NetworkType, nil
 }
 
 func (c *k8sClient) GetServiceNetworks() ([]string, error) {
@@ -370,14 +338,6 @@ func (c *k8sClient) updateControlPlaneReplicas(value string) error {
 	c.log.Debug(result)
 	c.log.Infof("Changed control plane replicas to %s", value)
 	return nil
-}
-
-func (c *k8sClient) PatchControlPlaneReplicas() error {
-	return c.updateControlPlaneReplicas("2")
-}
-
-func (c *k8sClient) UnPatchControlPlaneReplicas() error {
-	return c.updateControlPlaneReplicas("3")
 }
 
 func (c *k8sClient) RunOCctlCommand(args []string, kubeconfigPath string, o ops.Ops) (string, error) {

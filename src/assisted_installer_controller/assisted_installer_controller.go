@@ -463,18 +463,6 @@ func (c controller) postInstallConfigs(ctx context.Context) error {
 		return errors.Wrapf(err, "Timeout while waiting router ca data")
 	}
 
-	unpatch, err := utils.EtcdPatchRequired(c.ControllerConfig.OpenshiftVersion)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to patch etcd")
-	}
-	if unpatch && c.HighAvailabilityMode != models.ClusterHighAvailabilityModeNone {
-		if err = utils.WaitForPredicateWithContext(ctx, WaitTimeout, GeneralWaitInterval, c.unpatchEtcd); err != nil {
-			return errors.Wrapf(err, "Timeout while trying to unpatch etcd")
-		}
-	} else {
-		c.log.Infof("Skipping etcd unpatch for cluster version %s", c.ControllerConfig.OpenshiftVersion)
-	}
-
 	// Wait for OLM operators
 	if err = c.waitForOLMOperators(ctx); err != nil {
 		// no need to send error in case olm failed as service should move to degraded in that case
@@ -877,15 +865,6 @@ func (c controller) updateBMHs(bmhList *metal3v1alpha1.BareMetalHostList, machin
 		}
 	}
 	return allUpdated
-}
-
-func (c controller) unpatchEtcd() bool {
-	c.log.Infof("Unpatching etcd")
-	if err := c.kc.UnPatchEtcd(); err != nil {
-		c.log.Error(err)
-		return false
-	}
-	return true
 }
 
 // AddRouterCAToClusterCA adds router CA to cluster CA in kubeconfig

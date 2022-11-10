@@ -58,60 +58,18 @@ func (mr *MockK8SClientMockRecorder) ListMasterNodes() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListMasterNodes", reflect.TypeOf((*MockK8SClient)(nil).ListMasterNodes))
 }
 
-// PatchEtcd mocks base method
-func (m *MockK8SClient) PatchEtcd() error {
+// EnableRouterAccessLogs mocks base method
+func (m *MockK8SClient) EnableRouterAccessLogs() error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PatchEtcd")
+	ret := m.ctrl.Call(m, "EnableRouterAccessLogs")
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// PatchEtcd indicates an expected call of PatchEtcd
-func (mr *MockK8SClientMockRecorder) PatchEtcd() *gomock.Call {
+// EnableRouterAccessLogs indicates an expected call of EnableRouterAccessLogs
+func (mr *MockK8SClientMockRecorder) EnableRouterAccessLogs() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchEtcd", reflect.TypeOf((*MockK8SClient)(nil).PatchEtcd))
-}
-
-// UnPatchEtcd mocks base method
-func (m *MockK8SClient) UnPatchEtcd() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UnPatchEtcd")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UnPatchEtcd indicates an expected call of UnPatchEtcd
-func (mr *MockK8SClientMockRecorder) UnPatchEtcd() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnPatchEtcd", reflect.TypeOf((*MockK8SClient)(nil).UnPatchEtcd))
-}
-
-// PatchControlPlaneReplicas mocks base method
-func (m *MockK8SClient) PatchControlPlaneReplicas() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PatchControlPlaneReplicas")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// PatchControlPlaneReplicas indicates an expected call of PatchControlPlaneReplicas
-func (mr *MockK8SClientMockRecorder) PatchControlPlaneReplicas() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchControlPlaneReplicas", reflect.TypeOf((*MockK8SClient)(nil).PatchControlPlaneReplicas))
-}
-
-// UnPatchControlPlaneReplicas mocks base method
-func (m *MockK8SClient) UnPatchControlPlaneReplicas() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UnPatchControlPlaneReplicas")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UnPatchControlPlaneReplicas indicates an expected call of UnPatchControlPlaneReplicas
-func (mr *MockK8SClientMockRecorder) UnPatchControlPlaneReplicas() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnPatchControlPlaneReplicas", reflect.TypeOf((*MockK8SClient)(nil).UnPatchControlPlaneReplicas))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnableRouterAccessLogs", reflect.TypeOf((*MockK8SClient)(nil).EnableRouterAccessLogs))
 }
 
 // ListNodes mocks base method
@@ -422,21 +380,6 @@ func (m *MockK8SClient) GetClusterVersion(name string) (*v1.ClusterVersion, erro
 func (mr *MockK8SClientMockRecorder) GetClusterVersion(name interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClusterVersion", reflect.TypeOf((*MockK8SClient)(nil).GetClusterVersion), name)
-}
-
-// GetNetworkType mocks base method
-func (m *MockK8SClient) GetNetworkType() (string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetNetworkType")
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetNetworkType indicates an expected call of GetNetworkType
-func (mr *MockK8SClientMockRecorder) GetNetworkType() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNetworkType", reflect.TypeOf((*MockK8SClient)(nil).GetNetworkType))
 }
 
 // GetServiceNetworks mocks base method

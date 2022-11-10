@@ -253,21 +253,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
 			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), inventoryNamesHost["node1"].Host.InfraEnvID.String(), inventoryNamesHost["node1"].Host.ID.String(), models.HostStageJoined, "").Times(1)
 		}
-		getNetworkTypeSuccessOpenshiftSDN := func() {
-			mockk8sclient.EXPECT().GetNetworkType().Return("OpenshiftSDN", nil).Times(2)
-		}
-		getNetworkTypeSuccessOVNKubernetes := func() {
-			mockk8sclient.EXPECT().GetNetworkType().Return("OVNKubernetes", nil).Times(2)
-		}
-		getControlPlaneReplicasSuccess := func() {
-			mockk8sclient.EXPECT().GetControlPlaneReplicas().Return(3, nil).Times(1)
-		}
-		patchControlPlaneReplicasSuccess := func() {
-			mockk8sclient.EXPECT().PatchControlPlaneReplicas().Return(nil).Times(1)
-		}
-		unpatchControlPlaneReplicasSuccess := func() {
-			mockk8sclient.EXPECT().UnPatchControlPlaneReplicas().Return(nil).Times(1)
-		}
 		prepareControllerSuccess := func() {
 			mockops.EXPECT().PrepareController().Return(nil).Times(1)
 		}
@@ -300,7 +285,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			createOpenshiftSshManifestSuccess()
 			daemonReload(nil)
 		}
-		for _, version := range []string{"4.6", "4.6.16", "4.7", "4.7.1", "4.7-pre-release", "4.8"} {
+		for _, version := range []string{"4.7", "4.7.1", "4.7-pre-release", "4.8"} {
 			Context(version, func() {
 				BeforeEach(func() {
 					conf.OpenshiftVersion = version
@@ -321,9 +306,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					restartNetworkManager(nil)
 					prepareControllerSuccess()
 					startServicesSuccess()
-					if conf.OpenshiftVersion == "4.6" {
-						getNetworkTypeSuccessOpenshiftSDN()
-					}
 					WaitMasterNodesSucccess()
 					waitForBootkubeSuccess()
 					bootkubeStatusSuccess()
@@ -353,12 +335,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					restartNetworkManager(nil)
 					prepareControllerSuccess()
 					startServicesSuccess()
-					if conf.OpenshiftVersion == "4.6" {
-						getNetworkTypeSuccessOVNKubernetes()
-						getControlPlaneReplicasSuccess()
-						patchControlPlaneReplicasSuccess()
-						unpatchControlPlaneReplicasSuccess()
-					}
 					WaitMasterNodesSucccess()
 					waitForBootkubeSuccess()
 					bootkubeStatusSuccess()
