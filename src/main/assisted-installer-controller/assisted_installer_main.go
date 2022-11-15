@@ -150,6 +150,9 @@ func main() {
 	go assistedController.UploadLogs(mainContext, &wg)
 	wg.Add(1)
 
+	go assistedController.UpdateNodeLabels(mainContext, &wg)
+	wg.Add(1)
+
 	// monitoring installation by cluster status
 	waitForInstallation(client, logger, assistedController.Status)
 }

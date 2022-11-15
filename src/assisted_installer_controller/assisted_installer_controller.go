@@ -449,16 +449,24 @@ func (c controller) PostInstallConfigs(ctx context.Context, wg *sync.WaitGroup) 
 	c.sendCompleteInstallation(ctx, success, errMessage)
 }
 
+func (c controller) UpdateNodeLabels(ctx context.Context, wg *sync.WaitGroup) {
+	defer func() {
+		c.log.Infof("Finished UpdateNodeLabels")
+		wg.Done()
+	}()
+
+	c.log.Infof("Updating host labels if required")
+	err := utils.WaitForPredicateWithContext(ctx, LongWaitTimeout, GeneralWaitInterval, c.updateNodesLabels)
+	if err != nil {
+		c.log.Warn("Failed to label the nodes")
+	}
+}
+
 func (c controller) postInstallConfigs(ctx context.Context) error {
 	var err error
 
 	if err = c.waitingForClusterOperators(ctx); err != nil {
 		return errors.Wrapf(err, "Timeout while waiting for cluster operators to be available")
-	}
-
-	err = utils.WaitForPredicateWithContext(ctx, WaitTimeout, GeneralWaitInterval, c.updateNodesLabels)
-	if err != nil {
-		c.log.Warn("Failed to label the nodes")
 	}
 
 	err = utils.WaitForPredicateWithContext(ctx, WaitTimeout, GeneralWaitInterval, c.addRouterCAToClusterCA)
@@ -997,7 +1005,7 @@ func (c controller) waitingForClusterOperators(ctx context.Context) error {
 	return utils.WaitForPredicateWithTimer(ctxWithTimeout, WaitTimeout, GeneralProgressUpdateInt, isClusterVersionAvailable)
 }
 
-func areNodeLabelsUpdated(node *v1.Node, nodeLabels string) bool {
+func areNodeLabelsUpdated(node v1.Node, nodeLabels string) bool {
 	nodeLabelsPresent := node.Labels
 	nodeLabelsRequired := make(map[string]string)
 	_ = json.Unmarshal([]byte(nodeLabels), &nodeLabelsRequired)
@@ -1022,35 +1030,53 @@ func (c *controller) updateNodesLabels() bool {
 		return KeepWaiting
 	}
 
-	retry := false
-
+	hostsWithLabels := make(map[string]inventory_client.HostData)
 	for hostname, hostData := range assistedNodesMap {
-
 		if len(hostData.Host.NodeLabels) == 0 {
 			continue
 		}
-
-		node, err := c.kc.GetNode(hostname)
-		if err != nil {
-			log.WithError(err).Errorf("Failed to get node %s from k8s client", hostname)
-			retry = true
-			continue
-		} else if areNodeLabelsUpdated(node, hostData.Host.NodeLabels) {
-			continue
-		}
-
-		err = c.kc.PatchNodeLabels(node.Name, hostData.Host.NodeLabels)
-		if err != nil {
-			log.WithError(err).Errorf("Failed to patch node %s with node labels %s", node.Name, hostData.Host.NodeLabels)
-			retry = true
-		}
+		hostsWithLabels[hostname] = hostData
+	}
+	if len(hostsWithLabels) == 0 {
+		c.log.Infof("No hosts with labels, skipping update node labels")
+		return ExitWaiting
 	}
 
-	if retry {
+	if len(hostsWithLabels) > c.patchNodesLabels(log, hostsWithLabels) {
 		return KeepWaiting
 	} else {
 		return ExitWaiting
 	}
+}
+
+func (c controller) patchNodesLabels(log logrus.FieldLogger, hostsWithLabels map[string]inventory_client.HostData) int {
+	patchedNumber := 0
+	knownIpAddresses := common.BuildHostsMapIPAddressBased(hostsWithLabels)
+	nodes, err := c.kc.ListNodes()
+	if err != nil {
+		log.WithError(err).Error("Failed to get list of nodes from k8s client")
+		return patchedNumber
+	}
+
+	for _, node := range nodes.Items {
+		host, ok := common.HostMatchByNameOrIPAddress(node, hostsWithLabels, knownIpAddresses)
+		if !ok {
+			continue
+		}
+		if areNodeLabelsUpdated(node, host.Host.NodeLabels) {
+			patchedNumber++
+			continue
+		}
+
+		err = c.kc.PatchNodeLabels(node.Name, host.Host.NodeLabels)
+		if err != nil {
+			log.WithError(err).Errorf("Failed to patch node %s with node labels %s", node.Name, host.Host.NodeLabels)
+			continue
+		}
+		log.Infof("Successfully patched label for host %s", node.Name)
+		patchedNumber++
+	}
+	return patchedNumber
 }
 
 func (c controller) sendCompleteInstallation(ctx context.Context, isSuccess bool, errorInfo string) {
