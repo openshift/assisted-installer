@@ -20,6 +20,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/apis/metal3.io/v1alpha1"
+	configv1 "github.com/openshift/api/config/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -57,6 +58,8 @@ const (
 	ExitWaiting               = true
 	customManifestsFile       = "custom_manifests.json"
 	kubeconfigFileName        = "kubeconfig-noingress"
+
+	consoleCapabilityName = configv1.ClusterVersionCapability("Console")
 )
 
 var (
@@ -971,12 +974,24 @@ func (c controller) waitingForClusterOperators(ctx context.Context) error {
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, CVOMaxTimeout)
 	defer cancel()
 	isClusterVersionAvailable := func(timer *time.Timer) bool {
-		result := c.isOperatorAvailable(NewClusterOperatorHandler(c.kc, consoleOperatorName))
-
-		if c.WaitForClusterVersion {
-			result = c.isOperatorAvailable(NewClusterVersionHandler(c.log, c.kc, timer)) && result
+		clusterOperatorHandler := NewClusterOperatorHandler(c.kc, consoleOperatorName)
+		clusterVersionHandler := NewClusterVersionHandler(c.log, c.kc, timer)
+		isConsoleEnabled, err := c.kc.IsClusterCapabilityEnabled(consoleCapabilityName)
+		if err != nil {
+			c.log.WithError(err).Error("Failed to check if console is enabled")
+			return false
 		}
-
+		var result bool
+		if isConsoleEnabled {
+			c.log.Info("Console is enabled, will wait for the console operator to be available")
+			result = c.isOperatorAvailable(clusterOperatorHandler)
+		} else {
+			c.log.Info("Console is disabled, will not wait for the console operator to be available")
+			result = true
+		}
+		if c.WaitForClusterVersion {
+			result = c.isOperatorAvailable(clusterVersionHandler) && result
+		}
 		return result
 	}
 	return utils.WaitForPredicateWithTimer(ctxWithTimeout, WaitTimeout, GeneralProgressUpdateInt, isClusterVersionAvailable)

@@ -150,7 +150,7 @@ func PrepareControllerDryMock(mockk8sclient *k8s_client.MockK8SClient, logger *l
 			Conditions: availableConditions,
 		},
 	}
-	mockk8sclient.EXPECT().GetClusterVersion(gomock.Any()).Return(&clusterVersion, nil).AnyTimes()
+	mockk8sclient.EXPECT().GetClusterVersion().Return(&clusterVersion, nil).AnyTimes()
 
 	configMap := v1.ConfigMap{
 		Data: map[string]string{
@@ -273,6 +273,8 @@ dEFgad6P3hMZTOg7yVkMOd3QtgVQ9I8dXqS2nG9EMEh97WIhi6f5ztvcQvQ5tXjh
 	}
 
 	mockk8sclient.EXPECT().ListClusterOperators().Return(clusterOperatorList, nil).AnyTimes()
+
+	mockk8sclient.EXPECT().IsClusterCapabilityEnabled(gomock.Any()).Return(true, nil).AnyTimes()
 }
 
 // PrepareInstallerDryK8sMock utilizes k8s_client.MockK8SClient to fake the k8s API to make the

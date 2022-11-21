@@ -368,18 +368,18 @@ func (mr *MockK8SClientMockRecorder) SetProxyEnvVars() *gomock.Call {
 }
 
 // GetClusterVersion mocks base method
-func (m *MockK8SClient) GetClusterVersion(name string) (*v1.ClusterVersion, error) {
+func (m *MockK8SClient) GetClusterVersion() (*v1.ClusterVersion, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetClusterVersion", name)
+	ret := m.ctrl.Call(m, "GetClusterVersion")
 	ret0, _ := ret[0].(*v1.ClusterVersion)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetClusterVersion indicates an expected call of GetClusterVersion
-func (mr *MockK8SClientMockRecorder) GetClusterVersion(name interface{}) *gomock.Call {
+func (mr *MockK8SClientMockRecorder) GetClusterVersion() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClusterVersion", reflect.TypeOf((*MockK8SClient)(nil).GetClusterVersion), name)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClusterVersion", reflect.TypeOf((*MockK8SClient)(nil).GetClusterVersion))
 }
 
 // GetServiceNetworks mocks base method
@@ -585,4 +585,19 @@ func (m *MockK8SClient) DeleteJob(job types.NamespacedName) error {
 func (mr *MockK8SClientMockRecorder) DeleteJob(job interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteJob", reflect.TypeOf((*MockK8SClient)(nil).DeleteJob), job)
+}
+
+// IsClusterCapabilityEnabled mocks base method
+func (m *MockK8SClient) IsClusterCapabilityEnabled(arg0 v1.ClusterVersionCapability) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsClusterCapabilityEnabled", arg0)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsClusterCapabilityEnabled indicates an expected call of IsClusterCapabilityEnabled
+func (mr *MockK8SClientMockRecorder) IsClusterCapabilityEnabled(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsClusterCapabilityEnabled", reflect.TypeOf((*MockK8SClient)(nil).IsClusterCapabilityEnabled), arg0)
 }

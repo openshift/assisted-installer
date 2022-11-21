@@ -17,9 +17,8 @@ import (
 )
 
 const (
-	cvoOperatorName    = "cvo"
-	clusterVersionName = "version"
-	olmNamespace       = "openshift-marketplace"
+	cvoOperatorName = "cvo"
+	olmNamespace    = "openshift-marketplace"
 )
 
 type OperatorHandler interface {
@@ -116,7 +115,7 @@ func (handler ClusterVersionHandler) GetName() string { return cvoOperatorName }
 func (handler ClusterVersionHandler) IsInitialized() bool { return true }
 
 func (handler ClusterVersionHandler) GetStatus() (models.OperatorStatus, string, error) {
-	co, err := handler.kc.GetClusterVersion(clusterVersionName)
+	co, err := handler.kc.GetClusterVersion()
 	if err != nil {
 		return "", "", err
 	}
