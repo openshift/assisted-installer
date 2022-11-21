@@ -10,8 +10,7 @@ import (
 )
 
 const (
-	cvoOperatorName    = "cvo"
-	clusterVersionName = "version"
+	cvoOperatorName = "cvo"
 )
 
 type OperatorHandler interface {
@@ -36,7 +35,7 @@ func (c controller) isOperatorAvailable(handler OperatorHandler) bool {
 		return false
 	}
 
-	if operatorStatusInService.Status != operatorStatus || (operatorStatusInService.StatusInfo != operatorMessage && operatorMessage != "") {
+	if operatorStatusInService != nil && (operatorStatusInService.Status != operatorStatus || (operatorStatusInService.StatusInfo != operatorMessage && operatorMessage != "")) {
 		c.log.Infof("Operator <%s> updated, status: %s -> %s, message: %s -> %s.", operatorName, operatorStatusInService.Status, operatorStatus, operatorStatusInService.StatusInfo, operatorMessage)
 		if !handler.OnChange(operatorStatus) {
 			c.log.WithError(err).Warnf("<%s> operator's OnChange() returned false. Will skip an update.", operatorName)
@@ -107,7 +106,7 @@ func (handler ClusterVersionHandler) GetName() string { return cvoOperatorName }
 func (handler ClusterVersionHandler) IsInitialized() bool { return true }
 
 func (handler ClusterVersionHandler) GetStatus() (models.OperatorStatus, string, error) {
-	co, err := handler.kc.GetClusterVersion(clusterVersionName)
+	co, err := handler.kc.GetClusterVersion()
 	if err != nil {
 		return "", "", err
 	}
