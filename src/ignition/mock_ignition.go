@@ -11,59 +11,30 @@ import (
 	gomock "github.com/golang/mock/gomock"
 )
 
-// MockIgnition is a mock of Ignition interface
+// MockIgnition is a mock of Ignition interface.
 type MockIgnition struct {
 	ctrl     *gomock.Controller
 	recorder *MockIgnitionMockRecorder
 }
 
-// MockIgnitionMockRecorder is the mock recorder for MockIgnition
+// MockIgnitionMockRecorder is the mock recorder for MockIgnition.
 type MockIgnitionMockRecorder struct {
 	mock *MockIgnition
 }
 
-// NewMockIgnition creates a new mock instance
+// NewMockIgnition creates a new mock instance.
 func NewMockIgnition(ctrl *gomock.Controller) *MockIgnition {
 	mock := &MockIgnition{ctrl: ctrl}
 	mock.recorder = &MockIgnitionMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockIgnition) EXPECT() *MockIgnitionMockRecorder {
 	return m.recorder
 }
 
-// ParseIgnitionFile mocks base method
-func (m *MockIgnition) ParseIgnitionFile(path string) (*types.Config, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ParseIgnitionFile", path)
-	ret0, _ := ret[0].(*types.Config)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ParseIgnitionFile indicates an expected call of ParseIgnitionFile
-func (mr *MockIgnitionMockRecorder) ParseIgnitionFile(path interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseIgnitionFile", reflect.TypeOf((*MockIgnition)(nil).ParseIgnitionFile), path)
-}
-
-// WriteIgnitionFile mocks base method
-func (m *MockIgnition) WriteIgnitionFile(path string, config *types.Config) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WriteIgnitionFile", path, config)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// WriteIgnitionFile indicates an expected call of WriteIgnitionFile
-func (mr *MockIgnitionMockRecorder) WriteIgnitionFile(path, config interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteIgnitionFile", reflect.TypeOf((*MockIgnition)(nil).WriteIgnitionFile), path, config)
-}
-
-// MergeIgnitionConfig mocks base method
+// MergeIgnitionConfig mocks base method.
 func (m *MockIgnition) MergeIgnitionConfig(base, overrides *types.Config) (*types.Config, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "MergeIgnitionConfig", base, overrides)
@@ -72,8 +43,37 @@ func (m *MockIgnition) MergeIgnitionConfig(base, overrides *types.Config) (*type
 	return ret0, ret1
 }
 
-// MergeIgnitionConfig indicates an expected call of MergeIgnitionConfig
+// MergeIgnitionConfig indicates an expected call of MergeIgnitionConfig.
 func (mr *MockIgnitionMockRecorder) MergeIgnitionConfig(base, overrides interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MergeIgnitionConfig", reflect.TypeOf((*MockIgnition)(nil).MergeIgnitionConfig), base, overrides)
+}
+
+// ParseIgnitionFile mocks base method.
+func (m *MockIgnition) ParseIgnitionFile(path string) (*types.Config, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ParseIgnitionFile", path)
+	ret0, _ := ret[0].(*types.Config)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ParseIgnitionFile indicates an expected call of ParseIgnitionFile.
+func (mr *MockIgnitionMockRecorder) ParseIgnitionFile(path interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseIgnitionFile", reflect.TypeOf((*MockIgnition)(nil).ParseIgnitionFile), path)
+}
+
+// WriteIgnitionFile mocks base method.
+func (m *MockIgnition) WriteIgnitionFile(path string, config *types.Config) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WriteIgnitionFile", path, config)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WriteIgnitionFile indicates an expected call of WriteIgnitionFile.
+func (mr *MockIgnitionMockRecorder) WriteIgnitionFile(path, config interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteIgnitionFile", reflect.TypeOf((*MockIgnition)(nil).WriteIgnitionFile), path, config)
 }

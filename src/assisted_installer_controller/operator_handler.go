@@ -274,7 +274,7 @@ func (handler ClusterServiceVersionHandler) OnChange(newStatus models.OperatorSt
 		if handler.retries < failedOperatorRetry {
 			// FIXME: We retry the check of the operator status in case it's in failed state to WA bug 1968606
 			// Remove this code when bug 1968606 is fixed
-			handler.retries++
+			handler.retries++ //nolint:staticcheck
 			return false
 		}
 		handler.status.OperatorError(handler.operator.Name)

@@ -11,30 +11,30 @@ import (
 	gomock "github.com/golang/mock/gomock"
 )
 
-// MockExecute is a mock of Execute interface
+// MockExecute is a mock of Execute interface.
 type MockExecute struct {
 	ctrl     *gomock.Controller
 	recorder *MockExecuteMockRecorder
 }
 
-// MockExecuteMockRecorder is the mock recorder for MockExecute
+// MockExecuteMockRecorder is the mock recorder for MockExecute.
 type MockExecuteMockRecorder struct {
 	mock *MockExecute
 }
 
-// NewMockExecute creates a new mock instance
+// NewMockExecute creates a new mock instance.
 func NewMockExecute(ctrl *gomock.Controller) *MockExecute {
 	mock := &MockExecute{ctrl: ctrl}
 	mock.recorder = &MockExecuteMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockExecute) EXPECT() *MockExecuteMockRecorder {
 	return m.recorder
 }
 
-// ExecCommand mocks base method
+// ExecCommand mocks base method.
 func (m *MockExecute) ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{liveLogger, command}
@@ -47,7 +47,7 @@ func (m *MockExecute) ExecCommand(liveLogger io.Writer, command string, args ...
 	return ret0, ret1
 }
 
-// ExecCommand indicates an expected call of ExecCommand
+// ExecCommand indicates an expected call of ExecCommand.
 func (mr *MockExecuteMockRecorder) ExecCommand(liveLogger, command interface{}, args ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{liveLogger, command}, args...)
