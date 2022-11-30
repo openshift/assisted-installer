@@ -722,7 +722,11 @@ func (i *installer) cleanupDevice(device string) error {
 		}
 	}
 
-	return i.ops.RemoveAllPVsOnDevice(device)
+	if err = i.ops.RemoveAllPVsOnDevice(device); err != nil {
+		return err
+	}
+
+	return i.ops.RemoveAllDMDevicesOnDisk(device)
 }
 
 func (i *installer) verifyHostCanMoveToConfigurationStatus(inventoryHostsMapWithIp map[string]inventory_client.HostData) {

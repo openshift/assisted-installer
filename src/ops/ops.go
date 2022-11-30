@@ -41,6 +41,7 @@ type Ops interface {
 	PrepareController() error
 	GetVolumeGroupsByDisk(diskName string) ([]string, error)
 	RemoveAllPVsOnDevice(diskName string) error
+	RemoveAllDMDevicesOnDisk(diskName string) error
 	RemoveVG(vgName string) error
 	RemovePV(pvName string) error
 	Wipefs(device string) error
@@ -422,6 +423,58 @@ func (o *ops) RemoveAllPVsOnDevice(diskName string) error {
 		err = o.RemovePV(pv)
 		if err != nil {
 			o.log.Errorf("Failed remove pv %s from disk %s", pv, diskName)
+			return err
+		}
+	}
+	return nil
+}
+
+func (o *ops) getDMDevices(diskName string) ([]string, error) {
+	var dmDevices []string
+	output, err := o.ExecPrivilegeCommand(o.logWriter, "dmsetup", "ls")
+	if err != nil {
+		o.log.Errorf("Failed to list DM devices in the system")
+		return dmDevices, err
+	}
+
+	if strings.TrimSuffix(output, "\n") == "No devices found" {
+		return dmDevices, nil
+	}
+
+	diskBasename := filepath.Base(diskName)
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		dmDevice := strings.Split(line, "\t")[0]
+		output, err = o.ExecPrivilegeCommand(o.logWriter, "dmsetup", "deps", "-o", "devname", dmDevice)
+		if err != nil {
+			o.log.Errorf("Failed to get parent device for DM device %s", dmDevice)
+			return dmDevices, err
+		}
+		if strings.Contains(output, "("+diskBasename) {
+			dmDevices = append(dmDevices, dmDevice)
+		}
+	}
+	return dmDevices, nil
+}
+
+func (o *ops) RemoveDMDevice(dmDevice string) error {
+	output, err := o.ExecPrivilegeCommand(o.logWriter, "dmsetup", "remove", "--retry", dmDevice)
+	if err != nil {
+		o.log.Errorf("Failed to remove DM device %s, output %s, error %s", dmDevice, output, err)
+	}
+	return err
+}
+
+func (o *ops) RemoveAllDMDevicesOnDisk(diskName string) error {
+	dmDevices, err := o.getDMDevices(diskName)
+	if err != nil {
+		return err
+	}
+	for _, dmDevice := range dmDevices {
+		o.log.Infof("Removing DM device %s", dmDevice)
+		err = o.RemoveDMDevice(dmDevice)
+		if err != nil {
+			o.log.Errorf("Failed to remove DM device %s", dmDevice)
 			return err
 		}
 	}

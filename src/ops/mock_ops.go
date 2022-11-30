@@ -332,6 +332,20 @@ func (mr *MockOpsMockRecorder) ReloadHostFile(filepath interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReloadHostFile", reflect.TypeOf((*MockOps)(nil).ReloadHostFile), filepath)
 }
 
+// RemoveAllDMDevicesOnDisk mocks base method.
+func (m *MockOps) RemoveAllDMDevicesOnDisk(diskName string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveAllDMDevicesOnDisk", diskName)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveAllDMDevicesOnDisk indicates an expected call of RemoveAllDMDevicesOnDisk.
+func (mr *MockOpsMockRecorder) RemoveAllDMDevicesOnDisk(diskName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveAllDMDevicesOnDisk", reflect.TypeOf((*MockOps)(nil).RemoveAllDMDevicesOnDisk), diskName)
+}
+
 // RemoveAllPVsOnDevice mocks base method.
 func (m *MockOps) RemoveAllPVsOnDevice(diskName string) error {
 	m.ctrl.T.Helper()

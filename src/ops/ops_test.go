@@ -221,3 +221,95 @@ var _ = Describe("RemoveAllPVsOnDevice", func() {
 		Expect(err).To(HaveOccurred())
 	})
 })
+var _ = Describe("RemoveAllDMDevicesOnDisk", func() {
+
+	var (
+		l        = logrus.New()
+		ctrl     *gomock.Controller
+		execMock *execute.MockExecute
+		conf     *config.Config
+		o        Ops
+	)
+
+	BeforeEach(func() {
+		ctrl = gomock.NewController(GinkgoT())
+		execMock = execute.NewMockExecute(ctrl)
+		conf = &config.Config{}
+		o = NewOpsWithConfig(conf, l, execMock)
+	})
+
+	It("When DM devices are available for a given disk, they should be removed", func() {
+		dmsetupLsMatcher := MatcherContainsStringElements{[]string{"dmsetup", "ls"}, true}
+		mockedDmsetupLsResult := `volumegroup-logicalvolume	(253:0)`
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), dmsetupLsMatcher).Times(1).Return(mockedDmsetupLsResult, nil)
+
+		dmsetupDepsMatcher := MatcherContainsStringElements{[]string{"dmsetup", "deps", "-o", "devname", "volumegroup-logicalvolume"}, true}
+		mockedDmsetupDepsResult := `1 dependencies  : (sdx1)`
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), dmsetupDepsMatcher).Times(1).Return(mockedDmsetupDepsResult, nil)
+
+		removeMatcher := MatcherContainsStringElements{[]string{"dmsetup", "remove", "--retry", "volumegroup-logicalvolume"}, true}
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), removeMatcher).Times(1).Return("", nil)
+
+		err := o.RemoveAllDMDevicesOnDisk("/dev/sdx")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("When no DM devices are available for a given disk, nothing should be deleted", func() {
+		dmsetupLsMatcher := MatcherContainsStringElements{[]string{"dmsetup", "ls"}, true}
+		mockedDmsetupLsResult := `volumegroup-logicalvolume	(253:0)`
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), dmsetupLsMatcher).Times(1).Return(mockedDmsetupLsResult, nil)
+
+		dmsetupDepsMatcher := MatcherContainsStringElements{[]string{"dmsetup", "deps", "-o", "devname", "volumegroup-logicalvolume"}, true}
+		mockedDmsetupDepsResult := `1 dependencies  : (vdb1)`
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), dmsetupDepsMatcher).Times(1).Return(mockedDmsetupDepsResult, nil)
+
+		err := o.RemoveAllDMDevicesOnDisk("/dev/sdx")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("When no DM devices are available for a given disk, nothing should be done", func() {
+		dmsetupLsMatcher := MatcherContainsStringElements{[]string{"dmsetup", "ls"}, true}
+		mockedDmsetupLsResult := `No devices found`
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), dmsetupLsMatcher).Times(1).Return(mockedDmsetupLsResult, nil)
+
+		err := o.RemoveAllDMDevicesOnDisk("/dev/sdx")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("When the command to list DM devices returns an error, error should be returned", func() {
+		dmsetupLsMatcher := MatcherContainsStringElements{[]string{"dmsetup", "ls"}, true}
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), dmsetupLsMatcher).Times(1).Return("", errors.New("Some arbitrary error occurred!"))
+
+		err := o.RemoveAllDMDevicesOnDisk("/dev/sdx")
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("When the command to list DM device dependencies returns an error, error should be returned", func() {
+		dmsetupLsMatcher := MatcherContainsStringElements{[]string{"dmsetup", "ls"}, true}
+		mockedDmsetupLsResult := `volumegroup-logicalvolume	(253:0)`
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), dmsetupLsMatcher).Times(1).Return(mockedDmsetupLsResult, nil)
+
+		dmsetupDepsMatcher := MatcherContainsStringElements{[]string{"dmsetup", "deps", "-o", "devname", "volumegroup-logicalvolume"}, true}
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), dmsetupDepsMatcher).Times(1).Return("", errors.New("Some arbitrary error occurred!"))
+
+		err := o.RemoveAllDMDevicesOnDisk("/dev/sdx")
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("When the command to remove DM device returns an error, error should be returned", func() {
+		dmsetupLsMatcher := MatcherContainsStringElements{[]string{"dmsetup", "ls"}, true}
+		mockedDmsetupLsResult := `volumegroup-logicalvolume	(253:0)`
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), dmsetupLsMatcher).Times(1).Return(mockedDmsetupLsResult, nil)
+
+		dmsetupDepsMatcher := MatcherContainsStringElements{[]string{"dmsetup", "deps", "-o", "devname", "volumegroup-logicalvolume"}, true}
+		mockedDmsetupDepsResult := `1 dependencies  : (sdx1)`
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), dmsetupDepsMatcher).Times(1).Return(mockedDmsetupDepsResult, nil)
+
+		removeMatcher := MatcherContainsStringElements{[]string{"dmsetup", "remove", "--retry", "volumegroup-logicalvolume"}, true}
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), removeMatcher).Times(1).Return("", errors.New("Some arbitrary error occurred!"))
+
+		err := o.RemoveAllDMDevicesOnDisk("/dev/sdx")
+		Expect(err).To(HaveOccurred())
+	})
+
+})
