@@ -414,6 +414,7 @@ func (o *ops) getDiskPVs(diskName string) ([]string, error) {
 }
 
 func (o *ops) RemoveAllPVsOnDevice(diskName string) error {
+	var ret error
 	pvs, err := o.getDiskPVs(diskName)
 	if err != nil {
 		return err
@@ -423,10 +424,10 @@ func (o *ops) RemoveAllPVsOnDevice(diskName string) error {
 		err = o.RemovePV(pv)
 		if err != nil {
 			o.log.Errorf("Failed remove pv %s from disk %s", pv, diskName)
-			return err
+			ret = utils.CombineErrors(ret, err)
 		}
 	}
-	return nil
+	return ret
 }
 
 func (o *ops) getDMDevices(diskName string) ([]string, error) {
@@ -466,6 +467,7 @@ func (o *ops) RemoveDMDevice(dmDevice string) error {
 }
 
 func (o *ops) RemoveAllDMDevicesOnDisk(diskName string) error {
+	var ret error
 	dmDevices, err := o.getDMDevices(diskName)
 	if err != nil {
 		return err
@@ -475,10 +477,10 @@ func (o *ops) RemoveAllDMDevicesOnDisk(diskName string) error {
 		err = o.RemoveDMDevice(dmDevice)
 		if err != nil {
 			o.log.Errorf("Failed to remove DM device %s", dmDevice)
-			return err
+			ret = utils.CombineErrors(ret, err)
 		}
 	}
-	return nil
+	return ret
 }
 
 func (o *ops) RemoveVG(vgName string) error {

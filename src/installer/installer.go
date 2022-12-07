@@ -95,8 +95,8 @@ func (i *installer) InstallNode() error {
 	i.Config.Device = i.ops.EvaluateDiskSymlink(i.Config.Device)
 	err := i.cleanupInstallDevice()
 	if err != nil {
+		// Do not change the phrasing of this error message, as we rely on it in a triage signature
 		i.log.Errorf("failed to prepare install device %s, err %s", i.Device, err)
-		return err
 	}
 
 	if err = i.ops.Mkdir(InstallDir); err != nil {
@@ -659,11 +659,12 @@ func (i *installer) cleanupInstallDevice() error {
 		return nil
 	}
 
+	var ret error
 	i.log.Infof("Start cleaning up device %s", i.Device)
 	err := i.cleanupDevice(i.Device)
 
 	if err != nil {
-		return err
+		ret = utils.CombineErrors(ret, err)
 	}
 
 	if i.ops.IsRaidMember(i.Device) {
@@ -672,7 +673,7 @@ func (i *installer) cleanupInstallDevice() error {
 		devices, err = i.ops.GetRaidDevices(i.Device)
 
 		if err != nil {
-			return err
+			ret = utils.CombineErrors(ret, err)
 		}
 
 		for _, device := range devices {
@@ -680,53 +681,63 @@ func (i *installer) cleanupInstallDevice() error {
 			err = i.cleanupDevice(device)
 
 			if err != nil {
-				return err
+				ret = utils.CombineErrors(ret, err)
 			}
 		}
 
 		err = i.ops.CleanRaidMembership(i.Device)
 
 		if err != nil {
-			return err
+			ret = utils.CombineErrors(ret, err)
 		}
 		i.log.Infof("Finished cleaning up device %s", i.Device)
 	}
 
-	return i.ops.Wipefs(i.Device)
+	err = i.ops.Wipefs(i.Device)
+	if err != nil {
+		ret = utils.CombineErrors(ret, err)
+	}
+
+	return ret
 }
 
 func (i *installer) removeVolumeGroupsFromDevice(vgNames []string, device string) error {
+	var ret error
 	for _, vgName := range vgNames {
 		i.log.Infof("A volume group (%s) was detected on the installation device (%s) - cleaning", vgName, device)
 		err := i.ops.RemoveVG(vgName)
 
 		if err != nil {
 			i.log.Errorf("Could not delete volume group (%s) due to error: %w", vgName, err)
-			return err
+			ret = utils.CombineErrors(ret, err)
 		}
 	}
 
-	return nil
+	return ret
 }
 
 func (i *installer) cleanupDevice(device string) error {
+	var ret error
 	vgNames, err := i.ops.GetVolumeGroupsByDisk(device)
 	if err != nil {
-		return err
+		ret = err
 	}
 
 	if len(vgNames) > 0 {
-		err = i.removeVolumeGroupsFromDevice(vgNames, device)
-		if err != nil {
-			return err
+		if err = i.removeVolumeGroupsFromDevice(vgNames, device); err != nil {
+			ret = utils.CombineErrors(ret, err)
 		}
 	}
 
 	if err = i.ops.RemoveAllPVsOnDevice(device); err != nil {
-		return err
+		ret = utils.CombineErrors(ret, err)
 	}
 
-	return i.ops.RemoveAllDMDevicesOnDisk(device)
+	if err = i.ops.RemoveAllDMDevicesOnDisk(device); err != nil {
+		ret = utils.CombineErrors(ret, err)
+	}
+
+	return ret
 }
 
 func (i *installer) verifyHostCanMoveToConfigurationStatus(inventoryHostsMapWithIp map[string]inventory_client.HostData) {

@@ -308,3 +308,10 @@ func GetOutboundIP() (string, error) {
 
 	return localAddr.(*net.UDPAddr).IP.String(), nil
 }
+
+func CombineErrors(error1 error, error2 error) error {
+	if error1 != nil {
+		return errors.Wrapf(error1, "%s", error2)
+	}
+	return error2
+}

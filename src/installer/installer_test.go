@@ -181,7 +181,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("If there is a failure during the removal of a volume group, the PV removal and subsequent volume group removal should fail", func() {
+		It("If there is a failure during the removal of a volume group, the PV removal and subsequent volume group removal should proceed anyways", func() {
 			mockedVgsResult := []string{
 				"vg1",
 				"vg2",
@@ -190,9 +190,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockops.EXPECT().GetVolumeGroupsByDisk("/dev/vda").Times(1).Return(mockedVgsResult, nil)
 			mockops.EXPECT().RemoveVG("vg1").Times(1)
 			mockops.EXPECT().RemoveVG("vg2").Times(1).Return(errors.New(fmt.Sprintf("Failed to remove VG %s, output %s, error %s", "vg2", "some arbitrary output", "some arbitrary error")))
-			mockops.EXPECT().RemoveVG("vg3").Times(0)
-			mockops.EXPECT().RemoveAllPVsOnDevice("/dev/vda").Return(nil).Times(0)
-			mockops.EXPECT().RemoveAllDMDevicesOnDisk("/dev/vda").Return(nil).Times(0)
+			mockops.EXPECT().RemoveVG("vg3").Times(1)
+			mockops.EXPECT().RemoveAllPVsOnDevice("/dev/vda").Return(nil).Times(1)
+			mockops.EXPECT().RemoveAllDMDevicesOnDisk("/dev/vda").Return(nil).Times(1)
 			err := installerObj.cleanupDevice("/dev/vda")
 			Expect(err).To(HaveOccurred())
 		})
@@ -608,11 +608,16 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
-		It("HostRoleMaster role failed to cleanup disk", func() {
+		It("HostRoleMaster role failed to cleanup disk continues installation", func() {
 			err := fmt.Errorf("Failed to remove vg")
 			cleanInstallDeviceError := func() {
 				mockops.EXPECT().GetVolumeGroupsByDisk(device).Return([]string{"vg1"}, nil).Times(1)
 				mockops.EXPECT().RemoveVG("vg1").Return(err).Times(1)
+				mockops.EXPECT().RemoveAllPVsOnDevice(device).Times(1)
+				mockops.EXPECT().RemoveAllDMDevicesOnDisk(device).Times(1)
+				mockops.EXPECT().IsRaidMember(device).Times(1)
+				mockops.EXPECT().Wipefs(device).Times(1)
+				mockops.EXPECT().Mkdir(InstallDir).Return(err).Times(1)
 			}
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
 			cleanInstallDeviceError()
@@ -639,7 +644,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
-		It("HostRoleMaster role raid cleanup disk - failed", func() {
+		It("HostRoleMaster role raid cleanup disk - failed continues installation", func() {
 			err := fmt.Errorf("failed cleaning raid device")
 
 			cleanInstallDeviceClean := func() {
@@ -652,6 +657,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockops.EXPECT().RemoveAllPVsOnDevice(raidDevice).Return(nil).Times(1)
 				mockops.EXPECT().RemoveAllDMDevicesOnDisk(raidDevice).Return(nil).Times(1)
 				mockops.EXPECT().CleanRaidMembership(device).Return(err).Times(1)
+				mockops.EXPECT().Wipefs(device).Return(nil).Times(1)
+				mockops.EXPECT().Mkdir(InstallDir).Return(err).Times(1)
 			}
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
 			cleanInstallDeviceClean()
