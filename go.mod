@@ -28,7 +28,7 @@ require (
 	github.com/sirupsen/logrus v1.9.0
 	github.com/thoas/go-funk v0.9.2
 	github.com/vincent-petithory/dataurl v1.0.0
-	golang.org/x/net v0.2.0
+	golang.org/x/net v0.4.0
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.25.4
@@ -135,9 +135,9 @@ require (
 	go.opentelemetry.io/otel/trace v1.11.1 // indirect
 	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
-	golang.org/x/sys v0.2.0 // indirect
-	golang.org/x/term v0.2.0 // indirect
-	golang.org/x/text v0.4.0 // indirect
+	golang.org/x/sys v0.3.0 // indirect
+	golang.org/x/term v0.3.0 // indirect
+	golang.org/x/text v0.5.0 // indirect
 	golang.org/x/time v0.0.0-20220609170525-579cf78fd858 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
