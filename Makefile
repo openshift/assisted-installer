@@ -19,10 +19,7 @@ GO_BUILD_VARS := CGO_ENABLED=0 $(GO_BUILD_ARCHITECTURE_VARS)
 
 all: lint format-check build-images unit-test
 
-ci-lint: vendor-diff
-	${ROOT_DIR}/hack/check-commits.sh
-
-lint: ci-lint
+lint: vendor-diff
 	golangci-lint run -v
 
 vendor-diff:
