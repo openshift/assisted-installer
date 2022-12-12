@@ -15,10 +15,7 @@ GINKGO_FLAGS = -ginkgo.focus="$(FOCUS)" -ginkgo.v -ginkgo.skip="$(SKIP)" -ginkgo
 
 all: lint format-check build-images unit-test
 
-ci-lint: vendor-diff
-	${ROOT_DIR}/hack/check-commits.sh
-
-lint: ci-lint
+lint: vendor-diff
 	golangci-lint run -v
 
 vendor-diff:
