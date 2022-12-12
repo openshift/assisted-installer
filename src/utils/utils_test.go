@@ -9,6 +9,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -114,5 +116,26 @@ var _ = Describe("Verify_utils", func() {
 			Expect(callCount).Should(Equal(tries))
 
 		})
+	})
+})
+
+var _ = Describe("CombineErrors", func() {
+	var (
+		error1       = errors.New("One")
+		error2       = errors.New("Two")
+		textCombined = fmt.Sprintf("%s", errors.Wrapf(error1, "%s", error2))
+	)
+	It("When both errors are nil, return nil", func() {
+		err := CombineErrors(nil, nil)
+		Expect(err).Should(BeNil())
+	})
+	It("When error1 is nil, return error2", func() {
+		err := CombineErrors(nil, error2)
+		Expect(err).Should(Equal(error2))
+	})
+	It("When both errors exist, combine them", func() {
+		err := CombineErrors(error1, error2)
+		textErr := fmt.Sprintf("%s", err)
+		Expect(textErr).Should(Equal(textCombined))
 	})
 })
