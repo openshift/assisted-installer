@@ -610,6 +610,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 		It("HostRoleMaster role failed to cleanup disk continues installation", func() {
 			err := fmt.Errorf("Failed to remove vg")
+			cleanupErrorText := fmt.Sprintf("Could not clean install device %s. The installation will continue. If the installation fails, clean the disk and try again", device)
 			cleanInstallDeviceError := func() {
 				mockops.EXPECT().GetVolumeGroupsByDisk(device).Return([]string{"vg1"}, nil).Times(1)
 				mockops.EXPECT().RemoveVG("vg1").Return(err).Times(1)
@@ -619,7 +620,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockops.EXPECT().Wipefs(device).Times(1)
 				mockops.EXPECT().Mkdir(InstallDir).Return(err).Times(1)
 			}
-			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}, {string(models.HostStageStartingInstallation), cleanupErrorText}})
 			cleanInstallDeviceError()
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
@@ -646,7 +647,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 		It("HostRoleMaster role raid cleanup disk - failed continues installation", func() {
 			err := fmt.Errorf("failed cleaning raid device")
-
+			cleanupErrorText := fmt.Sprintf("Could not clean install device %s. The installation will continue. If the installation fails, clean the disk and try again", device)
 			cleanInstallDeviceClean := func() {
 				mockops.EXPECT().GetVolumeGroupsByDisk(device).Return([]string{}, nil).Times(1)
 				mockops.EXPECT().RemoveAllPVsOnDevice(device).Return(nil).Times(1)
@@ -660,7 +661,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockops.EXPECT().Wipefs(device).Return(nil).Times(1)
 				mockops.EXPECT().Mkdir(InstallDir).Return(err).Times(1)
 			}
-			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}, {string(models.HostStageStartingInstallation), cleanupErrorText}})
 			cleanInstallDeviceClean()
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))

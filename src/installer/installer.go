@@ -95,6 +95,7 @@ func (i *installer) InstallNode() error {
 	i.Config.Device = i.ops.EvaluateDiskSymlink(i.Config.Device)
 	err := i.cleanupInstallDevice()
 	if err != nil {
+		i.UpdateHostInstallProgress(models.HostStageStartingInstallation, fmt.Sprintf("Could not clean install device %s. The installation will continue. If the installation fails, clean the disk and try again", i.Device))
 		// Do not change the phrasing of this error message, as we rely on it in a triage signature
 		i.log.Errorf("failed to prepare install device %s, err %s", i.Device, err)
 	}
