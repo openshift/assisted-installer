@@ -390,8 +390,11 @@ func (o *ops) GetVolumeGroupsByDisk(diskName string) ([]string, error) {
 			continue
 		}
 
+		o.log.Infof("Found LVM Volume Group %s in disk %s", res[0], res[1])
 		if strings.Contains(res[1], diskName) {
 			vgs = append(vgs, res[0])
+		} else {
+			o.log.Infof("Skipping removal of Volume Group %s, does not belong to disk %s", res[0], diskName)
 		}
 	}
 	return vgs, nil
