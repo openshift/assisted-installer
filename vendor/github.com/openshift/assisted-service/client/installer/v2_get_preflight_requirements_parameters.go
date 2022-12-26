@@ -52,16 +52,18 @@ func NewV2GetPreflightRequirementsParamsWithHTTPClient(client *http.Client) *V2G
 	}
 }
 
-/* V2GetPreflightRequirementsParams contains all the parameters to send to the API endpoint
-   for the v2 get preflight requirements operation.
+/*
+V2GetPreflightRequirementsParams contains all the parameters to send to the API endpoint
 
-   Typically these are written to a http.Request.
+	for the v2 get preflight requirements operation.
+
+	Typically these are written to a http.Request.
 */
 type V2GetPreflightRequirementsParams struct {
 
 	/* ClusterID.
 
-	   The cluster to return preflight requrements for.
+	   The cluster to return preflight requirements for.
 
 	   Format: uuid
 	*/

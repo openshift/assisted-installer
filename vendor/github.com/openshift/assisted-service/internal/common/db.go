@@ -112,6 +112,10 @@ type InfraEnv struct {
 	Hosts []*Host `json:"hosts" gorm:"foreignkey:InfraEnvID;references:ID"`
 
 	ImageTokenKey string `json:"image_token_key"`
+
+	// Json formatted string containing internal overrides for the default ignition config.
+	// This is used for adding ironic ignition config to the assisted ignition config
+	InternalIgnitionConfigOverride string `json:"internal_ignition_config_override,omitempty"`
 }
 
 type EagerLoadingState bool
@@ -134,13 +138,32 @@ const (
 	ClusterNetworksTable    = "ClusterNetworks"
 	ServiceNetworksTable    = "ServiceNetworks"
 	MachineNetworksTable    = "MachineNetworks"
+	APIVIPsTable            = "APIVips"
+	IngressVIPsTable        = "IngressVips"
 )
 
-var ClusterSubTables = [...]string{HostsTable, MonitoredOperatorsTable, ClusterNetworksTable, ServiceNetworksTable, MachineNetworksTable}
+var ClusterSubTables = [...]string{
+	HostsTable,
+	MonitoredOperatorsTable,
+	ClusterNetworksTable,
+	ServiceNetworksTable,
+	MachineNetworksTable,
+	APIVIPsTable,
+	IngressVIPsTable,
+}
 
 func AutoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(&models.MonitoredOperator{}, &Host{}, &Cluster{}, &Event{}, &InfraEnv{},
-		&models.ClusterNetwork{}, &models.ServiceNetwork{}, &models.MachineNetwork{})
+	return db.AutoMigrate(&models.MonitoredOperator{},
+		&Host{},
+		&Cluster{},
+		&Event{},
+		&InfraEnv{},
+		&models.ClusterNetwork{},
+		&models.ServiceNetwork{},
+		&models.MachineNetwork{},
+		&models.APIVip{},
+		&models.IngressVip{},
+	)
 }
 
 func LoadTableFromDB(db *gorm.DB, tableName string, conditions ...interface{}) *gorm.DB {
@@ -335,6 +358,21 @@ func GetInfraEnvFromDBWhere(db *gorm.DB, where ...interface{}) (*InfraEnv, error
 		return nil, err
 	}
 	return &infraEnv, nil
+}
+
+func ResetAutoAssignRoles(db *gorm.DB, onClusters interface{}) (int, error) {
+	if db == nil {
+		return 0, nil
+	}
+
+	reply := db.Model(&models.Host{}).Where("role = ?", models.HostRoleAutoAssign).
+		Where("cluster_id in (?)", onClusters).
+		Update("suggested_role", models.HostRoleAutoAssign)
+
+	if err := reply.Error; err != nil {
+		return 0, err
+	}
+	return int(reply.RowsAffected), nil
 }
 
 func ToModelsHosts(hosts []*Host) []*models.Host {

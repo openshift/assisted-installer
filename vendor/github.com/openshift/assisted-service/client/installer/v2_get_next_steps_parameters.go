@@ -14,6 +14,7 @@ import (
 	"github.com/go-openapi/runtime"
 	cr "github.com/go-openapi/runtime/client"
 	"github.com/go-openapi/strfmt"
+	"github.com/go-openapi/swag"
 )
 
 // NewV2GetNextStepsParams creates a new V2GetNextStepsParams object,
@@ -52,10 +53,12 @@ func NewV2GetNextStepsParamsWithHTTPClient(client *http.Client) *V2GetNextStepsP
 	}
 }
 
-/* V2GetNextStepsParams contains all the parameters to send to the API endpoint
-   for the v2 get next steps operation.
+/*
+V2GetNextStepsParams contains all the parameters to send to the API endpoint
 
-   Typically these are written to a http.Request.
+	for the v2 get next steps operation.
+
+	Typically these are written to a http.Request.
 */
 type V2GetNextStepsParams struct {
 
@@ -80,6 +83,12 @@ type V2GetNextStepsParams struct {
 	   Format: uuid
 	*/
 	InfraEnvID strfmt.UUID
+
+	/* Timestamp.
+
+	   The time on the host as seconds since the Unix epoch.
+	*/
+	Timestamp *int64
 
 	timeout    time.Duration
 	Context    context.Context
@@ -167,6 +176,17 @@ func (o *V2GetNextStepsParams) SetInfraEnvID(infraEnvID strfmt.UUID) {
 	o.InfraEnvID = infraEnvID
 }
 
+// WithTimestamp adds the timestamp to the v2 get next steps params
+func (o *V2GetNextStepsParams) WithTimestamp(timestamp *int64) *V2GetNextStepsParams {
+	o.SetTimestamp(timestamp)
+	return o
+}
+
+// SetTimestamp adds the timestamp to the v2 get next steps params
+func (o *V2GetNextStepsParams) SetTimestamp(timestamp *int64) {
+	o.Timestamp = timestamp
+}
+
 // WriteToRequest writes these params to a swagger request
 func (o *V2GetNextStepsParams) WriteToRequest(r runtime.ClientRequest, reg strfmt.Registry) error {
 
@@ -191,6 +211,23 @@ func (o *V2GetNextStepsParams) WriteToRequest(r runtime.ClientRequest, reg strfm
 	// path param infra_env_id
 	if err := r.SetPathParam("infra_env_id", o.InfraEnvID.String()); err != nil {
 		return err
+	}
+
+	if o.Timestamp != nil {
+
+		// query param timestamp
+		var qrTimestamp int64
+
+		if o.Timestamp != nil {
+			qrTimestamp = *o.Timestamp
+		}
+		qTimestamp := swag.FormatInt64(qrTimestamp)
+		if qTimestamp != "" {
+
+			if err := r.SetQueryParam("timestamp", qTimestamp); err != nil {
+				return err
+			}
+		}
 	}
 
 	if len(res) > 0 {

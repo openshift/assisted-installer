@@ -73,7 +73,10 @@ type InstallerAPI interface {
 	/* RegisterInfraEnv Creates a new OpenShift Discovery ISO. */
 	RegisterInfraEnv(ctx context.Context, params installer.RegisterInfraEnvParams) middleware.Responder
 
-	/* TransformClusterToDay2 Transforming cluster to day2 and allowing adding hosts */
+	/* TransformClusterToAddingHosts Transforms installed cluster to a state which allows adding hosts. */
+	TransformClusterToAddingHosts(ctx context.Context, params installer.TransformClusterToAddingHostsParams) middleware.Responder
+
+	/* TransformClusterToDay2 Deprecated, maintained for legacy purposes. Does the same thing as allow-add-hosts. Use allow-add-hosts instead. */
 	TransformClusterToDay2(ctx context.Context, params installer.TransformClusterToDay2Params) middleware.Responder
 
 	/* UnbindHost Unbind host to a cluster */
@@ -297,6 +300,11 @@ type Config struct {
 	BasicAuthenticator func(security.UserPassAuthentication) runtime.Authenticator
 	// Authenticator to use for all Basic authentication
 	BearerAuthenticator func(string, security.ScopedTokenAuthentication) runtime.Authenticator
+
+	// JSONConsumer is a json consumer that will replace the default if not nil.
+	JSONConsumer runtime.Consumer
+	// MultipartformConsumer is a multipartform consumer that will replace the default if not nil.
+	MultipartformConsumer runtime.Consumer
 }
 
 // Handler returns an http.Handler given the handler configuration
@@ -328,8 +336,16 @@ func HandlerAPI(c Config) (http.Handler, *operations.AssistedInstallAPI, error) 
 		api.BearerAuthenticator = c.BearerAuthenticator
 	}
 
-	api.JSONConsumer = runtime.JSONConsumer()
-	api.MultipartformConsumer = runtime.DiscardConsumer
+	if c.JSONConsumer != nil {
+		api.JSONConsumer = c.JSONConsumer
+	} else {
+		api.JSONConsumer = runtime.JSONConsumer()
+	}
+	if c.MultipartformConsumer != nil {
+		api.MultipartformConsumer = c.MultipartformConsumer
+	} else {
+		api.MultipartformConsumer = runtime.DiscardConsumer
+	}
 	api.BinProducer = runtime.ByteStreamProducer()
 	api.JSONProducer = runtime.JSONProducer()
 	api.AgentAuthAuth = func(token string) (interface{}, error) {
@@ -422,6 +438,11 @@ func HandlerAPI(c Config) (http.Handler, *operations.AssistedInstallAPI, error) 
 		ctx := params.HTTPRequest.Context()
 		ctx = storeAuth(ctx, principal)
 		return c.InstallerAPI.RegisterInfraEnv(ctx, params)
+	})
+	api.InstallerTransformClusterToAddingHostsHandler = installer.TransformClusterToAddingHostsHandlerFunc(func(params installer.TransformClusterToAddingHostsParams, principal interface{}) middleware.Responder {
+		ctx := params.HTTPRequest.Context()
+		ctx = storeAuth(ctx, principal)
+		return c.InstallerAPI.TransformClusterToAddingHosts(ctx, params)
 	})
 	api.InstallerTransformClusterToDay2Handler = installer.TransformClusterToDay2HandlerFunc(func(params installer.TransformClusterToDay2Params, principal interface{}) middleware.Responder {
 		ctx := params.HTTPRequest.Context()
