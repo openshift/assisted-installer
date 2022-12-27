@@ -22,11 +22,17 @@ type InfraEnvUpdateParams struct {
 	// A comma-separated list of NTP sources (name or IP) going to be added to all the hosts.
 	AdditionalNtpSources *string `json:"additional_ntp_sources,omitempty"`
 
+	// Allows users to change the additional_trust_bundle infra-env field
+	AdditionalTrustBundle *string `json:"additional_trust_bundle,omitempty"`
+
 	// JSON formatted string containing the user overrides for the initial ignition config.
 	IgnitionConfigOverride string `json:"ignition_config_override,omitempty"`
 
 	// image type
 	ImageType ImageType `json:"image_type,omitempty"`
+
+	// kernel arguments
+	KernelArguments KernelArguments `json:"kernel_arguments"`
 
 	// proxy
 	Proxy *Proxy `json:"proxy,omitempty" gorm:"embedded;embeddedPrefix:proxy_"`
@@ -46,6 +52,10 @@ func (m *InfraEnvUpdateParams) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateImageType(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateKernelArguments(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -73,6 +83,23 @@ func (m *InfraEnvUpdateParams) validateImageType(formats strfmt.Registry) error 
 			return ve.ValidateName("image_type")
 		} else if ce, ok := err.(*errors.CompositeError); ok {
 			return ce.ValidateName("image_type")
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (m *InfraEnvUpdateParams) validateKernelArguments(formats strfmt.Registry) error {
+	if swag.IsZero(m.KernelArguments) { // not required
+		return nil
+	}
+
+	if err := m.KernelArguments.Validate(formats); err != nil {
+		if ve, ok := err.(*errors.Validation); ok {
+			return ve.ValidateName("kernel_arguments")
+		} else if ce, ok := err.(*errors.CompositeError); ok {
+			return ce.ValidateName("kernel_arguments")
 		}
 		return err
 	}
@@ -133,6 +160,10 @@ func (m *InfraEnvUpdateParams) ContextValidate(ctx context.Context, formats strf
 		res = append(res, err)
 	}
 
+	if err := m.contextValidateKernelArguments(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
 	if err := m.contextValidateProxy(ctx, formats); err != nil {
 		res = append(res, err)
 	}
@@ -154,6 +185,20 @@ func (m *InfraEnvUpdateParams) contextValidateImageType(ctx context.Context, for
 			return ve.ValidateName("image_type")
 		} else if ce, ok := err.(*errors.CompositeError); ok {
 			return ce.ValidateName("image_type")
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (m *InfraEnvUpdateParams) contextValidateKernelArguments(ctx context.Context, formats strfmt.Registry) error {
+
+	if err := m.KernelArguments.ContextValidate(ctx, formats); err != nil {
+		if ve, ok := err.(*errors.Validation); ok {
+			return ve.ValidateName("kernel_arguments")
+		} else if ce, ok := err.(*errors.CompositeError); ok {
+			return ce.ValidateName("kernel_arguments")
 		}
 		return err
 	}

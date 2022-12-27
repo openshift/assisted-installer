@@ -2,25 +2,19 @@ package common
 
 import (
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 
+	"github.com/containers/image/v5/docker/reference"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
+	yamlpatch "github.com/krishicks/yaml-patch"
 	"github.com/openshift/assisted-service/models"
 	"github.com/thoas/go-funk"
 	"gorm.io/gorm"
-)
-
-type InfraEnvCreateFlag bool
-
-const (
-	DoInfraEnvCreation   InfraEnvCreateFlag = true
-	SkipInfraEnvCreation InfraEnvCreateFlag = false
 )
 
 const (
@@ -29,9 +23,10 @@ const (
 	MinMasterHostsNeededForInstallation    = 3
 	AllowedNumberOfMasterHostsInNoneHaMode = 1
 	AllowedNumberOfWorkersInNoneHaMode     = 0
-	IllegalWorkerHostsCount                = 1
 
 	HostCACertPath = "/etc/assisted-service/service-ca-cert.crt"
+
+	AdditionalTrustBundlePath = "/etc/pki/ca-trust/source/anchors/assisted-infraenv-additional-trust-bundle.pem"
 
 	consoleUrlPrefix = "https://console-openshift-console.apps"
 
@@ -47,7 +42,13 @@ const (
 	FamilyIPv4 int32 = 4
 	FamilyIPv6 int32 = 6
 
-	DefaultCPUArchitecture = "x86_64"
+	X86CPUArchitecture     = "x86_64"
+	DefaultCPUArchitecture = X86CPUArchitecture
+	ARM64CPUArchitecture   = "arm64"
+	// rchos is sending aarch64 and not arm as arm64 arch
+	AARCH64CPUArchitecture = "aarch64"
+	PowerCPUArchitecture   = "ppc64le"
+	MultiCPUArchitecture   = "multi"
 )
 
 // Configuration to be injected by discovery ignition.  It will cause IPv6 DHCP client identifier to be the same
@@ -110,13 +111,20 @@ func GetBootstrapHost(cluster *Cluster) *models.Host {
 	return nil
 }
 
-// IsSingleNodeCluster if this cluster is single-node or not
 func IsSingleNodeCluster(cluster *Cluster) bool {
 	return swag.StringValue(cluster.HighAvailabilityMode) == models.ClusterHighAvailabilityModeNone
 }
 
+func IsDay2Cluster(cluster *Cluster) bool {
+	return swag.StringValue(cluster.Kind) == models.ClusterKindAddHostsCluster
+}
+
+func IsImportedCluster(cluster *Cluster) bool {
+	return swag.BoolValue(cluster.Imported)
+}
+
 func AreMastersSchedulable(cluster *Cluster) bool {
-	return swag.BoolValue(cluster.SchedulableMasters)
+	return swag.BoolValue(cluster.SchedulableMastersForcedTrue) || swag.BoolValue(cluster.SchedulableMasters)
 }
 
 func GetEffectiveRole(host *models.Host) models.HostRole {
@@ -134,23 +142,17 @@ func IsNtpSynced(c *Cluster) (bool, error) {
 	var min int64
 	var max int64
 	for _, h := range c.Hosts {
-		if h.Inventory == "" ||
-			*h.Status == models.HostStatusDisconnected ||
+		if *h.Status == models.HostStatusDisconnected ||
 			*h.Status == models.HostStatusResettingPendingUserAction ||
-			*h.Status == models.HostStatusDiscovering {
+			*h.Status == models.HostStatusDiscovering ||
+			h.Timestamp == 0 {
 			continue
 		}
-		var inventory models.Inventory
-		err := json.Unmarshal([]byte(h.Inventory), &inventory)
-		if err != nil {
-			return false, err
+		if h.Timestamp < min || min == 0 {
+			min = h.Timestamp
 		}
-
-		if inventory.Timestamp < min || min == 0 {
-			min = inventory.Timestamp
-		}
-		if inventory.Timestamp > max {
-			max = inventory.Timestamp
+		if h.Timestamp > max {
+			max = h.Timestamp
 		}
 	}
 	return (max-min)/60 <= MaximumAllowedTimeDiffMinutes, nil
@@ -359,4 +361,76 @@ func CanonizeStrings(slice []string) (ret []string) {
 		}
 	}
 	return
+}
+
+func GetHostKey(host *models.Host) string {
+	return host.ID.String() + "@" + host.InfraEnvID.String()
+}
+
+func GetInventoryInterfaces(inventory string) (string, error) {
+	startIndex := strings.Index(inventory, "\"interfaces\":")
+	interfacesLocation := startIndex + len(`"interfaces:"`)
+	if (startIndex) == -1 {
+		return "", errors.New("unable to find interfaces in the inventory")
+	}
+
+	endIndex := strings.Index(inventory[interfacesLocation:], "}],")
+	if (endIndex) == -1 {
+		return "", errors.New("inventory is malformed")
+	}
+
+	endLocation := endIndex + len("}]")
+	return inventory[interfacesLocation : interfacesLocation+endLocation], nil
+}
+
+// GetTagFromImageRef returns the tag of the given container image reference. For example, if the
+// image reference is 'quay.io/my/image:latest' then the result will be 'latest'. If the image
+// reference isn't valid or doesn't contain a tag then the result will be an empty string.
+func GetTagFromImageRef(ref string) string {
+	parsed, err := reference.ParseNamed(ref)
+	if err != nil {
+		return ""
+	}
+	switch typed := parsed.(type) {
+	case reference.Tagged:
+		return typed.Tag()
+	default:
+		return ""
+	}
+}
+
+func GetConvertedClusterAPIVipDNSName(c *Cluster) string {
+	// In case cluster that isn't configured with user-managed-networking
+	// and api vip is set we should set api vip as APIVipDNSName
+	if !swag.BoolValue(c.Cluster.UserManagedNetworking) && c.Cluster.APIVip != "" {
+		return c.Cluster.APIVip
+	}
+	return fmt.Sprintf("api.%s.%s", c.Cluster.Name, c.Cluster.BaseDNSDomain)
+}
+
+func GetAPIHostname(c *Cluster) string {
+	// Despite the confusing name of this parameter, in day-2 scenarios where
+	// this function is used it could either be a DNS domain name that points
+	// at the API's IP address (this is the default) or it could also not be a
+	// DNS domain name at all - such as when the user chooses to override this
+	// parameter with an IP address. Such override is commonly done by users in
+	// day-2 SaaS imported clusters where the user never bothered to set up DNS
+	// for their day-1 cluster in the first place and just wants the worker to
+	// connect to the API directly. The UI even has a special dialog to help users
+	// do that.
+	return swag.StringValue(c.APIVipDNSName)
+}
+
+func ApplyYamlPatch(src []byte, ops []byte) ([]byte, error) {
+	patch, err := yamlpatch.DecodePatch(ops)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	patched, err := patch.Apply(src)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return patched, nil
 }

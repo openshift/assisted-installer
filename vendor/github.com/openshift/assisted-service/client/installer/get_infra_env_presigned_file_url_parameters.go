@@ -52,10 +52,12 @@ func NewGetInfraEnvPresignedFileURLParamsWithHTTPClient(client *http.Client) *Ge
 	}
 }
 
-/* GetInfraEnvPresignedFileURLParams contains all the parameters to send to the API endpoint
-   for the get infra env presigned file URL operation.
+/*
+GetInfraEnvPresignedFileURLParams contains all the parameters to send to the API endpoint
 
-   Typically these are written to a http.Request.
+	for the get infra env presigned file URL operation.
+
+	Typically these are written to a http.Request.
 */
 type GetInfraEnvPresignedFileURLParams struct {
 
@@ -72,6 +74,12 @@ type GetInfraEnvPresignedFileURLParams struct {
 	   Format: uuid
 	*/
 	InfraEnvID strfmt.UUID
+
+	/* IpxeScriptType.
+
+	   Specify the script type to be served for iPXE.
+	*/
+	IpxeScriptType *string
 
 	timeout    time.Duration
 	Context    context.Context
@@ -148,6 +156,17 @@ func (o *GetInfraEnvPresignedFileURLParams) SetInfraEnvID(infraEnvID strfmt.UUID
 	o.InfraEnvID = infraEnvID
 }
 
+// WithIpxeScriptType adds the ipxeScriptType to the get infra env presigned file URL params
+func (o *GetInfraEnvPresignedFileURLParams) WithIpxeScriptType(ipxeScriptType *string) *GetInfraEnvPresignedFileURLParams {
+	o.SetIpxeScriptType(ipxeScriptType)
+	return o
+}
+
+// SetIpxeScriptType adds the ipxeScriptType to the get infra env presigned file URL params
+func (o *GetInfraEnvPresignedFileURLParams) SetIpxeScriptType(ipxeScriptType *string) {
+	o.IpxeScriptType = ipxeScriptType
+}
+
 // WriteToRequest writes these params to a swagger request
 func (o *GetInfraEnvPresignedFileURLParams) WriteToRequest(r runtime.ClientRequest, reg strfmt.Registry) error {
 
@@ -169,6 +188,23 @@ func (o *GetInfraEnvPresignedFileURLParams) WriteToRequest(r runtime.ClientReque
 	// path param infra_env_id
 	if err := r.SetPathParam("infra_env_id", o.InfraEnvID.String()); err != nil {
 		return err
+	}
+
+	if o.IpxeScriptType != nil {
+
+		// query param ipxe_script_type
+		var qrIpxeScriptType string
+
+		if o.IpxeScriptType != nil {
+			qrIpxeScriptType = *o.IpxeScriptType
+		}
+		qIpxeScriptType := qrIpxeScriptType
+		if qIpxeScriptType != "" {
+
+			if err := r.SetQueryParam("ipxe_script_type", qIpxeScriptType); err != nil {
+				return err
+			}
+		}
 	}
 
 	if len(res) > 0 {

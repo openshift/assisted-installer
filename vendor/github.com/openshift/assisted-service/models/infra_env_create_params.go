@@ -23,6 +23,12 @@ type InfraEnvCreateParams struct {
 	// A comma-separated list of NTP sources (name or IP) going to be added to all the hosts.
 	AdditionalNtpSources *string `json:"additional_ntp_sources,omitempty"`
 
+	// PEM-encoded X.509 certificate bundle. Hosts discovered by this
+	// infra-env will trust the certificates in this bundle. Clusters formed
+	// from the hosts discovered by this infra-env will also trust the
+	// certificates in this bundle.
+	AdditionalTrustBundle string `json:"additional_trust_bundle,omitempty"`
+
 	// If set, all hosts that register will be associated with the specified cluster.
 	// Format: uuid
 	ClusterID *strfmt.UUID `json:"cluster_id,omitempty"`
@@ -35,6 +41,9 @@ type InfraEnvCreateParams struct {
 
 	// image type
 	ImageType ImageType `json:"image_type,omitempty"`
+
+	// kernel arguments
+	KernelArguments KernelArguments `json:"kernel_arguments"`
 
 	// Name of the infra-env.
 	// Required: true
@@ -66,6 +75,10 @@ func (m *InfraEnvCreateParams) Validate(formats strfmt.Registry) error {
 	}
 
 	if err := m.validateImageType(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateKernelArguments(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -113,6 +126,23 @@ func (m *InfraEnvCreateParams) validateImageType(formats strfmt.Registry) error 
 			return ve.ValidateName("image_type")
 		} else if ce, ok := err.(*errors.CompositeError); ok {
 			return ce.ValidateName("image_type")
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (m *InfraEnvCreateParams) validateKernelArguments(formats strfmt.Registry) error {
+	if swag.IsZero(m.KernelArguments) { // not required
+		return nil
+	}
+
+	if err := m.KernelArguments.Validate(formats); err != nil {
+		if ve, ok := err.(*errors.Validation); ok {
+			return ve.ValidateName("kernel_arguments")
+		} else if ce, ok := err.(*errors.CompositeError); ok {
+			return ce.ValidateName("kernel_arguments")
 		}
 		return err
 	}
@@ -191,6 +221,10 @@ func (m *InfraEnvCreateParams) ContextValidate(ctx context.Context, formats strf
 		res = append(res, err)
 	}
 
+	if err := m.contextValidateKernelArguments(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
 	if err := m.contextValidateProxy(ctx, formats); err != nil {
 		res = append(res, err)
 	}
@@ -212,6 +246,20 @@ func (m *InfraEnvCreateParams) contextValidateImageType(ctx context.Context, for
 			return ve.ValidateName("image_type")
 		} else if ce, ok := err.(*errors.CompositeError); ok {
 			return ce.ValidateName("image_type")
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (m *InfraEnvCreateParams) contextValidateKernelArguments(ctx context.Context, formats strfmt.Registry) error {
+
+	if err := m.KernelArguments.ContextValidate(ctx, formats); err != nil {
+		if ve, ok := err.(*errors.Validation); ok {
+			return ve.ValidateName("kernel_arguments")
+		} else if ce, ok := err.(*errors.CompositeError); ok {
+			return ce.ValidateName("kernel_arguments")
 		}
 		return err
 	}

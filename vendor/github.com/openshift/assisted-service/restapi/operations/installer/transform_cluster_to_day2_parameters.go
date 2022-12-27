@@ -31,7 +31,7 @@ type TransformClusterToDay2Params struct {
 	// HTTP Request Object
 	HTTPRequest *http.Request `json:"-"`
 
-	/*The cluster to transform to day2 and to allow adding hosts by this.
+	/*The cluster to transform.
 	  Required: true
 	  In: path
 	*/
