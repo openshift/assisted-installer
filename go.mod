@@ -22,7 +22,7 @@ require (
 	github.com/openshift/assisted-service/models v0.0.0
 	github.com/openshift/client-go v0.0.0-20220525160904-9e1acff93e4a
 	github.com/openshift/machine-api-operator v0.2.1-0.20201002104344-6abfb5440597
-	github.com/operator-framework/api v0.17.1
+	github.com/operator-framework/api v0.17.3
 	github.com/operator-framework/operator-lifecycle-manager v0.22.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.0
@@ -31,10 +31,10 @@ require (
 	golang.org/x/net v0.4.0
 	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.24.3-rc.0
-	k8s.io/apimachinery v0.24.3-rc.0
-	k8s.io/client-go v0.24.3-rc.0
-	sigs.k8s.io/controller-runtime v0.12.3
+	k8s.io/api v0.25.0
+	k8s.io/apimachinery v0.25.0
+	k8s.io/client-go v0.25.0
+	sigs.k8s.io/controller-runtime v0.13.0
 )
 
 require (
@@ -61,7 +61,7 @@ require (
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.8.0 // indirect
-	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
+	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
@@ -148,8 +148,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/driver/postgres v1.3.5 // indirect
 	gorm.io/gorm v1.23.8 // indirect
-	k8s.io/apiextensions-apiserver v0.24.3-rc.0 // indirect
-	k8s.io/component-base v0.24.3-rc.0 // indirect
+	k8s.io/apiextensions-apiserver v0.25.0 // indirect
+	k8s.io/component-base v0.25.0 // indirect
 	k8s.io/klog/v2 v2.70.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20220803162953-67bda5d908f1 // indirect
 	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed // indirect
