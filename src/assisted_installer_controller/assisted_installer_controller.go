@@ -671,7 +671,7 @@ func (c controller) UpdateBMHs(ctx context.Context, wg *sync.WaitGroup) {
 		bmhs, err := c.kc.ListBMHs()
 		if err != nil {
 			c.log.WithError(err).Errorf("Failed to list BMH hosts")
-			return false
+			return KeepWaiting
 		}
 
 		c.log.Infof("Number of BMHs is %d", len(bmhs.Items))
@@ -679,7 +679,7 @@ func (c controller) UpdateBMHs(ctx context.Context, wg *sync.WaitGroup) {
 		machines, err := c.unallocatedMachines(bmhs)
 		if err != nil {
 			c.log.WithError(err).Errorf("Failed to find unallocated machines")
-			return false
+			return KeepWaiting
 		}
 
 		c.log.Infof("Number of unallocated Machines is %d", len(machines.Items))
@@ -687,9 +687,9 @@ func (c controller) UpdateBMHs(ctx context.Context, wg *sync.WaitGroup) {
 		allUpdated := c.updateBMHs(&bmhs, machines)
 		if allUpdated {
 			c.log.Infof("Updated all the BMH CRs, finished successfully")
-			return true
+			return ExitWaiting
 		}
-		return false
+		return KeepWaiting
 	})
 }
 
@@ -1364,10 +1364,12 @@ func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
-func (c controller) SetReadyState() {
+func (c controller) SetReadyState() *models.Cluster {
 	c.log.Infof("Start waiting to be ready")
+	var cluster *models.Cluster
+	var err error
 	_ = utils.WaitForPredicate(WaitTimeout, 1*time.Second, func() bool {
-		_, err := c.ic.GetCluster(context.TODO(), false)
+		cluster, err = c.ic.GetCluster(context.TODO(), false)
 		if err != nil {
 			c.log.WithError(err).Warningf("Failed to connect to assisted service")
 			return false
@@ -1391,4 +1393,5 @@ func (c controller) SetReadyState() {
 
 		return true
 	})
+	return cluster
 }
