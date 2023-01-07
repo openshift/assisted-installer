@@ -75,6 +75,10 @@ spec:
               mountPath: /tmp/var-run-resolv.conf
             - name: host-resolv-conf
               mountPath: /tmp/host-resolv.conf
+          {{if .SNO}}
+            - name: sno-bootstrap-kubeconfig
+              mountPath: /tmp/bootstrap-kubeconfig
+          {{end}}
           {{if .CACertPath}}
             - name: service-ca-cert-config
               mountPath: {{.CACertPath}}
@@ -88,6 +92,14 @@ spec:
       - key: node-role.kubernetes.io/master
         effect: NoSchedule
         operator: Exists
+      {{if .SNO}}
+      - effect: NoSchedule
+        key: node.kubernetes.io/not-ready
+        operator: Exists
+      - effect: NoSchedule
+        key: node.kubernetes.io/network-unavailable
+        operator: Exists
+      {{end}}
       volumes:
         - name: host-ca-bundle
           hostPath:
@@ -98,6 +110,11 @@ spec:
         - name: host-resolv-conf
           hostPath:
             path: /etc/resolv.conf
+        {{if .SNO}}
+        - name: sno-bootstrap-kubeconfig
+          hostPath:
+            path: /etc/kubernetes/bootstrap-secrets/kubeconfig
+        {{end}}
         {{if .CACertPath}}
         - name: service-ca-cert-config
           hostPath:
