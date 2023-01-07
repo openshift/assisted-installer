@@ -304,7 +304,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			Expect(exit).Should(Equal(true))
 		})
 
-		It("WaitAndUpdateNodesStatus including joined state", func() {
+		It("WaitAndUpdateNodesStatus including joined state from configuring", func() {
 			joined := []models.HostStage{models.HostStageJoined,
 				models.HostStageJoined,
 				models.HostStageJoined}
@@ -324,6 +324,58 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().ListNodes().Return(nodes, nil).Times(1)
 			updateProgressSuccess(joined, inventoryNamesIds)
 			configuringSuccess()
+
+			exit := assistedController.waitAndUpdateNodesStatus()
+			Expect(exit).Should(Equal(false))
+		})
+
+		It("WaitAndUpdateNodesStatus including joined state from reboot", func() {
+			joined := []models.HostStage{models.HostStageJoined,
+				models.HostStageJoined,
+				models.HostStageJoined}
+
+			hosts := create3Hosts(models.HostStatusInstalling, models.HostStageRebooting, "")
+			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
+				Return(hosts, nil).Times(2)
+			// not ready nodes
+			nodes := GetKubeNodes(kubeNamesIds)
+			for _, node := range nodes.Items {
+				for i, cond := range node.Status.Conditions {
+					if cond.Type == v1.NodeReady {
+						node.Status.Conditions[i].Status = v1.ConditionFalse
+					}
+				}
+			}
+			mockk8sclient.EXPECT().ListNodes().Return(nodes, nil).Times(1)
+			updateProgressSuccess(joined, inventoryNamesIds)
+			mockk8sclient.EXPECT().GetPods(gomock.Any(), gomock.Any(), "").Return([]v1.Pod{}, nil).AnyTimes()
+
+			exit := assistedController.waitAndUpdateNodesStatus()
+			Expect(exit).Should(Equal(false))
+		})
+
+		It("WaitAndUpdateNodesStatus sno including joined state from reboot", func() {
+			joined := []models.HostStage{models.HostStageJoined}
+			currentState := models.HostProgressInfo{CurrentStage: models.HostStageRebooting}
+			currentStatus := models.HostStatusInstalling
+			infraEnvId := strfmt.UUID("7916fa89-ea7a-443e-a862-b3e930309f50")
+			node0Id := strfmt.UUID("7916fa89-ea7a-443e-a862-b3e930309f65")
+			hosts := map[string]inventory_client.HostData{"node0": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node0Id, Progress: &currentState, Status: &currentStatus}}}
+			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
+				Return(hosts, nil).Times(2)
+			// not ready nodes
+			kubeNamesIds = map[string]string{"node0": "6d6f00e8-70dd-48a5-859a-0f1459485ad9"}
+			nodes := GetKubeNodes(kubeNamesIds)
+			for _, node := range nodes.Items {
+				for i, cond := range node.Status.Conditions {
+					if cond.Type == v1.NodeReady {
+						node.Status.Conditions[i].Status = v1.ConditionFalse
+					}
+				}
+			}
+			mockk8sclient.EXPECT().ListNodes().Return(nodes, nil).Times(1)
+			updateProgressSuccess(joined, inventoryNamesIds)
+			mockk8sclient.EXPECT().GetPods(gomock.Any(), gomock.Any(), "").Return([]v1.Pod{}, nil).AnyTimes()
 
 			exit := assistedController.waitAndUpdateNodesStatus()
 			Expect(exit).Should(Equal(false))

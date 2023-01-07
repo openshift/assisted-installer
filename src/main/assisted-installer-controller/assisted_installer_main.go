@@ -40,6 +40,7 @@ var Options struct {
 const (
 	maximumInventoryClientRetries = 15
 	maximumErrorsBeforeExit       = 3
+	bootstrapKubeconfigForSNO     = "/tmp/bootstrap-secrets/kubeconfig"
 )
 
 func DryRebootComplete() bool {
@@ -83,7 +84,13 @@ func main() {
 
 	var kc k8s_client.K8SClient
 	if !Options.ControllerConfig.DryRunEnabled {
-		kc, err = k8s_client.NewK8SClient("", logger)
+		// in case of sno we want controller to start as fast as possible,
+		//in that case we want to use kubeconfig from filesystem and not pulling it from api
+		k8sConfigPath := ""
+		if _, errB := os.Stat(bootstrapKubeconfigForSNO); errB == nil {
+			k8sConfigPath = bootstrapKubeconfigForSNO
+		}
+		kc, err = k8s_client.NewK8SClient(k8sConfigPath, logger)
 		if err != nil {
 			log.Fatalf("Failed to create k8 client %v", err)
 		}
