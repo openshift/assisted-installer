@@ -127,7 +127,7 @@ func main() {
 		go assistedController.HackDNSAddressConflict(&wg)
 		wg.Add(1)
 	}
-	assistedController.SetReadyState()
+	cluster := assistedController.SetReadyState()
 
 	// While adding new routine don't miss to add wg.add(1)
 	// without adding it will panic
@@ -144,8 +144,13 @@ func main() {
 	wg.Add(1)
 	go assistedController.PostInstallConfigs(mainContext, &wg)
 	wg.Add(1)
-	go assistedController.UpdateBMHs(mainContext, &wg)
-	wg.Add(1)
+
+	if *cluster.Platform.Type == models.PlatformTypeBaremetal {
+		go assistedController.UpdateBMHs(mainContext, &wg)
+		wg.Add(1)
+	} else {
+		logger.Infof("Cluster platform is not %s, skipping BMH", models.PlatformTypeBaremetal)
+	}
 
 	go assistedController.UploadLogs(mainContext, &wg)
 	wg.Add(1)
