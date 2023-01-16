@@ -16,6 +16,10 @@ spec:
             - "assisted-api.local.openshift.io"{{end}}{{end}}
       containers:
         - name: assisted-installer-controller
+          {{if .SNO}}
+          securityContext:
+            runAsUser: 0
+          {{end}}
           image: {{.ControllerImage}}
           imagePullPolicy: IfNotPresent
           env:
@@ -78,6 +82,10 @@ spec:
           {{if .SNO}}
             - name: sno-bootstrap-kubeconfig
               mountPath: /tmp/bootstrap-kubeconfig
+            - name: pods-logs
+              mountPath: /tmp/node-pod-logs
+            - name: journal
+              mountPath: /tmp/node-journal
           {{end}}
           {{if .CACertPath}}
             - name: service-ca-cert-config
@@ -85,6 +93,9 @@ spec:
           {{end}}
       restartPolicy: OnFailure
       hostNetwork: true
+      {{if .SNO}}
+      privileged: true
+      {{end}}
       nodeSelector:
         node-role.kubernetes.io/master: ""
       serviceAccountName: assisted-installer-controller
@@ -114,6 +125,12 @@ spec:
         - name: sno-bootstrap-kubeconfig
           hostPath:
             path: /etc/kubernetes/bootstrap-secrets/kubeconfig
+        - name: pods-logs
+          hostPath:
+            path: /var/log/pods
+        - name: journal
+          hostPath:
+            path: /var/log/journal
         {{end}}
         {{if .CACertPath}}
         - name: service-ca-cert-config

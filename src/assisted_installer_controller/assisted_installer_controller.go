@@ -1187,25 +1187,23 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 	var tarentries = make([]utils.TarEntry, 0)
 	var ok bool = true
 	ctx := utils.GenerateRequestContext()
-
-	// Send upload operator logs before must-gather
-	c.logClusterOperatorsStatus()
-	if c.Status.HasError() || c.Status.HasOperatorError() {
-		c.logHostResolvConf()
-		c.log.Infof("Uploading cluster operator status logs before must-gather")
-		err := common.UploadPodLogs(c.kc, c.ic, c.ClusterID, podName, c.Namespace, controllerLogsSecondsAgo, c.log)
-		if err != nil {
-			c.log.WithError(err).Warnf("Failed to upload controller logs")
+	if !c.Status.HasError() && !c.Status.HasOperatorError() {
+		return nil
+	}
+	// Collect host logs will run only in sno case as we mount them only in that case
+	if tarredLogs, err := c.ops.CollectHostLogs(); err == nil && tarredLogs != "" {
+		if entry1, tarerr := utils.NewTarEntryFromFile(tarredLogs); tarerr == nil {
+			tarentries = append(tarentries, *entry1)
 		}
-		c.log.Infof("Uploading oc must-gather logs")
-		images := c.parseMustGatherImages()
-		if tarfile, err := c.collectMustGatherLogs(ctx, images...); err == nil {
-			if entry, tarerr := utils.NewTarEntryFromFile(tarfile); tarerr == nil {
-				tarentries = append(tarentries, *entry)
-			}
-		} else {
-			ok = false
+	}
+	c.log.Infof("Uploading oc must-gather logs")
+	images := c.parseMustGatherImages()
+	if tarfile, err := c.collectMustGatherLogs(ctx, images...); err == nil {
+		if entry, tarerr := utils.NewTarEntryFromFile(tarfile); tarerr == nil {
+			tarentries = append(tarentries, *entry)
 		}
+	} else {
+		ok = false
 	}
 
 	c.log.Infof("Uploading logs for %s in %s", podName, namespace)
@@ -1222,7 +1220,7 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 		defer pw.Close()
 		err := utils.WriteToTarGz(pw, tarentries)
 		if err != nil {
-			c.log.WithError(err).Warnf("Failed to create tar.gz body of the log uplaod request")
+			c.log.WithError(err).Warnf("Failed to create tar.gz body of the log upload request")
 		}
 	}()
 	// if error will occur in goroutine above, the writer will be closed
@@ -1316,6 +1314,20 @@ func (c controller) collectMustGatherLogs(ctx context.Context, images ...string)
 	return logtar, nil
 }
 
+func (c *controller) uploadControllerSummaryLogs(ctx context.Context, podName string) error {
+	c.log.Infof("Upload final controller and cluster logs before exit")
+	c.ic.ClusterLogProgressReport(ctx, c.ClusterID, models.LogsStateRequested)
+	c.logRouterStatus()
+	c.logClusterOperatorsStatus()
+	c.logHostResolvConf()
+	err := common.UploadPodLogs(c.kc, c.ic, c.ClusterID, podName, c.Namespace, controllerLogsSecondsAgo, c.log)
+	if err != nil {
+		c.log.WithError(err).Warnf("Failed to upload controller logs")
+		return err
+	}
+	return nil
+}
+
 // Uploading logs every 5 minutes
 // We will take logs of assisted controller and upload them to assisted-service
 // by creating tar gz of them.
@@ -1332,10 +1344,19 @@ func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup) {
 	for {
 		select {
 		case <-ctx.Done():
-			c.log.Infof("Upload final controller and cluster logs before exit")
-			c.ic.ClusterLogProgressReport(progressCtx, c.ClusterID, models.LogsStateRequested)
-			c.logRouterStatus()
+			uploadedPreMustGatherLogs := false
 			_ = utils.WaitForPredicate(WaitTimeout, SummaryLogsPeriod, func() bool {
+				if podName == "" {
+					podName = common.AssistedControllerPrefix
+				}
+				if uploadedPreMustGatherLogs == false {
+					err := c.uploadControllerSummaryLogs(progressCtx, podName)
+					if err != nil {
+						return KeepWaiting
+					}
+					uploadedPreMustGatherLogs = true
+				}
+
 				err := c.uploadSummaryLogs(podName, c.Namespace, controllerLogsSecondsAgo)
 				if err != nil {
 					c.log.Infof("retry uploading logs in 30 seconds...")

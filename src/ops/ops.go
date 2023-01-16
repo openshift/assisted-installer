@@ -63,6 +63,8 @@ type Ops interface {
 	DryRebootHappened(markerPath string) bool
 	ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error)
 	ReadFile(filePath string) ([]byte, error)
+	TarFolder(pathToFolder, outPutTarName string) (string, error)
+	CollectHostLogs() (string, error)
 }
 
 const (
@@ -75,6 +77,8 @@ const (
 	renderedControllerSecret       = "assisted-installer-controller-secret.yaml"
 	controllerDeploySecretTemplate = "assisted-installer-controller-secret.yaml.template"
 	MustGatherFileName             = "must-gather.tar.gz"
+	hostPodLogs                    = "/tmp/node-pod-logs"
+	hostJournal                    = "/tmp/node-journal"
 )
 
 type ops struct {
@@ -813,15 +817,42 @@ func (o *ops) GetMustGatherLogs(workDir, kubeconfigPath string, images ...string
 		return "", lerr
 	}
 	logsDir := filepath.Base(files[0])
+	return o.TarFolder(path.Join(workDir, logsDir), path.Join(workDir, MustGatherFileName))
+}
 
+func (o *ops) CollectHostLogs() (string, error) {
+	outPutTar := path.Join("/tmp", "host_logs.tar.gz")
+	// We should not create pod logs if they already were created and upload failed
+	if _, err := os.Stat(outPutTar); err == nil {
+		o.log.Info("Pods logs tar already exists, skip gathering")
+		return outPutTar, nil
+	}
+
+	if _, err := os.Stat(hostPodLogs); err != nil {
+		o.log.Info("Pod logs folder doesn't exist, nothing to gather")
+		return "", nil
+	}
+
+	// output journal logs to logs folder in order to bring all as one tar.gz
+	o.log.Info("%s exists, gathering it", hostJournal)
+	command := fmt.Sprintf("journalctl -D %s > %s/journal.log", hostJournal, hostPodLogs)
+	_, err := o.executor.ExecCommand(o.logWriter, "bash", "-c", command)
+	if err != nil {
+		o.log.WithError(err).Info("Failed to write journal logs")
+	}
+
+	return o.TarFolder(hostPodLogs, outPutTar)
+}
+
+func (o *ops) TarFolder(pathToFolder, outPutTarName string) (string, error) {
 	//tar the log directory and return the path to the tarball
-	command = fmt.Sprintf("cd %s && tar zcf %s %s", workDir, MustGatherFileName, logsDir)
-	_, err = o.executor.ExecCommand(o.logWriter, "bash", "-c", command)
+	command := fmt.Sprintf("tar zcf %s %s", outPutTarName, pathToFolder)
+	_, err := o.executor.ExecCommand(o.logWriter, "bash", "-c", command)
 	if err != nil {
 		o.log.WithError(err).Errorf("Failed to tar must-gather logs\n")
 		return "", err
 	}
-	return path.Join(workDir, MustGatherFileName), nil
+	return outPutTarName, nil
 }
 
 func (o *ops) CreateRandomHostname(hostname string) error {

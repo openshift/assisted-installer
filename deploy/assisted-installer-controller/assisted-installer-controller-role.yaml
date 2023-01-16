@@ -190,6 +190,7 @@ rules:
       - "hostnetwork"
       - "hostaccess"
       - "node-exporter"
+      - "privileged"
     resources:
       - securitycontextconstraints
     verbs:

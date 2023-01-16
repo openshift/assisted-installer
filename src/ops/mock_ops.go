@@ -49,6 +49,21 @@ func (mr *MockOpsMockRecorder) CleanRaidMembership(device interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CleanRaidMembership", reflect.TypeOf((*MockOps)(nil).CleanRaidMembership), device)
 }
 
+// CollectHostLogs mocks base method.
+func (m *MockOps) CollectHostLogs() (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CollectHostLogs")
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CollectHostLogs indicates an expected call of CollectHostLogs.
+func (mr *MockOpsMockRecorder) CollectHostLogs() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CollectHostLogs", reflect.TypeOf((*MockOps)(nil).CollectHostLogs))
+}
+
 // CreateManifests mocks base method.
 func (m *MockOps) CreateManifests(arg0 string, arg1 []byte) error {
 	m.ctrl.T.Helper()
@@ -419,6 +434,21 @@ func (mr *MockOpsMockRecorder) SystemctlAction(action interface{}, args ...inter
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{action}, args...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SystemctlAction", reflect.TypeOf((*MockOps)(nil).SystemctlAction), varargs...)
+}
+
+// TarFolder mocks base method.
+func (m *MockOps) TarFolder(pathToFolder, outPutTarName string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TarFolder", pathToFolder, outPutTarName)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// TarFolder indicates an expected call of TarFolder.
+func (mr *MockOpsMockRecorder) TarFolder(pathToFolder, outPutTarName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TarFolder", reflect.TypeOf((*MockOps)(nil).TarFolder), pathToFolder, outPutTarName)
 }
 
 // UploadInstallationLogs mocks base method.
