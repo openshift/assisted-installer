@@ -94,7 +94,7 @@ func (handler ClusterOperatorHandler) GetStatus() (models.OperatorStatus, string
 		return "", "", err
 	}
 
-	operatorStatus, operatorMessage := utils.ClusterOperatorConditionsToMonitoredOperatorStatus(co.Status.Conditions)
+	operatorStatus, operatorMessage := utils.MonitoredOperatorStatus(co.Status.Conditions)
 	return operatorStatus, operatorMessage, nil
 }
 
@@ -120,7 +120,7 @@ func (handler ClusterVersionHandler) GetStatus() (models.OperatorStatus, string,
 		return "", "", err
 	}
 
-	operatorStatus, operatorMessage := utils.ClusterOperatorConditionsToMonitoredOperatorStatus(co.Status.Conditions)
+	operatorStatus, operatorMessage := utils.MonitoredOperatorStatus(co.Status.Conditions)
 	return operatorStatus, operatorMessage, nil
 }
 

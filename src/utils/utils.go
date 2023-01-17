@@ -277,7 +277,7 @@ func CsvStatusToOperatorStatus(csvStatus string) models.OperatorStatus {
 	}
 }
 
-func ClusterOperatorConditionsToMonitoredOperatorStatus(conditions []configv1.ClusterOperatorStatusCondition) (models.OperatorStatus, string) {
+func MonitoredOperatorStatus(conditions []configv1.ClusterOperatorStatusCondition) (models.OperatorStatus, string) {
 	for _, condition := range conditions {
 		if condition.Type == configv1.OperatorAvailable && condition.Status == configv1.ConditionTrue {
 			return models.OperatorStatusAvailable, condition.Message
@@ -285,7 +285,8 @@ func ClusterOperatorConditionsToMonitoredOperatorStatus(conditions []configv1.Cl
 		if condition.Type == configv1.OperatorProgressing && condition.Status == configv1.ConditionTrue {
 			return models.OperatorStatusProgressing, condition.Message
 		}
-		if condition.Type == configv1.OperatorDegraded && condition.Status == configv1.ConditionTrue {
+		if condition.Type == configv1.OperatorDegraded && condition.Status == configv1.ConditionTrue ||
+			condition.Type == configv1.OperatorAvailable && condition.Status == configv1.ConditionFalse {
 			return models.OperatorStatusFailed, condition.Message
 		}
 	}

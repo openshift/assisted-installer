@@ -50,17 +50,17 @@ func (mr *MockInventoryClientMockRecorder) ClusterLogProgressReport(ctx, cluster
 }
 
 // CompleteInstallation mocks base method.
-func (m *MockInventoryClient) CompleteInstallation(ctx context.Context, clusterId string, isSuccess bool, errorInfo string) error {
+func (m *MockInventoryClient) CompleteInstallation(ctx context.Context, clusterId string, isSuccess bool, errorInfo string, data map[string]interface{}) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CompleteInstallation", ctx, clusterId, isSuccess, errorInfo)
+	ret := m.ctrl.Call(m, "CompleteInstallation", ctx, clusterId, isSuccess, errorInfo, data)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CompleteInstallation indicates an expected call of CompleteInstallation.
-func (mr *MockInventoryClientMockRecorder) CompleteInstallation(ctx, clusterId, isSuccess, errorInfo interface{}) *gomock.Call {
+func (mr *MockInventoryClientMockRecorder) CompleteInstallation(ctx, clusterId, isSuccess, errorInfo, data interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteInstallation", reflect.TypeOf((*MockInventoryClient)(nil).CompleteInstallation), ctx, clusterId, isSuccess, errorInfo)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteInstallation", reflect.TypeOf((*MockInventoryClient)(nil).CompleteInstallation), ctx, clusterId, isSuccess, errorInfo, data)
 }
 
 // DownloadClusterCredentials mocks base method.

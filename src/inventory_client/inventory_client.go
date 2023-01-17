@@ -54,7 +54,7 @@ type InventoryClient interface {
 	ListsHostsForRole(ctx context.Context, role string) (models.HostList, error)
 	GetClusterMonitoredOperator(ctx context.Context, clusterId, operatorName string, openshiftVersion string) (*models.MonitoredOperator, error)
 	GetClusterMonitoredOLMOperators(ctx context.Context, clusterId string, openshiftVersion string) ([]models.MonitoredOperator, error)
-	CompleteInstallation(ctx context.Context, clusterId string, isSuccess bool, errorInfo string) error
+	CompleteInstallation(ctx context.Context, clusterId string, isSuccess bool, errorInfo string, data map[string]interface{}) error
 	GetHosts(ctx context.Context, log logrus.FieldLogger, skippedStatuses []string) (map[string]HostData, error)
 	UploadLogs(ctx context.Context, clusterId string, logsType models.LogsType, upfile io.Reader) error
 	ClusterLogProgressReport(ctx context.Context, clusterId string, progress models.LogsState)
@@ -425,10 +425,10 @@ func (c *inventoryClient) getHostsWithInventoryInfo(ctx context.Context, log log
 	return hostsWithHwInfo, nil
 }
 
-func (c *inventoryClient) CompleteInstallation(ctx context.Context, clusterId string, isSuccess bool, errorInfo string) error {
+func (c *inventoryClient) CompleteInstallation(ctx context.Context, clusterId string, isSuccess bool, errorInfo string, data map[string]interface{}) error {
 	_, err := c.ai.Installer.V2CompleteInstallation(ctx,
 		&installer.V2CompleteInstallationParams{ClusterID: strfmt.UUID(clusterId),
-			CompletionParams: &models.CompletionParams{IsSuccess: &isSuccess, ErrorInfo: errorInfo}})
+			CompletionParams: &models.CompletionParams{IsSuccess: &isSuccess, ErrorInfo: errorInfo, Data: data}})
 	return aserror.GetAssistedError(err)
 }
 
