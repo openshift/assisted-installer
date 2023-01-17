@@ -166,7 +166,7 @@ func (o *ops) FormatDisk(disk string) error {
 
 func (o *ops) Reboot() error {
 	o.log.Info("Rebooting node")
-	_, err := o.ExecPrivilegeCommand(o.logWriter, "shutdown", "-r", "+1", "'Installation completed, server is going to reboot.'")
+	_, err := o.ExecPrivilegeCommand(o.logWriter, "shutdown", "-r", "now", "'Installation completed, server is going to reboot.'")
 	if err != nil {
 		o.log.Errorf("Failed to reboot node, err: %s", err)
 		return err
