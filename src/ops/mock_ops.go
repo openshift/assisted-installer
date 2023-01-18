@@ -305,17 +305,17 @@ func (mr *MockOpsMockRecorder) ReadFile(filePath interface{}) *gomock.Call {
 }
 
 // Reboot mocks base method.
-func (m *MockOps) Reboot() error {
+func (m *MockOps) Reboot(delay string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Reboot")
+	ret := m.ctrl.Call(m, "Reboot", delay)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Reboot indicates an expected call of Reboot.
-func (mr *MockOpsMockRecorder) Reboot() *gomock.Call {
+func (mr *MockOpsMockRecorder) Reboot(delay interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reboot", reflect.TypeOf((*MockOps)(nil).Reboot))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reboot", reflect.TypeOf((*MockOps)(nil).Reboot), delay)
 }
 
 // ReloadHostFile mocks base method.

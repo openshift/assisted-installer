@@ -34,7 +34,7 @@ const (
 type Ops interface {
 	Mkdir(dirName string) error
 	WriteImageToDisk(ignitionPath string, device string, progressReporter inventory_client.InventoryClient, extra []string) error
-	Reboot() error
+	Reboot(delay string) error
 	SetBootOrder(device string) error
 	ExtractFromIgnition(ignitionPath string, fileToExtract string) error
 	SystemctlAction(action string, args ...string) error
@@ -164,9 +164,9 @@ func (o *ops) FormatDisk(disk string) error {
 	return nil
 }
 
-func (o *ops) Reboot() error {
+func (o *ops) Reboot(delay string) error {
 	o.log.Info("Rebooting node")
-	_, err := o.ExecPrivilegeCommand(o.logWriter, "shutdown", "-r", "now", "'Installation completed, server is going to reboot.'")
+	_, err := o.ExecPrivilegeCommand(o.logWriter, "shutdown", "-r", delay, "'Installation completed, server is going to reboot.'")
 	if err != nil {
 		o.log.Errorf("Failed to reboot node, err: %s", err)
 		return err

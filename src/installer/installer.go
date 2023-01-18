@@ -197,7 +197,13 @@ func (i *installer) finalize() error {
 		}
 	} else {
 		i.UpdateHostInstallProgress(models.HostStageRebooting, "")
-		if err = i.ops.Reboot(); err != nil {
+		// Deu to a race condition in etcd bootstrap strategy we need to bring back this delay.
+		// See: https://issues.redhat.com/browse/OCPBUGS-5988
+		whenToReboot := "+1"
+		if i.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone {
+			whenToReboot = "now"
+		}
+		if err = i.ops.Reboot(whenToReboot); err != nil {
 			return err
 		}
 	}
