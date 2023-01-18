@@ -130,7 +130,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	}
 
 	rebootSuccess := func() {
-		mockops.EXPECT().Reboot().Return(nil).Times(1)
+		mockops.EXPECT().Reboot("+1").Return(nil).Times(1)
+	}
+	rebootNowSuccess := func() {
+		mockops.EXPECT().Reboot("now").Return(nil).Times(1)
 	}
 	ironicAgentDoesntExist := func() {
 		mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "systemctl", "list-units", "--no-legend", "ironic-agent.service").Return("", nil).Times(1)
@@ -731,7 +734,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			setBootOrderSuccess(gomock.Any())
 			ironicAgentDoesntExist()
 			err := fmt.Errorf("failed to reboot")
-			mockops.EXPECT().Reboot().Return(err).Times(1)
+			mockops.EXPECT().Reboot("+1").Return(err).Times(1)
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
@@ -879,7 +882,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			uploadLogsSuccess(true)
 			reportLogProgressSuccess()
 			ironicAgentDoesntExist()
-			rebootSuccess()
+			rebootNowSuccess()
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(BeNil())
 		})
