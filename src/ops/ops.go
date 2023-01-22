@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"text/template"
 
+	"github.com/openshift/assisted-service/models"
+
 	"github.com/openshift/assisted-installer/src/ops/execute"
 
 	"io/ioutil"
@@ -339,6 +341,10 @@ func (o *ops) renderControllerPod() error {
 
 	if o.installerConfig.ServiceIPs != "" {
 		params["ServiceIPs"] = strings.Split(o.installerConfig.ServiceIPs, ",")
+	}
+
+	if o.installerConfig.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone {
+		params["SNO"] = true
 	}
 
 	return o.renderDeploymentFiles(filepath.Join(controllerDeployFolder, controllerDeployPodTemplate),
