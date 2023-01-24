@@ -374,7 +374,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				}
 			}
 			mockk8sclient.EXPECT().ListNodes().Return(nodes, nil).Times(1)
-			updateProgressSuccess(joined, inventoryNamesIds)
+			updateProgressSuccess(joined, hosts)
 			mockk8sclient.EXPECT().GetPods(gomock.Any(), gomock.Any(), "").Return([]v1.Pod{}, nil).AnyTimes()
 
 			exit := assistedController.waitAndUpdateNodesStatus()

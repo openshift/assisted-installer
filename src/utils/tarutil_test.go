@@ -27,7 +27,7 @@ var _ = Describe("tar_utils", func() {
 			h2, err := NewTarEntryFromFile("../../test_files/tartest.tar.gz")
 			Expect(err).NotTo(HaveOccurred())
 
-			err = WriteToTarGz(&outbuf, []TarEntry{*h1, *h2})
+			err = WriteToTarGz(&outbuf, []TarEntry{*h1, *h2}, l)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("verify tar gz structure")
