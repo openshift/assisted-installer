@@ -1239,7 +1239,7 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 
 	go func() {
 		defer pw.Close()
-		err := utils.WriteToTarGz(pw, tarentries)
+		err := utils.WriteToTarGz(pw, tarentries, c.log)
 		if err != nil {
 			c.log.WithError(err).Warnf("Failed to create tar.gz body of the log uplaod request")
 		}
