@@ -61,7 +61,8 @@ const (
 	customManifestsFile       = "custom_manifests.json"
 	kubeconfigFileName        = "kubeconfig-noingress"
 
-	consoleCapabilityName = configv1.ClusterVersionCapability("Console")
+	consoleCapabilityName              = configv1.ClusterVersionCapability("Console")
+	cluster_operator_report_key string = "CLUSTER_OPERATORS_REPORT"
 )
 
 var (
@@ -436,7 +437,7 @@ func (c controller) PostInstallConfigs(ctx context.Context, wg *sync.WaitGroup) 
 	}
 
 	errMessage := ""
-	err = c.postInstallConfigs(ctx)
+	err, data := c.postInstallConfigs(ctx)
 	// context was cancelled, requires usage of WaitForPredicateWithContext
 	// no reason to set error
 	if ctx.Err() != nil {
@@ -447,8 +448,8 @@ func (c controller) PostInstallConfigs(ctx context.Context, wg *sync.WaitGroup) 
 		errMessage = err.Error()
 		c.Status.Error()
 	}
-	success := err == nil
-	c.sendCompleteInstallation(ctx, success, errMessage)
+	success := (err == nil)
+	c.sendCompleteInstallation(ctx, success, errMessage, data)
 }
 
 func (c controller) UpdateNodeLabels(ctx context.Context, wg *sync.WaitGroup) {
@@ -464,16 +465,23 @@ func (c controller) UpdateNodeLabels(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
-func (c controller) postInstallConfigs(ctx context.Context) error {
+func (c controller) postInstallConfigs(ctx context.Context) (error, map[string]interface{}) {
 	var err error
+	var data map[string]interface{}
 
-	if err = c.waitingForClusterOperators(ctx); err != nil {
-		return errors.Wrapf(err, "Timeout while waiting for cluster operators to be available")
+	err = c.waitingForClusterOperators(ctx)
+	//copmiles a report about cluster operators and prints it to the logs
+	if report := c.operatorReport(); report != nil {
+		data = map[string]interface{}{cluster_operator_report_key: report}
+	}
+
+	if err != nil {
+		return errors.Wrapf(err, "Timeout while waiting for cluster operators to be available"), data
 	}
 
 	err = utils.WaitForPredicateWithContext(ctx, WaitTimeout, GeneralWaitInterval, c.addRouterCAToClusterCA)
 	if err != nil {
-		return errors.Wrapf(err, "Timeout while waiting router ca data")
+		return errors.Wrapf(err, "Timeout while waiting router ca data"), data
 	}
 
 	// Wait for OLM operators
@@ -482,7 +490,7 @@ func (c controller) postInstallConfigs(ctx context.Context) error {
 		c.log.WithError(err).Warn("Error while initializing OLM operators")
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (c controller) waitForOLMOperators(ctx context.Context) error {
@@ -1081,11 +1089,11 @@ func (c controller) patchNodesLabels(log logrus.FieldLogger, hostsWithLabels map
 	return patchedNumber
 }
 
-func (c controller) sendCompleteInstallation(ctx context.Context, isSuccess bool, errorInfo string) {
+func (c controller) sendCompleteInstallation(ctx context.Context, isSuccess bool, errorInfo string, data map[string]interface{}) {
 	c.log.Infof("Start complete installation step, with params success: %t, error info: %s", isSuccess, errorInfo)
 	_ = utils.WaitForPredicateWithContext(ctx, CompleteTimeout, GeneralProgressUpdateInt, func() bool {
 		ctxReq := utils.GenerateRequestContext()
-		if err := c.ic.CompleteInstallation(ctxReq, c.ClusterID, isSuccess, errorInfo); err != nil {
+		if err := c.ic.CompleteInstallation(ctxReq, c.ClusterID, isSuccess, errorInfo, data); err != nil {
 			utils.RequestIDLogger(ctxReq, c.log).Error(err)
 			return false
 		}
@@ -1094,17 +1102,30 @@ func (c controller) sendCompleteInstallation(ctx context.Context, isSuccess bool
 	c.log.Infof("Done complete installation step")
 }
 
-// logClusterOperatorsStatus logging cluster operators status
-func (c controller) logClusterOperatorsStatus() {
+// Gather information about cluster operators. This information is required for
+// debugging purposes so it is printed into the controller's log file (always)
+// and sent to the service to be formatted in an event to the user (in case of
+// a failure)
+func (c controller) operatorReport() []models.OperatorMonitorReport {
 	operators, err := c.kc.ListClusterOperators()
 	if err != nil {
 		c.log.WithError(err).Warning("Failed to list cluster operators")
-		return
+		return nil
 	}
 
+	report := make([]models.OperatorMonitorReport, 0)
 	for _, operator := range operators.Items {
+		// Note: always keep this log so we have all the information
+		// in the controller's log
 		c.log.Infof("Operator %s, statuses: %v", operator.Name, operator.Status.Conditions)
+		status, message := utils.MonitoredOperatorStatus(operator.Status.Conditions)
+		report = append(report, models.OperatorMonitorReport{
+			Name:       operator.Name,
+			Status:     status,
+			StatusInfo: message,
+		})
 	}
+	return report
 }
 
 func (c controller) logHostResolvConf() {
@@ -1188,8 +1209,6 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 	var ok bool = true
 	ctx := utils.GenerateRequestContext()
 
-	// Send upload operator logs before must-gather
-	c.logClusterOperatorsStatus()
 	if c.Status.HasError() || c.Status.HasOperatorError() {
 		c.logHostResolvConf()
 		c.log.Infof("Uploading cluster operator status logs before must-gather")

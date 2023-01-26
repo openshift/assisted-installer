@@ -1669,6 +1669,7 @@ func init() {
             "enum": [
               "host",
               "controller",
+              "node-boot",
               "all"
             ],
             "type": "string",
@@ -1763,7 +1764,8 @@ func init() {
           {
             "enum": [
               "host",
-              "controller"
+              "controller",
+              "node-boot"
             ],
             "type": "string",
             "description": "The type of log file to be uploaded.",
@@ -5291,6 +5293,10 @@ func init() {
         "ip": {
           "description": "The IP address.",
           "$ref": "#/definitions/ip"
+        },
+        "verification": {
+          "description": "API VIP verification result.",
+          "$ref": "#/definitions/vip_verification"
         }
       }
     },
@@ -6186,6 +6192,13 @@ func init() {
         "is_success"
       ],
       "properties": {
+        "data": {
+          "description": "additional data from the cluster",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object"
+          }
+        },
         "error_info": {
           "type": "string"
         },
@@ -8006,6 +8019,10 @@ func init() {
         "ip": {
           "description": "The IP address.",
           "$ref": "#/definitions/ip"
+        },
+        "verification": {
+          "description": "Ingress VIP verification result.",
+          "$ref": "#/definitions/vip_verification"
         }
       }
     },
@@ -8422,6 +8439,7 @@ func init() {
       "type": "string",
       "enum": [
         "host",
+        "node-boot",
         "controller",
         "all",
         ""
@@ -9100,7 +9118,8 @@ func init() {
         "next-step-runner",
         "upgrade-agent",
         "download-boot-artifacts",
-        "reboot-for-reclaim"
+        "reboot-for-reclaim",
+        "verify-vips"
       ]
     },
     "steps": {
@@ -9444,6 +9463,47 @@ func init() {
         }
       }
     },
+    "verified_vip": {
+      "description": "Single VIP verification result.",
+      "type": "object",
+      "properties": {
+        "verification": {
+          "$ref": "#/definitions/vip_verification"
+        },
+        "vip": {
+          "$ref": "#/definitions/ip"
+        },
+        "vip_type": {
+          "$ref": "#/definitions/vip_type"
+        }
+      }
+    },
+    "verify_vip": {
+      "description": "Request to verify single vip.",
+      "type": "object",
+      "properties": {
+        "vip": {
+          "$ref": "#/definitions/ip"
+        },
+        "vip_type": {
+          "$ref": "#/definitions/vip_type"
+        }
+      }
+    },
+    "verify_vips_request": {
+      "description": "list of vips to be verified.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/verify_vip"
+      }
+    },
+    "verify_vips_response": {
+      "description": "list of verified vips.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/verified_vip"
+      }
+    },
     "versioned-host-requirements": {
       "type": "object",
       "properties": {
@@ -9478,6 +9538,24 @@ func init() {
       "additionalProperties": {
         "type": "string"
       }
+    },
+    "vip_type": {
+      "description": "The vip type.",
+      "type": "string",
+      "enum": [
+        "api",
+        "ingress"
+      ]
+    },
+    "vip_verification": {
+      "description": "vip verification result.",
+      "type": "string",
+      "default": "unverified",
+      "enum": [
+        "unverified",
+        "failed",
+        "succeeded"
+      ]
     }
   },
   "securityDefinitions": {
@@ -11198,6 +11276,7 @@ func init() {
             "enum": [
               "host",
               "controller",
+              "node-boot",
               "all"
             ],
             "type": "string",
@@ -11292,7 +11371,8 @@ func init() {
           {
             "enum": [
               "host",
-              "controller"
+              "controller",
+              "node-boot"
             ],
             "type": "string",
             "description": "The type of log file to be uploaded.",
@@ -14993,6 +15073,10 @@ func init() {
         "ip": {
           "description": "The IP address.",
           "$ref": "#/definitions/ip"
+        },
+        "verification": {
+          "description": "API VIP verification result.",
+          "$ref": "#/definitions/vip_verification"
         }
       }
     },
@@ -15888,6 +15972,13 @@ func init() {
         "is_success"
       ],
       "properties": {
+        "data": {
+          "description": "additional data from the cluster",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object"
+          }
+        },
         "error_info": {
           "type": "string"
         },
@@ -17628,6 +17719,10 @@ func init() {
         "ip": {
           "description": "The IP address.",
           "$ref": "#/definitions/ip"
+        },
+        "verification": {
+          "description": "Ingress VIP verification result.",
+          "$ref": "#/definitions/vip_verification"
         }
       }
     },
@@ -18044,6 +18139,7 @@ func init() {
       "type": "string",
       "enum": [
         "host",
+        "node-boot",
         "controller",
         "all",
         ""
@@ -18711,7 +18807,8 @@ func init() {
         "next-step-runner",
         "upgrade-agent",
         "download-boot-artifacts",
-        "reboot-for-reclaim"
+        "reboot-for-reclaim",
+        "verify-vips"
       ]
     },
     "steps": {
@@ -19029,6 +19126,47 @@ func init() {
         }
       }
     },
+    "verified_vip": {
+      "description": "Single VIP verification result.",
+      "type": "object",
+      "properties": {
+        "verification": {
+          "$ref": "#/definitions/vip_verification"
+        },
+        "vip": {
+          "$ref": "#/definitions/ip"
+        },
+        "vip_type": {
+          "$ref": "#/definitions/vip_type"
+        }
+      }
+    },
+    "verify_vip": {
+      "description": "Request to verify single vip.",
+      "type": "object",
+      "properties": {
+        "vip": {
+          "$ref": "#/definitions/ip"
+        },
+        "vip_type": {
+          "$ref": "#/definitions/vip_type"
+        }
+      }
+    },
+    "verify_vips_request": {
+      "description": "list of vips to be verified.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/verify_vip"
+      }
+    },
+    "verify_vips_response": {
+      "description": "list of verified vips.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/verified_vip"
+      }
+    },
     "versioned-host-requirements": {
       "type": "object",
       "properties": {
@@ -19063,6 +19201,24 @@ func init() {
       "additionalProperties": {
         "type": "string"
       }
+    },
+    "vip_type": {
+      "description": "The vip type.",
+      "type": "string",
+      "enum": [
+        "api",
+        "ingress"
+      ]
+    },
+    "vip_verification": {
+      "description": "vip verification result.",
+      "type": "string",
+      "default": "unverified",
+      "enum": [
+        "unverified",
+        "failed",
+        "succeeded"
+      ]
     }
   },
   "securityDefinitions": {
