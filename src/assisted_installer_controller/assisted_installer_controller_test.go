@@ -1098,7 +1098,34 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				assistedController.UpdateNodeLabels(context.TODO(), &wg)
 				wg.Wait()
 			})
+			// 1. Set one node as not ready
+			// 2. Patch labels on 2 other nodes
+			// 3. Set last node as ready and patch labels for it
+			It("Set label only in when nodes are ready", func() {
+				nodeLabels := `{"node.ocs.openshift.io/storage":""}`
+				notReadyNodeName := ""
+				k8sNodesWith1NotReady := GetKubeNodes(kubeNamesIds)
+				for i, cond := range k8sNodesWith1NotReady.Items[0].Status.Conditions {
+					if cond.Type == v1.NodeReady {
+						k8sNodesWith1NotReady.Items[0].Status.Conditions[i].Status = v1.ConditionFalse
+					}
+					notReadyNodeName = k8sNodesWith1NotReady.Items[0].Name
+				}
 
+				hosts := create3Hosts(models.HostStatusInstalled, models.HostStageDone, nodeLabels)
+				mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled, models.HostStatusError}).
+					Return(hosts, nil).Times(2)
+				// first run with 2 ready nodes
+				mockk8sclient.EXPECT().ListNodes().Return(k8sNodesWith1NotReady, nil).Times(1)
+				// Set 3rd node as ready
+				mockk8sclient.EXPECT().ListNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
+				mockk8sclient.EXPECT().PatchNodeLabels(gomock.Any(), nodeLabels).Return(nil).Times(2)
+				mockk8sclient.EXPECT().PatchNodeLabels(notReadyNodeName, nodeLabels).Return(nil).Times(1)
+
+				wg.Add(1)
+				assistedController.UpdateNodeLabels(context.TODO(), &wg)
+				wg.Wait()
+			})
 		})
 	})
 
