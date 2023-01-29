@@ -1069,6 +1069,9 @@ func (c controller) patchNodesLabels(log logrus.FieldLogger, hostsWithLabels map
 	}
 
 	for _, node := range nodes.Items {
+		if !common.IsK8sNodeIsReady(node) {
+			continue
+		}
 		host, ok := common.HostMatchByNameOrIPAddress(node, hostsWithLabels, knownIpAddresses)
 		if !ok {
 			continue

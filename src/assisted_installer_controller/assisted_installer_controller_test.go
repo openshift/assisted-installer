@@ -1098,7 +1098,45 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				assistedController.UpdateNodeLabels(context.TODO(), &wg)
 				wg.Wait()
 			})
+			// 1. Set one node as not ready
+			// 2. Patch labels on 2 other nodes
+			// 3. Set last node as ready and patch labels for it
+			It("Set label only in when nodes are ready", func() {
+				nodeLabels := `{"node.ocs.openshift.io/storage":""}`
+				k8sReadyNodes := GetKubeNodes(kubeNamesIds)
+				k8sNodesWith1NotReady := k8sReadyNodes.DeepCopy()
+				conds := k8sNodesWith1NotReady.Items[0].Status.Conditions
+				for i, cond := range conds {
+					if cond.Type == v1.NodeReady {
+						conds[i].Status = v1.ConditionFalse
+					}
+				}
+				k8sNodesWith1NotReady.Items[0].Status.Conditions = conds
+				notReadyNodeName := k8sNodesWith1NotReady.Items[0].Name
 
+				hosts := create3Hosts(models.HostStatusInstalled, models.HostStageDone, nodeLabels)
+				mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled, models.HostStatusError}).
+					Return(hosts, nil).Times(2)
+
+				// set node labels to k8s object for 2 already patched nodes
+				k8sReadyNodes.Items[1].ObjectMeta.Labels["node.ocs.openshift.io/storage"] = ""
+				k8sReadyNodes.Items[2].ObjectMeta.Labels["node.ocs.openshift.io/storage"] = ""
+
+				// first run with 2 ready nodes
+				gomock.InOrder(
+					mockk8sclient.EXPECT().ListNodes().Return(k8sNodesWith1NotReady, nil).Times(1),
+					mockk8sclient.EXPECT().ListNodes().Return(k8sReadyNodes, nil).Times(1),
+				)
+
+				gomock.InOrder(
+					mockk8sclient.EXPECT().PatchNodeLabels(gomock.Any(), nodeLabels).Return(nil).Times(2),
+					mockk8sclient.EXPECT().PatchNodeLabels(notReadyNodeName, nodeLabels).Return(nil).Times(1),
+				)
+
+				wg.Add(1)
+				assistedController.UpdateNodeLabels(context.TODO(), &wg)
+				wg.Wait()
+			})
 		})
 	})
 
@@ -1907,12 +1945,14 @@ var _ = Describe("installer HostRoleMaster role", func() {
 func GetKubeNodes(kubeNamesIds map[string]string) *v1.NodeList {
 	file, _ := ioutil.ReadFile("../../test_files/node.json")
 	var node v1.Node
-	_ = json.Unmarshal(file, &node)
+	err := json.Unmarshal(file, &node)
+	Expect(err).ToNot(HaveOccurred())
 	nodeList := &v1.NodeList{}
 	for name, id := range kubeNamesIds {
 		node.Status.NodeInfo.SystemUUID = id
 		node.Name = name
-		nodeList.Items = append(nodeList.Items, node)
+		newNode := node.DeepCopy()
+		nodeList.Items = append(nodeList.Items, *newNode)
 	}
 	return nodeList
 }
