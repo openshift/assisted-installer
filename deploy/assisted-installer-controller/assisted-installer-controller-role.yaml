@@ -194,3 +194,10 @@ rules:
       - securitycontextconstraints
     verbs:
       - use
+  - apiGroups:
+      - "machineconfiguration.openshift.io"
+    resources:
+      - "*"
+    verbs:
+      - patch
+      - get
