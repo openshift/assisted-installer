@@ -9,3 +9,6 @@
 2020-07-01T16:57:22.320165920+00:00 stderr F I0701 16:57:22.320128       1 bootstrap_server.go:84] reading file "/etc/mcs/bootstrap/machine-configs/rendered-master-39287e7d053e8395ab3c1ecd762dd578.yaml"
 2020-07-01T16:57:08.449846700+00:00 stderr F I0701 16:57:08.449808       1 api.go:102] Pool master requested by 192.168.126.100:32780 User-Agent:"Ignition/2.6.0"
 2020-07-01T16:57:08.449904020+00:00 stderr F I0701 16:57:08.449893       1 bootstrap_server.go:64] reading file "/etc/mcs/bootstrap/machine-pools/master.yaml"
+I0206 16:26:48.364205       1 api.go:109] Pool master requested by address:"[2620:52:0:1351:67c2:adb3:cfd6:83]:47018" User-Agent:"Ignition/2.14.0" Accept-Header: "application/vnd.coreos.ignition+json;version=3.3.0, */*;q=0.1"
+I0206 16:26:48.364233       1 bootstrap_server.go:66] reading file "/etc/mcs/bootstrap/machine-pools/master.yaml"
+I0206 16:26:48.365296       1 bootstrap_server.go:86] reading file "/etc/mcs/bootstrap/machine-configs/rendered-master-2a58b078298d4e5124ad04da186bff14.yaml"
