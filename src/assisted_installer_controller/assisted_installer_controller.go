@@ -191,7 +191,9 @@ func logHostsStatus(log logrus.FieldLogger, hosts map[string]inventory_client.Ho
 // it will update joined/done status
 // approve csr will run as routine and cancelled whenever all nodes are ready and joined
 // this will allow to run it and end only when it is needed
-func (c *controller) WaitAndUpdateNodesStatus(ctx context.Context, wg *sync.WaitGroup) {
+// removeUninitializedTaint parameter is removing unitialized taint on platforms with
+// external cloud provider, as assisted-installer is using fake credentials
+func (c *controller) WaitAndUpdateNodesStatus(ctx context.Context, wg *sync.WaitGroup, removeUninitializedTaint bool) {
 	approveCtx, approveCancel := context.WithCancel(ctx)
 	defer func() {
 		approveCancel()
@@ -202,12 +204,13 @@ func (c *controller) WaitAndUpdateNodesStatus(ctx context.Context, wg *sync.Wait
 	go c.ApproveCsrs(approveCtx)
 
 	c.log.Infof("Waiting till all nodes will join and update status to assisted installer")
-	_ = utils.WaitForPredicateWithContext(ctx, LongWaitTimeout, GeneralWaitInterval, c.waitAndUpdateNodesStatus)
+	_ = utils.WaitForPredicateParamsWithContext(ctx, LongWaitTimeout, GeneralWaitInterval, c.waitAndUpdateNodesStatus, removeUninitializedTaint)
 }
 
-func (c *controller) waitAndUpdateNodesStatus() bool {
+func (c *controller) waitAndUpdateNodesStatus(arg interface{}) bool {
 	ignoreStatuses := []string{models.HostStatusDisabled}
 	var hostsInError int
+	removeUninitializedTaint := arg.(bool)
 	ctxReq := utils.GenerateRequestContext()
 	log := utils.RequestIDLogger(ctxReq, c.log)
 
@@ -258,7 +261,15 @@ func (c *controller) waitAndUpdateNodesStatus() bool {
 			}
 		}
 
-		if common.IsK8sNodeIsReady(node) && host.Host.Progress.CurrentStage != models.HostStageDone {
+		ready := common.IsK8sNodeIsReady(node)
+		if !ready && removeUninitializedTaint {
+			if err := c.kc.UntaintNode(node.Name); err != nil {
+				log.WithError(err).Errorf("Failed to remove uninitialized taint from node %s", node.Name)
+				continue
+			}
+		}
+
+		if ready && host.Host.Progress.CurrentStage != models.HostStageDone {
 			log.Infof("Found new ready node %s with inventory id %s, kubernetes id %s, updating its status to %s",
 				node.Name, host.Host.ID.String(), node.Status.NodeInfo.SystemUUID, models.HostStageDone)
 
@@ -1143,7 +1154,7 @@ func (c controller) logHostResolvConf() {
 }
 
 // This is temporary function, till https://bugzilla.redhat.com/show_bug.cgi?id=2097041 will not be resolved,
-//that should validate router state only in case of failure
+// that should validate router state only in case of failure
 // It will patch router to add access logs
 // It will run http router health check to see if router is healthy on host network
 func (c controller) logRouterStatus() {

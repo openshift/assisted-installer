@@ -85,6 +85,7 @@ type K8SClient interface {
 	ListJobs(namespace string) (*batchV1.JobList, error)
 	DeleteJob(job types.NamespacedName) error
 	IsClusterCapabilityEnabled(configv1.ClusterVersionCapability) (bool, error)
+	UntaintNode(name string) error
 }
 
 type K8SClientBuilder func(configPath string, logger logrus.FieldLogger) (K8SClient, error)
@@ -102,8 +103,9 @@ type k8sClient struct {
 }
 
 const (
-	KUBE_SYSTEM_NAMESPACE  = "kube-system"
-	CLUSTER_CONFIG_V1_NAME = "cluster-config-v1"
+	KUBE_SYSTEM_NAMESPACE   = "kube-system"
+	CLUSTER_CONFIG_V1_NAME  = "cluster-config-v1"
+	UNINITIALIZED_TAINT_KEY = "node.cloudprovider.kubernetes.io/uninitialized"
 )
 
 func NewK8SClient(configPath string, logger logrus.FieldLogger) (K8SClient, error) {
@@ -626,4 +628,45 @@ func (c *k8sClient) IsClusterCapabilityEnabled(capability configv1.ClusterVersio
 	isExplicitlyEnabled := funk.Contains(version.Status.Capabilities.EnabledCapabilities, capability)
 	isKnown := funk.Contains(version.Status.Capabilities.KnownCapabilities, capability)
 	return isExplicitlyEnabled || !isKnown, nil
+}
+
+type taintRemovePatch struct {
+	Op   string `json:"op"`
+	Path string `json:"path"`
+}
+
+func (c *k8sClient) UntaintNode(name string) error {
+	node, err := c.client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	foundTaintIndex := -1
+	for i, taint := range node.Spec.Taints {
+		if taint.Key == UNINITIALIZED_TAINT_KEY {
+			foundTaintIndex = i
+			break
+		}
+	}
+	if foundTaintIndex == -1 {
+		c.log.Infof("No uninitialized taint found for node %s", name)
+		return nil
+	}
+	c.log.Infof("Removing uninitialized taint on node %s", name)
+	patch := []taintRemovePatch{{
+		Op:   "remove",
+		Path: fmt.Sprintf("/spec/taints/%d", foundTaintIndex),
+	}}
+	c.log.Debugf("Prepared patch: %+v", patch)
+	data, err := json.Marshal(patch)
+	if err != nil {
+		return errors.Wrap(err, "Failed to convert patch to JSON")
+	}
+	c.log.Debugf("Marshaled patch into %+v", string(data))
+	result, err := c.client.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.JSONPatchType, data, metav1.PatchOptions{})
+	if err != nil {
+		return errors.Wrap(err, "Failed to patch node")
+	}
+	c.log.Debugf("Node patch result: %+v", result)
+	c.log.Infof("Removed taint from node %s", node.Name)
+	return err
 }

@@ -574,6 +574,20 @@ func (mr *MockK8SClientMockRecorder) SetProxyEnvVars() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetProxyEnvVars", reflect.TypeOf((*MockK8SClient)(nil).SetProxyEnvVars))
 }
 
+// UntaintNode mocks base method.
+func (m *MockK8SClient) UntaintNode(name string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UntaintNode", name)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UntaintNode indicates an expected call of UntaintNode.
+func (mr *MockK8SClientMockRecorder) UntaintNode(name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UntaintNode", reflect.TypeOf((*MockK8SClient)(nil).UntaintNode), name)
+}
+
 // UpdateBMH mocks base method.
 func (m *MockK8SClient) UpdateBMH(bmh *v1alpha1.BareMetalHost) error {
 	m.ctrl.T.Helper()

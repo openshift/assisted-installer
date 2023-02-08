@@ -147,7 +147,11 @@ func main() {
 		logger.Infof("Finished all")
 	}()
 
-	go assistedController.WaitAndUpdateNodesStatus(mainContext, &wg)
+	removeUninitializedTaint := false
+	if cluster.Platform != nil && *cluster.Platform.Type == models.PlatformTypeVsphere {
+		removeUninitializedTaint = true
+	}
+	go assistedController.WaitAndUpdateNodesStatus(mainContext, &wg, removeUninitializedTaint)
 	wg.Add(1)
 	go assistedController.PostInstallConfigs(mainContext, &wg)
 	wg.Add(1)

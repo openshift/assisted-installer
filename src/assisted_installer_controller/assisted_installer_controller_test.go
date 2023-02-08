@@ -300,7 +300,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 
 		It("waitAndUpdateNodesStatus happy flow - all nodes installing", func() {
-
 			updateProgressSuccess([]models.HostStage{models.HostStageJoined,
 				models.HostStageJoined,
 				models.HostStageJoined}, inventoryNamesIds)
@@ -312,7 +311,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			configuringSuccess()
 			listNodes()
 
-			exit := assistedController.waitAndUpdateNodesStatus()
+			exit := assistedController.waitAndUpdateNodesStatus(false)
 			Expect(exit).Should(Equal(false))
 		})
 
@@ -321,8 +320,42 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			hosts := create3Hosts(models.HostStatusInstalled, models.HostStageDone, "")
 			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
 				Return(hosts, nil).Times(1)
-			exit := assistedController.waitAndUpdateNodesStatus()
+			exit := assistedController.waitAndUpdateNodesStatus(false)
 			Expect(exit).Should(Equal(true))
+		})
+
+		It("waitAndUpdateNodesStatus happy flow - remove uninitialized taint on not ready node", func() {
+			joined := []models.HostStage{models.HostStageJoined}
+			currentState := models.HostProgressInfo{CurrentStage: models.HostStageRebooting}
+			currentStatus := models.HostStatusInstalling
+			infraEnvId := strfmt.UUID("7916fa89-ea7a-443e-a862-b3e930309f50")
+			node0Id := strfmt.UUID("7916fa89-ea7a-443e-a862-b3e930309f65")
+			hosts := map[string]inventory_client.HostData{"node0": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node0Id, Progress: &currentState, Status: &currentStatus}}}
+			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
+				Return(hosts, nil).Times(2)
+			// not ready nodes with taint
+			kubeNamesIds = map[string]string{"node0": "6d6f00e8-70dd-48a5-859a-0f1459485ad9"}
+			nodes := GetKubeNodes(kubeNamesIds)
+			for _, node := range nodes.Items {
+				for i, cond := range node.Status.Conditions {
+					if cond.Type == v1.NodeReady {
+						node.Status.Conditions[i].Status = v1.ConditionFalse
+					}
+				}
+				node.Spec.Taints = []v1.Taint{
+					{
+						Key:    k8s_client.UNINITIALIZED_TAINT_KEY,
+						Effect: v1.TaintEffectNoExecute,
+						Value:  "true",
+					},
+				}
+			}
+			mockk8sclient.EXPECT().ListNodes().Return(nodes, nil).Times(1)
+			mockk8sclient.EXPECT().UntaintNode(gomock.Any()).Return(nil).Times(1)
+			updateProgressSuccess(joined, hosts)
+			mockk8sclient.EXPECT().GetPods(gomock.Any(), gomock.Any(), "").Return([]v1.Pod{}, nil).AnyTimes()
+			exit := assistedController.waitAndUpdateNodesStatus(true)
+			Expect(exit).Should(Equal(false))
 		})
 
 		It("WaitAndUpdateNodesStatus including joined state from configuring", func() {
@@ -346,7 +379,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			updateProgressSuccess(joined, inventoryNamesIds)
 			configuringSuccess()
 
-			exit := assistedController.waitAndUpdateNodesStatus()
+			exit := assistedController.waitAndUpdateNodesStatus(false)
 			Expect(exit).Should(Equal(false))
 		})
 
@@ -371,7 +404,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			updateProgressSuccess(joined, inventoryNamesIds)
 			mockk8sclient.EXPECT().GetPods(gomock.Any(), gomock.Any(), "").Return([]v1.Pod{}, nil).AnyTimes()
 
-			exit := assistedController.waitAndUpdateNodesStatus()
+			exit := assistedController.waitAndUpdateNodesStatus(false)
 			Expect(exit).Should(Equal(false))
 		})
 
@@ -398,7 +431,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			updateProgressSuccess(joined, hosts)
 			mockk8sclient.EXPECT().GetPods(gomock.Any(), gomock.Any(), "").Return([]v1.Pod{}, nil).AnyTimes()
 
-			exit := assistedController.waitAndUpdateNodesStatus()
+			exit := assistedController.waitAndUpdateNodesStatus(false)
 			Expect(exit).Should(Equal(false))
 		})
 
@@ -415,7 +448,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			updateProgressSuccess(done, hosts)
 			configuringSuccess()
 
-			exit := assistedController.waitAndUpdateNodesStatus()
+			exit := assistedController.waitAndUpdateNodesStatus(false)
 			Expect(exit).Should(Equal(false))
 		})
 		It("waitAndUpdateNodesStatus don't update progress for hosts in stage done", func() {
@@ -427,7 +460,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().ListNodes().Return(nodes, nil).Times(1)
 			configuringSuccess()
 
-			exit := assistedController.waitAndUpdateNodesStatus()
+			exit := assistedController.waitAndUpdateNodesStatus(false)
 			Expect(exit).Should(Equal(false))
 
 		})
@@ -436,7 +469,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
 				Return(map[string]inventory_client.HostData{}, fmt.Errorf("dummy")).Times(1)
 
-			exit := assistedController.waitAndUpdateNodesStatus()
+			exit := assistedController.waitAndUpdateNodesStatus(false)
 			Expect(exit).Should(Equal(false))
 		})
 
@@ -444,7 +477,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			hosts := create3Hosts(models.HostStatusError, models.HostStageJoined, "")
 			mockbmclient.EXPECT().GetHosts(gomock.Any(), gomock.Any(), []string{models.HostStatusDisabled}).
 				Return(hosts, nil).Times(1)
-			exit := assistedController.waitAndUpdateNodesStatus()
+			exit := assistedController.waitAndUpdateNodesStatus(false)
 			Expect(exit).Should(Equal(true))
 		})
 	})
@@ -490,16 +523,16 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			configuringSuccess()
 
 			// first host set to installed
-			exit := assistedController.waitAndUpdateNodesStatus()
+			exit := assistedController.waitAndUpdateNodesStatus(false)
 			Expect(exit).Should(Equal(false))
 			// second host set to installed
-			exit = assistedController.waitAndUpdateNodesStatus()
+			exit = assistedController.waitAndUpdateNodesStatus(false)
 			Expect(exit).Should(Equal(false))
 			// third host set to installed
-			exit = assistedController.waitAndUpdateNodesStatus()
+			exit = assistedController.waitAndUpdateNodesStatus(false)
 			Expect(exit).Should(Equal(false))
 			// all hosts were installed
-			exit = assistedController.waitAndUpdateNodesStatus()
+			exit = assistedController.waitAndUpdateNodesStatus(false)
 			Expect(exit).Should(Equal(true))
 		})
 	})
@@ -530,7 +563,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			configuringSuccess()
 
 			mockk8sclient.EXPECT().ListCsrs().Return(nil, fmt.Errorf("no matter what")).AnyTimes()
-			go assistedController.WaitAndUpdateNodesStatus(context.TODO(), &wg)
+			go assistedController.WaitAndUpdateNodesStatus(context.TODO(), &wg, false)
 			wg.Add(1)
 			wg.Wait()
 		})
@@ -554,7 +587,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			configuringSuccess()
 
 			mockk8sclient.EXPECT().ListCsrs().Return(nil, fmt.Errorf("no matter what")).AnyTimes()
-			go assistedController.WaitAndUpdateNodesStatus(context.TODO(), &wg)
+			go assistedController.WaitAndUpdateNodesStatus(context.TODO(), &wg, false)
 			wg.Add(1)
 			wg.Wait()
 
