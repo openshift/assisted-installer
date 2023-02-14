@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/yaml.v2"
-
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/apis/metal3.io/v1alpha1"
 	configv1 "github.com/openshift/api/config/v1"
 	configv1client "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
@@ -22,6 +20,8 @@ import (
 	olmv1client "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/typed/operators/v1alpha1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/thoas/go-funk"
+	"gopkg.in/yaml.v2"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -69,7 +69,7 @@ type K8SClient interface {
 	UpdateBMHStatus(bmh *metal3v1alpha1.BareMetalHost) error
 	UpdateBMH(bmh *metal3v1alpha1.BareMetalHost) error
 	SetProxyEnvVars() error
-	GetClusterVersion(name string) (*configv1.ClusterVersion, error)
+	GetClusterVersion() (*configv1.ClusterVersion, error)
 	GetNetworkType() (string, error)
 	GetServiceNetworks() ([]string, error)
 	GetControlPlaneReplicas() (int, error)
@@ -83,6 +83,7 @@ type K8SClient interface {
 	PatchNamespace(namespace string, data []byte) error
 	GetNode(name string) (*v1.Node, error)
 	PatchNodeLabels(nodeName string, nodeLabels string) error
+	IsClusterCapabilityEnabled(configv1.ClusterVersionCapability) (bool, error)
 }
 
 type K8SClientBuilder func(configPath string, logger logrus.FieldLogger) (K8SClient, error)
@@ -551,12 +552,12 @@ func (c *k8sClient) UpdateBMH(bmh *metal3v1alpha1.BareMetalHost) error {
 	return c.runtimeClient.Update(context.TODO(), bmh)
 }
 
-func (c *k8sClient) GetClusterVersion(name string) (*configv1.ClusterVersion, error) {
+func (c *k8sClient) GetClusterVersion() (*configv1.ClusterVersion, error) {
 	result := &configv1.ClusterVersion{}
 	err := c.client.RESTClient().Get().
 		AbsPath("/apis/config.openshift.io/v1").
 		Resource("clusterversions").
-		Name(name).
+		Name("version").
 		Do(context.Background()).
 		Into(result)
 	return result, err
@@ -612,4 +613,14 @@ func (c *k8sClient) PatchNodeLabels(nodeName string, nodeLabels string) error {
 	data := []byte(`{"metadata": {"labels": ` + nodeLabels + `}}`)
 	_, err := c.client.CoreV1().Nodes().Patch(context.Background(), nodeName, types.MergePatchType, data, metav1.PatchOptions{})
 	return err
+}
+
+func (c *k8sClient) IsClusterCapabilityEnabled(capability configv1.ClusterVersionCapability) (bool, error) {
+	version, err := c.GetClusterVersion()
+	if err != nil {
+		return false, err
+	}
+	isExplicitlyEnabled := funk.Contains(version.Status.Capabilities.EnabledCapabilities, capability)
+	isKnown := funk.Contains(version.Status.Capabilities.KnownCapabilities, capability)
+	return isExplicitlyEnabled || !isKnown, nil
 }
