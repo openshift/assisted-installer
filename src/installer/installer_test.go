@@ -449,6 +449,52 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
+
+		It("untaint nodes on bootstrap", func() {
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+				{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
+				{string(models.HostStageWaitingForControlPlane), waitingForMastersStatusInfo},
+				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+				{string(models.HostStageWritingImageToDisk)},
+				{string(models.HostStageRebooting)},
+			})
+			extractIgnitionToFS("extract failure", fmt.Errorf("extract failed"))
+			bootstrapSetup()
+			checkLocalHostname("not localhost", nil)
+			restartNetworkManager(nil)
+			prepareControllerSuccess()
+			startServicesSuccess()
+
+			mockbmclient.EXPECT().GetEnabledHostsNamesHosts(gomock.Any(), gomock.Any()).Return(inventoryNamesHost, nil).AnyTimes()
+			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(map[string]string{}), nil).Times(1)
+			kubeNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65"}
+			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
+			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), inventoryNamesHost["node0"].Host.InfraEnvID.String(), inventoryNamesHost["node0"].Host.ID.String(), models.HostStageJoined, "").Times(1)
+			// node not ready
+			mockk8sclient.EXPECT().ListMasterNodes().Return(GetNotReadyKubeNodes(kubeNamesIds), nil).Times(1)
+			mockk8sclient.EXPECT().UntaintNode("node0").Return(nil).AnyTimes()
+			// node becomes ready
+			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
+			kubeNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65",
+				"node1": "eb82821f-bf21-4614-9a3b-ecb07929f238"}
+			mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
+			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), inventoryNamesHost["node1"].Host.InfraEnvID.String(), inventoryNamesHost["node1"].Host.ID.String(), models.HostStageJoined, "").Times(1)
+			// mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), inventoryNamesHost["node0"].Host.InfraEnvID.String(), inventoryNamesHost["node0"].Host.ID.String(), models.HostStageJoined, "").Times(1)
+			waitForBootkubeSuccess()
+			bootkubeStatusSuccess()
+			resolvConfSuccess()
+			waitForControllerSuccessfully(conf.ClusterID)
+			//HostRoleMaster flow:
+			downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
+			writeToDiskSuccess(gomock.Any())
+			setBootOrderSuccess(gomock.Any())
+			uploadLogsSuccess(true)
+			reportLogProgressSuccess()
+			ironicAgentDoesntExist()
+			rebootSuccess()
+			ret := installerObj.InstallNode()
+			Expect(ret).Should(BeNil())
+		})
 	})
 	Context("Bootstrap role waiting for control plane", func() {
 
@@ -931,6 +977,16 @@ func GetKubeNodes(kubeNamesIds map[string]string) *v1.NodeList {
 		node.Status.NodeInfo.SystemUUID = id
 		node.Name = name
 		nodeList.Items = append(nodeList.Items, node)
+	}
+	return nodeList
+}
+
+func GetNotReadyKubeNodes(kubeNamesIds map[string]string) *v1.NodeList {
+	nodeList := GetKubeNodes(kubeNamesIds)
+	newNodeList := &v1.NodeList{}
+	for _, node := range nodeList.Items {
+		node.Status.Conditions = []v1.NodeCondition{{Status: v1.ConditionFalse, Type: v1.NodeReady}}
+		newNodeList.Items = append(newNodeList.Items, node)
 	}
 	return nodeList
 }

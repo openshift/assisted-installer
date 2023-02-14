@@ -210,7 +210,7 @@ func (i *installer) finalize() error {
 	return nil
 }
 
-//updateSingleNodeIgnition will download the host ignition config and add the files under storage
+// updateSingleNodeIgnition will download the host ignition config and add the files under storage
 func (i *installer) updateSingleNodeIgnition(singleNodeIgnitionPath string) error {
 	if i.DryRunEnabled {
 		return nil
@@ -585,6 +585,14 @@ func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, 
 		if err != nil {
 			i.log.Warnf("Still waiting for master nodes: %v", err)
 			return false
+		}
+		for _, node := range nodes.Items {
+			if common.IsK8sNodeIsReady(node) {
+				continue
+			}
+			if err = kc.UntaintNode(node.Name); err != nil {
+				i.log.Warnf("Failed to untaint node %s: %v", node.Name, err)
+			}
 		}
 		if err = i.updateReadyMasters(nodes, &readyMasters, inventoryHostsMap); err != nil {
 			i.log.WithError(err).Warnf("Failed to update ready with masters")
