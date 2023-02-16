@@ -15,6 +15,7 @@ import (
 	configv1client "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 	operatorv1 "github.com/openshift/client-go/operator/clientset/versioned"
 	machinev1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	olmv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	olmv1client "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/typed/operators/v1alpha1"
@@ -86,6 +87,7 @@ type K8SClient interface {
 	DeleteJob(job types.NamespacedName) error
 	IsClusterCapabilityEnabled(configv1.ClusterVersionCapability) (bool, error)
 	UntaintNode(name string) error
+	PatchMachineConfigPoolPaused(pause bool, mcpName string) error
 }
 
 type K8SClientBuilder func(configPath string, logger logrus.FieldLogger) (K8SClient, error)
@@ -145,6 +147,11 @@ func NewK8SClient(configPath string, logger logrus.FieldLogger) (K8SClient, erro
 		err = machinev1beta1.AddToScheme(scheme)
 		if err != nil {
 			return &k8sClient{}, errors.Wrap(err, "failed to add Machine scheme")
+		}
+
+		err = mcfgv1.AddToScheme(scheme)
+		if err != nil {
+			return &k8sClient{}, errors.Wrap(err, "failed to add MCP scheme")
 		}
 
 		runtimeClient, err = runtimeclient.New(runtimeconfig.GetConfigOrDie(), runtimeclient.Options{Scheme: scheme})
@@ -669,4 +676,18 @@ func (c *k8sClient) UntaintNode(name string) error {
 	c.log.Debugf("Node patch result: %+v", result)
 	c.log.Infof("Removed taint from node %s", node.Name)
 	return err
+}
+
+func (c *k8sClient) PatchMachineConfigPoolPaused(pause bool, mcpName string) error {
+	mcp := &mcfgv1.MachineConfigPool{}
+	err := c.runtimeClient.Get(context.TODO(), types.NamespacedName{Name: mcpName}, mcp)
+	if err != nil {
+		return err
+	}
+	if mcp.Spec.Paused == pause {
+		return nil
+	}
+	pausePatch := []byte(fmt.Sprintf("{\"spec\":{\"paused\":%t}}", pause))
+	c.log.Infof("Setting pause MCP %s to %t", mcpName, pause)
+	return c.runtimeClient.Patch(context.TODO(), mcp, runtimeclient.RawPatch(types.MergePatchType, pausePatch))
 }
