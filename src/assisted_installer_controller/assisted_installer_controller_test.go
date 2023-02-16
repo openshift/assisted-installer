@@ -78,7 +78,7 @@ var (
 	}
 )
 
-var _ = FDescribe("installer HostRoleMaster role", func() {
+var _ = Describe("installer HostRoleMaster role", func() {
 	var (
 		l                  = logrus.New()
 		ctrl               *gomock.Controller

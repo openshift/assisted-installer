@@ -1501,6 +1501,109 @@ func init() {
         }
       }
     },
+    "/v2/clusters/{cluster_id}/ignored-validations": {
+      "get": {
+        "description": "Fetch the validations which are to be ignored for this cluster.",
+        "tags": [
+          "installer"
+        ],
+        "operationId": "v2GetIgnoredValidations",
+        "parameters": [
+          {
+            "type": "string",
+            "format": "uuid",
+            "description": "The cluster whose failing validations should be ignored according to this list.",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "schema": {
+              "$ref": "#/definitions/ignored-validations"
+            }
+          },
+          "400": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "404": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          }
+        }
+      },
+      "put": {
+        "description": "Register the validations which are to be ignored for this cluster.",
+        "tags": [
+          "installer"
+        ],
+        "operationId": "v2SetIgnoredValidations",
+        "parameters": [
+          {
+            "type": "string",
+            "format": "uuid",
+            "description": "The cluster whose failing validations should be ignored according to this list.",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "description": "The validations to be ignored.",
+            "name": "ignored_validations",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ignored-validations"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success.",
+            "schema": {
+              "$ref": "#/definitions/ignored-validations"
+            }
+          },
+          "400": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "403": {
+            "description": "Forbidden.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "404": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "500": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          }
+        }
+      }
+    },
     "/v2/clusters/{cluster_id}/install-config": {
       "get": {
         "security": [
@@ -5452,6 +5555,14 @@ func init() {
           "description": "The CPU architecture of the image (x86_64/arm64/etc).",
           "type": "string",
           "default": "x86_64",
+          "enum": [
+            "x86_64",
+            "aarch64",
+            "arm64",
+            "ppc64le",
+            "s390x",
+            "multi"
+          ],
           "x-nullable": false
         },
         "created_at": {
@@ -5844,6 +5955,14 @@ func init() {
           "description": "The CPU architecture of the image (x86_64/arm64/etc).",
           "type": "string",
           "default": "x86_64",
+          "enum": [
+            "x86_64",
+            "aarch64",
+            "arm64",
+            "ppc64le",
+            "s390x",
+            "multi"
+          ],
           "x-nullable": false
         },
         "disk_encryption": {
@@ -6784,7 +6903,8 @@ func init() {
         "Multipath",
         "iSCSI",
         "FC",
-        "LVM"
+        "LVM",
+        "RAID"
       ]
     },
     "error": {
@@ -7627,6 +7747,21 @@ func init() {
       },
       "x-go-custom-tag": "gorm:\"embedded;embeddedPrefix:ignition_endpoint_\""
     },
+    "ignored-validations": {
+      "type": "object",
+      "properties": {
+        "cluster-validation-ids": {
+          "description": "JSON-formatted list of cluster validation IDs that will be ignored for all hosts that belong to this cluster. It may also contain a list with a single string \"all\" to ignore all cluster validations. Some validations cannot be ignored.",
+          "type": "string",
+          "format": "string"
+        },
+        "host-validation-ids": {
+          "description": "JSON-formatted list of host validation IDs that will be ignored for all hosts that belong to this cluster. It may also contain a list with a single string \"all\" to ignore all host validations. Some validations cannot be ignored.",
+          "type": "string",
+          "format": "string"
+        }
+      }
+    },
     "image-create-params": {
       "type": "object",
       "properties": {
@@ -7757,6 +7892,14 @@ func init() {
           "description": "The CPU architecture of the image (x86_64/arm64/etc).",
           "type": "string",
           "default": "x86_64",
+          "enum": [
+            "x86_64",
+            "aarch64",
+            "arm64",
+            "ppc64le",
+            "s390x",
+            "multi"
+          ],
           "x-nullable": false
         },
         "created_at": {
@@ -7894,6 +8037,14 @@ func init() {
           "description": "The CPU architecture of the image (x86_64/arm64/etc).",
           "type": "string",
           "default": "x86_64",
+          "enum": [
+            "x86_64",
+            "aarch64",
+            "arm64",
+            "ppc64le",
+            "s390x",
+            "multi"
+          ],
           "x-nullable": false
         },
         "ignition_config_override": {
@@ -8578,6 +8729,10 @@ func init() {
         "timeout_seconds": {
           "description": "Positive number represents a timeout in seconds for the operator to be available.",
           "type": "integer"
+        },
+        "version": {
+          "description": "Operator version",
+          "type": "string"
         }
       }
     },
@@ -8762,6 +8917,10 @@ func init() {
         "status_info": {
           "description": "Detailed information about the operator state.",
           "type": "string"
+        },
+        "version": {
+          "description": "operator version.",
+          "type": "string"
         }
       }
     },
@@ -8839,6 +8998,13 @@ func init() {
           "description": "The CPU architecture of the image (x86_64/arm64/etc).",
           "type": "string",
           "default": "x86_64",
+          "enum": [
+            "x86_64",
+            "aarch64",
+            "arm64",
+            "ppc64le",
+            "s390x"
+          ],
           "x-go-custom-tag": "gorm:\"default:'x86_64'\""
         },
         "openshift_version": {
@@ -8965,6 +9131,14 @@ func init() {
           "description": "(DEPRECATED) The CPU architecture of the image (x86_64/arm64/etc).",
           "type": "string",
           "default": "x86_64",
+          "enum": [
+            "x86_64",
+            "aarch64",
+            "arm64",
+            "ppc64le",
+            "s390x",
+            "multi"
+          ],
           "x-go-custom-tag": "gorm:\"default:'x86_64'\""
         },
         "cpu_architectures": {
@@ -11079,6 +11253,109 @@ func init() {
             "description": "Success.",
             "schema": {
               "$ref": "#/definitions/host-list"
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "403": {
+            "description": "Forbidden.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "404": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "500": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          }
+        }
+      }
+    },
+    "/v2/clusters/{cluster_id}/ignored-validations": {
+      "get": {
+        "description": "Fetch the validations which are to be ignored for this cluster.",
+        "tags": [
+          "installer"
+        ],
+        "operationId": "v2GetIgnoredValidations",
+        "parameters": [
+          {
+            "type": "string",
+            "format": "uuid",
+            "description": "The cluster whose failing validations should be ignored according to this list.",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "schema": {
+              "$ref": "#/definitions/ignored-validations"
+            }
+          },
+          "400": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "404": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          }
+        }
+      },
+      "put": {
+        "description": "Register the validations which are to be ignored for this cluster.",
+        "tags": [
+          "installer"
+        ],
+        "operationId": "v2SetIgnoredValidations",
+        "parameters": [
+          {
+            "type": "string",
+            "format": "uuid",
+            "description": "The cluster whose failing validations should be ignored according to this list.",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "description": "The validations to be ignored.",
+            "name": "ignored_validations",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ignored-validations"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success.",
+            "schema": {
+              "$ref": "#/definitions/ignored-validations"
+            }
+          },
+          "400": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
             }
           },
           "401": {
@@ -15232,6 +15509,14 @@ func init() {
           "description": "The CPU architecture of the image (x86_64/arm64/etc).",
           "type": "string",
           "default": "x86_64",
+          "enum": [
+            "x86_64",
+            "aarch64",
+            "arm64",
+            "ppc64le",
+            "s390x",
+            "multi"
+          ],
           "x-nullable": false
         },
         "created_at": {
@@ -15624,6 +15909,14 @@ func init() {
           "description": "The CPU architecture of the image (x86_64/arm64/etc).",
           "type": "string",
           "default": "x86_64",
+          "enum": [
+            "x86_64",
+            "aarch64",
+            "arm64",
+            "ppc64le",
+            "s390x",
+            "multi"
+          ],
           "x-nullable": false
         },
         "disk_encryption": {
@@ -16527,7 +16820,8 @@ func init() {
         "Multipath",
         "iSCSI",
         "FC",
-        "LVM"
+        "LVM",
+        "RAID"
       ]
     },
     "error": {
@@ -17325,6 +17619,21 @@ func init() {
       },
       "x-go-custom-tag": "gorm:\"embedded;embeddedPrefix:ignition_endpoint_\""
     },
+    "ignored-validations": {
+      "type": "object",
+      "properties": {
+        "cluster-validation-ids": {
+          "description": "JSON-formatted list of cluster validation IDs that will be ignored for all hosts that belong to this cluster. It may also contain a list with a single string \"all\" to ignore all cluster validations. Some validations cannot be ignored.",
+          "type": "string",
+          "format": "string"
+        },
+        "host-validation-ids": {
+          "description": "JSON-formatted list of host validation IDs that will be ignored for all hosts that belong to this cluster. It may also contain a list with a single string \"all\" to ignore all host validations. Some validations cannot be ignored.",
+          "type": "string",
+          "format": "string"
+        }
+      }
+    },
     "image-create-params": {
       "type": "object",
       "properties": {
@@ -17456,6 +17765,14 @@ func init() {
           "description": "The CPU architecture of the image (x86_64/arm64/etc).",
           "type": "string",
           "default": "x86_64",
+          "enum": [
+            "x86_64",
+            "aarch64",
+            "arm64",
+            "ppc64le",
+            "s390x",
+            "multi"
+          ],
           "x-nullable": false
         },
         "created_at": {
@@ -17594,6 +17911,14 @@ func init() {
           "description": "The CPU architecture of the image (x86_64/arm64/etc).",
           "type": "string",
           "default": "x86_64",
+          "enum": [
+            "x86_64",
+            "aarch64",
+            "arm64",
+            "ppc64le",
+            "s390x",
+            "multi"
+          ],
           "x-nullable": false
         },
         "ignition_config_override": {
@@ -18267,6 +18592,10 @@ func init() {
         "timeout_seconds": {
           "description": "Positive number represents a timeout in seconds for the operator to be available.",
           "type": "integer"
+        },
+        "version": {
+          "description": "Operator version",
+          "type": "string"
         }
       }
     },
@@ -18451,6 +18780,10 @@ func init() {
         "status_info": {
           "description": "Detailed information about the operator state.",
           "type": "string"
+        },
+        "version": {
+          "description": "operator version.",
+          "type": "string"
         }
       }
     },
@@ -18528,6 +18861,13 @@ func init() {
           "description": "The CPU architecture of the image (x86_64/arm64/etc).",
           "type": "string",
           "default": "x86_64",
+          "enum": [
+            "x86_64",
+            "aarch64",
+            "arm64",
+            "ppc64le",
+            "s390x"
+          ],
           "x-go-custom-tag": "gorm:\"default:'x86_64'\""
         },
         "openshift_version": {
@@ -18654,6 +18994,14 @@ func init() {
           "description": "(DEPRECATED) The CPU architecture of the image (x86_64/arm64/etc).",
           "type": "string",
           "default": "x86_64",
+          "enum": [
+            "x86_64",
+            "aarch64",
+            "arm64",
+            "ppc64le",
+            "s390x",
+            "multi"
+          ],
           "x-go-custom-tag": "gorm:\"default:'x86_64'\""
         },
         "cpu_architectures": {
