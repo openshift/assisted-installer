@@ -18,8 +18,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/thoas/go-funk"
-
 	"github.com/hashicorp/go-version"
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/apis/metal3.io/v1alpha1"
 	configv1 "github.com/openshift/api/config/v1"
@@ -248,7 +246,7 @@ func (c *controller) waitAndUpdateNodesStatus() bool {
 		}
 		common.LogIfHostIpChanged(c.log, node, knownIpAddresses)
 
-		if funk.Contains([]models.HostStage{models.HostStageConfiguring, models.HostStageRebooting}, host.Host.Progress.CurrentStage) {
+		if host.Host.Progress.CurrentStage == models.HostStageConfiguring {
 			log.Infof("Found new joined node %s with inventory id %s, kubernetes id %s, updating its status to %s",
 				node.Name, host.Host.ID.String(), node.Status.NodeInfo.SystemUUID, models.HostStageJoined)
 			if err := c.ic.UpdateHostInstallProgress(ctxReq, host.Host.InfraEnvID.String(), host.Host.ID.String(), models.HostStageJoined, ""); err != nil {
