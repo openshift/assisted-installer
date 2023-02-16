@@ -208,17 +208,17 @@ func (mr *MockInventoryClientMockRecorder) ListsHostsForRole(ctx, role interface
 }
 
 // UpdateClusterOperator mocks base method.
-func (m *MockInventoryClient) UpdateClusterOperator(ctx context.Context, clusterId, operatorName string, operatorStatus models.OperatorStatus, operatorStatusInfo string) error {
+func (m *MockInventoryClient) UpdateClusterOperator(ctx context.Context, clusterId, operatorName, operatorVersion string, operatorStatus models.OperatorStatus, operatorStatusInfo string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateClusterOperator", ctx, clusterId, operatorName, operatorStatus, operatorStatusInfo)
+	ret := m.ctrl.Call(m, "UpdateClusterOperator", ctx, clusterId, operatorName, operatorVersion, operatorStatus, operatorStatusInfo)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UpdateClusterOperator indicates an expected call of UpdateClusterOperator.
-func (mr *MockInventoryClientMockRecorder) UpdateClusterOperator(ctx, clusterId, operatorName, operatorStatus, operatorStatusInfo interface{}) *gomock.Call {
+func (mr *MockInventoryClientMockRecorder) UpdateClusterOperator(ctx, clusterId, operatorName, operatorVersion, operatorStatus, operatorStatusInfo interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateClusterOperator", reflect.TypeOf((*MockInventoryClient)(nil).UpdateClusterOperator), ctx, clusterId, operatorName, operatorStatus, operatorStatusInfo)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateClusterOperator", reflect.TypeOf((*MockInventoryClient)(nil).UpdateClusterOperator), ctx, clusterId, operatorName, operatorVersion, operatorStatus, operatorStatusInfo)
 }
 
 // UpdateHostInstallProgress mocks base method.

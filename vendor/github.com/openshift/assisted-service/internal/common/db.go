@@ -63,6 +63,9 @@ type Cluster struct {
 
 	// StaticNetworkConfigured indicates if static network configuration was set for the ISO used by clusters' nodes
 	StaticNetworkConfigured bool `json:"static_network_configured"`
+
+	IgnoredClusterValidations string `gorm:"type:text"`
+	IgnoredHostValidations    string `gorm:"type:text"`
 }
 
 type Event struct {
@@ -202,6 +205,12 @@ func GetClusterFromDBWithHosts(db *gorm.DB, clusterId strfmt.UUID) (*Cluster, er
 	db = LoadTableFromDB(db, HostsTable)
 	db = LoadClusterTablesFromDB(db, HostsTable)
 
+	return GetClusterFromDB(db, clusterId, SkipEagerLoading)
+}
+
+func GetClusterFromDBWithVips(db *gorm.DB, clusterId strfmt.UUID) (*Cluster, error) {
+	db = LoadTableFromDB(db, APIVIPsTable)
+	db = LoadTableFromDB(db, IngressVIPsTable)
 	return GetClusterFromDB(db, clusterId, SkipEagerLoading)
 }
 

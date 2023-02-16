@@ -23,7 +23,7 @@ const (
 
 type OperatorHandler interface {
 	GetName() string
-	GetStatus() (models.OperatorStatus, string, error)
+	GetStatus() (models.OperatorStatus, string, string, error)
 	OnChange(newStatus models.OperatorStatus) bool
 	IsInitialized() bool
 }
@@ -37,7 +37,7 @@ func (c controller) isOperatorAvailable(handler OperatorHandler) bool {
 		return true
 	}
 
-	operatorStatus, operatorMessage, err := handler.GetStatus()
+	operatorStatus, operatorMessage, operatorVersion, err := handler.GetStatus()
 	if err != nil {
 		c.log.WithError(err).Warnf("Failed to get <%s> operator", operatorName)
 		return false
@@ -50,7 +50,7 @@ func (c controller) isOperatorAvailable(handler OperatorHandler) bool {
 			return false
 		}
 
-		err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operatorName, operatorStatus, operatorMessage)
+		err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operatorName, operatorVersion, operatorStatus, operatorMessage)
 		if err != nil {
 			c.log.WithError(err).Warnf("Failed to update %s operator status %s with message %s", operatorName, operatorStatus, operatorMessage)
 			return false
@@ -88,14 +88,18 @@ func (handler ClusterOperatorHandler) GetName() string { return handler.operator
 
 func (handler ClusterOperatorHandler) IsInitialized() bool { return true }
 
-func (handler ClusterOperatorHandler) GetStatus() (models.OperatorStatus, string, error) {
+func (handler ClusterOperatorHandler) GetStatus() (models.OperatorStatus, string, string, error) {
 	co, err := handler.kc.GetClusterOperator(handler.operatorName)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
+	}
+	version := ""
+	if co != nil && len(co.Status.Versions) > 0 {
+		version = co.Status.Versions[0].Version
 	}
 
 	operatorStatus, operatorMessage := utils.MonitoredOperatorStatus(co.Status.Conditions)
-	return operatorStatus, operatorMessage, nil
+	return operatorStatus, operatorMessage, version, nil
 }
 
 func (handler ClusterOperatorHandler) OnChange(_ models.OperatorStatus) bool { return true }
@@ -114,14 +118,14 @@ func (handler ClusterVersionHandler) GetName() string { return cvoOperatorName }
 
 func (handler ClusterVersionHandler) IsInitialized() bool { return true }
 
-func (handler ClusterVersionHandler) GetStatus() (models.OperatorStatus, string, error) {
+func (handler ClusterVersionHandler) GetStatus() (models.OperatorStatus, string, string, error) {
 	co, err := handler.kc.GetClusterVersion()
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
 	operatorStatus, operatorMessage := utils.MonitoredOperatorStatus(co.Status.Conditions)
-	return operatorStatus, operatorMessage, nil
+	return operatorStatus, operatorMessage, co.Status.Desired.Version, nil
 }
 
 func (handler ClusterVersionHandler) OnChange(_ models.OperatorStatus) bool {
@@ -256,17 +260,17 @@ func (handler ClusterServiceVersionHandler) deleteFailedSubscriptionInstallPlans
 	return nil
 }
 
-func (handler ClusterServiceVersionHandler) GetStatus() (models.OperatorStatus, string, error) {
+func (handler ClusterServiceVersionHandler) GetStatus() (models.OperatorStatus, string, string, error) {
 	csvName, err := handler.kc.GetCSVFromSubscription(handler.operator.Namespace, handler.operator.SubscriptionName)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	csv, err := handler.kc.GetCSV(handler.operator.Namespace, csvName)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	operatorStatus := utils.CsvStatusToOperatorStatus(string(csv.Status.Phase))
-	return operatorStatus, csv.Status.Message, nil
+	return operatorStatus, csv.Status.Message, csv.Spec.Version.String(), nil
 }
 
 func (handler ClusterServiceVersionHandler) OnChange(newStatus models.OperatorStatus) bool {

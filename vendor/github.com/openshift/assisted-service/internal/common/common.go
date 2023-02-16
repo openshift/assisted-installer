@@ -42,6 +42,7 @@ const (
 	FamilyIPv4 int32 = 4
 	FamilyIPv6 int32 = 6
 
+	AMD64CPUArchitecture   = "amd64"
 	X86CPUArchitecture     = "x86_64"
 	DefaultCPUArchitecture = X86CPUArchitecture
 	ARM64CPUArchitecture   = "arm64"
@@ -91,6 +92,17 @@ const NMDebugModeConf = `
 [logging]
 domains=ALL:DEBUG
 `
+
+func NormalizeCPUArchitecture(arch string) string {
+	switch arch {
+	case AMD64CPUArchitecture:
+		return X86CPUArchitecture
+	case AARCH64CPUArchitecture:
+		return ARM64CPUArchitecture
+	default:
+		return arch
+	}
+}
 
 func AllStrings(vs []string, f func(string) bool) bool {
 	for _, v := range vs {
@@ -196,18 +208,18 @@ func GetNetworkCidrAttr(obj interface{}, fieldName string) []*string {
 // IsSliceNonEmpty checks whether the provided slice is non-empty. The slice is assumed to be
 // non-empty if at least one of its elements contains a non-zero value for its respective type.
 // Examples:
-// - `[]*models.MachineNetwork{{Cidr: "5.5.0.0/24"}, {Cidr: "6.6.0.0/24"}}` - valid, as we are
-//   configuring two machine networks
-// - `[]*models.ClusterNetwork{}` - valid, as it means we are removing all the cluster networks
-//   that may have been currently configured
-// - `[]*models.MachineNetwork{{}}` - invalid, as it means that we are trying to configure
-//    a single machine network that is empty; a valid network contains at least a CIDR which is
-//    missing in this case
-// - `[]*models.MachineNetwork{{Cidr: ""}}` - invalid, as it means we are trying to configure
-//   a single machine network that has empty CIDR; a valid network should contain a non-empty
-//   CIDR
-// - `[]*models.ClusterNetwork{{HostPrefix: 0}}` - invalid, as it means we are trying to configure
-//   a single cluster network with host prefix with a value 0; this is not a valid subnet lenght
+//   - `[]*models.MachineNetwork{{Cidr: "5.5.0.0/24"}, {Cidr: "6.6.0.0/24"}}` - valid, as we are
+//     configuring two machine networks
+//   - `[]*models.ClusterNetwork{}` - valid, as it means we are removing all the cluster networks
+//     that may have been currently configured
+//   - `[]*models.MachineNetwork{{}}` - invalid, as it means that we are trying to configure
+//     a single machine network that is empty; a valid network contains at least a CIDR which is
+//     missing in this case
+//   - `[]*models.MachineNetwork{{Cidr: ""}}` - invalid, as it means we are trying to configure
+//     a single machine network that has empty CIDR; a valid network should contain a non-empty
+//     CIDR
+//   - `[]*models.ClusterNetwork{{HostPrefix: 0}}` - invalid, as it means we are trying to configure
+//     a single cluster network with host prefix with a value 0; this is not a valid subnet lenght
 func IsSliceNonEmpty(arg interface{}) bool {
 	res := false
 	if reflect.ValueOf(arg).Kind() == reflect.Slice {
