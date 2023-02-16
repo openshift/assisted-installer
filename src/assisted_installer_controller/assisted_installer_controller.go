@@ -509,7 +509,7 @@ func (c controller) waitForOLMOperators(ctx context.Context) error {
 	var err error
 
 	// In case the timeout occur, we have to update the pending OLM operators to failed state,
-	// so the assisted-service can update the cluster state to completed.
+	// so the assisted-service can update the cluster state to complete.
 	defer func() {
 		if err == nil {
 			return
@@ -953,7 +953,7 @@ func (c controller) updatePendingOLMOperators(ctx context.Context) error {
 	}
 	for _, operator := range operators {
 		c.Status.OperatorError(operator.Name)
-		err := c.ic.UpdateClusterOperator(ctx, c.ClusterID, operator.Name, models.OperatorStatusFailed, "Waiting for operator timed out")
+		err := c.ic.UpdateClusterOperator(ctx, c.ClusterID, operator.Name, operator.Version, models.OperatorStatusFailed, "Waiting for operator timed out")
 		if err != nil {
 			c.log.WithError(err).Warnf("Failed to update olm %s status", operator.Name)
 			return err
