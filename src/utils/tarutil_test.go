@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io"
-	"io/ioutil"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -16,7 +15,7 @@ var _ = Describe("tar_utils", func() {
 	var (
 		l = logrus.New()
 	)
-	l.SetOutput(ioutil.Discard)
+	l.SetOutput(io.Discard)
 	Context("tar utils", func() {
 		It("test multiple input sources", func() {
 			var outbuf bytes.Buffer

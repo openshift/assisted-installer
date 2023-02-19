@@ -2,7 +2,7 @@ package ignition
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 
 	ignitionConfigPrevVersion "github.com/coreos/ignition/v2/config/v3_1"
 	ignitionConfig "github.com/coreos/ignition/v2/config/v3_2"
@@ -31,7 +31,7 @@ func NewIgnition() *ignition {
 
 // ParseIgnitionFile reads an ignition config from a given path on disk
 func (i *ignition) ParseIgnitionFile(path string) (*types.Config, error) {
-	configBytes, err := ioutil.ReadFile(path)
+	configBytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading file %s", path)
 	}
@@ -62,7 +62,7 @@ func (i *ignition) WriteIgnitionFile(path string, config *types.Config) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(path, updatedBytes, 0600)
+	err = os.WriteFile(path, updatedBytes, 0600)
 	if err != nil {
 		return errors.Wrapf(err, "error writing file %s", path)
 	}

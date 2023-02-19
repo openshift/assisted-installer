@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"sync"
 	"testing"
@@ -271,7 +270,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockbmclient.EXPECT().GetClusterMonitoredOLMOperators(gomock.Any(), gomock.Any(), gomock.Any()).Return(operators, nil).Times(1)
 		mockbmclient.EXPECT().DownloadFile(gomock.Any(), customManifestsFile, gomock.Any()).DoAndReturn(
 			func(ctx context.Context, filename, dest string) error {
-				if err := ioutil.WriteFile(dest, []byte("[]"), 0600); err != nil {
+				if err := os.WriteFile(dest, []byte("[]"), 0600); err != nil {
 					return err
 				}
 				return nil
@@ -2051,7 +2050,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 })
 
 func GetKubeNodes(kubeNamesIds map[string]string) *v1.NodeList {
-	file, _ := ioutil.ReadFile("../../test_files/node.json")
+	file, _ := os.ReadFile("../../test_files/node.json")
 	var node v1.Node
 	err := json.Unmarshal(file, &node)
 	Expect(err).ToNot(HaveOccurred())

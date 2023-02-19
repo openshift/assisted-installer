@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"regexp"
 	"strings"
 
@@ -104,7 +104,7 @@ func GetControllerPodLogs(kc k8s_client.K8SClient, podName string, namespace str
 	// we will fallback to reading from file
 	if err != nil || podLogs == nil || podLogs.Len() == 0 {
 		log.Infof("Reading logs from file")
-		logs, errF := ioutil.ReadFile(ControllerLogFile)
+		logs, errF := os.ReadFile(ControllerLogFile)
 		if errF != nil {
 			log.WithError(errF).Warnf("Failed to read %s", ControllerLogFile)
 			logs = []byte(fmt.Sprintf("Failed to get logs from kube-api and from file. Read file err %e, kube-api err %e", errF, err))

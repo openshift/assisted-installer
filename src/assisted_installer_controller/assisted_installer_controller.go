@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"net"
 	"net/http"
@@ -585,7 +584,7 @@ func (c controller) waitForCSVBeCreated(arg interface{}) bool {
 
 func (c controller) applyPostInstallManifests(arg interface{}) bool {
 	ctx := utils.GenerateRequestContext()
-	tempDir, err := ioutil.TempDir("", "controller-custom-manifests-")
+	tempDir, err := os.MkdirTemp("", "controller-custom-manifests-")
 	if err != nil {
 		c.log.WithError(err).Error("Failed to create temporary directory to create custom manifests.")
 		return false
@@ -605,7 +604,7 @@ func (c controller) applyPostInstallManifests(arg interface{}) bool {
 
 	// Unmarshall the content of the operators manifests:
 	var manifests []manifest
-	data, err := ioutil.ReadFile(customManifestPath)
+	data, err := os.ReadFile(customManifestPath)
 	if err != nil {
 		c.log.WithError(err).Errorf("Failed to read the custom manifests file.")
 		return false
@@ -1368,7 +1367,7 @@ func (c controller) downloadKubeconfigNoingress(ctx context.Context, dir string)
 }
 
 func (c controller) collectMustGatherLogs(ctx context.Context, images ...string) (string, error) {
-	tempDir, ferr := ioutil.TempDir("", "controller-must-gather-logs-")
+	tempDir, ferr := os.MkdirTemp("", "controller-must-gather-logs-")
 	if ferr != nil {
 		c.log.Errorf("Failed to create temp directory for must-gather-logs %v\n", ferr)
 		return "", ferr

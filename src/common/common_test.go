@@ -3,7 +3,8 @@ package common
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"os"
 	"testing"
 
 	"github.com/go-openapi/strfmt"
@@ -28,12 +29,12 @@ var _ = Describe("verify common", func() {
 		mockbmclient *inventory_client.MockInventoryClient
 	)
 	mockbmclient = inventory_client.NewMockInventoryClient(gomock.NewController(GinkgoT()))
-	l.SetOutput(ioutil.Discard)
+	l.SetOutput(io.Discard)
 	Context("Verify SetConfiguringStatusForHosts", func() {
 
 		It("test SetConfiguringStatusForHosts", func() {
 			var logs string
-			logsInBytes, _ := ioutil.ReadFile("../../test_files/mcs_logs.txt")
+			logsInBytes, _ := os.ReadFile("../../test_files/mcs_logs.txt")
 			logs = string(logsInBytes)
 			infraEnvId := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f250")
 			node0Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f238")
@@ -181,7 +182,7 @@ var _ = Describe("verify common", func() {
 })
 
 func GetKubeNodes(kubeNamesIds map[string]string) *v1.NodeList {
-	file, _ := ioutil.ReadFile("../../test_files/node.json")
+	file, _ := os.ReadFile("../../test_files/node.json")
 	var node v1.Node
 	_ = json.Unmarshal(file, &node)
 	nodeList := &v1.NodeList{}
