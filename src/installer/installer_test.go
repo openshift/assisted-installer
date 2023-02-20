@@ -5,7 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -55,7 +56,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	device := "/dev/vda"
 	events = v1.EventList{TypeMeta: metav1.TypeMeta{},
 		ListMeta: metav1.ListMeta{}, Items: []v1.Event{{TypeMeta: metav1.TypeMeta{}, ObjectMeta: metav1.ObjectMeta{UID: "7916fa89-ea7a-443e-a862-b3e930309f65", Name: common.AssistedControllerIsReadyEvent}, Message: "aaaa"}}}
-	l.SetOutput(ioutil.Discard)
+	l.SetOutput(io.Discard)
 	evaluateDiskSymlinkSuccess := func() {
 		mockops.EXPECT().EvaluateDiskSymlink(device).Return(device).Times(1)
 	}
@@ -527,7 +528,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 		It("Configuring state", func() {
 			var logs string
-			logsInBytes, _ := ioutil.ReadFile("../../test_files/mcs_logs.txt")
+			logsInBytes, _ := os.ReadFile("../../test_files/mcs_logs.txt")
 			logs = string(logsInBytes)
 			infraEnvID := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f250")
 			node0Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f238")
@@ -556,7 +557,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 		It("Configuring state, all hosts were set", func() {
 			var logs string
-			logsInBytes, _ := ioutil.ReadFile("../../test_files/mcs_logs.txt")
+			logsInBytes, _ := os.ReadFile("../../test_files/mcs_logs.txt")
 			logs = string(logsInBytes)
 			infraEnvId := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f250")
 			node1Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f239")
@@ -968,7 +969,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 })
 
 func GetKubeNodes(kubeNamesIds map[string]string) *v1.NodeList {
-	file, _ := ioutil.ReadFile("../../test_files/node.json")
+	file, _ := os.ReadFile("../../test_files/node.json")
 	var node v1.Node
 	_ = json.Unmarshal(file, &node)
 	nodeList := &v1.NodeList{}

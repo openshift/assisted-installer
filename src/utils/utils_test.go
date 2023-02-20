@@ -2,7 +2,8 @@ package utils
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -23,10 +24,10 @@ var _ = Describe("Verify_utils", func() {
 	var (
 		l = logrus.New()
 	)
-	l.SetOutput(ioutil.Discard)
+	l.SetOutput(io.Discard)
 	Context("Verify ignition parsing for pull secret", func() {
 		It("test GetPullSecretFromIgnition", func() {
-			ignitionData, err := ioutil.ReadFile("../../test_files/test_ignition.ign")
+			ignitionData, err := os.ReadFile("../../test_files/test_ignition.ign")
 			Expect(err).NotTo(HaveOccurred())
 			_, err = GetFileContentFromIgnition(ignitionData, "/root/.docker/config.json")
 			Expect(err).NotTo(HaveOccurred())

@@ -14,7 +14,6 @@ import (
 
 	"github.com/openshift/assisted-installer/src/ops/execute"
 
-	"io/ioutil"
 	"path"
 	"path/filepath"
 	"strings"
@@ -240,7 +239,7 @@ func (o *ops) ExtractFromIgnition(ignitionPath string, fileToExtract string) err
 	}
 
 	o.log.Infof("Getting data from %s", ignitionPath)
-	ignitionData, err := ioutil.ReadFile(ignitionPath)
+	ignitionData, err := os.ReadFile(ignitionPath)
 	if err != nil {
 		o.log.Errorf("Error occurred while trying to read %s : %e", ignitionPath, err)
 		return err
@@ -254,7 +253,7 @@ func (o *ops) ExtractFromIgnition(ignitionPath string, fileToExtract string) err
 	tmpFile := "/opt/extracted_from_ignition.json"
 	o.log.Infof("Writing extracted content to tmp file %s", tmpFile)
 	// #nosec
-	err = ioutil.WriteFile(tmpFile, extractedContent, 0644)
+	err = os.WriteFile(tmpFile, extractedContent, 0644)
 	if err != nil {
 		o.log.Errorf("Error occurred while writing extracted content to %s", tmpFile)
 		return err
@@ -352,7 +351,7 @@ func (o *ops) renderControllerPod() error {
 }
 
 func (o *ops) renderDeploymentFiles(srcTemplate string, params map[string]interface{}, dest string) error {
-	templateData, err := ioutil.ReadFile(srcTemplate)
+	templateData, err := os.ReadFile(srcTemplate)
 	if err != nil {
 		o.log.Errorf("Error occurred while trying to read %s : %e", srcTemplate, err)
 		return err
@@ -373,7 +372,7 @@ func (o *ops) renderDeploymentFiles(srcTemplate string, params map[string]interf
 	renderedControllerYaml := filepath.Join(manifestsFolder, dest)
 	o.log.Infof("Writing rendered data to %s", renderedControllerYaml)
 	// #nosec
-	if err = ioutil.WriteFile(renderedControllerYaml, buf.Bytes(), 0644); err != nil {
+	if err = os.WriteFile(renderedControllerYaml, buf.Bytes(), 0644); err != nil {
 		o.log.Errorf("Error occurred while trying to write rendered data to %s : %e", renderedControllerYaml, err)
 		return err
 	}
@@ -690,7 +689,7 @@ func (o *ops) GetMCSLogs() (string, error) {
 	}
 	// There is theoretical option in case of static pod restart that there can be more than one file
 	// we never saw it and it was decided not to handle it here
-	logs, err := ioutil.ReadFile(files[0])
+	logs, err := os.ReadFile(files[0])
 	if err != nil {
 		o.log.Errorf("Error occurred while trying to read %s : %e", files[0], err)
 		return "", err
@@ -837,7 +836,7 @@ func (o *ops) GetHostname() (string, error) {
 
 func (o *ops) CreateManifests(kubeconfig string, content []byte) error {
 	// Create temp file, where we store the content to be create by oc command:
-	file, err := ioutil.TempFile("", "operator-manifest")
+	file, err := os.CreateTemp("", "operator-manifest")
 	if err != nil {
 		return err
 	}
@@ -845,7 +844,7 @@ func (o *ops) CreateManifests(kubeconfig string, content []byte) error {
 
 	// Write the content to the temporary file:
 	// #nosec
-	if err = ioutil.WriteFile(file.Name(), content, 0644); err != nil {
+	if err = os.WriteFile(file.Name(), content, 0644); err != nil {
 		return err
 	}
 

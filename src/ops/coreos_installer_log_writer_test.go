@@ -1,7 +1,7 @@
 package ops
 
 import (
-	"io/ioutil"
+	"io"
 
 	"github.com/golang/mock/gomock"
 	"github.com/openshift/assisted-installer/src/inventory_client"
@@ -18,7 +18,7 @@ var _ = Describe("Verify CoreosInstallerLogger", func() {
 	var (
 		l = logrus.New()
 	)
-	l.SetOutput(ioutil.Discard)
+	l.SetOutput(io.Discard)
 	Context("test coreosInstlalerLogger", func() {
 		var (
 			cilogger     *CoreosInstallerLogWriter

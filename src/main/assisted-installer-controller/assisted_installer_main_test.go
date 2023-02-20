@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"testing"
 	"time"
 
@@ -31,7 +31,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		status       *assistedinstallercontroller.ControllerStatus
 	)
 
-	l.SetOutput(ioutil.Discard)
+	l.SetOutput(io.Discard)
 
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())

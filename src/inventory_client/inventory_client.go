@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -173,7 +172,7 @@ func readCACertificate(capath string, logger logrus.FieldLogger) (*x509.CertPool
 		return nil, nil
 	}
 
-	caData, err := ioutil.ReadFile(capath)
+	caData, err := os.ReadFile(capath)
 	if err != nil {
 		return nil, err
 	}
