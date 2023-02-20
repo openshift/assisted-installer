@@ -2,7 +2,7 @@ package ignition
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 
 	ignitionConfigPrevVersion "github.com/coreos/ignition/v2/config/v3_1"
 	ignitionConfig "github.com/coreos/ignition/v2/config/v3_2"
@@ -62,7 +62,7 @@ func (i *ignition) WriteIgnitionFile(path string, config *types.Config) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(path, updatedBytes, 0600)
+	err = os.WriteFile(path, updatedBytes, 0600)
 	if err != nil {
 		return errors.Wrapf(err, "error writing file %s", path)
 	}
