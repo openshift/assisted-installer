@@ -460,7 +460,7 @@ func (c controller) PostInstallConfigs(ctx context.Context, wg *sync.WaitGroup) 
 		errMessage = err.Error()
 		c.Status.Error()
 	}
-	success := (err == nil)
+	success := err == nil
 	c.sendCompleteInstallation(ctx, success, errMessage, data)
 }
 
@@ -468,17 +468,17 @@ func (c controller) postInstallConfigs(ctx context.Context) (error, map[string]i
 	var err error
 	var data map[string]interface{}
 
+	c.log.Info("Start post install configs")
 	err = c.waitingForClusterOperators(ctx)
 	// compiles a report about cluster operators and prints it to the logs
 	if report := c.operatorReport(); report != nil {
 		data = map[string]interface{}{clusterOperatorReportKey: report}
 	}
-
 	if err != nil {
 		return errors.Wrapf(err, "Timeout while waiting for cluster operators to be available"), data
 	}
 
-	err = utils.WaitForPredicateWithContext(ctx, WaitTimeout, GeneralWaitInterval, c.addRouterCAToClusterCA)
+	err = utils.WaitForPredicateWithContext(ctx, WaitTimeout, failedOperatorRetry*time.Second, c.addRouterCAToClusterCA)
 	if err != nil {
 		return errors.Wrapf(err, "Timeout while waiting router ca data"), data
 	}
@@ -893,19 +893,18 @@ func (c controller) addRouterCAToClusterCA() bool {
 	log := utils.RequestIDLogger(ctx, c.log)
 	log.Infof("Start adding ingress ca to cluster")
 	caConfigMap, err := c.kc.GetConfigMap(ingressConfigMapNamespace, ingressConfigMapName)
-
 	if err != nil {
-		log.WithError(err).Errorf("fetching %s configmap from %s namespace", ingressConfigMapName, ingressConfigMapNamespace)
-		return false
+		log.WithError(err).Warnf("fetching %s configmap from %s namespace", ingressConfigMapName, ingressConfigMapNamespace)
+		return KeepWaiting
 	}
 	log.Infof("Sending ingress certificate to inventory service. Certificate data %s", caConfigMap.Data["ca-bundle.crt"])
 	err = c.ic.UploadIngressCa(ctx, caConfigMap.Data["ca-bundle.crt"], c.ClusterID)
 	if err != nil {
 		log.WithError(err).Errorf("Failed to upload ingress ca to assisted-service")
-		return false
+		return KeepWaiting
 	}
 	log.Infof("Ingress ca successfully sent to inventory")
-	return true
+	return ExitWaiting
 
 }
 
