@@ -202,6 +202,9 @@ func WaitForPredicateWithTimer(ctx context.Context, timeout time.Duration, inter
 
 	// Keep trying until we're time out or get true
 	for {
+		if predicate(timeoutTimer) {
+			return nil
+		}
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -210,9 +213,7 @@ func WaitForPredicateWithTimer(ctx context.Context, timeout time.Duration, inter
 			return errors.New("timed out")
 		// Got a tick, we should check on checkSomething()
 		case <-ticker.C:
-			if predicate(timeoutTimer) {
-				return nil
-			}
+			continue
 		}
 	}
 }

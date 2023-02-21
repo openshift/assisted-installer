@@ -31,7 +31,6 @@ type OperatorHandler interface {
 func (c controller) isOperatorAvailable(handler OperatorHandler) bool {
 	operatorName := handler.GetName()
 	c.log.Infof("Checking <%s> operator availability status", operatorName)
-
 	operatorStatusInService, isAvailable := c.isOperatorAvailableInService(operatorName, c.OpenshiftVersion)
 	if isAvailable {
 		return true
@@ -55,9 +54,12 @@ func (c controller) isOperatorAvailable(handler OperatorHandler) bool {
 			c.log.WithError(err).Warnf("Failed to update %s operator status %s with message %s", operatorName, operatorStatus, operatorMessage)
 			return false
 		}
+		// In case operator was available we should return ealier in order finish quicker.
+		c.log.Infof("Operator %s, status %s", operatorName, operatorStatus)
+		isAvailable = operatorStatus == models.OperatorStatusAvailable
 	}
 
-	return false
+	return isAvailable
 }
 
 func (c controller) isOperatorAvailableInService(operatorName string, openshiftVersion string) (*models.MonitoredOperator, bool) {

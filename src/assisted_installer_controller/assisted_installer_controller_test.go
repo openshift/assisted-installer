@@ -189,7 +189,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			if operators[index].Status != models.OperatorStatusAvailable {
 				mockbmclient.EXPECT().GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), operators[index].Name, gomock.Any()).Return(&operators[index], nil).Times(1)
 			} else {
-				mockbmclient.EXPECT().GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), operators[index].Name, gomock.Any()).Return(&operators[index], nil).MinTimes(1)
+				mockbmclient.EXPECT().GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), operators[index].Name, gomock.Any()).Return(&operators[index], nil).AnyTimes()
 			}
 		}
 	}
@@ -209,8 +209,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockGetServiceOperators([]models.MonitoredOperator{{Name: consoleOperatorName, Status: models.OperatorStatusProgressing}})
 		mockk8sclient.EXPECT().GetClusterOperator(consoleOperatorName).Return(validConsoleOperator, nil).Times(1)
 		mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), clusterID, consoleOperatorName, "", models.OperatorStatusAvailable, gomock.Any()).Return(nil).Times(1)
-
-		mockGetServiceOperators([]models.MonitoredOperator{{Name: consoleOperatorName, Status: models.OperatorStatusAvailable}})
 	}
 
 	setCvoAsAvailable := func() {
@@ -763,7 +761,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), assistedController.ClusterID, consoleOperatorName, "", models.OperatorStatusAvailable, gomock.Any()).Return(fmt.Errorf("dummy")).Times(1)
 				mockGetServiceOperators([]models.MonitoredOperator{{Name: consoleOperatorName, Status: models.OperatorStatusProgressing}})
 				mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), assistedController.ClusterID, consoleOperatorName, "", models.OperatorStatusAvailable, gomock.Any()).Return(nil).Times(1)
-				mockGetServiceOperators([]models.MonitoredOperator{{Name: consoleOperatorName, Status: models.OperatorStatusAvailable}})
 
 				setClusterAsFinalizing()
 				uploadIngressCert(assistedController.ClusterID)
@@ -1619,7 +1616,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		)
 
 		BeforeEach(func() {
-			GeneralWaitInterval = 100 * time.Millisecond
+			// run once
+			GeneralWaitInterval = 200 * time.Millisecond
 			WaitTimeout = 150 * time.Millisecond
 		})
 
@@ -1863,11 +1861,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				}
 
 				mockbmclient.EXPECT().GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), cvoOperatorName, gomock.Any()).Return(t.currentServiceCVOStatus, nil).Times(1)
-
+				if newServiceCVOStatus.Status != models.OperatorStatusAvailable {
+					mockbmclient.EXPECT().GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), cvoOperatorName, gomock.Any()).Return(newServiceCVOStatus, nil).Times(1)
+				}
 				if t.shouldSendUpdate {
-					if t.currentServiceCVOStatus.Status != models.OperatorStatusAvailable {
-						mockbmclient.EXPECT().GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), cvoOperatorName, gomock.Any()).Return(newServiceCVOStatus, nil).Times(1)
-					}
 
 					mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), gomock.Any(), cvoOperatorName, "", gomock.Any(), gomock.Any()).Times(1)
 				}
@@ -1900,7 +1897,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 			mockk8sclient.EXPECT().GetClusterVersion().Return(clusterVersionReport, nil).AnyTimes()
 			mockbmclient.EXPECT().GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), cvoOperatorName, gomock.Any()).Return(currentServiceCVOStatus, nil).AnyTimes()
-			mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), gomock.Any(), cvoOperatorName, "", gomock.Any(), gomock.Any()).AnyTimes()
+			mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), gomock.Any(), cvoOperatorName, "", gomock.Any(), gomock.Any()).Return(fmt.Errorf("dummy")).AnyTimes()
 
 			err := func() error {
 				ctxTimeout, cancel := context.WithTimeout(context.Background(), 1*time.Second)
@@ -1927,37 +1924,13 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 			mockk8sclient.EXPECT().GetClusterVersion().Return(clusterVersionReport, nil).AnyTimes()
 			mockbmclient.EXPECT().GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), cvoOperatorName, gomock.Any()).Return(currentServiceCVOStatus, nil).AnyTimes()
-			mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), gomock.Any(), cvoOperatorName, "", gomock.Any(), gomock.Any()).AnyTimes()
+			mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), gomock.Any(), cvoOperatorName, "", gomock.Any(), gomock.Any()).Return(fmt.Errorf("dummy")).AnyTimes()
 
 			err := func() error {
 				return assistedController.waitingForClusterOperators(ctx)
 			}()
 
 			Expect(errors.Is(err, context.DeadlineExceeded)).To(BeTrue())
-		})
-
-		It("service fail to sync - finally succeed", func() {
-			mockAllCapabilitiesEnabled()
-
-			currentServiceCVOStatus := &models.MonitoredOperator{Status: models.OperatorStatusProgressing, StatusInfo: ""}
-			newServiceCVOStatus := &models.MonitoredOperator{Status: models.OperatorStatusAvailable, StatusInfo: ""}
-			clusterVersionReport := &configv1.ClusterVersion{
-				Status: configv1.ClusterVersionStatus{
-					Conditions: []configv1.ClusterOperatorStatusCondition{
-						{Type: configv1.OperatorAvailable, Status: configv1.ConditionTrue, Message: ""},
-					},
-				},
-			}
-
-			// Fail twice
-			mockk8sclient.EXPECT().GetClusterVersion().Return(clusterVersionReport, nil).Times(2)
-			mockbmclient.EXPECT().GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), cvoOperatorName, gomock.Any()).Return(currentServiceCVOStatus, nil).Times(2)
-			mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), gomock.Any(), cvoOperatorName, "", gomock.Any(), gomock.Any()).Times(2)
-
-			// Service succeed
-			mockbmclient.EXPECT().GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), cvoOperatorName, gomock.Any()).Return(newServiceCVOStatus, nil).Times(1)
-
-			Expect(assistedController.waitingForClusterOperators(context.TODO())).ShouldNot(HaveOccurred())
 		})
 	})
 

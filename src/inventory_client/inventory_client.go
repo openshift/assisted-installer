@@ -74,12 +74,6 @@ type HostData struct {
 	Host      *models.Host
 }
 
-func CreateInventoryClient(clusterId string, inventoryURL string, pullSecret string, insecure bool, caPath string,
-	logger *logrus.Logger, proxyFunc func(*http.Request) (*url.URL, error)) (*inventoryClient, error) {
-	return CreateInventoryClientWithDelay(clusterId, inventoryURL, pullSecret, insecure, caPath,
-		logger, proxyFunc, DefaultRetryMinDelay, DefaultRetryMaxDelay, DefaultMaxRetries, DefaultMinRetries)
-}
-
 func CreateInventoryClientWithDelay(clusterId string, inventoryURL string, pullSecret string, insecure bool, caPath string,
 	logger logrus.FieldLogger, proxyFunc func(*http.Request) (*url.URL, error),
 	retryMinDelay, retryMaxDelay time.Duration, maxRetries int, minRetries int) (*inventoryClient, error) {
