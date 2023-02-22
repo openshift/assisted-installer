@@ -2,6 +2,7 @@ package ops
 
 import (
 	"reflect"
+	"runtime"
 
 	"errors"
 
@@ -312,4 +313,26 @@ var _ = Describe("RemoveAllDMDevicesOnDisk", func() {
 		Expect(err).To(HaveOccurred())
 	})
 
+})
+var _ = Describe("Set Boot Order", func() {
+	var (
+		l        = logrus.New()
+		ctrl     *gomock.Controller
+		execMock *execute.MockExecute
+		conf     *config.Config
+	)
+
+	BeforeEach(func() {
+		ctrl = gomock.NewController(GinkgoT())
+		execMock = execute.NewMockExecute(ctrl)
+		conf = &config.Config{}
+	})
+
+	It("Set boot order", func() {
+		m := MatcherContainsStringElements{[]string{"bootlist"}, runtime.GOARCH == "ppc64le"}
+		o := NewOpsWithConfig(conf, l, execMock)
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m).Times(3)
+		err := o.SetBootOrder("/dev/sda")
+		Expect(err).ToNot(HaveOccurred())
+	})
 })
