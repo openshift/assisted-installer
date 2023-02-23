@@ -184,7 +184,7 @@ func (o *ops) SetBootOrder(device string) error {
 	o.log.Infof("SetBootOrder, runtime.GOARCH: %s, device: %s", runtime.GOARCH, device)
 	_, err := o.ExecPrivilegeCommand(nil, "test", "-f", "/usr/sbin/bootlist")
 	if err == nil {
-		_, err := o.ExecPrivilegeCommand(o.logWriter, "bootlist", "-m", "normal", "-o", device)
+		_, err = o.ExecPrivilegeCommand(o.logWriter, "bootlist", "-m", "normal", "-o", device)
 		if err != nil {
 			o.log.WithError(err).Errorf("Failed to set boot disk with bootlist. Skipping...")
 		}

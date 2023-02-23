@@ -313,6 +313,7 @@ var _ = Describe("RemoveAllDMDevicesOnDisk", func() {
 	})
 
 })
+
 var _ = Describe("Set Boot Order", func() {
 	var (
 		l        = logrus.New()
@@ -350,4 +351,5 @@ var _ = Describe("Set Boot Order", func() {
 		err := o.SetBootOrder("/dev/sda")
 		Expect(err).ToNot(HaveOccurred())
 	})
+
 })
