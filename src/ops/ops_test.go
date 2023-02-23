@@ -2,7 +2,6 @@ package ops
 
 import (
 	"reflect"
-	"runtime"
 
 	"errors"
 
@@ -329,9 +328,25 @@ var _ = Describe("Set Boot Order", func() {
 	})
 
 	It("Set boot order", func() {
-		m := MatcherContainsStringElements{[]string{"bootlist"}, runtime.GOARCH == "ppc64le"}
+		m1 := MatcherContainsStringElements{[]string{"/usr/sbin/bootlist"}, true}
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m1).Times(1).Return("", errors.New("Bootlist is not exist."))
+		m2 := MatcherContainsStringElements{[]string{"test", "-d", "/sys/firmware/efi"}, true}
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m2).Times(1)
+		m3 := MatcherContainsStringElements{[]string{"efibootmgr", "/dev/sda", "Red Hat Enterprise Linux"}, true}
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m3).Times(1).Return("", nil)
+		m4 := MatcherContainsStringElements{[]string{"efibootmgr", "-l"}, true}
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m4).Times(1)
 		o := NewOpsWithConfig(conf, l, execMock)
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m).Times(3)
+		err := o.SetBootOrder("/dev/sda")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("Set boot order for ppc64le", func() {
+		m1 := MatcherContainsStringElements{[]string{"/usr/sbin/bootlist"}, true}
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m1).Times(1)
+		m2 := MatcherContainsStringElements{[]string{"bootlist", "/dev/sda"}, true}
+		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m2).Times(1)
+		o := NewOpsWithConfig(conf, l, execMock)
 		err := o.SetBootOrder("/dev/sda")
 		Expect(err).ToNot(HaveOccurred())
 	})

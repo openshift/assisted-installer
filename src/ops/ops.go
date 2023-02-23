@@ -182,7 +182,8 @@ func (o *ops) SetBootOrder(device string) error {
 	}
 
 	o.log.Infof("SetBootOrder, runtime.GOARCH: %s, device: %s", runtime.GOARCH, device)
-	if runtime.GOARCH == "ppc64le" {
+	_, err := o.ExecPrivilegeCommand(nil, "test", "-f", "/usr/sbin/bootlist")
+	if err == nil {
 		_, err := o.ExecPrivilegeCommand(o.logWriter, "bootlist", "-m", "normal", "-o", device)
 		if err != nil {
 			o.log.WithError(err).Errorf("Failed to set boot disk with bootlist. Skipping...")
@@ -190,7 +191,7 @@ func (o *ops) SetBootOrder(device string) error {
 		return nil
 	}
 
-	_, err := o.ExecPrivilegeCommand(nil, "test", "-d", "/sys/firmware/efi")
+	_, err = o.ExecPrivilegeCommand(nil, "test", "-d", "/sys/firmware/efi")
 	if err != nil {
 		o.log.Info("setting the boot order on BIOS systems is not supported. Skipping...")
 		return nil
