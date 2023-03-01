@@ -1,0 +1,89 @@
+= Live Generic disk
+
+A generic, live, qcow disk is targeting cloud platforms installation or any VM based installation(could be even a local VM)
+Booting from that disk allows:
+1. reusing the installation media so only one disk is needed
+2. no boot order manipulation needed
+3. same disk used for any cluster installation
+4. many providers don't support ISO
+
+IMPORTANT: tools needed to perform the following tasks:
+openshift-install, coreos-installer, qemu-img, xorriso, jq, curl
+
+Here's how to prepare and use that disk:
+
+* Manipulate the ISO
+  - Take the live iso metal of the version
+  - Change platform to 'openstack' of the ISO
+  - Adapt the kernel arg line for proper bootloading
+    ** remove coreos.live=* to make initramfs load from memory
+    ** append to initrd the rootfs from /images/pxeboot/rootfs.img (will be loaded to mem as well)
+* Convert ISO to qcow2 disk
+* Download the ignition from the target infra-env
+* Spin an instance in whatever provider with the disk (as custom image) and ignition as cloud init data
+
+== Manipulate the ISO
+
+.First download RHCOS live iso from the metal platform, by extracting `openshift-installer coreos` subcommand:.
+[source,bash]
+-------------
+disk=$(openshift-install coreos print-stream-json |
+    jq -r '.architectures.x86_64.artifacts.metal.formats.iso.disk.location')
+
+curl -L ${disk} -o live.iso
+-------------
+
+
+.Change the platform id from metal to openstack and remove coreos.liveiso:
+[source,bash]
+-------------
+coreos-installer iso customize \
+    --live-karg-replace ignition.platform.id=metal=openstack \
+    --live-karg-delete coreos.liveiso=$(extract exact line) \
+    live.iso \
+    -o live-customized-1.iso
+-------------
+
+.Amend the initrd kernel argument, so it loads into memory:
+[source,bash]
+-------------
+
+    xorriso -osirrox on -dev live-customized-1.iso -extract  /isolinux/isolinux.cfg isolinux.cfg
+
+    # amend
+    sed -i 's/initrd=\/images\/pxeboot\/initrd.img,\/images\/ignition.img/initrd=\/images\/pxeboot\/initrd.img,\/images\/ignition.img,\/images/pxeboot/rootfs.img/' isolinux.cfg
+
+   
+    # write the file to live-customized-2.iso
+    xorriso  -dev live-customized-1.iso -outdev live-customized-2.iso -map isolinux.cfg /isolinux/isolinux.cfg
+-------------
+
+
+== QCOW2 Disk
+
+.Convert the iso to a qcow2 disk:
+[source,bash]
+-------------
+qemu-img convert -O qcow2 live-customized-2.iso rhcos-live-openstack-platform.qcow2
+-------------
+
+Now this disk can be imported by many cloud providers as a custom image.
+
+
+== Download ignition from a target infra env
+
+First make sure you go to "Add hosts" under the cluster view and add you ssh key,
+then approve the "generate the discovary ISO" dialog.
+[source,bash]
+-------------
+export INFRA_ENV_ID="set it"
+curl -s \
+    -H "Authorization: Bearer $(ocm token)" \
+     "https://api.openshift.com/api/assisted-install/v2/infra-envs/$INFRA_ENV_ID/downloads/files-presigned?file_name=discovery.ign" \
+     | jq  -r '.url' | curl $(cat /dev/stdin) -o ignition.ign
+
+-------------
+
+Spin an instance from the custom image, and add the ignition as a user data.
+
+
