@@ -317,3 +317,11 @@ func CombineErrors(error1 error, error2 error) error {
 	}
 	return error2
 }
+
+func RecreateFolder(folder string) error {
+	if err := os.RemoveAll(folder); err != nil {
+		return err
+	}
+
+	return os.MkdirAll(folder, 0700)
+}

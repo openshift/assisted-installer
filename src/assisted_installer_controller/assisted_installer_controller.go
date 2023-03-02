@@ -991,7 +991,7 @@ func (c controller) waitingForClusterOperators(ctx context.Context) error {
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, CVOMaxTimeout)
 	defer cancel()
 	isClusterVersionAvailable := func(timer *time.Timer) bool {
-		clusterOperatorHandler := NewClusterOperatorHandler(c.kc, consoleOperatorName)
+		clusterOperatorHandler := NewClusterOperatorHandler(c.kc, consoleOperatorName, c.log)
 		clusterVersionHandler := NewClusterVersionHandler(c.log, c.kc, timer)
 		isConsoleEnabled, err := c.kc.IsClusterCapabilityEnabled(consoleCapabilityName)
 		if err != nil {
@@ -1287,7 +1287,7 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 	c.log.Infof("Uploading logs for %s in %s", podName, namespace)
 	podLogs := common.GetControllerPodLogs(c.kc, podName, namespace, sinceSeconds, c.log)
 	tarentries = append(tarentries,
-		*utils.NewTarEntry(podLogs, nil, int64(podLogs.Len()), fmt.Sprintf("%s.logs", podName)))
+		*utils.NewTarEntry(podLogs, nil, int64(podLogs.Len()), common.ControllerLogFileName))
 
 	//write the combined input of the summary sources into a pipe and offload it
 	//to the UploadLogs request to the assisted-service
@@ -1366,24 +1366,24 @@ func (c controller) downloadKubeconfigNoingress(ctx context.Context, dir string)
 }
 
 func (c controller) collectMustGatherLogs(ctx context.Context, images ...string) (string, error) {
-	tempDir, ferr := os.MkdirTemp("", "controller-must-gather-logs-")
-	if ferr != nil {
-		c.log.Errorf("Failed to create temp directory for must-gather-logs %v\n", ferr)
-		return "", ferr
-	}
-
+	mustGatherDir := "/tmp/must-gather-logs"
 	// We should not create must-gather logs if they already were created and upload failed
-	if _, err := os.Stat(path.Join(tempDir, ops.MustGatherFileName)); err == nil {
-		return path.Join(tempDir, ops.MustGatherFileName), nil
+	if _, err := os.Stat(path.Join(mustGatherDir, ops.MustGatherFileName)); err == nil {
+		return path.Join(mustGatherDir, ops.MustGatherFileName), nil
 	}
 
-	kubeconfigPath, err := c.downloadKubeconfigNoingress(ctx, tempDir)
+	if err := utils.RecreateFolder(mustGatherDir); err != nil {
+		c.log.Errorf("Failed to create dir for must gather logs")
+		return "", err
+	}
+
+	kubeconfigPath, err := c.downloadKubeconfigNoingress(ctx, mustGatherDir)
 	if err != nil {
 		return "", err
 	}
 
 	//collect must gather logs
-	logtar, err := c.ops.GetMustGatherLogs(tempDir, kubeconfigPath, images...)
+	logtar, err := c.ops.GetMustGatherLogs(mustGatherDir, kubeconfigPath, images...)
 	if err != nil {
 		c.log.Errorf("Failed to collect must-gather logs %v\n", err)
 		return "", err

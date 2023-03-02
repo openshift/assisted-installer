@@ -53,6 +53,7 @@ func WriteToTarGz(w io.Writer, entries []TarEntry, log logrus.FieldLogger) error
 	defer tw.Close()
 
 	for _, tarEntry := range entries {
+		log.Infof("Uploading to tar %s", tarEntry.Header.Name)
 		// write the header to the tarball archive
 		header := *tarEntry.Header
 		if err := tw.WriteHeader(&header); err != nil {
