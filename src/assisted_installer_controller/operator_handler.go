@@ -80,10 +80,11 @@ func (c controller) isOperatorAvailableInService(operatorName string, openshiftV
 type ClusterOperatorHandler struct {
 	kc           k8s_client.K8SClient
 	operatorName string
+	log          *logrus.Logger
 }
 
-func NewClusterOperatorHandler(kc k8s_client.K8SClient, operatorName string) *ClusterOperatorHandler {
-	return &ClusterOperatorHandler{kc: kc, operatorName: operatorName}
+func NewClusterOperatorHandler(kc k8s_client.K8SClient, operatorName string, log *logrus.Logger) *ClusterOperatorHandler {
+	return &ClusterOperatorHandler{kc: kc, operatorName: operatorName, log: log}
 }
 
 func (handler ClusterOperatorHandler) GetName() string { return handler.operatorName }
@@ -100,6 +101,7 @@ func (handler ClusterOperatorHandler) GetStatus() (models.OperatorStatus, string
 		version = co.Status.Versions[0].Version
 	}
 
+	handler.log.Infof("%s status conditions: %+v", handler.GetName(), co.Status.Conditions)
 	operatorStatus, operatorMessage := utils.MonitoredOperatorStatus(co.Status.Conditions)
 	return operatorStatus, operatorMessage, version, nil
 }
@@ -125,6 +127,7 @@ func (handler ClusterVersionHandler) GetStatus() (models.OperatorStatus, string,
 	if err != nil {
 		return "", "", "", err
 	}
+	handler.log.Infof("CVO status conditions: %+v", co.Status.Conditions)
 
 	operatorStatus, operatorMessage := utils.MonitoredOperatorStatus(co.Status.Conditions)
 	return operatorStatus, operatorMessage, co.Status.Desired.Version, nil
