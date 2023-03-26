@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/thoas/go-funk"
+
 	"github.com/openshift/assisted-installer/src/common"
 
 	"github.com/openshift/assisted-installer/src/ops/execute"
@@ -148,7 +150,9 @@ func main() {
 	}()
 
 	removeUninitializedTaint := false
-	if cluster.Platform != nil && *cluster.Platform.Type == models.PlatformTypeVsphere {
+	if cluster.Platform != nil && funk.Contains([]models.PlatformType{models.PlatformTypeNutanix,
+		models.PlatformTypeVsphere}, *cluster.Platform.Type) {
+
 		removeUninitializedTaint = true
 	}
 	go assistedController.WaitAndUpdateNodesStatus(mainContext, &wg, removeUninitializedTaint)
