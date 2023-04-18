@@ -417,7 +417,14 @@ func (i *installer) waitForControlPlane(ctx context.Context) error {
 	}
 	i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, waitingForMastersStatusInfo)
 
-	if err = i.waitForMinMasterNodes(ctx, kc); err != nil {
+	cluster, callErr := i.inventoryClient.GetCluster(ctx, false)
+	if callErr != nil {
+		i.log.WithError(callErr).Errorf("Getting cluster %s", i.ClusterID)
+		return callErr
+	}
+
+	removeUninitializedTaint := common.RemoveUninitializedTaint(cluster.Platform)
+	if err = i.waitForMinMasterNodes(ctx, kc, removeUninitializedTaint); err != nil {
 		return err
 	}
 
@@ -472,8 +479,8 @@ func (i *installer) workerWaitFor2ReadyMasters(ctx context.Context) error {
 	return nil
 }
 
-func (i *installer) waitForMinMasterNodes(ctx context.Context, kc k8s_client.K8SClient) error {
-	i.waitForMasterNodes(ctx, minMasterNodes, kc)
+func (i *installer) waitForMinMasterNodes(ctx context.Context, kc k8s_client.K8SClient, removeUninitializedTaint bool) error {
+	i.waitForMasterNodes(ctx, minMasterNodes, kc, removeUninitializedTaint)
 	return nil
 }
 
@@ -570,8 +577,7 @@ func (i *installer) wasControllerReadyEventSet(kc k8s_client.K8SClient, previous
 }
 
 // wait for minimum master nodes to be in ready status
-func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, kc k8s_client.K8SClient) {
-
+func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, kc k8s_client.K8SClient, removeUninitializedTaint bool) {
 	var readyMasters []string
 	var inventoryHostsMap map[string]inventory_client.HostData
 	i.log.Infof("Waiting for %d master nodes", minMasterNodes)
@@ -586,12 +592,14 @@ func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, 
 			i.log.Warnf("Still waiting for master nodes: %v", err)
 			return false
 		}
-		for _, node := range nodes.Items {
-			if common.IsK8sNodeIsReady(node) {
-				continue
-			}
-			if err = kc.UntaintNode(node.Name); err != nil {
-				i.log.Warnf("Failed to untaint node %s: %v", node.Name, err)
+		if removeUninitializedTaint {
+			for _, node := range nodes.Items {
+				if common.IsK8sNodeIsReady(node) {
+					continue
+				}
+				if err = kc.UntaintNode(node.Name); err != nil {
+					i.log.Warnf("Failed to untaint node %s: %v", node.Name, err)
+				}
 			}
 		}
 		if err = i.updateReadyMasters(nodes, &readyMasters, inventoryHostsMap); err != nil {

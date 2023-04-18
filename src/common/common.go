@@ -200,3 +200,11 @@ func HostMatchByNameOrIPAddress(node v1.Node, namesMap, IPAddressMap map[string]
 	}
 	return host, ok
 }
+
+// Returns True when uninitialized taint must be removed.
+// This is required for some external platforms (e.g. VSphere, Nutanix) to proceed
+// with the installation using fake credentials.
+func RemoveUninitializedTaint(platform *models.Platform) bool {
+	removeUninitializedTaintForPlatforms := [...]models.PlatformType{models.PlatformTypeNutanix, models.PlatformTypeVsphere}
+	return platform != nil && funk.Contains(removeUninitializedTaintForPlatforms, *platform.Type)
+}

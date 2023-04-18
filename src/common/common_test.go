@@ -179,6 +179,52 @@ var _ = Describe("verify common", func() {
 			Expect(match.Host.ID).To(Equal(&node0Id))
 		})
 	})
+
+	Context("Verify RemoveUninitializedTaint", func() {
+		It("nil platform struct should not remove uninitiazed taint", func() {
+			removeUninitializedTaint := RemoveUninitializedTaint(nil)
+			Expect(removeUninitializedTaint).To(BeFalse())
+		})
+
+		for _, test := range []struct {
+			PlatformType                     models.PlatformType
+			ExpectedRemoveUninitializedTaint bool
+		}{
+			{
+				PlatformType:                     models.PlatformTypeNutanix,
+				ExpectedRemoveUninitializedTaint: true,
+			},
+			{
+				PlatformType:                     models.PlatformTypeVsphere,
+				ExpectedRemoveUninitializedTaint: true,
+			},
+			{
+				PlatformType:                     models.PlatformTypeNone,
+				ExpectedRemoveUninitializedTaint: false,
+			},
+			{
+				PlatformType:                     models.PlatformTypeBaremetal,
+				ExpectedRemoveUninitializedTaint: false,
+			},
+		} {
+			platformType := test.PlatformType
+			expectedRemoveUninitializedTaint := test.ExpectedRemoveUninitializedTaint
+
+			Context("by platform", func() {
+				var platform *models.Platform
+				BeforeEach(func() {
+					platform = &models.Platform{
+						Type: &platformType,
+					}
+				})
+
+				It(fmt.Sprintf("%v is expected to remove unitialized taint = %v", platformType, expectedRemoveUninitializedTaint), func() {
+					removeUninitializedTaint := RemoveUninitializedTaint(platform)
+					Expect(removeUninitializedTaint).To(Equal(expectedRemoveUninitializedTaint))
+				})
+			})
+		}
+	})
 })
 
 func GetKubeNodes(kubeNamesIds map[string]string) *v1.NodeList {
