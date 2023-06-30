@@ -38,6 +38,7 @@ require (
 )
 
 require (
+	github.com/Masterminds/vcs v1.13.3 // indirect
 	github.com/aws/aws-sdk-go v1.34.28 // indirect
 	github.com/emicklei/go-restful v2.15.0+incompatible // indirect
 	github.com/google/gnostic v0.5.7-v3refs // indirect
