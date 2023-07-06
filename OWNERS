@@ -3,10 +3,11 @@
 filters:
   .*:
     approvers:
-      - code-approvers
+      - approvers
+    emeritus_approvers:
+      - emeritus_approvers
     reviewers:
-      - code-approvers
-      - code-reviewers
+      - approvers
   ^Dockerfile\..*:
     labels:
       - downstream-change-needed
