@@ -1,34 +1,31 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 aliases:
-  code-approvers:
+  approvers:
     - avishayt
-    - empovit
     - eranco74
     - filanov
     - eliorerz
-    - celebdor
     - gamli75
     - ori-amizur
     - romfreiman
     - tsorya
-    - yevgeny-shnaidman
     - nmagnezi
     - carbonin
-    - rollandf
     - danielerez
-    - ybettan
-    - slaviered
     - osherdp
     - flaper87
     - mkowalski
-    - lranjbar
     - omertuc
     - paul-maidment
-  code-reviewers:
-    - jakub-dzon
-    - pkliczewski
-    - masayag
-    - jordigilh
-    - machacekondra
-    - sagidayan
+    - rccrdpccl
+    - jhernand
+    - adriengentil
+    - javipolo
+    - CrystalChun
+  emeritus_approvers:
+    - empovit
+    - celebdor
+    - yevgeny-shnaidman
+    - lranjbar
+    - ybettan
