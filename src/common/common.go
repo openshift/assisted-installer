@@ -48,7 +48,7 @@ func SetConfiguringStatusForHosts(client inventory_client.InventoryClient, inven
 		}
 		log.Infof("Verifying if host %s pulled ignition", hostName)
 		hostIPs := fmt.Sprintf("(%s\\b)", strings.Join(host.IPs, "|"))
-		pattern, err := regexp.Compile(hostIPs + `(\%[0-9a-zA-Z]{1,}])?:\d+\"? User-Agent:\"Ignition`)
+		pattern, err := regexp.Compile(hostIPs + `(\%[0-9a-zA-Z]{1,})?(])?:\d+\"? User-Agent:\"Ignition`)
 		if err != nil {
 			log.WithError(err).Errorf("Failed to compile regex from host %s ips list", hostName)
 			return
