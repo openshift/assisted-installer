@@ -58,10 +58,10 @@ endif
 build: installer controller
 
 installer:
-	CGO_ENABLED=0 go build -o build/installer src/main/main.go
+	CGO_ENABLED=1 go build -o build/installer src/main/main.go
 
 controller:
-	CGO_ENABLED=0 go build -o build/assisted-installer-controller src/main/assisted-installer-controller/assisted_installer_main.go
+	CGO_ENABLED=1 go build -o build/assisted-installer-controller src/main/assisted-installer-controller/assisted_installer_main.go
 
 build-images: installer-image controller-image
 
