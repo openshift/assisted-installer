@@ -2,21 +2,32 @@ package ops
 
 import (
 	"bytes"
+	"compress/gzip"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"io"
+	"math"
+	"net/http"
 	"os"
+	"path"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strconv"
+	"strings"
 	"text/template"
+	"time"
 
-	"github.com/openshift/assisted-service/models"
+	config_latest "github.com/coreos/ignition/v2/config/v3_2"
+	"github.com/go-openapi/swag"
+	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	"github.com/thoas/go-funk"
+	"github.com/vincent-petithory/dataurl"
 
 	"github.com/openshift/assisted-installer/src/ops/execute"
-
-	"path"
-	"path/filepath"
-	"strings"
+	"github.com/openshift/assisted-service/models"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -29,6 +40,8 @@ import (
 const (
 	coreosInstallerExecutable       = "coreos-installer"
 	dryRunCoreosInstallerExecutable = "dry-installer"
+	encapsulatedMachineConfigFile   = "/etc/ignition-machine-config-encapsulated.json"
+	defaultIgnitionPlatformId       = "ignition.platform.id=metal"
 )
 
 //go:generate mockgen -source=ops.go -package=ops -destination=mock_ops.go
@@ -62,6 +75,8 @@ type Ops interface {
 	DryRebootHappened(markerPath string) bool
 	ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error)
 	ReadFile(filePath string) ([]byte, error)
+	GetEncapsulatedMC(ignitionPath string) (*mcfgv1.MachineConfig, error)
+	OverwriteOsImage(osImage, device string, extraArgs []string) error
 }
 
 const (
@@ -916,4 +931,194 @@ func installerArgs(ignitionPath string, device string, extra []string) []string 
 		allArgs = append(allArgs, extra...)
 	}
 	return append(allArgs, device)
+}
+
+func (o *ops) getPointedIgnitionAndCA(ignitionPath string) (string, string, error) {
+	b, err := os.ReadFile(ignitionPath)
+	if err != nil {
+		return "", "", errors.Wrapf(err, "failed to read ignition file %s", ignitionPath)
+	}
+	conf, _, err := config_latest.ParseCompatibleVersion(b)
+	if err != nil {
+		return "", "", errors.Wrapf(err, "failed to parse ignition file %s", ignitionPath)
+	}
+	source := ""
+	for i := range conf.Ignition.Config.Merge {
+		r := &conf.Ignition.Config.Merge[i]
+		if r.Source != nil {
+			source = swag.StringValue(r.Source)
+			if source != "" {
+				break
+			}
+		}
+	}
+	if source == "" {
+		return "", "", errors.Errorf("source URL not found for ignition %s", ignitionPath)
+	}
+	ca := ""
+	for i := range conf.Ignition.Security.TLS.CertificateAuthorities {
+		r := &conf.Ignition.Security.TLS.CertificateAuthorities[i]
+		if r.Source != nil {
+			d, err := dataurl.DecodeString(swag.StringValue(r.Source))
+			if err != nil {
+				return "", "", err
+			}
+			ca = string(d.Data)
+			break
+		}
+	}
+	return source, ca, nil
+}
+
+func (o *ops) getEmbeddedIgnition(source string) ([]byte, error) {
+	d, err := dataurl.DecodeString(source)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode dataurl")
+	}
+	r, err := gzip.NewReader(bytes.NewReader(d.Data))
+	if err != nil {
+		return nil, errors.Wrap(err, "getEmbeddedIgnition: failed to decompress")
+	}
+	var out bytes.Buffer
+	if _, err = io.CopyN(&out, r, math.MaxInt64); err != nil && err != io.EOF {
+		return nil, errors.Wrap(err, "getEmbeddedIgnition: failed to copy")
+	}
+	return out.Bytes(), nil
+}
+
+func (o *ops) getIgnitionFromBoostrap(source, ca string) ([]byte, error) {
+	if ca == "" {
+		return nil, errors.New("CA cert is empty")
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM([]byte(ca))
+	tr := &http.Transport{TLSClientConfig: &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    caCertPool,
+	}}
+	client := http.Client{Transport: tr}
+	o.log.Infof("Getting ignition from %s", source)
+	resp, err := client.Get(source)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get ignition from %s", source)
+	}
+	defer resp.Body.Close()
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, resp.Body)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to copy ignition from %s", source)
+	}
+	return buf.Bytes(), nil
+}
+
+func (o *ops) getMCSIgnition(source, ca string) ([]byte, error) {
+	if strings.HasPrefix(source, "data:") {
+		return o.getEmbeddedIgnition(source)
+	} else {
+		return o.getIgnitionFromBoostrap(source, ca)
+	}
+}
+
+func (o *ops) GetEncapsulatedMC(ignitionPath string) (*mcfgv1.MachineConfig, error) {
+	source, ca, err := o.getPointedIgnitionAndCA(ignitionPath)
+	if err != nil {
+		return nil, err
+	}
+	ignBytes, err := o.getMCSIgnition(source, ca)
+	if err != nil {
+		return nil, err
+	}
+	var ignition struct {
+		Storage struct {
+			Files []struct {
+				Path     string
+				Contents struct {
+					Source string
+				}
+			}
+		}
+	}
+	err = json.Unmarshal(ignBytes, &ignition)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range ignition.Storage.Files {
+		if f.Path == encapsulatedMachineConfigFile {
+			d, err := dataurl.DecodeString(f.Contents.Source)
+			if err != nil {
+				return nil, err
+			}
+			var machineConfig mcfgv1.MachineConfig
+
+			if err = json.Unmarshal(d.Data, &machineConfig); err != nil {
+				return nil, err
+			}
+			return &machineConfig, nil
+		}
+	}
+	return nil, errors.New("failed to get encapsulated machine config from ignition")
+}
+
+func (o *ops) ignitionPlatformId() string {
+	output, err := o.ExecPrivilegeCommand(nil, "cat", "/proc/cmdline")
+	if err != nil {
+		o.log.WithError(err).Warningf("failed to read /proc/cmdline. Defaulting to metal")
+		return defaultIgnitionPlatformId
+	}
+	splits := strings.Split(output, " ")
+	id, found := funk.FindString(splits, func(s string) bool { return strings.HasPrefix(s, "ignition.platform.id=") })
+	if !found {
+		o.log.WithError(err).Warningf("ignition platform id not present in /proc/cmdline. Defaulting to metal")
+		return defaultIgnitionPlatformId
+	}
+	return id
+}
+
+func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error {
+	type cmd struct {
+		command string
+		args    []string
+	}
+
+	makecmd := func(commad string, args ...string) *cmd {
+		return &cmd{command: commad, args: args}
+	}
+	cmds := []*cmd{
+		makecmd("mount", device+"4", "/mnt"),
+		makecmd("mount", device+"3", "/mnt/boot"),
+		makecmd("growpart", device, "4"),
+		makecmd("xfs_growfs", "/mnt"),
+
+		// On 4.14 ostree command fails if selinux is not disabled
+		// TODO: find a way to avoid disabling selinux
+		makecmd("setenforce", "0"),
+		makecmd("ostree",
+			append(append([]string{}, "container",
+				"image",
+				"deploy",
+				"--sysroot",
+				"/mnt",
+				"--authfile",
+				"/root/.docker/config.json",
+				"--imgref",
+				"ostree-unverified-registry:"+osImage,
+				"--karg",
+				o.ignitionPlatformId(),
+				"--karg",
+				"$ignition_firstboot",
+				"--stateroot",
+				"rhcos"), extraArgs...)...,
+		),
+	}
+	for i := range cmds {
+		c := cmds[i]
+		o.log.Infof("Running %s with args %+v", c.command, c.args)
+		if err := utils.Retry(3, 5*time.Second, o.log, func() (ret error) {
+			_, ret = o.ExecPrivilegeCommand(nil, c.command, c.args...)
+			return
+		}); err != nil {
+			return errors.Wrapf(err, "failed to run %s with args %+v", c.command, c.args)
+		}
+	}
+	return nil
 }

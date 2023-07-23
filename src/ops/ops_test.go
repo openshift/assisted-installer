@@ -1,17 +1,28 @@
 package ops
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
+	"io"
+	"net/http"
+	"os"
 	"reflect"
 
 	"errors"
 
+	"github.com/coreos/ignition/v2/config/v3_2/types"
+	"github.com/go-openapi/swag"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/ghttp"
 	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/ops/execute"
+	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/thoas/go-funk"
+	"github.com/vincent-petithory/dataurl"
 )
 
 var _ = Describe("installerArgs", func() {
@@ -351,5 +362,228 @@ var _ = Describe("Set Boot Order", func() {
 		err := o.SetBootOrder("/dev/sda")
 		Expect(err).ToNot(HaveOccurred())
 	})
+})
 
+var _ = Describe("Get encapsulated machine config", func() {
+	var (
+		l = logrus.New()
+	)
+	var localhostCert = []byte(`-----BEGIN CERTIFICATE-----
+MIIDOTCCAiGgAwIBAgIQSRJrEpBGFc7tNb1fb5pKFzANBgkqhkiG9w0BAQsFADAS
+MRAwDgYDVQQKEwdBY21lIENvMCAXDTcwMDEwMTAwMDAwMFoYDzIwODQwMTI5MTYw
+MDAwWjASMRAwDgYDVQQKEwdBY21lIENvMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A
+MIIBCgKCAQEA6Gba5tHV1dAKouAaXO3/ebDUU4rvwCUg/CNaJ2PT5xLD4N1Vcb8r
+bFSW2HXKq+MPfVdwIKR/1DczEoAGf/JWQTW7EgzlXrCd3rlajEX2D73faWJekD0U
+aUgz5vtrTXZ90BQL7WvRICd7FlEZ6FPOcPlumiyNmzUqtwGhO+9ad1W5BqJaRI6P
+YfouNkwR6Na4TzSj5BrqUfP0FwDizKSJ0XXmh8g8G9mtwxOSN3Ru1QFc61Xyeluk
+POGKBV/q6RBNklTNe0gI8usUMlYyoC7ytppNMW7X2vodAelSu25jgx2anj9fDVZu
+h7AXF5+4nJS4AAt0n1lNY7nGSsdZas8PbQIDAQABo4GIMIGFMA4GA1UdDwEB/wQE
+AwICpDATBgNVHSUEDDAKBggrBgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MB0GA1Ud
+DgQWBBStsdjh3/JCXXYlQryOrL4Sh7BW5TAuBgNVHREEJzAlggtleGFtcGxlLmNv
+bYcEfwAAAYcQAAAAAAAAAAAAAAAAAAAAATANBgkqhkiG9w0BAQsFAAOCAQEAxWGI
+5NhpF3nwwy/4yB4i/CwwSpLrWUa70NyhvprUBC50PxiXav1TeDzwzLx/o5HyNwsv
+cxv3HdkLW59i/0SlJSrNnWdfZ19oTcS+6PtLoVyISgtyN6DpkKpdG1cOkW3Cy2P2
++tK/tKHRP1Y/Ra0RiDpOAmqn0gCOFGz8+lqDIor/T7MTpibL3IxqWfPrvfVRHL3B
+grw/ZQTTIVjjh4JBSW3WyWgNo/ikC1lrVxzl4iPUGptxT36Cr7Zk2Bsg0XqwbOvK
+5d+NTDREkSnUbie4GeutujmX3Dsx88UiV6UY/4lHJa6I5leHUNOHahRbpbWeOfs/
+WkBKOclmOV2xlTVuPw==
+-----END CERTIFICATE-----`)
+	buildPointerIgnition := func(source string) types.Config {
+		ret := types.Config{}
+		ret.Ignition.Version = "3.2.0"
+		ret.Ignition.Config.Merge = append(ret.Ignition.Config.Merge,
+			types.Resource{
+				Source: swag.String(source),
+			})
+		ret.Ignition.Security.TLS.CertificateAuthorities = append(ret.Ignition.Security.TLS.CertificateAuthorities,
+			types.Resource{
+				Source: swag.String(dataurl.EncodeBytes(localhostCert)),
+			})
+		return ret
+	}
+	buildPointerIgnitionFile := func(source string) string {
+		cfg := buildPointerIgnition(source)
+		b, err := json.Marshal(&cfg)
+		Expect(err).ToNot(HaveOccurred())
+		f, err := os.CreateTemp("", "ign")
+		Expect(err).ToNot(HaveOccurred())
+		_, err = f.Write(b)
+		Expect(err).ToNot(HaveOccurred())
+		f.Close()
+		return f.Name()
+	}
+	Context("get pointed ignition", func() {
+		checkSource := func(source string) {
+			ignitionPath := buildPointerIgnitionFile(source)
+			defer func() {
+				_ = os.RemoveAll(ignitionPath)
+			}()
+			o := NewOps(l, nil).(*ops)
+			ign, ca, err := o.getPointedIgnitionAndCA(ignitionPath)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(ign).To(Equal(source))
+			Expect(ca).To(Equal(string(localhostCert)))
+		}
+		It("from bootstrap", func() {
+			checkSource("https://abc.com")
+		})
+		It("embedded", func() {
+			checkSource(dataurl.EncodeBytes([]byte("source")))
+		})
+	})
+	Context("get MCS ignition", func() {
+		var (
+			osImageURL      string
+			kernelArguments []string
+		)
+		buildMcsIgnition := func(osImageURL string, kernelArguments []string) string {
+			type file struct {
+				Path     string
+				Contents struct {
+					Source string
+				}
+			}
+			var ignition struct {
+				Storage struct {
+					Files []file
+				}
+			}
+			var machineConfig mcfgv1.MachineConfig
+			machineConfig.Spec.OSImageURL = osImageURL
+			machineConfig.Spec.KernelArguments = kernelArguments
+			b, err := json.Marshal(&machineConfig)
+			Expect(err).ToNot(HaveOccurred())
+			f := file{
+				Path: encapsulatedMachineConfigFile,
+			}
+			f.Contents.Source = dataurl.EncodeBytes(b)
+			ignition.Storage.Files = append(ignition.Storage.Files,
+				file{Path: "/tmp/abc"},
+				f,
+				file{Path: "/zzz"})
+			b, err = json.Marshal(&ignition)
+			Expect(err).ToNot(HaveOccurred())
+			return string(b)
+		}
+		checkMcsIgnition := func(source string, shouldSucceed bool) {
+			ignitionPath := buildPointerIgnitionFile(source)
+			defer func() {
+				_ = os.RemoveAll(ignitionPath)
+			}()
+			o := NewOps(l, nil)
+			mc, err := o.GetEncapsulatedMC(ignitionPath)
+			if shouldSucceed {
+				Expect(err).ToNot(HaveOccurred())
+				Expect(mc).ToNot(BeNil())
+				Expect(mc.Spec.OSImageURL).To(Equal(osImageURL))
+				Expect(mc.Spec.KernelArguments).To(Equal(kernelArguments))
+			} else {
+				Expect(err).To(HaveOccurred())
+			}
+		}
+		compress := func(data []byte) []byte {
+			var buf bytes.Buffer
+			w := gzip.NewWriter(&buf)
+			_, err := w.Write(data)
+			Expect(err).ToNot(HaveOccurred())
+			w.Close()
+			return buf.Bytes()
+		}
+		BeforeEach(func() {
+			osImageURL = "https://os.machine.url"
+			kernelArguments = []string{
+				"arg1",
+				"arg2",
+			}
+		})
+		It("from bootstrap - non existant URL", func() {
+			checkMcsIgnition("https://127.0.0.1:44", false)
+		})
+		It("from bootstrap - success", func() {
+			s := ghttp.NewTLSServer()
+			s.RouteToHandler("GET", "/",
+				func(w http.ResponseWriter, req *http.Request) {
+					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
+					Expect(err).ToNot(HaveOccurred())
+				})
+			checkMcsIgnition(s.URL(), true)
+			s.Close()
+		})
+		It("from bootstrap - empty response", func() {
+			s := ghttp.NewTLSServer()
+			s.RouteToHandler("GET", "/",
+				func(w http.ResponseWriter, req *http.Request) {
+					_, err := io.WriteString(w, "")
+					Expect(err).ToNot(HaveOccurred())
+				})
+			checkMcsIgnition(s.URL(), false)
+			s.Close()
+		})
+		It("embedded - success", func() {
+			checkMcsIgnition(dataurl.EncodeBytes(compress([]byte(buildMcsIgnition(osImageURL, kernelArguments)))), true)
+		})
+	})
+})
+
+var _ = Describe("overwrite OS image", func() {
+	var (
+		l        = logrus.New()
+		ctrl     *gomock.Controller
+		execMock *execute.MockExecute
+		conf     *config.Config
+		o        Ops
+	)
+
+	BeforeEach(func() {
+		ctrl = gomock.NewController(GinkgoT())
+		execMock = execute.NewMockExecute(ctrl)
+		conf = &config.Config{}
+		o = NewOpsWithConfig(conf, l, execMock)
+	})
+
+	mockPrivileged := func(args ...interface{}) {
+		execMock.EXPECT().ExecCommand(nil, "nsenter",
+			append(append([]interface{}{},
+				"--target",
+				"1",
+				"--cgroup",
+				"--mount",
+				"--ipc",
+				"--pid",
+				"--"), args...)...).Times(1)
+	}
+	It("overwrite OS image", func() {
+		osImage := "quay.io/release-image:latest"
+		device := "/dev/sda"
+		extraArgs := []string{
+			"--karg",
+			"abc",
+		}
+		mockPrivileged("cat", "/proc/cmdline")
+		mockPrivileged("mount", "/dev/sda4", "/mnt")
+		mockPrivileged("mount", "/dev/sda3", "/mnt/boot")
+		mockPrivileged("growpart", "/dev/sda", "4")
+		mockPrivileged("xfs_growfs", "/mnt")
+		mockPrivileged("setenforce", "0")
+		mockPrivileged("ostree",
+			"container",
+			"image",
+			"deploy",
+			"--sysroot",
+			"/mnt",
+			"--authfile",
+			"/root/.docker/config.json",
+			"--imgref",
+			"ostree-unverified-registry:quay.io/release-image:latest",
+			"--karg",
+			"ignition.platform.id=metal",
+			"--karg",
+			"$ignition_firstboot",
+			"--stateroot",
+			"rhcos",
+			"--karg",
+			"abc")
+		err := o.OverwriteOsImage(osImage, device, extraArgs)
+		Expect(err).ToNot(HaveOccurred())
+	})
 })
