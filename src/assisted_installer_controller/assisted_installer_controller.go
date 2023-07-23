@@ -78,7 +78,7 @@ var (
 	DeletionRetryInterval    = 10 * time.Second
 	FetchRetryInterval       = 10 * time.Second
 	LongWaitTimeout          = 10 * time.Hour
-	CVOMaxTimeout            = 3 * time.Hour
+	CVOMaxTimeout            = 10 * time.Hour
 	dnsValidationTimeout     = 10 * time.Second
 )
 
@@ -990,6 +990,7 @@ func (c controller) waitingForClusterOperators(ctx context.Context) error {
 	c.log.Info("Waiting for cluster operators")
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, CVOMaxTimeout)
 	defer cancel()
+
 	isClusterVersionAvailable := func(timer *time.Timer) bool {
 		clusterOperatorHandler := NewClusterOperatorHandler(c.kc, consoleOperatorName, c.log)
 		clusterVersionHandler := NewClusterVersionHandler(c.log, c.kc, timer)
@@ -1011,7 +1012,7 @@ func (c controller) waitingForClusterOperators(ctx context.Context) error {
 		}
 		return result
 	}
-	return utils.WaitForPredicateWithTimer(ctxWithTimeout, WaitTimeout, GeneralProgressUpdateInt, isClusterVersionAvailable)
+	return utils.WaitForPredicateWithTimer(ctxWithTimeout, LongWaitTimeout, GeneralProgressUpdateInt, isClusterVersionAvailable)
 }
 
 func (c controller) UpdateNodeLabels(ctx context.Context, wg *sync.WaitGroup) {
@@ -1265,7 +1266,6 @@ func (c controller) uploadSummaryLogs(podName string, namespace string, sinceSec
 	var tarentries = make([]utils.TarEntry, 0)
 	var ok bool = true
 	ctx := utils.GenerateRequestContext()
-
 	if c.Status.HasError() || c.Status.HasOperatorError() {
 		c.logHostResolvConf()
 		c.log.Infof("Uploading cluster operator status logs before must-gather")
