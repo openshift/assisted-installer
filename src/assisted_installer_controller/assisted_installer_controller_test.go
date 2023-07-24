@@ -205,6 +205,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	setConsoleAsAvailable := func(clusterID string) {
 		WaitTimeout = 100 * time.Millisecond
+		LongWaitTimeout = 100 * time.Millisecond
 
 		mockGetServiceOperators([]models.MonitoredOperator{{Name: consoleOperatorName, Status: models.OperatorStatusProgressing}})
 		mockk8sclient.EXPECT().GetClusterOperator(consoleOperatorName).Return(validConsoleOperator, nil).Times(1)
@@ -1619,6 +1620,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			// run once
 			GeneralWaitInterval = 200 * time.Millisecond
 			WaitTimeout = 150 * time.Millisecond
+			LongWaitTimeout = WaitTimeout
 		})
 
 		It("List is empty", func() {
@@ -1682,7 +1684,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			Expect(assistedController.waitForCSV(context.TODO(), WaitTimeout)).To(HaveOccurred())
 		})
 		It("check that we tolerate the failed state reported by CSV", func() {
-			WaitTimeout = WaitTimeout * 10
+			LongWaitTimeout = LongWaitTimeout * 10
 
 			operators := []models.MonitoredOperator{
 				{
@@ -1714,6 +1716,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 
 		It("multiple OLMs", func() {
+			LongWaitTimeout = LongWaitTimeout * 10
 			operators := []models.MonitoredOperator{
 				{
 					SubscriptionName: "subscription-1", Namespace: "namespace-1",
@@ -1839,7 +1842,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		BeforeEach(func() {
 			assistedController.WaitForClusterVersion = true
 			GeneralProgressUpdateInt = 100 * time.Millisecond
-			WaitTimeout = 150 * time.Millisecond
+			LongWaitTimeout = 150 * time.Millisecond
 			CVOMaxTimeout = 1 * time.Second
 
 			mockGetServiceOperators([]models.MonitoredOperator{{Name: consoleOperatorName, Status: models.OperatorStatusAvailable}})
