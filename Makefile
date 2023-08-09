@@ -15,7 +15,13 @@ GINKGO_FLAGS = -ginkgo.focus="$(FOCUS)" -ginkgo.v -ginkgo.skip="$(SKIP)" -ginkgo
 
 # Multiarch support.  Transform argument passed from docker buidx tool to go build arguments to support cross compiling
 GO_BUILD_ARCHITECTURE_VARS := $(if ${TARGETPLATFORM},$(shell echo ${TARGETPLATFORM} | awk -F / '{printf("GOOS=%s GOARCH=%s", $$1, $$2)}'),)
-GO_BUILD_VARS := CGO_ENABLED=0 $(GO_BUILD_ARCHITECTURE_VARS)
+GO_BUILD_VARS = 
+ifeq ($(TARGETPLATFORM),linux/amd64)
+	GO_BUILD_VARS = CGO_ENABLED=1 $(GO_BUILD_ARCHITECTURE_VARS)
+else
+	GO_BUILD_VARS = CGO_ENABLED=0 $(GO_BUILD_ARCHITECTURE_VARS)
+endif
+
 
 all: lint format-check build-images unit-test
 
