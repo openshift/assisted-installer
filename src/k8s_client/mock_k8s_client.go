@@ -12,7 +12,7 @@ import (
 	v1alpha1 "github.com/metal3-io/baremetal-operator/apis/metal3.io/v1alpha1"
 	v1 "github.com/openshift/api/config/v1"
 	ops "github.com/openshift/assisted-installer/src/ops"
-	v1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	v1beta1 "github.com/openshift/api/machine/v1beta1"
 	v1alpha10 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	v10 "k8s.io/api/batch/v1"
 	v11 "k8s.io/api/certificates/v1"
