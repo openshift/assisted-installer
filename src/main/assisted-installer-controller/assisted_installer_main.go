@@ -41,6 +41,9 @@ const (
 	maximumInventoryClientRetries = 15
 	maximumErrorsBeforeExit       = 3
 	bootstrapKubeconfigForSNO     = "/tmp/bootstrap-secrets/kubeconfig"
+	installConfigMapName          = "openshift-install-manifests"
+	installConfigMapNS            = "openshift-config"
+	installConfigMapAttribute     = "invoker"
 )
 
 func DryRebootComplete() bool {
@@ -117,6 +120,14 @@ func main() {
 		log.Fatalf("Failed to create inventory client %v", err)
 	}
 
+	invoker := ""
+	invokerCM, err := kc.GetConfigMap(installConfigMapNS, installConfigMapName)
+	if err != nil {
+		logger.Warnf("error retrieving %v ConfigMap, cannot determine invoker: %v", installConfigMapName, err)
+	}
+	invoker = invokerCM.Data[installConfigMapAttribute]
+	logger.Infof("%v ConfigMap attribute %v = %v", installConfigMapName, installConfigMapAttribute, invoker)
+
 	assistedController := assistedinstallercontroller.NewController(logger,
 		Options.ControllerConfig,
 		o,
@@ -135,6 +146,20 @@ func main() {
 		wg.Add(1)
 	}
 	cluster := assistedController.SetReadyState()
+	if cluster == nil && invoker == assistedinstallercontroller.InvokerAgent {
+		// When the agent-based installer installs a SNO cluster, assisted-service
+		// will never be reachable because it will not be running after the boostrap
+		// node reboots to become the SNO cluster. SetReadyState will never be
+		// able to get a connection to assisted-service in this circumstance.
+		//
+		// Instead of exiting with panic with "invalid memory address or nil pointer
+		// dereference" and having the controller restart because cluster is nil,
+		// log warning and exit 0. Otherwise the controller will keep restarting
+		// leaving the controller in a running state, even through the cluster
+		// has finished install.
+		logger.Warnf("SetReadyState timed out fetching cluster from assisted-service, invoker = %v", invoker)
+		return
+	}
 
 	// While adding new routine don't miss to add wg.add(1)
 	// without adding it will panic
@@ -161,14 +186,19 @@ func main() {
 		logger.Infof("Cluster platform is not %s, skipping BMH", models.PlatformTypeBaremetal)
 	}
 
-	go assistedController.UploadLogs(mainContext, &wg)
+	go assistedController.UploadLogs(mainContext, &wg, invoker)
 	wg.Add(1)
 
 	go assistedController.UpdateNodeLabels(mainContext, &wg)
 	wg.Add(1)
 
 	// monitoring installation by cluster status
-	waitForInstallation(client, logger, assistedController.Status)
+	switch invoker {
+	case assistedinstallercontroller.InvokerAgent:
+		waitForInstallationAgentBasedInstaller(kc, logger)
+	default:
+		waitForInstallation(client, logger, assistedController.Status)
+	}
 }
 
 // waitForInstallation monitor cluster status and is blocking main from cancelling all go routine s
@@ -212,6 +242,29 @@ func waitForInstallation(client inventory_client.InventoryClient, log logrus.Fie
 		if finished {
 			return
 		}
+	}
+}
+
+// The agent-based installer version of waitForInstallation only uses the kubernetes
+// client to determine if the cluster installation has finished. It does not use
+// the inventory client because assisted-service is deployed on the bootstrap node
+// and when the bootstrap node reboots to join the cluster, assisted-service becomes
+// unavailable.
+func waitForInstallationAgentBasedInstaller(kubeClient k8s_client.K8SClient, log logrus.FieldLogger) {
+	for {
+		clusterVersion, err := kubeClient.GetClusterVersion()
+		if err != nil {
+			log.WithError(err).Error("Failed to get cluster version from k8s client")
+		}
+		for _, condition := range clusterVersion.Status.Conditions {
+			if condition.Type == "Available" && condition.Status == "True" {
+				// cluster install is complete, we can exit
+				log.Info("ClusterVersion Available=True")
+				return
+			}
+		}
+		log.Info("ClusterVersion Available!=True, sleeping 30s")
+		time.Sleep(30 * time.Second)
 	}
 }
 

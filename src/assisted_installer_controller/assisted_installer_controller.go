@@ -64,6 +64,8 @@ const (
 	clusterOperatorReportKey string = "CLUSTER_OPERATORS_REPORT"
 	workerMCPName                   = "worker"
 	roleLabel                       = "node-role.kubernetes.io"
+	invokerAssisted                 = "assisted-service"
+	InvokerAgent                    = "agent-installer"
 )
 
 var (
@@ -1395,7 +1397,7 @@ func (c controller) collectMustGatherLogs(ctx context.Context, images ...string)
 // Uploading logs every 5 minutes
 // We will take logs of assisted controller and upload them to assisted-service
 // by creating tar gz of them.
-func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup) {
+func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup, invoker string) {
 	podName := ""
 	ticker := time.NewTicker(LogsUploadPeriod)
 	progressCtx := utils.GenerateRequestContext()
@@ -1408,6 +1410,14 @@ func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup) {
 	for {
 		select {
 		case <-ctx.Done():
+			if invoker == InvokerAgent {
+				// In the agent installer, assisted-service will not be available after
+				// the bootstrap node reboots. Attempting to upload logs to assisted-service
+				// will fail in a continuous loop. To avoid this situation, we skip the final
+				// log uploads.
+				c.log.Infof("assisted-service is offline in agent installer mode. final log uploads skipped.")
+				return
+			}
 			c.log.Infof("Upload final controller and cluster logs before exit")
 			c.ic.ClusterLogProgressReport(progressCtx, c.ClusterID, models.LogsStateRequested)
 			c.logRouterStatus()
