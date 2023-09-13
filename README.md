@@ -39,7 +39,7 @@ The node will start with the new CoreOS image and ignition, and will contact the
  - Get the ignition from the bm-inventory instead of S3.
 
 # Build
-To build and push your image to docker registry  just run make.
+To build and push your image to docker registry just run make.
 You can change the default target, export `INSTALLER` environment variable to your docker registry
 
 ```bash
