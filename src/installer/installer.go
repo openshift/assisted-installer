@@ -422,6 +422,10 @@ func (i *installer) waitForControlPlane(ctx context.Context) error {
 	}
 
 	i.waitForBootkube(ctx)
+	if err = i.waitForETCDBootstrap(ctx); err != nil {
+		i.log.Error(err)
+		return err
+	}
 
 	// waiting for controller pod to be running
 	if err = i.waitForController(kc); err != nil {
@@ -430,6 +434,23 @@ func (i *installer) waitForControlPlane(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (i *installer) waitForETCDBootstrap(ctx context.Context) error {
+	i.UpdateHostInstallProgress(models.HostStageWaitingForBootkube, "waiting for ETCD bootstrap to be complete")
+	i.log.Infof("Started waiting for ETCD bootstrap to complete")
+	return utils.WaitForPredicate(waitForeverTimeout, generalWaitInterval, func() bool {
+		// check if ETCD bootstrap has completed every 5 seconds
+		if result, err := i.ops.ExecPrivilegeCommand(nil, "systemctl", "is-active", "progress.service"); result == "inactive" {
+			i.log.Infof("ETCD bootstrap progress service status: %s", result)
+			out, _ := i.ops.ExecPrivilegeCommand(nil, "systemctl", "status", "progress.service")
+			i.log.Info(out)
+			return true
+		} else if err != nil {
+			i.log.WithError(err).Warnf("error occurred checking ETCD bootstrap progress: %s", result)
+		}
+		return false
+	})
 }
 
 func numDone(hosts models.HostList) int {
