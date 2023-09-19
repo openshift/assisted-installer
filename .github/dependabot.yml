@@ -20,6 +20,7 @@ updates:
       go-dependencies:
         patterns:
           - "*"
-        exclude-patterns:
-          - "k8s.io/*"
-          - "sigs.k8s.io/*"
+    ignore:
+      - dependency-name: "k8s.io/*"
+      - dependency-name: "sigs.k8s.io/*"
+
