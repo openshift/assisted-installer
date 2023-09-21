@@ -629,3 +629,17 @@ func (mr *MockK8SClientMockRecorder) UpdateBMHStatus(bmh interface{}) *gomock.Ca
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateBMHStatus", reflect.TypeOf((*MockK8SClient)(nil).UpdateBMHStatus), bmh)
 }
+
+// UpdateSubscription mocks base method.
+func (m *MockK8SClient) UpdateSubscription(sub *v1alpha10.Subscription) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateSubscription", sub)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateSubscription indicates an expected call of UpdateSubscription.
+func (mr *MockK8SClientMockRecorder) UpdateSubscription(sub interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateSubscription", reflect.TypeOf((*MockK8SClient)(nil).UpdateSubscription), sub)
+}

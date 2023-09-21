@@ -2,6 +2,7 @@ package assisted_installer_controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	olmv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
@@ -161,6 +162,10 @@ func (handler ClusterServiceVersionHandler) GetName() string { return handler.op
 func (handler ClusterServiceVersionHandler) IsInitialized() bool {
 	csvName, err := handler.kc.GetCSVFromSubscription(handler.operator.Namespace, handler.operator.SubscriptionName)
 	if err != nil {
+		err = handler.handleOLMEarlySetupBug()
+		if err != nil {
+			handler.log.WithError(err).Warnf("Failed to handle OLMEarlySetupBug")
+		}
 		return false
 	}
 	handler.log.Infof("Operator %s csv name is %s", handler.GetName(), csvName)
@@ -190,18 +195,34 @@ func (handler ClusterServiceVersionHandler) IsInitialized() bool {
 // them.
 func (handler ClusterServiceVersionHandler) handleOLMEarlySetupBug() error {
 	handler.log.Infof("Check if there are failed olm jobs and delete them in case they exists")
+
+	errors := []error{}
+
 	err := handler.deleteFailedOlmJobs()
 	if err != nil {
 		handler.log.WithError(err).Warnf("Failed to delete olm jobs")
-		return err
+		errors = append(errors, err)
 	}
+
 	// OLM for some reason doesn't reconcile the subscription if job was deleted
 	// so we have to delete failed install plans to force OLM
 	// to re-create them and jobs that were deleted previously
 	err = handler.deleteFailedSubscriptionInstallPlans()
 	if err != nil {
 		handler.log.WithError(err).Warnf("Failed to delete %s install plan", handler.GetName())
-		return err
+		errors = append(errors, err)
+	}
+
+	// re-annotate subscriptions to force OLM to reconcile them This seems to
+	// sometimes be required since OCP 4.14
+	err = handler.reannotateSubscriptions()
+	if err != nil {
+		handler.log.WithError(err).Warnf("Failed to reannotateSubscriptions %s install plan", handler.GetName())
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("failed to handle OLM early setup bug: %v", errors)
 	}
 
 	return nil
@@ -263,6 +284,27 @@ func (handler ClusterServiceVersionHandler) deleteFailedSubscriptionInstallPlans
 	}
 
 	return nil
+}
+
+func (handler ClusterServiceVersionHandler) reannotateSubscriptions() error {
+	subscription, err := handler.kc.GetSubscription(types.NamespacedName{
+		Name:      handler.operator.SubscriptionName,
+		Namespace: handler.operator.Namespace,
+	})
+	if err != nil {
+		return err
+	}
+
+	// If assisted-controller-force-reconcile exists, remove it. If it doesn't,
+	// add it. This will force OLM to reconcile the subscription
+	forceReconcileAnnotation := "assisted-controller-force-reconcile"
+	if _, ok := subscription.Annotations[forceReconcileAnnotation]; ok {
+		delete(subscription.Annotations, forceReconcileAnnotation)
+	} else {
+		subscription.Annotations[forceReconcileAnnotation] = "true"
+	}
+
+	return handler.kc.UpdateSubscription(subscription)
 }
 
 func (handler ClusterServiceVersionHandler) GetStatus() (models.OperatorStatus, string, string, error) {

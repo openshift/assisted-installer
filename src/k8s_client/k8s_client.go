@@ -69,6 +69,7 @@ type K8SClient interface {
 	GetBMH(name string) (*metal3v1alpha1.BareMetalHost, error)
 	UpdateBMHStatus(bmh *metal3v1alpha1.BareMetalHost) error
 	UpdateBMH(bmh *metal3v1alpha1.BareMetalHost) error
+	UpdateSubscription(sub *operatorsv1alpha1.Subscription) error
 	SetProxyEnvVars() error
 	GetClusterVersion() (*configv1.ClusterVersion, error)
 	GetServiceNetworks() ([]string, error)
@@ -525,6 +526,10 @@ func (c *k8sClient) UpdateBMHStatus(bmh *metal3v1alpha1.BareMetalHost) error {
 
 func (c *k8sClient) UpdateBMH(bmh *metal3v1alpha1.BareMetalHost) error {
 	return c.runtimeClient.Update(context.TODO(), bmh)
+}
+
+func (c *k8sClient) UpdateSubscription(sub *operatorsv1alpha1.Subscription) error {
+	return c.runtimeClient.Update(context.Background(), sub)
 }
 
 func (c *k8sClient) GetClusterVersion() (*configv1.ClusterVersion, error) {
