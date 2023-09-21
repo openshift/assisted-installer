@@ -17,9 +17,8 @@ RUN go mod download
 COPY . .
 RUN TARGETPLATFORM=$TARGETPLATFORM make controller
 
-FROM quay.io/centos/centos:stream8
+FROM quay.io/centos/centos:stream9
 
-RUN yum -y install make gcc unzip wget curl rsync && yum clean all
 COPY --from=cli-artifacts /usr/share/openshift/assisted/oc /usr/bin/oc
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/assisted-installer-controller /usr/bin/assisted-installer-controller
 
