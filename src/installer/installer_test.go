@@ -279,6 +279,15 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "systemctl", "status", "bootkube.service").Return("1", nil).Times(1)
 		}
 
+		waitForETCDBootstrapSuccess := func() {
+			mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), infraEnvId, hostId, models.HostStageWaitingForBootkube, "waiting for ETCD bootstrap to be complete").Return(nil).Times(1)
+			mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "systemctl", "is-active", "progress.service").Return("inactive", nil).Times(1)
+		}
+
+		bootstrapETCDStatusSuccess := func() {
+			mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "systemctl", "status", "progress.service").Return("1", nil).Times(1)
+		}
+
 		extractSecretFromIgnitionSuccess := func() {
 			mockops.EXPECT().ExtractFromIgnition(filepath.Join(InstallDir, bootstrapIgn), dockerConfigFile).Return(nil).Times(1)
 		}
@@ -327,6 +336,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					WaitMasterNodesSucccess()
 					waitForBootkubeSuccess()
 					bootkubeStatusSuccess()
+					waitForETCDBootstrapSuccess()
+					bootstrapETCDStatusSuccess()
 					resolvConfSuccess()
 					waitForControllerSuccessfully(conf.ClusterID)
 					//HostRoleMaster flow:
@@ -362,6 +373,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					WaitMasterNodesSucccess()
 					waitForBootkubeSuccess()
 					bootkubeStatusSuccess()
+					waitForETCDBootstrapSuccess()
+					bootstrapETCDStatusSuccess()
 					resolvConfSuccess()
 					waitForControllerSuccessfully(conf.ClusterID)
 					//HostRoleMaster flow:
@@ -416,6 +429,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			WaitMasterNodesSucccess()
 			waitForBootkubeSuccess()
 			bootkubeStatusSuccess()
+			waitForETCDBootstrapSuccess()
+			bootstrapETCDStatusSuccess()
 			resolvConfSuccess()
 			waitForControllerSuccessfully(conf.ClusterID)
 			//HostRoleMaster flow:
