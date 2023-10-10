@@ -2,30 +2,10 @@
 
 aliases:
   approvers:
-    - avishayt
-    - eranco74
-    - filanov
-    - eliorerz
-    - gamli75
-    - ori-amizur
     - romfreiman
-    - tsorya
-    - nmagnezi
-    - carbonin
-    - danielerez
+    - oourfali
+    - filanov
+    - gamli75
+    - eliorerz
     - osherdp
-    - flaper87
-    - mkowalski
-    - omertuc
-    - paul-maidment
-    - rccrdpccl
-    - jhernand
     - adriengentil
-    - javipolo
-    - CrystalChun
-  emeritus_approvers:
-    - empovit
-    - celebdor
-    - yevgeny-shnaidman
-    - lranjbar
-    - ybettan
