@@ -10,6 +10,7 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	inventory_client "github.com/openshift/assisted-installer/src/inventory_client"
+	v1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
 // MockOps is a mock of Ops interface.
@@ -167,6 +168,21 @@ func (mr *MockOpsMockRecorder) FormatDisk(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FormatDisk", reflect.TypeOf((*MockOps)(nil).FormatDisk), arg0)
 }
 
+// GetEncapsulatedMC mocks base method.
+func (m *MockOps) GetEncapsulatedMC(ignitionPath string) (*v1.MachineConfig, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEncapsulatedMC", ignitionPath)
+	ret0, _ := ret[0].(*v1.MachineConfig)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetEncapsulatedMC indicates an expected call of GetEncapsulatedMC.
+func (mr *MockOpsMockRecorder) GetEncapsulatedMC(ignitionPath interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEncapsulatedMC", reflect.TypeOf((*MockOps)(nil).GetEncapsulatedMC), ignitionPath)
+}
+
 // GetHostname mocks base method.
 func (m *MockOps) GetHostname() (string, error) {
 	m.ctrl.T.Helper()
@@ -273,6 +289,20 @@ func (m *MockOps) Mkdir(dirName string) error {
 func (mr *MockOpsMockRecorder) Mkdir(dirName interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Mkdir", reflect.TypeOf((*MockOps)(nil).Mkdir), dirName)
+}
+
+// OverwriteOsImage mocks base method.
+func (m *MockOps) OverwriteOsImage(osImage, device string, extraArgs []string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OverwriteOsImage", osImage, device, extraArgs)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// OverwriteOsImage indicates an expected call of OverwriteOsImage.
+func (mr *MockOpsMockRecorder) OverwriteOsImage(osImage, device, extraArgs interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OverwriteOsImage", reflect.TypeOf((*MockOps)(nil).OverwriteOsImage), osImage, device, extraArgs)
 }
 
 // PrepareController mocks base method.

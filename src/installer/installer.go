@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/openshift/assisted-installer/src/ops/execute"
+	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	"github.com/go-openapi/swag"
 	"github.com/google/uuid"
@@ -148,6 +149,17 @@ func (i *installer) InstallNode() error {
 		//return err
 	}
 
+	if i.Config.Role == string(models.HostRoleWorker) {
+		// Wait for 2 masters to be ready before rebooting
+		if err = i.workerWaitFor2ReadyMasters(ctx); err != nil {
+			return err
+		}
+	}
+
+	if i.EnableSkipMcoReboot {
+		i.skipMcoReboot(ignitionPath)
+	}
+
 	if isBootstrap {
 		i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, waitingForBootstrapToPrepare)
 		if err = bootstrapErrGroup.Wait(); err != nil {
@@ -158,13 +170,8 @@ func (i *installer) InstallNode() error {
 			return err
 		}
 		i.log.Info("Setting bootstrap node new role to master")
-
-	} else if i.Config.Role == string(models.HostRoleWorker) {
-		// Wait for 2 masters to be ready before rebooting
-		if err = i.workerWaitFor2ReadyMasters(ctx); err != nil {
-			return err
-		}
 	}
+
 	//upload host logs and report log status before reboot
 	i.log.Infof("Uploading logs and reporting status before rebooting the node %s for cluster %s", i.Config.HostID, i.Config.ClusterID)
 	i.inventoryClient.HostLogProgressReport(ctx, i.Config.InfraEnvID, i.Config.HostID, models.LogsStateRequested)
@@ -243,18 +250,77 @@ func (i *installer) updateSingleNodeIgnition(singleNodeIgnitionPath string) erro
 	return nil
 }
 
+func convertToInstallerKargs(kargs []string) []string {
+	var ret []string
+	for _, karg := range kargs {
+		ret = append(ret, "--append-karg", karg)
+	}
+	return ret
+}
+
+func convertToOverwriteKargs(args []string) []string {
+	var ret []string
+	i := 0
+	for i < len(args) {
+		if args[i] == "--append-karg" && i+1 < len(args) {
+			ret = append(ret, "--karg", args[i+1])
+			i += 2
+		} else {
+			i++
+		}
+	}
+	return ret
+}
+
+func (i *installer) getEncapsulatedMC(ignitionPath string) (*mcfgv1.MachineConfig, error) {
+	interval := 5 * time.Second
+	var mc *mcfgv1.MachineConfig
+	err := utils.Retry(240, interval, i.log, func() error {
+		var gerr error
+		mc, gerr = i.ops.GetEncapsulatedMC(ignitionPath)
+		return gerr
+	})
+	if err != nil {
+		return nil, err
+	}
+	return mc, nil
+}
+
+func (i *installer) overwriteOsImage(overwriteImage string, kargs []string) error {
+	err := i.ops.OverwriteOsImage(overwriteImage, i.Device,
+		convertToOverwriteKargs(append(i.Config.InstallerArgs, convertToInstallerKargs(kargs)...)))
+	if err != nil {
+		i.log.WithError(err).Error("failed to overwrite install image")
+		return err
+	}
+	return nil
+}
+
 func (i *installer) writeImageToDisk(ignitionPath string) error {
 	i.UpdateHostInstallProgress(models.HostStageWritingImageToDisk, "")
+
 	interval := time.Second
 	err := utils.Retry(3, interval, i.log, func() error {
 		return i.ops.WriteImageToDisk(ignitionPath, i.Device, i.inventoryClient, i.Config.InstallerArgs)
 	})
 	if err != nil {
-		i.log.Errorf("Failed to write image to disk %s", err)
+		i.log.WithError(err).Error("Failed to write image to disk")
 		return err
 	}
 	i.log.Info("Done writing image to disk")
 	return nil
+}
+
+func (i *installer) skipMcoReboot(ignitionPath string) {
+	var mc *mcfgv1.MachineConfig
+	mc, err := i.getEncapsulatedMC(ignitionPath)
+	if err != nil {
+		i.log.WithError(err).Warning("failed getting encapsulated machine config.  Continuing installation without skipping MCO reboot")
+		return
+	}
+	if err = i.overwriteOsImage(mc.Spec.OSImageURL, mc.Spec.KernelArguments); err != nil {
+		i.log.WithError(err).Warning("failed overwriting OS image.  Continuing installation without skipping MCO reboot")
+	}
 }
 
 func (i *installer) startBootstrap() error {
