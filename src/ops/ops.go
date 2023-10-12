@@ -1117,7 +1117,23 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 			_, ret = o.ExecPrivilegeCommand(nil, c.command, c.args...)
 			return
 		}); err != nil {
-			return errors.Wrapf(err, "failed to run %s with args %+v", c.command, c.args)
+			o.log.Warningf("failed applying ostree for image %s", osImage)
+			ret := errors.Wrapf(err, "failed to run %s with args %+v", c.command, c.args)
+			_, err = o.ExecPrivilegeCommand(nil, "podman", "pull", osImage)
+			if err != nil {
+				o.log.WithError(err).Warningf("failed to pull %s", osImage)
+			}
+			splits := strings.Split(osImage, "/")
+			if len(splits) > 0 {
+				for _, recordType := range []string{"A", "AAAA"} {
+					reply, err := o.ExecPrivilegeCommand(nil, "dig", recordType, splits[0])
+					if err != nil {
+						o.log.Warning("failed to run dig(%s) for %s", recordType, splits[0])
+					}
+					o.log.Infof("Output of dig(%s): %s", recordType, reply)
+				}
+			}
+			return ret
 		}
 	}
 	return nil
