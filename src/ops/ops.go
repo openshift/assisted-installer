@@ -1109,6 +1109,10 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 				"--stateroot",
 				"rhcos"), extraArgs...)...,
 		),
+		makecmd("fsfreeze", "--freeze", "/mnt/boot"),
+		makecmd("umount", "/mnt/boot"),
+		makecmd("fsfreeze", "--freeze", "/mnt"),
+		makecmd("umount", "/mnt"),
 	}
 	for i := range cmds {
 		c := cmds[i]

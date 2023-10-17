@@ -583,6 +583,10 @@ var _ = Describe("overwrite OS image", func() {
 			"rhcos",
 			"--karg",
 			"abc")
+		mockPrivileged("fsfreeze", "--freeze", "/mnt/boot")
+		mockPrivileged("umount", "/mnt/boot")
+		mockPrivileged("fsfreeze", "--freeze", "/mnt")
+		mockPrivileged("umount", "/mnt")
 		err := o.OverwriteOsImage(osImage, device, extraArgs)
 		Expect(err).ToNot(HaveOccurred())
 	})
