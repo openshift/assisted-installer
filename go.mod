@@ -3,32 +3,32 @@ module github.com/openshift/assisted-installer
 go 1.18
 
 require (
-	github.com/PuerkitoBio/rehttp v1.1.0
+	github.com/PuerkitoBio/rehttp v1.3.0
 	github.com/ReneKroon/ttlcache/v2 v2.11.0
-	github.com/coreos/ignition/v2 v2.15.0
-	github.com/go-openapi/runtime v0.25.0
+	github.com/coreos/ignition/v2 v2.16.2
+	github.com/go-openapi/runtime v0.26.0
 	github.com/go-openapi/strfmt v0.21.7
 	github.com/go-openapi/swag v0.22.4
 	github.com/golang/mock v1.6.0
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.3.1
 	github.com/hashicorp/go-version v1.6.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/metal3-io/baremetal-operator/apis v0.1.0
 	github.com/onsi/ginkgo v1.16.5
-	github.com/onsi/gomega v1.27.8
+	github.com/onsi/gomega v1.28.0
 	github.com/openshift/api v0.0.0-20230816181854-a7ca92db022a
 	github.com/openshift/assisted-installer-agent v1.0.9
 	github.com/openshift/assisted-service v1.0.10-0.20230215124228-189e234b9582
 	github.com/openshift/assisted-service/models v0.0.0
 	github.com/openshift/client-go v0.0.0-20230120202327-72f107311084
 	github.com/openshift/machine-config-operator v0.0.1-0.20230810165308-00f2deeebffb
-	github.com/operator-framework/api v0.17.3
+	github.com/operator-framework/api v0.17.7
 	github.com/operator-framework/operator-lifecycle-manager v0.22.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/thoas/go-funk v0.9.3
 	github.com/vincent-petithory/dataurl v1.0.0
-	golang.org/x/net v0.14.0
+	golang.org/x/net v0.17.0
 	golang.org/x/sync v0.4.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.28.0
@@ -43,7 +43,7 @@ require (
 	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
-	github.com/aws/aws-sdk-go v1.44.204 // indirect
+	github.com/aws/aws-sdk-go v1.44.298 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -73,8 +73,8 @@ require (
 	github.com/go-openapi/jsonpointer v0.20.0 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/loads v0.21.2 // indirect
-	github.com/go-openapi/spec v0.20.7 // indirect
-	github.com/go-openapi/validate v0.22.0 // indirect
+	github.com/go-openapi/spec v0.20.8 // indirect
+	github.com/go-openapi/validate v0.22.1 // indirect
 	github.com/go-sql-driver/mysql v1.7.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
@@ -114,7 +114,6 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/onsi/ginkgo/v2 v2.11.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0-rc2 // indirect
 	github.com/opencontainers/runc v1.1.4 // indirect
@@ -136,15 +135,15 @@ require (
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	go.mongodb.org/mongo-driver v1.11.3 // indirect
-	go.opentelemetry.io/otel v1.11.1 // indirect
-	go.opentelemetry.io/otel/trace v1.11.1 // indirect
+	go.opentelemetry.io/otel v1.14.0 // indirect
+	go.opentelemetry.io/otel/trace v1.14.0 // indirect
 	go.uber.org/zap v1.25.0 // indirect
-	golang.org/x/crypto v0.12.0 // indirect
+	golang.org/x/crypto v0.14.0 // indirect
 	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/oauth2 v0.11.0 // indirect
-	golang.org/x/sys v0.11.0 // indirect
-	golang.org/x/term v0.11.0 // indirect
-	golang.org/x/text v0.12.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/term v0.13.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.12.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
