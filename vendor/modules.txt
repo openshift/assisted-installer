@@ -478,7 +478,7 @@ github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.opens
 github.com/opentracing/opentracing-go
 github.com/opentracing/opentracing-go/ext
 github.com/opentracing/opentracing-go/log
-# github.com/operator-framework/api v0.17.7
+# github.com/operator-framework/api v0.18.0
 ## explicit; go 1.19
 github.com/operator-framework/api/pkg/lib/version
 github.com/operator-framework/api/pkg/operators
