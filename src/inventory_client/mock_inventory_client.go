@@ -207,6 +207,20 @@ func (mr *MockInventoryClientMockRecorder) ListsHostsForRole(ctx, role interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListsHostsForRole", reflect.TypeOf((*MockInventoryClient)(nil).ListsHostsForRole), ctx, role)
 }
 
+// TriggerEvent mocks base method.
+func (m *MockInventoryClient) TriggerEvent(ctx context.Context, ev *models.Event) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TriggerEvent", ctx, ev)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// TriggerEvent indicates an expected call of TriggerEvent.
+func (mr *MockInventoryClientMockRecorder) TriggerEvent(ctx, ev interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TriggerEvent", reflect.TypeOf((*MockInventoryClient)(nil).TriggerEvent), ctx, ev)
+}
+
 // UpdateClusterOperator mocks base method.
 func (m *MockInventoryClient) UpdateClusterOperator(ctx context.Context, clusterId, operatorName, operatorVersion string, operatorStatus models.OperatorStatus, operatorStatusInfo string) error {
 	m.ctrl.T.Helper()

@@ -3,6 +3,7 @@ package ops
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -66,6 +67,7 @@ type Ops interface {
 	UploadInstallationLogs(isBootstrap bool) (string, error)
 	ReloadHostFile(filepath string) error
 	CreateOpenshiftSshManifest(filePath, template, sshPubKeyPath string) error
+	GetNumberOfReboots(ctx context.Context, nodeName, kubeconfigPath string) (int, error)
 	GetMustGatherLogs(workDir, kubeconfigPath string, images ...string) (string, error)
 	CreateRandomHostname(hostname string) error
 	GetHostname() (string, error)
@@ -807,6 +809,30 @@ func (o *ops) CreateOpenshiftSshManifest(filePath, tmpl, sshPubKeyPath string) e
 		return err
 	}
 	return nil
+}
+
+func (o *ops) GetNumberOfReboots(ctx context.Context, nodeName, kubeconfigPath string) (int, error) {
+	out, err := o.executor.ExecCommandWithContext(ctx, o.logWriter, "oc",
+		"--kubeconfig",
+		kubeconfigPath,
+		"debug",
+		fmt.Sprintf("node/%s", nodeName),
+		"--",
+		"chroot",
+		"/host",
+		"last",
+		"reboot")
+	if err != nil {
+		return 0, err
+	}
+	lines := strings.Split(out, "\n")
+	numReboots := 0
+	for _, line := range lines {
+		if strings.HasPrefix(line, "reboot ") {
+			numReboots++
+		}
+	}
+	return numReboots, nil
 }
 
 func (o *ops) GetMustGatherLogs(workDir, kubeconfigPath string, images ...string) (string, error) {

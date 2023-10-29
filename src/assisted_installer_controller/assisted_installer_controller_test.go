@@ -79,16 +79,17 @@ var (
 
 var _ = Describe("installer HostRoleMaster role", func() {
 	var (
-		l                  = logrus.New()
-		ctrl               *gomock.Controller
-		mockops            *ops.MockOps
-		mockbmclient       *inventory_client.MockInventoryClient
-		mockk8sclient      *k8s_client.MockK8SClient
-		assistedController *controller
-		inventoryNamesIds  map[string]inventory_client.HostData
-		kubeNamesIds       map[string]string
-		wg                 sync.WaitGroup
-		defaultStages      []models.HostStage
+		l                   = logrus.New()
+		ctrl                *gomock.Controller
+		mockops             *ops.MockOps
+		mockbmclient        *inventory_client.MockInventoryClient
+		mockk8sclient       *k8s_client.MockK8SClient
+		mockRebootsNotifier *MockRebootsNotifier
+		assistedController  *controller
+		inventoryNamesIds   map[string]inventory_client.HostData
+		kubeNamesIds        map[string]string
+		wg                  sync.WaitGroup
+		defaultStages       []models.HostStage
 	)
 	kubeNamesIds = map[string]string{"node0": "6d6f00e8-70dd-48a5-859a-0f1459485ad9",
 		"node1": "2834ff2e-8965-48a5-859a-0f1459485a77",
@@ -100,6 +101,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockops = ops.NewMockOps(ctrl)
 		mockbmclient = inventory_client.NewMockInventoryClient(ctrl)
 		mockk8sclient = k8s_client.NewMockK8SClient(ctrl)
+		mockRebootsNotifier = NewMockRebootsNotifier(ctrl)
 		infraEnvId := strfmt.UUID("7916fa89-ea7a-443e-a862-b3e930309f50")
 		node0Id := strfmt.UUID("7916fa89-ea7a-443e-a862-b3e930309f65")
 		node1Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f238")
@@ -120,7 +122,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			models.HostStageDone,
 			models.HostStageDone}
 
-		assistedController = NewController(l, defaultTestControllerConf, mockops, mockbmclient, mockk8sclient)
+		assistedController = NewController(l, defaultTestControllerConf, mockops, mockbmclient, mockk8sclient, mockRebootsNotifier)
 	})
 	AfterEach(func() {
 		ctrl.Finish()
@@ -275,7 +277,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				return nil
 			},
 		).Times(1)
-		mockbmclient.EXPECT().DownloadClusterCredentials(gomock.Any(), kubeconfigFileName, gomock.Any()).Return(nil).Times(1)
+		mockbmclient.EXPECT().DownloadClusterCredentials(gomock.Any(), common.KubeconfigFileName, gomock.Any()).Return(nil).Times(1)
 	}
 
 	mockAllCapabilitiesEnabled := func() {
@@ -312,6 +314,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			configuringSuccess()
 			listNodes()
 
+			for name, value := range inventoryNamesIds {
+				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, value.Host.ID, &value.Host.InfraEnvID, gomock.Any()).Times(1)
+			}
 			exit := assistedController.waitAndUpdateNodesStatus(false)
 			Expect(exit).Should(Equal(false))
 		})
@@ -448,7 +453,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().ListNodes().Return(nodes, nil).Times(1)
 			updateProgressSuccess(done, hosts)
 			configuringSuccess()
-
+			for name, value := range inventoryNamesIds {
+				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, value.Host.ID, &value.Host.InfraEnvID, gomock.Any()).Times(1)
+			}
 			exit := assistedController.waitAndUpdateNodesStatus(false)
 			Expect(exit).Should(Equal(false))
 		})
@@ -501,6 +508,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				"node2": "57df89ee-3546-48a5-859a-0f1459485a66"}
 		})
 		It("WaitAndUpdateNodesStatus one by one", func() {
+			for name, value := range inventoryNamesIds {
+				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, value.Host.ID, &value.Host.InfraEnvID, gomock.Any()).Times(1)
+			}
 			listNodesOneByOne := func() {
 				kubeNameIdsToReturn := make(map[string]string)
 				for name, id := range kubeNamesIds {
@@ -540,6 +550,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	Context("UpdateStatusFails and then succeeds", func() {
 		It("UpdateStatus fails and then succeeds, list nodes failed ", func() {
+			for name, value := range inventoryNamesIds {
+				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, value.Host.ID, &value.Host.InfraEnvID, gomock.Any()).Times(1)
+			}
 			updateProgressSuccessFailureTest := func(stages []models.HostStage, inventoryNamesIds map[string]inventory_client.HostData) {
 				var hostIds []string
 				var infraEnvIds []string
@@ -588,6 +601,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			configuringSuccess()
 
 			mockk8sclient.EXPECT().ListCsrs().Return(nil, fmt.Errorf("no matter what")).AnyTimes()
+			for name, value := range inventoryNamesIds {
+				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, value.Host.ID, &value.Host.InfraEnvID, gomock.Any()).Times(1)
+			}
+
 			go assistedController.WaitAndUpdateNodesStatus(context.TODO(), &wg, false)
 			wg.Add(1)
 			wg.Wait()
@@ -1561,7 +1578,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	Context("must-gather image set parsing", func() {
 		var ac *controller
 		BeforeEach(func() {
-			ac = NewController(l, defaultTestControllerConf, mockops, mockbmclient, mockk8sclient)
+			ac = NewController(l, defaultTestControllerConf, mockops, mockbmclient, mockk8sclient, mockRebootsNotifier)
 		})
 
 		It("MustGatherImage is empty", func() {

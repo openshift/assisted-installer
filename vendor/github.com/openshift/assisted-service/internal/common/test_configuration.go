@@ -124,7 +124,9 @@ var TestImageStatusesFailure = &models.ContainerImageAvailability{
 var DomainAPI = "api.test-cluster.example.com"
 var DomainAPIInternal = "api-int.test-cluster.example.com"
 var DomainApps = fmt.Sprintf("%s.apps.test-cluster.example.com", constants.AppsSubDomainNameHostDNSValidation)
-var WildcardDomain = fmt.Sprintf("%s.test-cluster.example.com", constants.DNSWildcardFalseDomainName)
+var UndottedWildcardDomain = fmt.Sprintf("%s.test-cluster.example.com", constants.DNSWildcardFalseDomainName)
+var WildcardDomain = UndottedWildcardDomain + "."
+var ReleaseDomain = "quay.io"
 
 var DomainResolutions = []*models.DomainResolutionResponseDomain{
 	{
@@ -143,7 +145,17 @@ var DomainResolutions = []*models.DomainResolutionResponseDomain{
 		IPV6Addresses: []strfmt.IPv6{"1003:db8::40/120"},
 	},
 	{
+		DomainName:    &ReleaseDomain,
+		IPV4Addresses: []strfmt.IPv4{"7.8.9.11/24"},
+		IPV6Addresses: []strfmt.IPv6{"1003:db8::41/120"},
+	},
+	{
 		DomainName:    &WildcardDomain,
+		IPV4Addresses: []strfmt.IPv4{},
+		IPV6Addresses: []strfmt.IPv6{},
+	},
+	{
+		DomainName:    &UndottedWildcardDomain,
 		IPV4Addresses: []strfmt.IPv4{},
 		IPV6Addresses: []strfmt.IPv6{},
 	},
@@ -152,6 +164,24 @@ var DomainResolutions = []*models.DomainResolutionResponseDomain{
 var WildcardResolved = []*models.DomainResolutionResponseDomain{
 	{
 		DomainName:    &WildcardDomain,
+		IPV4Addresses: []strfmt.IPv4{"7.8.9.10/24"},
+		IPV6Addresses: []strfmt.IPv6{"1003:db8::40/120"},
+	},
+	{
+		DomainName:    &UndottedWildcardDomain,
+		IPV4Addresses: []strfmt.IPv4{"7.8.9.10/24"},
+		IPV6Addresses: []strfmt.IPv6{"1003:db8::40/120"},
+	},
+}
+
+var SubDomainWildcardResolved = []*models.DomainResolutionResponseDomain{
+	{
+		DomainName:    &WildcardDomain,
+		IPV4Addresses: []strfmt.IPv4{},
+		IPV6Addresses: []strfmt.IPv6{},
+	},
+	{
+		DomainName:    &UndottedWildcardDomain,
 		IPV4Addresses: []strfmt.IPv4{"7.8.9.10/24"},
 		IPV6Addresses: []strfmt.IPv6{"1003:db8::40/120"},
 	},
@@ -167,6 +197,16 @@ var DomainResolutionNoAPI = []*models.DomainResolutionResponseDomain{
 		DomainName:    &WildcardDomain,
 		IPV4Addresses: []strfmt.IPv4{},
 		IPV6Addresses: []strfmt.IPv6{},
+	},
+	{
+		DomainName:    &UndottedWildcardDomain,
+		IPV4Addresses: []strfmt.IPv4{},
+		IPV6Addresses: []strfmt.IPv6{},
+	},
+	{
+		DomainName:    &ReleaseDomain,
+		IPV4Addresses: []strfmt.IPv4{"7.8.9.11/24"},
+		IPV6Addresses: []strfmt.IPv6{"1003:db8::41/120"},
 	},
 }
 
@@ -191,12 +231,18 @@ var DomainResolutionAllEmpty = []*models.DomainResolutionResponseDomain{
 		IPV4Addresses: []strfmt.IPv4{},
 		IPV6Addresses: []strfmt.IPv6{},
 	},
+	{
+		DomainName:    &UndottedWildcardDomain,
+		IPV4Addresses: []strfmt.IPv4{},
+		IPV6Addresses: []strfmt.IPv6{},
+	},
 }
 
 var TestDomainNameResolutionsSuccess = &models.DomainResolutionResponse{Resolutions: DomainResolutions}
 var TestDomainResolutionsNoAPI = &models.DomainResolutionResponse{Resolutions: DomainResolutionNoAPI}
 var TestDomainResolutionsAllEmpty = &models.DomainResolutionResponse{Resolutions: DomainResolutionAllEmpty}
 var TestDomainNameResolutionsWildcardResolved = &models.DomainResolutionResponse{Resolutions: WildcardResolved}
+var TestSubDomainNameResolutionsWildcardResolved = &models.DomainResolutionResponse{Resolutions: SubDomainWildcardResolved}
 
 var TestDefaultRouteConfiguration = []*models.Route{{Family: FamilyIPv4, Interface: "eth0", Gateway: "1.2.3.10", Destination: "0.0.0.0", Metric: 600}}
 
@@ -273,6 +319,9 @@ func IncrementCidrMask(subnet string) string {
 
 func GenerateTestDefaultInventory() string {
 	inventory := &models.Inventory{
+		CPU: &models.CPU{
+			Architecture: models.ClusterCPUArchitectureX8664,
+		},
 		Interfaces: []*models.Interface{
 			{
 				Name: "eth0",
@@ -317,6 +366,9 @@ func GenerateTestInventoryWithVirtualInterface(physicalInterfaces, virtualInterf
 	interfaces := generateInterfaces(physicalInterfaces, "physical")
 	interfaces = append(interfaces, generateInterfaces(virtualInterfaces, "device")...)
 	inventory := &models.Inventory{
+		CPU: &models.CPU{
+			Architecture: models.ClusterCPUArchitectureX8664,
+		},
 		Interfaces: interfaces,
 		Disks: []*models.Disk{
 			TestDefaultConfig.Disks,
@@ -404,14 +456,21 @@ func GenerateTestDefaultVmwareInventory() string {
 
 func CreateWildcardDomainNameResolutionReply(name string, baseDomain string) *models.DomainResolutionResponse {
 
-	domain := fmt.Sprintf("%s.%s.%s", constants.DNSWildcardFalseDomainName, name, baseDomain)
+	undottedDomain := fmt.Sprintf("%s.%s.%s", constants.DNSWildcardFalseDomainName, name, baseDomain)
+	domain := undottedDomain + "."
 
 	var domainNameWildcardConfig = []*models.DomainResolutionResponseDomain{
+		{
+			DomainName:    &undottedDomain,
+			IPV4Addresses: []strfmt.IPv4{},
+			IPV6Addresses: []strfmt.IPv6{},
+		},
 		{
 			DomainName:    &domain,
 			IPV4Addresses: []strfmt.IPv4{},
 			IPV6Addresses: []strfmt.IPv6{},
-		}}
+		},
+	}
 
 	var testDomainNameResolutionWildcard = &models.DomainResolutionResponse{
 		Resolutions: domainNameWildcardConfig}

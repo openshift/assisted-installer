@@ -5,6 +5,7 @@
 package ops
 
 import (
+	context "context"
 	io "io"
 	reflect "reflect"
 
@@ -231,6 +232,21 @@ func (mr *MockOpsMockRecorder) GetMustGatherLogs(workDir, kubeconfigPath interfa
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{workDir, kubeconfigPath}, images...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMustGatherLogs", reflect.TypeOf((*MockOps)(nil).GetMustGatherLogs), varargs...)
+}
+
+// GetNumberOfReboots mocks base method.
+func (m *MockOps) GetNumberOfReboots(ctx context.Context, nodeName, kubeconfigPath string) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNumberOfReboots", ctx, nodeName, kubeconfigPath)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNumberOfReboots indicates an expected call of GetNumberOfReboots.
+func (mr *MockOpsMockRecorder) GetNumberOfReboots(ctx, nodeName, kubeconfigPath interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNumberOfReboots", reflect.TypeOf((*MockOps)(nil).GetNumberOfReboots), ctx, nodeName, kubeconfigPath)
 }
 
 // GetRaidDevices mocks base method.
