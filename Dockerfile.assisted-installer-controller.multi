@@ -1,0 +1,52 @@
+FROM quay.io/openshift/origin-cli-artifacts:latest as cli-artifacts
+
+# Builder Image
+FROM registry.access.redhat.com/ubi8/ubi as builder
+
+#################################################################################
+# DNF Package Install List
+ARG DNF_LIST="\
+  jq \
+  tar \
+  gcc \
+  make \
+  git \
+  gpgme-devel \
+  libassuan-devel \
+  wget \
+"
+
+
+#################################################################################
+# Build UBI8 Builder with multi-arch support
+RUN set -ex \
+     && ARCH=$(arch | sed 's|x86_64|amd64|g' | sed 's|aarch64|arm64|g')         \
+     && dnf install -y --nodocs --setopt=install_weak_deps=false ${DNF_LIST}    \
+     && dnf clean all -y                                                        \
+     && GO_VERSION=go1.19.5                                                     \
+     && curl -sL https://golang.org/dl/${GO_VERSION}.linux-${ARCH}.tar.gz       \
+        | tar xzvf - --directory /usr/local/                                    \
+     && /usr/local/go/bin/go version                                            \
+     && ln -f /usr/local/go/bin/go /usr/bin/go
+
+#################################################################################
+# Link gcc to /usr/bin/s390x-linux-gnu-gcc as go requires it on s390x
+RUN [ "$(arch)" == "s390x" ]                                                    \
+     && ln /usr/bin/gcc /usr/bin/s390x-linux-gnu-gcc                            \
+     || echo "Not running on s390x, skip linking gcc binary"
+
+WORKDIR /go/src/github.com/openshift/assisted-installer
+ENV GOFLAGS="-mod=vendor"
+
+COPY . .
+RUN make controller
+
+FROM registry.access.redhat.com/ubi9/ubi
+ARG TARGETARCH
+
+LABEL io.openshift.release.operator=true
+
+COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/assisted-installer-controller /usr/bin/assisted-installer-controller
+COPY --from=cli-artifacts /usr/share/openshift/linux_$TARGETARCH/oc /usr/bin/oc
+
+ENTRYPOINT ["/usr/bin/assisted-installer-controller"]
