@@ -2,9 +2,13 @@ package v1alpha1
 
 import (
 	"fmt"
+	"net"
+	"net/url"
 	"regexp"
+	"strings"
 
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/metal3-io/baremetal-operator/pkg/hardwareutils/bmc"
@@ -35,6 +39,20 @@ func (host *BareMetalHost) validateHost() []error {
 
 	if err := validateBMHName(host.Name); err != nil {
 		errs = append(errs, err)
+	}
+
+	if err := validateDNSName(host.Spec.BMC.Address); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateRootDeviceHints(host.Spec.RootDeviceHints); err != nil {
+		errs = append(errs, err)
+	}
+
+	if host.Spec.Image != nil {
+		if err := validateImageURL(host.Spec.Image.URL); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	return errs
@@ -82,6 +100,13 @@ func validateBMCAccess(s BareMetalHostSpec, bmcAccess bmc.AccessDetails) []error
 
 	if bmcAccess.NeedsMAC() && s.BootMACAddress == "" {
 		errs = append(errs, fmt.Errorf("BMC driver %s requires a BootMACAddress value", bmcAccess.Type()))
+	}
+
+	if s.BootMACAddress != "" {
+		_, err := net.ParseMAC(s.BootMACAddress)
+		if err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	if s.BootMode == UEFISecureBoot && !bmcAccess.SupportsSecureBoot() {
@@ -133,5 +158,46 @@ func validateBMHName(bmhname string) error {
 		return fmt.Errorf("BareMetalHost resource name cannot be a UUID")
 	}
 
+	return nil
+}
+
+func validateDNSName(hostaddress string) error {
+
+	if hostaddress == "" {
+		return nil
+	}
+
+	_, err := bmc.GetParsedURL(hostaddress)
+	if err != nil {
+		return errors.Wrap(err, "BMO validation")
+	}
+
+	return nil
+}
+
+func validateImageURL(imageURL string) error {
+
+	_, err := url.ParseRequestURI(imageURL)
+	if err != nil {
+		return fmt.Errorf("Image URL %s is an invalid URL", imageURL)
+	}
+
+	return nil
+}
+
+func validateRootDeviceHints(rdh *RootDeviceHints) error {
+	if rdh == nil || rdh.DeviceName == "" {
+		return nil
+	}
+
+	subpath := strings.TrimPrefix(rdh.DeviceName, "/dev/")
+	if rdh.DeviceName == subpath {
+		return fmt.Errorf("Device Name of root device hint must be a /dev/ path, not \"%s\"", rdh.DeviceName)
+	}
+
+	subpath = strings.TrimPrefix(subpath, "disk/by-path/")
+	if strings.Contains(subpath, "/") {
+		return fmt.Errorf("Device Name of root device hint must be path in /dev/ or /dev/disk/by-path/, not \"%s\"", rdh.DeviceName)
+	}
 	return nil
 }

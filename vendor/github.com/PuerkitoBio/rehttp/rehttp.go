@@ -9,16 +9,17 @@
 //
 // The package offers common delay strategies as ready-made functions that
 // return a DelayFn:
-//     - ConstDelay(delay time.Duration) DelayFn
-//     - ExpJitterDelay(base, max time.Duration) DelayFn
+//   - ConstDelay(delay time.Duration) DelayFn
+//   - ExpJitterDelay(base, max time.Duration) DelayFn
 //
 // It also provides common retry helpers that return a RetryFn:
-//     - RetryIsErr(func(error) bool) RetryFn
-//     - RetryHTTPMethods(methods ...string) RetryFn
-//     - RetryMaxRetries(max int) RetryFn
-//     - RetryStatuses(statuses ...int) RetryFn
-//     - RetryStatusInterval(fromStatus, toStatus int) RetryFn
-//     - RetryTemporaryErr() RetryFn
+//   - RetryIsErr(func(error) bool) RetryFn
+//   - RetryHTTPMethods(methods ...string) RetryFn
+//   - RetryMaxRetries(max int) RetryFn
+//   - RetryStatuses(statuses ...int) RetryFn
+//   - RetryStatusInterval(fromStatus, toStatus int) RetryFn
+//   - RetryTimeoutErr() RetryFn
+//   - RetryTemporaryErr() RetryFn
 //
 // Those can be combined with RetryAny or RetryAll as needed. RetryAny
 // enables retries if any of the RetryFn return true, while RetryAll
@@ -38,17 +39,18 @@
 // (https://golang.org/pkg/net/http/#Transport.CancelRequest).
 //
 // On Go1.7+, it uses the context returned by http.Request.Context
-// to check for cancelled requests.
+// to check for cancelled requests. Before Go1.7, PerAttemptTimeout
+// has no effect.
 //
 // It should work on Go1.5, but only if there is no timeout set on the
 // *http.Client. Go's stdlib will return an error on the first request
 // if that's the case, because it requires a RoundTripper that
 // implements the CancelRequest method.
-//
 package rehttp
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -173,6 +175,8 @@ func RetryIsErr(fn func(error) bool) RetryFn {
 // is a temporary error. A temporary error is one that implements
 // the Temporary() bool method. Most errors from the net package implement
 // this.
+// This interface was deprecated in go 1.18. Favor RetryTimeoutErr.
+// https://github.com/golang/go/issues/45729
 func RetryTemporaryErr() RetryFn {
 	return RetryIsErr(func(err error) bool {
 		if terr, ok := err.(temporaryer); ok {
@@ -180,6 +184,16 @@ func RetryTemporaryErr() RetryFn {
 		}
 		return false
 	})
+}
+
+// RetryTimeoutErr returns a RetryFn that retries if the Attempt's error
+// is a timeout error. Before go 1.13, a timeout error is one that implements
+// the Timeout() bool method. Most errors from the net package implement this.
+// After go 1.13, a timeout error is one that implements the net.Error interface
+// which includes both Timeout() and Temporary() to make it less likely to
+// falsely identify errors that occurred outside of the net package.
+func RetryTimeoutErr() RetryFn {
+	return RetryIsErr(isTimeoutErr)
 }
 
 // RetryStatusInterval returns a RetryFn that retries if the response's
@@ -213,7 +227,7 @@ func RetryStatuses(statuses ...int) RetryFn {
 
 // RetryHTTPMethods returns a RetryFn that retries if the request's
 // HTTP method is one of the provided methods. It is meant to be used
-// in conjunction with another RetryFn such as RetryTemporaryErr combined
+// in conjunction with another RetryFn such as RetryTimeoutErr combined
 // using RetryAll, otherwise this function will retry any successful
 // request made with one of the provided methods.
 func RetryHTTPMethods(methods ...string) RetryFn {
@@ -267,6 +281,22 @@ type Transport struct {
 	// is non-nil.
 	PreventRetryWithBody bool
 
+	// PerAttemptTimeout can be optionally set to add per-attempt timeouts.
+	// These may be used in place of or in conjunction with overall timeouts.
+	// For example, a per-attempt timeout of 5s would mean an attempt will
+	// be canceled after 5s, then the delay fn will be consulted before
+	// potentially making another attempt, which will again be capped at 5s.
+	// This means that the overall duration may be up to
+	// (PerAttemptTimeout + delay) * n, where n is the maximum attempts.
+	// If using an overall timeout (whether on the http client or the request
+	// context), the request will stop at whichever timeout is reached first.
+	// Your RetryFn can determine if a request hit the per-attempt timeout by
+	// checking if attempt.Error == context.DeadlineExceeded (or use errors.Is
+	// on go 1.13+).
+	// time.Duration(0) signals that no per-attempt timeout should be used.
+	// Note that before go 1.7 this option has no effect.
+	PerAttemptTimeout time.Duration
+
 	// retry is a function that determines if the request should be retried.
 	// Unless a retry is prevented based on PreventRetryWithBody, all requests
 	// go through that function, even those that are typically considered
@@ -282,7 +312,10 @@ type Transport struct {
 // adds retry logic as per its configuration.
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	var attempt int
-	preventRetry := req.Body != nil && t.PreventRetryWithBody
+	preventRetry := req.Body != nil && req.Body != http.NoBody && t.PreventRetryWithBody
+
+	// used as a baseline to set fresh timeouts per-attempt if needed
+	ctx := getRequestContext(req)
 
 	// get the done cancellation channel for the context, will be nil
 	// for < go1.7.
@@ -290,7 +323,7 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	// buffer the body if needed
 	var br *bytes.Reader
-	if req.Body != nil && !preventRetry {
+	if req.Body != nil && req.Body != http.NoBody && !preventRetry {
 		var buf bytes.Buffer
 		if _, err := io.Copy(&buf, req.Body); err != nil {
 			// cannot even try the first attempt, body has been consumed
@@ -304,19 +337,24 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	for {
-		res, err := t.RoundTripper.RoundTrip(req)
+		var cancel context.CancelFunc = func() {} // empty unless a timeout is set
+		reqWithTimeout := req
+		if t.PerAttemptTimeout != 0 {
+			reqWithTimeout, cancel = getPerAttemptTimeoutInfo(ctx, req, t.PerAttemptTimeout)
+		}
+		res, err := t.RoundTripper.RoundTrip(reqWithTimeout)
 		if preventRetry {
-			return res, err
+			return injectCancelReader(res, cancel), err
 		}
 
 		retry, delay := t.retry(Attempt{
-			Request:  req,
+			Request:  reqWithTimeout,
 			Response: res,
 			Index:    attempt,
 			Error:    err,
 		})
 		if !retry {
-			return res, err
+			return injectCancelReader(res, cancel), err
 		}
 
 		if br != nil {
@@ -325,15 +363,16 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 			// to reset on the request is the body, if any.
 			if _, serr := br.Seek(0, 0); serr != nil {
 				// failed to retry, return the results
-				return res, err
+				return injectCancelReader(res, cancel), err
 			}
-			req.Body = ioutil.NopCloser(br)
+			reqWithTimeout.Body = ioutil.NopCloser(br)
 		}
 		// close the disposed response's body, if any
 		if res != nil {
-			io.Copy(ioutil.Discard, res.Body)
+			_, _ = io.Copy(ioutil.Discard, res.Body)
 			res.Body.Close()
 		}
+		cancel() // we're done with this response and won't be returning it, so it's safe to cancel immediately
 
 		select {
 		case <-time.After(delay):

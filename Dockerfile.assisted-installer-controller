@@ -3,7 +3,7 @@ ARG TARGETPLATFORM
 RUN mkdir -p /usr/share/openshift/assisted
 RUN case $TARGETPLATFORM in "") dir=linux_amd64;; *) dir=`echo $TARGETPLATFORM | sed 's@/@_@'` ;; esac ;  ln /usr/share/openshift/${dir}/oc /usr/share/openshift/assisted
 
-FROM registry.ci.openshift.org/openshift/release:golang-1.19 AS builder
+FROM registry.ci.openshift.org/openshift/release:golang-1.20 AS builder
 ARG TARGETPLATFORM
 ENV GOFLAGS=-mod=mod
 WORKDIR /go/src/github.com/openshift/assisted-installer
@@ -17,9 +17,8 @@ RUN go mod download
 COPY . .
 RUN TARGETPLATFORM=$TARGETPLATFORM make controller
 
-FROM quay.io/centos/centos:stream8
+FROM quay.io/centos/centos:stream9
 
-RUN yum -y install make gcc unzip wget curl rsync && yum clean all
 COPY --from=cli-artifacts /usr/share/openshift/assisted/oc /usr/bin/oc
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/assisted-installer-controller /usr/bin/assisted-installer-controller
 

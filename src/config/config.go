@@ -38,6 +38,7 @@ type Config struct {
 	MustGatherImage             string
 	DisksToFormat               ArrayFlags
 	SkipInstallationDiskCleanup bool
+	EnableSkipMcoReboot         bool
 }
 
 func printHelpAndExit(err error) {
@@ -75,6 +76,7 @@ func (c *Config) ProcessArgs(args []string) {
 	flagSet.StringVar(&c.MustGatherImage, "must-gather-image", "", "Custom must-gather image")
 	flagSet.Var(&c.DisksToFormat, "format-disk", "Disk to format. Can be specified multiple times")
 	flagSet.BoolVar(&c.SkipInstallationDiskCleanup, "skip-installation-disk-cleanup", false, "Skip installation disk cleanup gives disk management to coreos-installer in case needed")
+	flagSet.BoolVar(&c.EnableSkipMcoReboot, "enable-skip-mco-reboot", false, "indicate assisted installer to generate settings to match MCO requirements for skipping reboot after firstboot")
 
 	var installerArgs string
 	flagSet.StringVar(&installerArgs, "installer-args", "", "JSON array of additional coreos-installer arguments")
