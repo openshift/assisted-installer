@@ -2,6 +2,7 @@ package execute
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -16,6 +17,7 @@ import (
 //go:generate mockgen -source=execute.go -package=execute -destination=mock_execute.go
 type Execute interface {
 	ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error)
+	ExecCommandWithContext(ctx context.Context, liveLogger io.Writer, command string, args ...string) (string, error)
 }
 
 type executor struct {
@@ -40,10 +42,9 @@ func NewExecutor(installerConfig *config.Config, logger logrus.FieldLogger, prox
 	return &executor{cmdEnv: cmdEnv, log: logger, installerConfig: installerConfig}
 }
 
-func (e *executor) ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
-
+func (e *executor) execCommand(liveLogger io.Writer, cmd *exec.Cmd) (string, error) {
 	var stdoutBuf bytes.Buffer
-	cmd := exec.Command(command, args...)
+
 	if liveLogger != nil {
 		cmd.Stdout = io.MultiWriter(liveLogger, &stdoutBuf)
 		cmd.Stderr = io.MultiWriter(liveLogger, &stdoutBuf)
@@ -64,8 +65,8 @@ func (e *executor) ExecCommand(liveLogger io.Writer, command string, args ...str
 		}
 
 		execErr := &ExecCommandError{
-			Command:         command,
-			Args:            args,
+			Command:         cmd.Path,
+			Args:            cmd.Args[1:],
 			Env:             cmd.Env,
 			ExitErr:         err,
 			Output:          output,
@@ -82,9 +83,17 @@ func (e *executor) ExecCommand(liveLogger io.Writer, command string, args ...str
 		}
 		return output, execErr
 	}
-	e.log.Debug("Command executed:", " command", command, " arguments", removePullSecret(args, e.installerConfig.PullSecretToken), "env vars",
+	e.log.Debug("Command executed:", " command", cmd.Path, " arguments", removePullSecret(cmd.Args[1:], e.installerConfig.PullSecretToken), "env vars",
 		removePullSecret(cmd.Env, e.installerConfig.PullSecretToken), "output", output)
 	return output, err
+}
+
+func (e *executor) ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
+	return e.execCommand(liveLogger, exec.Command(command, args...))
+}
+
+func (e *executor) ExecCommandWithContext(ctx context.Context, liveLogger io.Writer, command string, args ...string) (string, error) {
+	return e.execCommand(liveLogger, exec.CommandContext(ctx, command, args...))
 }
 
 type ExecCommandError struct {

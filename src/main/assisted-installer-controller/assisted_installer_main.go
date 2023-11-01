@@ -128,11 +128,14 @@ func main() {
 	invoker = invokerCM.Data[installConfigMapAttribute]
 	logger.Infof("%v ConfigMap attribute %v = %v", installConfigMapName, installConfigMapAttribute, invoker)
 
+	rn := assistedinstallercontroller.NewRebootsNotifier(o, client, logger)
+	defer rn.Finalize()
 	assistedController := assistedinstallercontroller.NewController(logger,
 		Options.ControllerConfig,
 		o,
 		client,
 		kc,
+		rn,
 	)
 
 	var wg sync.WaitGroup

@@ -127,6 +127,12 @@ type Cluster struct {
 	// Explicit ignition endpoint overrides the default ignition endpoint.
 	IgnitionEndpoint *IgnitionEndpoint `json:"ignition_endpoint,omitempty" gorm:"embedded;embeddedPrefix:ignition_endpoint_"`
 
+	// Json formatted string containing a list of cluster validations to be ignored. May also contain a list with a single string "all" to ignore all cluster validations. Some validations cannot be ignored.
+	IgnoredClusterValidations string `json:"ignored_cluster_validations,omitempty" gorm:"type:text"`
+
+	// Json formatted string containing a list of host validations to be ignored. May also contain a list with a single string "all" to ignore all host validations. Some validations cannot be ignored.
+	IgnoredHostValidations string `json:"ignored_host_validations,omitempty" gorm:"type:text"`
+
 	// image info
 	// Required: true
 	ImageInfo *ImageInfo `json:"image_info" gorm:"embedded;embeddedPrefix:image_"`
@@ -259,7 +265,7 @@ type Cluster struct {
 	// Format: date-time
 	UpdatedAt timeext.Time `json:"updated_at,omitempty" gorm:"type:timestamp with time zone"`
 
-	// Indicate if the networking is managed by the user.
+	// (DEPRECATED) Indicate if the networking is managed by the user.
 	UserManagedNetworking *bool `json:"user_managed_networking,omitempty"`
 
 	// user name

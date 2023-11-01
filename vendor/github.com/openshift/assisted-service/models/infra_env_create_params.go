@@ -28,6 +28,7 @@ type InfraEnvCreateParams struct {
 	// infra-env will trust the certificates in this bundle. Clusters formed
 	// from the hosts discovered by this infra-env will also trust the
 	// certificates in this bundle.
+	// Max Length: 65535
 	AdditionalTrustBundle string `json:"additional_trust_bundle,omitempty"`
 
 	// If set, all hosts that register will be associated with the specified cluster.
@@ -35,7 +36,7 @@ type InfraEnvCreateParams struct {
 	ClusterID *strfmt.UUID `json:"cluster_id,omitempty"`
 
 	// The CPU architecture of the image (x86_64/arm64/etc).
-	// Enum: [x86_64 aarch64 arm64 ppc64le s390x multi]
+	// Enum: [x86_64 aarch64 arm64 ppc64le s390x]
 	CPUArchitecture string `json:"cpu_architecture,omitempty"`
 
 	// JSON formatted string containing the user overrides for the initial ignition config.
@@ -71,6 +72,10 @@ type InfraEnvCreateParams struct {
 // Validate validates this infra env create params
 func (m *InfraEnvCreateParams) Validate(formats strfmt.Registry) error {
 	var res []error
+
+	if err := m.validateAdditionalTrustBundle(formats); err != nil {
+		res = append(res, err)
+	}
 
 	if err := m.validateClusterID(formats); err != nil {
 		res = append(res, err)
@@ -110,6 +115,18 @@ func (m *InfraEnvCreateParams) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
+func (m *InfraEnvCreateParams) validateAdditionalTrustBundle(formats strfmt.Registry) error {
+	if swag.IsZero(m.AdditionalTrustBundle) { // not required
+		return nil
+	}
+
+	if err := validate.MaxLength("additional_trust_bundle", "body", m.AdditionalTrustBundle, 65535); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (m *InfraEnvCreateParams) validateClusterID(formats strfmt.Registry) error {
 	if swag.IsZero(m.ClusterID) { // not required
 		return nil
@@ -126,7 +143,7 @@ var infraEnvCreateParamsTypeCPUArchitecturePropEnum []interface{}
 
 func init() {
 	var res []string
-	if err := json.Unmarshal([]byte(`["x86_64","aarch64","arm64","ppc64le","s390x","multi"]`), &res); err != nil {
+	if err := json.Unmarshal([]byte(`["x86_64","aarch64","arm64","ppc64le","s390x"]`), &res); err != nil {
 		panic(err)
 	}
 	for _, v := range res {
@@ -150,9 +167,6 @@ const (
 
 	// InfraEnvCreateParamsCPUArchitectureS390x captures enum value "s390x"
 	InfraEnvCreateParamsCPUArchitectureS390x string = "s390x"
-
-	// InfraEnvCreateParamsCPUArchitectureMulti captures enum value "multi"
-	InfraEnvCreateParamsCPUArchitectureMulti string = "multi"
 )
 
 // prop value enum
