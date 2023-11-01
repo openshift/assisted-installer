@@ -195,7 +195,7 @@ func main() {
 	// monitoring installation by cluster status
 	switch invoker {
 	case assistedinstallercontroller.InvokerAgent:
-		waitForInstallationAgentBasedInstaller(kc, logger)
+		waitForInstallationAgentBasedInstaller(kc, logger, removeUninitializedTaint)
 	default:
 		waitForInstallation(client, logger, assistedController.Status)
 	}
@@ -250,8 +250,27 @@ func waitForInstallation(client inventory_client.InventoryClient, log logrus.Fie
 // the inventory client because assisted-service is deployed on the bootstrap node
 // and when the bootstrap node reboots to join the cluster, assisted-service becomes
 // unavailable.
-func waitForInstallationAgentBasedInstaller(kubeClient k8s_client.K8SClient, log logrus.FieldLogger) {
+func waitForInstallationAgentBasedInstaller(kubeClient k8s_client.K8SClient, log logrus.FieldLogger, removeUninitializedTaint bool) {
 	for {
+		if removeUninitializedTaint {
+			// After the boostrap node has rebooted, assisted-service becomes unavailable
+			// and nodes can no longer be untainted through
+			// assistedController.WaitAndUpdateNodesStatus(mainContext, &wg, removeUninitializedTaint).
+			// because the call to retrieve hosts (c.ic.GetHosts(ctxReq, log, ignoreStatuses))
+			// will fail immediately.
+			// Here we have an alternative mechanism to untaint nodes when
+			// assisted-service is no longer available.
+			nodes, err := kubeClient.ListNodes()
+			if err != nil {
+				log.WithError(err).Error("Failed to get list of nodes from k8s client")
+			}
+			for _, node := range nodes.Items {
+				if err := kubeClient.UntaintNode(node.Name); err != nil {
+					log.WithError(err).Errorf("Failed to remove uninitialized taint from node %s", node.Name)
+					continue
+				}
+			}
+		}
 		clusterVersion, err := kubeClient.GetClusterVersion()
 		if err != nil {
 			log.WithError(err).Error("Failed to get cluster version from k8s client")
