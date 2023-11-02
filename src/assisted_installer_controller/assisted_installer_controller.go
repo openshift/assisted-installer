@@ -58,7 +58,6 @@ const (
 	KeepWaiting               = false
 	ExitWaiting               = true
 	customManifestsFile       = "custom_manifests.json"
-	kubeconfigFileName        = "kubeconfig-noingress"
 
 	consoleCapabilityName           = configv1.ClusterVersionCapability("Console")
 	clusterOperatorReportKey string = "CLUSTER_OPERATORS_REPORT"
@@ -117,11 +116,12 @@ type ControllerStatus struct {
 
 type controller struct {
 	ControllerConfig
-	Status *ControllerStatus
-	log    *logrus.Logger
-	ops    ops.Ops
-	ic     inventory_client.InventoryClient
-	kc     k8s_client.K8SClient
+	Status          *ControllerStatus
+	log             *logrus.Logger
+	ops             ops.Ops
+	ic              inventory_client.InventoryClient
+	kc              k8s_client.K8SClient
+	rebootsNotifier RebootsNotifier
 }
 
 // manifest store the operator manifest used by assisted-installer to create CRs of the OLM:
@@ -132,7 +132,7 @@ type manifest struct {
 	Content string
 }
 
-func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inventory_client.InventoryClient, kc k8s_client.K8SClient) *controller {
+func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inventory_client.InventoryClient, kc k8s_client.K8SClient, rebootsNotifier RebootsNotifier) *controller {
 	return &controller{
 		log:              log,
 		ControllerConfig: cfg,
@@ -140,6 +140,7 @@ func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inv
 		ic:               ic,
 		kc:               kc,
 		Status:           NewControllerStatus(),
+		rebootsNotifier:  rebootsNotifier,
 	}
 }
 
@@ -280,6 +281,7 @@ func (c *controller) waitAndUpdateNodesStatus(arg interface{}) bool {
 				log.WithError(err).Errorf("Failed to update node %s installation status", node.Name)
 				continue
 			}
+			c.rebootsNotifier.Start(ctxReq, node.Name, host.Host.ID, &host.Host.InfraEnvID, host.Host.ClusterID)
 		}
 	}
 
@@ -599,7 +601,7 @@ func (c controller) applyPostInstallManifests(arg interface{}) bool {
 		return false
 	}
 
-	kubeconfigName, err := c.downloadKubeconfigNoingress(ctx, tempDir)
+	kubeconfigName, err := common.DownloadKubeconfigNoingress(ctx, tempDir, c.ic, c.log)
 	if err != nil {
 		return false
 	}
@@ -1354,19 +1356,6 @@ func (c controller) parseMustGatherImages() []string {
 	return images
 }
 
-func (c controller) downloadKubeconfigNoingress(ctx context.Context, dir string) (string, error) {
-	// Download kubeconfig file
-	kubeconfigPath := path.Join(dir, kubeconfigFileName)
-	err := c.ic.DownloadClusterCredentials(ctx, kubeconfigFileName, kubeconfigPath)
-	if err != nil {
-		c.log.Errorf("Failed to download noingress kubeconfig %v\n", err)
-		return "", err
-	}
-	c.log.Infof("Downloaded %s to %s.", kubeconfigFileName, kubeconfigPath)
-
-	return kubeconfigPath, nil
-}
-
 func (c controller) collectMustGatherLogs(ctx context.Context, images ...string) (string, error) {
 	mustGatherDir := "/tmp/must-gather-logs"
 	// We should not create must-gather logs if they already were created and upload failed
@@ -1379,7 +1368,7 @@ func (c controller) collectMustGatherLogs(ctx context.Context, images ...string)
 		return "", err
 	}
 
-	kubeconfigPath, err := c.downloadKubeconfigNoingress(ctx, mustGatherDir)
+	kubeconfigPath, err := common.DownloadKubeconfigNoingress(ctx, mustGatherDir, c.ic, c.log)
 	if err != nil {
 		return "", err
 	}

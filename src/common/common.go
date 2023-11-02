@@ -2,9 +2,11 @@ package common
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"regexp"
 	"strings"
 
@@ -24,6 +26,7 @@ const (
 	AssistedControllerPrefix       = "assisted-installer-controller"
 	ControllerLogFile              = "/tmp/controller_logs.log"
 	ControllerLogFileName          = "assisted-installer-controller.logs"
+	KubeconfigFileName             = "kubeconfig-noingress"
 )
 
 func GetHostsInStatus(hosts map[string]inventory_client.HostData, status []string, isMatch bool) map[string]inventory_client.HostData {
@@ -207,4 +210,17 @@ func HostMatchByNameOrIPAddress(node v1.Node, namesMap, IPAddressMap map[string]
 func RemoveUninitializedTaint(platform *models.Platform) bool {
 	removeUninitializedTaintForPlatforms := [...]models.PlatformType{models.PlatformTypeNutanix, models.PlatformTypeVsphere}
 	return platform != nil && funk.Contains(removeUninitializedTaintForPlatforms, *platform.Type)
+}
+
+func DownloadKubeconfigNoingress(ctx context.Context, dir string, ic inventory_client.InventoryClient, log logrus.FieldLogger) (string, error) {
+	// Download kubeconfig file
+	kubeconfigPath := path.Join(dir, KubeconfigFileName)
+	err := ic.DownloadClusterCredentials(ctx, KubeconfigFileName, kubeconfigPath)
+	if err != nil {
+		log.Errorf("Failed to download noingress kubeconfig %v\n", err)
+		return "", err
+	}
+	log.Infof("Downloaded %s to %s.", KubeconfigFileName, kubeconfigPath)
+
+	return kubeconfigPath, nil
 }

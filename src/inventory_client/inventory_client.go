@@ -24,6 +24,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/client"
+	"github.com/openshift/assisted-service/client/events"
 	"github.com/openshift/assisted-service/client/installer"
 	"github.com/openshift/assisted-service/client/operators"
 	"github.com/openshift/assisted-service/models"
@@ -59,6 +60,7 @@ type InventoryClient interface {
 	ClusterLogProgressReport(ctx context.Context, clusterId string, progress models.LogsState)
 	HostLogProgressReport(ctx context.Context, infraEnvId string, hostId string, progress models.LogsState)
 	UpdateClusterOperator(ctx context.Context, clusterId string, operatorName string, operatorVersion string, operatorStatus models.OperatorStatus, operatorStatusInfo string) error
+	TriggerEvent(ctx context.Context, ev *models.Event) error
 }
 
 type inventoryClient struct {
@@ -473,4 +475,13 @@ func (c *inventoryClient) UpdateClusterOperator(ctx context.Context, clusterId s
 		},
 	})
 	return aserror.GetAssistedError(err)
+}
+
+func (c *inventoryClient) TriggerEvent(ctx context.Context, ev *models.Event) error {
+	et := strfmt.DateTime(time.Now())
+	ev.EventTime = &et
+	_, err := c.ai.Events.V2TriggerEvent(ctx, &events.V2TriggerEventParams{
+		TriggerEventParams: ev,
+	})
+	return err
 }

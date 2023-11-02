@@ -3,7 +3,9 @@ package ops
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -589,5 +591,55 @@ var _ = Describe("overwrite OS image", func() {
 		mockPrivileged("umount", "/mnt")
 		err := o.OverwriteOsImage(osImage, device, extraArgs)
 		Expect(err).ToNot(HaveOccurred())
+	})
+})
+
+var _ = Describe("get number of reboots", func() {
+	const (
+		kubeconfigPath = "/kubeconfig"
+		nodeName       = "node1"
+	)
+	var (
+		l        = logrus.New()
+		ctrl     *gomock.Controller
+		execMock *execute.MockExecute
+		conf     *config.Config
+		o        Ops
+	)
+
+	BeforeEach(func() {
+		ctrl = gomock.NewController(GinkgoT())
+		execMock = execute.NewMockExecute(ctrl)
+		conf = &config.Config{}
+		o = NewOpsWithConfig(conf, l, execMock)
+	})
+	expect := func(ret string, err error) {
+		execMock.EXPECT().ExecCommandWithContext(gomock.Any(), gomock.Any(), "oc",
+			"--kubeconfig",
+			kubeconfigPath,
+			"debug",
+			fmt.Sprintf("node/%s", nodeName),
+			"--",
+			"chroot",
+			"/host",
+			"last",
+			"reboot").Return(ret, err)
+	}
+	It("1 reboot", func() {
+		expect("reboot   system boot  4.18.0-372.9.1.e Tue Mar  7 04:13   still running\n", nil)
+		numReboots, err := o.GetNumberOfReboots(context.TODO(), nodeName, kubeconfigPath)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(numReboots).To(Equal(1))
+	})
+	It("2 reboot", func() {
+		expect("reboot   system boot  4.18.0-372.9.1.e Tue Mar  7 04:13   still running\nreboot   system boot  4.18.0-372.9.1.e Sun Mar  5 07:29 - 09:11 (2+01:41)\n", nil)
+		numReboots, err := o.GetNumberOfReboots(context.TODO(), nodeName, kubeconfigPath)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(numReboots).To(Equal(2))
+	})
+	It("with error", func() {
+		expect("", errors.New("An error"))
+		_, err := o.GetNumberOfReboots(context.TODO(), nodeName, kubeconfigPath)
+		Expect(err).To(HaveOccurred())
 	})
 })
