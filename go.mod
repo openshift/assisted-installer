@@ -23,14 +23,14 @@ require (
 	github.com/openshift/assisted-service/models v0.0.0
 	github.com/openshift/client-go v0.0.0-20230120202327-72f107311084
 	github.com/openshift/machine-config-operator v0.0.1-0.20230810165308-00f2deeebffb
-	github.com/operator-framework/api v0.18.0
+	github.com/operator-framework/api v0.19.0
 	github.com/operator-framework/operator-lifecycle-manager v0.22.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/thoas/go-funk v0.9.3
 	github.com/vincent-petithory/dataurl v1.0.0
 	golang.org/x/net v0.17.0
-	golang.org/x/sync v0.4.0
+	golang.org/x/sync v0.5.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.28.0
 	k8s.io/apimachinery v0.28.0
