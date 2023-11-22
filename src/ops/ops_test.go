@@ -554,17 +554,16 @@ var _ = Describe("overwrite OS image", func() {
 				"--pid",
 				"--"), args...)...).Times(1)
 	}
-	It("overwrite OS image", func() {
+	runTest := func(device, part3, part4 string) {
 		osImage := "quay.io/release-image:latest"
-		device := "/dev/sda"
 		extraArgs := []string{
 			"--karg",
 			"abc",
 		}
 		mockPrivileged("cat", "/proc/cmdline")
-		mockPrivileged("mount", "/dev/sda4", "/mnt")
-		mockPrivileged("mount", "/dev/sda3", "/mnt/boot")
-		mockPrivileged("growpart", "/dev/sda", "4")
+		mockPrivileged("mount", part4, "/mnt")
+		mockPrivileged("mount", part3, "/mnt/boot")
+		mockPrivileged("growpart", device, "4")
 		mockPrivileged("xfs_growfs", "/mnt")
 		mockPrivileged("setenforce", "0")
 		mockPrivileged("ostree",
@@ -591,6 +590,15 @@ var _ = Describe("overwrite OS image", func() {
 		mockPrivileged("umount", "/mnt")
 		err := o.OverwriteOsImage(osImage, device, extraArgs)
 		Expect(err).ToNot(HaveOccurred())
+	}
+	It("overwrite OS image - sda", func() {
+		runTest("/dev/sda", "/dev/sda3", "/dev/sda4")
+	})
+	It("overwrite OS image - nvme", func() {
+		runTest("/dev/nvme0n1", "/dev/nvme0n1p3", "/dev/nvme0n1p4")
+	})
+	It("overwrite OS image - mmcblk", func() {
+		runTest("/dev/mmcblk1", "/dev/mmcblk1P3", "/dev/mmcblk1P4")
 	})
 })
 

@@ -1100,6 +1100,19 @@ func (o *ops) ignitionPlatformId() string {
 	return id
 }
 
+func getPartition(device, partitionNumber string) string {
+	var format string
+	switch {
+	case strings.HasPrefix(device, "/dev/nvme"):
+		format = "%sp%s"
+	case strings.HasPrefix(device, "/dev/mmcblk"):
+		format = "%sP%s"
+	default:
+		format = "%s%s"
+	}
+	return fmt.Sprintf(format, device, partitionNumber)
+}
+
 func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error {
 	type cmd struct {
 		command string
@@ -1110,8 +1123,8 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 		return &cmd{command: commad, args: args}
 	}
 	cmds := []*cmd{
-		makecmd("mount", device+"4", "/mnt"),
-		makecmd("mount", device+"3", "/mnt/boot"),
+		makecmd("mount", getPartition(device, "4"), "/mnt"),
+		makecmd("mount", getPartition(device, "3"), "/mnt/boot"),
 		makecmd("growpart", device, "4"),
 		makecmd("xfs_growfs", "/mnt"),
 
