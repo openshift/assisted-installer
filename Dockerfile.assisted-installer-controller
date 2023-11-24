@@ -1,11 +1,9 @@
-FROM quay.io/openshift/origin-cli-artifacts:latest as cli-artifacts
-ARG TARGETPLATFORM
-RUN mkdir -p /usr/share/openshift/assisted
-RUN case $TARGETPLATFORM in "") dir=linux_amd64;; *) dir=`echo $TARGETPLATFORM | sed 's@/@_@'` ;; esac ;  ln /usr/share/openshift/${dir}/oc /usr/share/openshift/assisted
-
-FROM registry.ci.openshift.org/openshift/release:golang-1.20 AS builder
+FROM registry.access.redhat.com/ubi9/go-toolset:1.20.10-2 AS builder
 ARG TARGETPLATFORM
 ENV GOFLAGS=-mod=mod
+
+USER root
+
 WORKDIR /go/src/github.com/openshift/assisted-installer
 
 # Bring in the go dependencies before anything else so we can take
@@ -19,7 +17,14 @@ RUN TARGETPLATFORM=$TARGETPLATFORM make controller
 
 FROM quay.io/centos/centos:stream9
 
-COPY --from=cli-artifacts /usr/share/openshift/assisted/oc /usr/bin/oc
+ENV OCP_VERSION=4.15-el8-beta
+RUN echo -e "\
+[mirror.openshift.com_pub_openshift-v4_multiarch_dependencies_rpms_${OCP_VERSION}_]\n\
+name=created by dnf config-manager from https://mirror.openshift.com/pub/openshift-v4/\$basearch/dependencies/rpms/${OCP_VERSION}/\n\
+baseurl=https://mirror.openshift.com/pub/openshift-v4/\$basearch/dependencies/rpms/${OCP_VERSION}/\n\
+enabled=1" >  /etc/yum.repos.d/mirror.openshift.com_pub_openshift-v4_${TARGETPLATFORM}_dependencies_rpms_${OCP_VERSION}_.repo &&\
+    dnf install --nogpgcheck -y openshift-clients && dnf clean all && rm -rf /var/cache
+
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/assisted-installer-controller /usr/bin/assisted-installer-controller
 
 ENTRYPOINT ["/usr/bin/assisted-installer-controller"]
