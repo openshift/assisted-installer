@@ -77,10 +77,4 @@ var _ = Describe("Reboots notifier", func() {
 		notifier.Start(context.TODO(), nodeName, &hostId, &infraenvId, &clusterId)
 		notifier.Finalize()
 	})
-	It("fail to get number of reboots", func() {
-		mockclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-		mockops.EXPECT().GetNumberOfReboots(gomock.Any(), nodeName, gomock.Any()).Return(1, errors.New("error"))
-		notifier.Start(context.TODO(), nodeName, &hostId, &infraenvId, &clusterId)
-		notifier.Finalize()
-	})
 })

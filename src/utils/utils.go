@@ -161,13 +161,23 @@ func FindAndRemoveElementFromStringList(s []string, r string) []string {
 }
 
 func Retry(attempts int, sleep time.Duration, log logrus.FieldLogger, f func() error) (err error) {
+	return RetryWithContext(context.TODO(), attempts, sleep, log, f)
+}
+
+func RetryWithContext(ctx context.Context, attempts int, sleep time.Duration, log logrus.FieldLogger, f func() error) (err error) {
+	ticker := time.NewTicker(sleep)
+	defer ticker.Stop()
 	for i := 0; i < attempts-1; i++ {
 		err = f()
 		if err == nil {
 			return
 		}
-		time.Sleep(sleep)
-		log.Warnf("Retrying after error: %s", err)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			log.Warnf("Retrying after error: %s", err)
+		}
 	}
 	// Don't wait after the last retry
 	err = f()

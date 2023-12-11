@@ -12,14 +12,18 @@ import (
 	"github.com/openshift/assisted-installer/src/common"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/ops"
+	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/models"
 	"github.com/sirupsen/logrus"
 	"github.com/thoas/go-funk"
 )
 
 const (
-	eventName            = "reboots_for_node"
-	eventMessageTemplate = "Node %s has been rebooted %d times before completing installation"
+	eventName                       = "reboots_for_node"
+	eventMessageTemplate            = "Node %s has been rebooted %d times before completing installation"
+	getNumRebootsRetries            = 10
+	getNumRebootsTimeout            = 6 * time.Minute
+	getNumRebootsRetrySleepDuration = 15 * time.Second
 )
 
 //go:generate mockgen -source=reboots_notifier.go -package=assisted_installer_controller -destination=mock_reboots_notifier.go
@@ -53,10 +57,16 @@ func (r *rebootsNotifier) getKubeconfigPath(ctx context.Context) (string, error)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.kubeconfigPath == "" {
-		var err error
-		if r.kubeconfigPath, err = common.DownloadKubeconfigNoingress(ctx, os.TempDir(), r.ic, r.log); err != nil {
+		dir, err := os.MkdirTemp("", "kubedir")
+		if err != nil {
 			return "", err
 		}
+		kubeconfigPath, err := common.DownloadKubeconfigNoingress(ctx, dir, r.ic, r.log)
+		if err != nil {
+			_ = os.RemoveAll(dir)
+			return "", err
+		}
+		r.kubeconfigPath = kubeconfigPath
 	}
 	return r.kubeconfigPath, nil
 }
@@ -68,7 +78,11 @@ func (r *rebootsNotifier) run(ctx context.Context, nodeName string, hostId, infr
 		r.log.Warningf("failed to get kubeconfig.  aborting notifying reboots for %s", nodeName)
 		return
 	}
-	numberOfReboots, err := r.ops.GetNumberOfReboots(ctx, nodeName, kubeconfigPath)
+	var numberOfReboots int
+	err = utils.RetryWithContext(ctx, getNumRebootsRetries, getNumRebootsRetrySleepDuration, r.log, func() (err error) {
+		numberOfReboots, err = r.ops.GetNumberOfReboots(ctx, nodeName, kubeconfigPath)
+		return err
+	})
 	if err != nil {
 		r.log.WithError(err).Errorf("failed to get number of reboots for node %s", nodeName)
 		return
@@ -91,7 +105,7 @@ func (r *rebootsNotifier) run(ctx context.Context, nodeName string, hostId, infr
 }
 
 func (r *rebootsNotifier) Start(ctx context.Context, nodeName string, hostId, infraenvId, clusterId *strfmt.UUID) {
-	execCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	execCtx, cancel := context.WithTimeout(ctx, getNumRebootsTimeout)
 	r.cancelers = append(r.cancelers, cancel)
 	r.wg.Add(1)
 	go r.run(execCtx, nodeName, hostId, infraenvId, clusterId)
