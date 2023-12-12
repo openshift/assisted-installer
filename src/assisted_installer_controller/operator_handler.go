@@ -159,6 +159,11 @@ func NewClusterServiceVersionHandler(log *logrus.Logger, kc k8s_client.K8SClient
 func (handler ClusterServiceVersionHandler) GetName() string { return handler.operator.Name }
 
 func (handler ClusterServiceVersionHandler) IsInitialized() bool {
+	err := handler.handleOLMEarlySetupBug()
+	if err != nil {
+		handler.log.WithError(err).Warnf("Failed to handle OLMEarlySetupBug")
+	}
+
 	csvName, err := handler.kc.GetCSVFromSubscription(handler.operator.Namespace, handler.operator.SubscriptionName)
 	if err != nil {
 		return false
@@ -166,13 +171,7 @@ func (handler ClusterServiceVersionHandler) IsInitialized() bool {
 	handler.log.Infof("Operator %s csv name is %s", handler.GetName(), csvName)
 	if _, err := handler.kc.GetCSV(handler.operator.Namespace, csvName); err != nil {
 		if apierrors.IsNotFound(err) {
-			handler.log.WithError(err).Warnf("CSV %s not exists for %s. "+
-				"Going to handle it with OLMEarlySetupBug fix", csvName, handler.GetName())
-
-			err = handler.handleOLMEarlySetupBug()
-			if err != nil {
-				handler.log.WithError(err).Warnf("Failed to handle OLMEarlySetupBug")
-			}
+			handler.log.WithError(err).Warnf("CSV %s does not exist for %s. ", csvName, handler.GetName())
 		} else {
 			handler.log.WithError(err).Warnf("Failed to get csv %s not for %s. ", csvName, handler.GetName())
 		}
