@@ -2,13 +2,14 @@ FROM registry.ci.openshift.org/openshift/release:golang-1.19
 ENV GO111MODULE=on
 ENV GOFLAGS=""
 
-COPY --from=quay.io/app-sre/golangci-lint:v1.53.1 /usr/bin/golangci-lint /usr/bin/golangci-lint
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b /usr/bin v1.53.1
+
 RUN yum install -y docker && \
-    yum clean all
+  yum clean all
 
 RUN go install golang.org/x/tools/cmd/goimports@v0.1.0 && \
-    go install github.com/onsi/ginkgo/ginkgo@v1.16.1 && \
-    go install github.com/golang/mock/mockgen@v1.6.0 && \
-    go install gotest.tools/gotestsum@v1.6.3 && \
-    go install github.com/axw/gocov/gocov@latest && \
-    go install github.com/AlekSi/gocov-xml@latest
+  go install github.com/onsi/ginkgo/ginkgo@v1.16.1 && \
+  go install github.com/golang/mock/mockgen@v1.6.0 && \
+  go install gotest.tools/gotestsum@v1.6.3 && \
+  go install github.com/axw/gocov/gocov@latest && \
+  go install github.com/AlekSi/gocov-xml@latest
