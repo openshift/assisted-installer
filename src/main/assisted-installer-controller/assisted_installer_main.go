@@ -77,7 +77,7 @@ func main() {
 	mw := io.MultiWriter(os.Stdout, logFile)
 	logger.SetOutput(mw)
 
-	logger.Infof("Start running Assisted-Controller. Configuration is:\n %s", secretdump.DumpSecretStruct(Options.ControllerConfig))
+	logger.Infof("Start running Assisted-controller. Configuration is:\n %s", secretdump.DumpSecretStruct(Options.ControllerConfig))
 
 	executor := execute.NewExecutor(&config.Config{}, logger, false)
 	o := ops.NewOps(logger, executor)
@@ -196,7 +196,7 @@ func main() {
 	case common.InvokerAgent:
 		waitForInstallationAgentBasedInstaller(kc, logger, removeUninitializedTaint)
 	default:
-		waitForInstallation(client, logger, assistedController.Status)
+		waitForInstallation(client, logger, assistedController)
 	}
 }
 
@@ -204,7 +204,7 @@ func main() {
 // if cluster status is (cancelled,installed) there is no need to continue and we will exit.
 // if cluster is in error, in addition to stop waiting we need to set error status to tell upload logs to send must-gather.
 // if we have maximumErrorsBeforeExit GetClusterNotFound/GetClusterUnauthorized errors in a row we force exiting controller
-func waitForInstallation(client inventory_client.InventoryClient, log logrus.FieldLogger, status *assistedinstallercontroller.ControllerStatus) {
+func waitForInstallation(client inventory_client.InventoryClient, log logrus.FieldLogger, controller assistedinstallercontroller.Controller) {
 	log.Infof("monitor cluster installation status")
 	reqCtx := utils.GenerateRequestContext()
 	errCounter := 0
@@ -237,7 +237,7 @@ func waitForInstallation(client inventory_client.InventoryClient, log logrus.Fie
 		}
 		// reset error counter in case no error occurred
 		errCounter = 0
-		finished := didInstallationFinish(*cluster.Status, log, status)
+		finished := didInstallationFinish(*cluster.Status, log, controller.GetStatus())
 		if finished {
 			return
 		}
