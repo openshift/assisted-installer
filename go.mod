@@ -7,8 +7,8 @@ require (
 	github.com/ReneKroon/ttlcache/v2 v2.11.0
 	github.com/coreos/ignition/v2 v2.17.0
 	github.com/go-openapi/runtime v0.26.2
-	github.com/go-openapi/strfmt v0.21.10
-	github.com/go-openapi/swag v0.22.6
+	github.com/go-openapi/strfmt v0.22.0
+	github.com/go-openapi/swag v0.22.7
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.5.0
 	github.com/hashicorp/go-version v1.6.0
