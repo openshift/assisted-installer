@@ -175,7 +175,7 @@ func main() {
 		logger.Infof("Finished all")
 	}()
 
-	removeUninitializedTaint := common.RemoveUninitializedTaint(cluster.Platform)
+	removeUninitializedTaint := false
 
 	go assistedController.WaitAndUpdateNodesStatus(mainContext, &wg, removeUninitializedTaint)
 	wg.Add(1)
