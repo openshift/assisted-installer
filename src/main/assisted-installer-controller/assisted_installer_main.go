@@ -41,9 +41,6 @@ const (
 	maximumInventoryClientRetries = 15
 	maximumErrorsBeforeExit       = 3
 	bootstrapKubeconfigForSNO     = "/tmp/bootstrap-secrets/kubeconfig"
-	installConfigMapName          = "openshift-install-manifests"
-	installConfigMapNS            = "openshift-config"
-	installConfigMapAttribute     = "invoker"
 )
 
 func DryRebootComplete() bool {
@@ -120,14 +117,6 @@ func main() {
 		log.Fatalf("Failed to create inventory client %v", err)
 	}
 
-	invoker := ""
-	invokerCM, err := kc.GetConfigMap(installConfigMapNS, installConfigMapName)
-	if err != nil {
-		logger.Warnf("error retrieving %v ConfigMap, cannot determine invoker: %v", installConfigMapName, err)
-	}
-	invoker = invokerCM.Data[installConfigMapAttribute]
-	logger.Infof("%v ConfigMap attribute %v = %v", installConfigMapName, installConfigMapAttribute, invoker)
-
 	rn := assistedinstallercontroller.NewRebootsNotifier(o, client, logger)
 	defer rn.Finalize()
 	assistedController := assistedinstallercontroller.NewController(logger,
@@ -148,8 +137,9 @@ func main() {
 		go assistedController.HackDNSAddressConflict(&wg)
 		wg.Add(1)
 	}
+	invoker := common.GetInvoker(kc, logger)
 	cluster := assistedController.SetReadyState()
-	if cluster == nil && invoker == assistedinstallercontroller.InvokerAgent {
+	if cluster == nil && invoker == common.InvokerAgent {
 		// When the agent-based installer installs a SNO cluster, assisted-service
 		// will never be reachable because it will not be running after the boostrap
 		// node reboots to become the SNO cluster. SetReadyState will never be
@@ -175,7 +165,13 @@ func main() {
 		logger.Infof("Finished all")
 	}()
 
-	removeUninitializedTaint := common.RemoveUninitializedTaint(cluster.Platform)
+	hasValidvSphereCredentials := common.HasValidvSphereCredentials(mainContext, client, logger)
+	if hasValidvSphereCredentials {
+		logger.Infof("hasValidvSphereCredentials: %v", hasValidvSphereCredentials)
+	}
+	removeUninitializedTaint := common.RemoveUninitializedTaint(cluster.Platform,
+		invoker, hasValidvSphereCredentials, cluster.OpenshiftVersion)
+	logger.Infof("removeUnitializedTaint %v", removeUninitializedTaint)
 
 	go assistedController.WaitAndUpdateNodesStatus(mainContext, &wg, removeUninitializedTaint)
 	wg.Add(1)
@@ -197,7 +193,7 @@ func main() {
 
 	// monitoring installation by cluster status
 	switch invoker {
-	case assistedinstallercontroller.InvokerAgent:
+	case common.InvokerAgent:
 		waitForInstallationAgentBasedInstaller(kc, logger, removeUninitializedTaint)
 	default:
 		waitForInstallation(client, logger, assistedController.Status)

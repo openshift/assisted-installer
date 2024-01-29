@@ -63,8 +63,6 @@ const (
 	clusterOperatorReportKey string = "CLUSTER_OPERATORS_REPORT"
 	workerMCPName                   = "worker"
 	roleLabel                       = "node-role.kubernetes.io"
-	invokerAssisted                 = "assisted-service"
-	InvokerAgent                    = "agent-installer"
 )
 
 var (
@@ -1399,7 +1397,7 @@ func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup, invoker
 	for {
 		select {
 		case <-ctx.Done():
-			if invoker == InvokerAgent {
+			if invoker == common.InvokerAgent {
 				// In the agent installer, assisted-service will not be available after
 				// the bootstrap node reboots. Attempting to upload logs to assisted-service
 				// will fail in a continuous loop. To avoid this situation, we skip the final

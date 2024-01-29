@@ -182,28 +182,68 @@ var _ = Describe("verify common", func() {
 
 	Context("Verify RemoveUninitializedTaint", func() {
 		It("nil platform struct should not remove uninitiazed taint", func() {
-			removeUninitializedTaint := RemoveUninitializedTaint(nil)
+			removeUninitializedTaint := RemoveUninitializedTaint(nil, InvokerAssisted, false, "4.14.0")
 			Expect(removeUninitializedTaint).To(BeFalse())
 		})
 
 		for _, test := range []struct {
 			PlatformType                     models.PlatformType
 			ExpectedRemoveUninitializedTaint bool
+			Invoker                          string
+			HasValidvSphereCredentials       bool
+			VersionOpenshift                 string
 		}{
 			{
 				PlatformType:                     models.PlatformTypeNutanix,
+				Invoker:                          InvokerAssisted,
+				VersionOpenshift:                 "4.14.0",
 				ExpectedRemoveUninitializedTaint: true,
 			},
 			{
 				PlatformType:                     models.PlatformTypeVsphere,
+				Invoker:                          InvokerAssisted,
+				HasValidvSphereCredentials:       false,
+				VersionOpenshift:                 "4.14.0-rc0",
 				ExpectedRemoveUninitializedTaint: true,
 			},
 			{
+				PlatformType:                     models.PlatformTypeVsphere,
+				Invoker:                          InvokerAgent,
+				HasValidvSphereCredentials:       false,
+				VersionOpenshift:                 "4.14.0-rc0",
+				ExpectedRemoveUninitializedTaint: true,
+			},
+			{
+				PlatformType:                     models.PlatformTypeVsphere,
+				Invoker:                          InvokerAgent,
+				HasValidvSphereCredentials:       false,
+				VersionOpenshift:                 "4.15.0",
+				ExpectedRemoveUninitializedTaint: true,
+			},
+			{
+				PlatformType:                     models.PlatformTypeVsphere,
+				Invoker:                          InvokerAgent,
+				HasValidvSphereCredentials:       true,
+				VersionOpenshift:                 "4.14.0",
+				ExpectedRemoveUninitializedTaint: true,
+			},
+			{
+				PlatformType:                     models.PlatformTypeVsphere,
+				Invoker:                          InvokerAgent,
+				HasValidvSphereCredentials:       true,
+				VersionOpenshift:                 "4.15.0",
+				ExpectedRemoveUninitializedTaint: false,
+			},
+			{
 				PlatformType:                     models.PlatformTypeNone,
+				Invoker:                          InvokerAssisted,
+				VersionOpenshift:                 "4.14.0-rc10-z10",
 				ExpectedRemoveUninitializedTaint: false,
 			},
 			{
 				PlatformType:                     models.PlatformTypeBaremetal,
+				Invoker:                          InvokerAssisted,
+				VersionOpenshift:                 "4.14.0",
 				ExpectedRemoveUninitializedTaint: false,
 			},
 		} {
@@ -219,7 +259,8 @@ var _ = Describe("verify common", func() {
 				})
 
 				It(fmt.Sprintf("%v is expected to remove unitialized taint = %v", platformType, expectedRemoveUninitializedTaint), func() {
-					removeUninitializedTaint := RemoveUninitializedTaint(platform)
+					removeUninitializedTaint := RemoveUninitializedTaint(platform, test.Invoker,
+						test.HasValidvSphereCredentials, test.VersionOpenshift)
 					Expect(removeUninitializedTaint).To(Equal(expectedRemoveUninitializedTaint))
 				})
 			})
