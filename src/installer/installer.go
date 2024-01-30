@@ -690,6 +690,7 @@ func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, 
 			invoker := common.GetInvoker(kc, i.log)
 			removeUninitializedTaint := common.RemoveUninitializedTaint(platform, invoker,
 				hasValidvSphereCredentials, i.OpenshiftVersion)
+			i.log.Infof("removeUnitializedTaint %v", removeUninitializedTaint)
 			if removeUninitializedTaint {
 				for _, node := range nodes.Items {
 					if common.IsK8sNodeIsReady(node) {

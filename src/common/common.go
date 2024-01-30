@@ -35,6 +35,7 @@ const (
 	installConfigMapAttribute      = "invoker"
 	InvokerAssisted                = "assisted-service"
 	InvokerAgent                   = "agent-installer"
+	InstallConfigFile              = "/tmp/install-config.yaml"
 )
 
 func GetHostsInStatus(hosts map[string]inventory_client.HostData, status []string, isMatch bool) map[string]inventory_client.HostData {
@@ -235,9 +236,16 @@ func RemoveUninitializedTaint(platform *models.Platform, invoker string, hasVali
 	return platform != nil && funk.Contains(removeUninitializedTaintForPlatforms, *platform.Type)
 }
 
+// parseOpenshiftVersionIntoMajorMinorZOnly adds a .0 to verions that only specify
+// major and minor.
 func parseOpenshiftVersionIntoMajorMinorZOnly(version string) string {
-	versionSplit := strings.Split(version, "-")
-	return versionSplit[0]
+	versionHypenSplit := strings.Split(version, "-")
+	dotSplit := strings.Split(versionHypenSplit[0], ".")
+	if len(dotSplit) == 2 {
+		// Converts 4.7 to 4.7.0
+		return versionHypenSplit[0] + ".0"
+	}
+	return versionHypenSplit[0]
 }
 
 // HasValidvSphereCredentials returns true if the
@@ -245,29 +253,30 @@ func parseOpenshiftVersionIntoMajorMinorZOnly(version string) string {
 // real credential values and not placeholder values.
 func HasValidvSphereCredentials(ctx context.Context, ic inventory_client.InventoryClient, log logrus.FieldLogger) bool {
 	cluster, callErr := ic.GetCluster(ctx, false)
+	defer os.Remove(InstallConfigFile)
+
 	if callErr != nil {
 		log.WithError(callErr).Errorf("error getting cluster")
 		return false
 	}
 
-	if *cluster.Platform.Type != models.PlatformTypeVsphere {
+	if cluster == nil || cluster.Platform == nil || *cluster.Platform.Type != models.PlatformTypeVsphere {
 		return false
 	}
 
-	installConfigFilename := "/tmp/install-config.yaml"
-	downloadErr := ic.DownloadFile(ctx, "install-config.yaml", installConfigFilename)
+	downloadErr := ic.DownloadFile(ctx, "install-config.yaml", InstallConfigFile)
 	if downloadErr != nil {
-		log.Infof("downloading install-config.yaml to %v error: %v", installConfigFilename, downloadErr)
+		log.Infof("downloading install-config.yaml to %v error: %v", InstallConfigFile, downloadErr)
 		return false
 	}
-	installConfigData, readErr := os.ReadFile(installConfigFilename)
+	installConfigData, readErr := os.ReadFile(InstallConfigFile)
 	if readErr != nil {
-		log.Info("error reading %v: %v", installConfigFilename, readErr)
+		log.Info("error reading %v: %v", InstallConfigFile, readErr)
 		return false
 	}
 	config := &types.InstallConfig{}
 	if err := yaml.UnmarshalStrict(installConfigData, config, yaml.DisallowUnknownFields); err != nil {
-		log.Infof("failed to unmarshal %s", installConfigFilename)
+		log.Infof("failed to unmarshal %s", InstallConfigFile)
 		return false
 	}
 	if config.Platform.VSphere.VCenters[0].Username != "usernameplaceholder" &&

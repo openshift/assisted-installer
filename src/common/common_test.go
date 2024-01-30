@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,7 +15,10 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-service/models"
+	"github.com/openshift/installer/pkg/types"
+	"github.com/openshift/installer/pkg/types/vsphere"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -231,7 +235,7 @@ var _ = Describe("verify common", func() {
 				PlatformType:                     models.PlatformTypeVsphere,
 				Invoker:                          InvokerAgent,
 				HasValidvSphereCredentials:       true,
-				VersionOpenshift:                 "4.15.0",
+				VersionOpenshift:                 "4.15",
 				ExpectedRemoveUninitializedTaint: false,
 			},
 			{
@@ -247,26 +251,119 @@ var _ = Describe("verify common", func() {
 				ExpectedRemoveUninitializedTaint: false,
 			},
 		} {
-			platformType := test.PlatformType
-			expectedRemoveUninitializedTaint := test.ExpectedRemoveUninitializedTaint
-
 			Context("by platform", func() {
-				var platform *models.Platform
-				BeforeEach(func() {
-					platform = &models.Platform{
-						Type: &platformType,
+				It(fmt.Sprintf("platform %v, invoker %v, hasValidCredentials %v, version %v, expected remove uninitialized taint = %v", test.PlatformType, test.Invoker, test.HasValidvSphereCredentials, test.VersionOpenshift, test.ExpectedRemoveUninitializedTaint), func() {
+					platform := &models.Platform{
+						Type: &test.PlatformType,
 					}
-				})
-
-				It(fmt.Sprintf("%v is expected to remove unitialized taint = %v", platformType, expectedRemoveUninitializedTaint), func() {
 					removeUninitializedTaint := RemoveUninitializedTaint(platform, test.Invoker,
 						test.HasValidvSphereCredentials, test.VersionOpenshift)
-					Expect(removeUninitializedTaint).To(Equal(expectedRemoveUninitializedTaint))
+					Expect(removeUninitializedTaint).To(Equal(test.ExpectedRemoveUninitializedTaint))
 				})
 			})
 		}
 	})
+
+	Context("Verify HasValidvSphereCredentials", func() {
+		It("nil cluster struct should not cause nil pointer exception", func() {
+			mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(nil, nil).Times(1)
+			hasValidvSphereCredentials := HasValidvSphereCredentials(context.TODO(), mockbmclient, l)
+			Expect(hasValidvSphereCredentials).To(BeFalse())
+		})
+
+		for _, test := range []struct {
+			TestName                   string
+			Cluster                    models.Cluster
+			InstallConfig              types.InstallConfig
+			HasValidvSphereCredentials bool
+		}{
+			{
+				TestName: "has valid vSphere credentials",
+				Cluster: models.Cluster{
+					Platform: &models.Platform{Type: platformTypePtr(models.PlatformTypeVsphere)},
+				},
+				InstallConfig: types.InstallConfig{
+					Platform: types.Platform{
+						VSphere: &vsphere.Platform{
+							VCenters: []vsphere.VCenter{
+								{
+									Server:   "good-server",
+									Username: "good-username",
+									Password: "good-password",
+								},
+							},
+						},
+					},
+				},
+				HasValidvSphereCredentials: true,
+			},
+			{
+				TestName: "does not have valid vSphere credentials",
+				Cluster: models.Cluster{
+					Platform: &models.Platform{Type: platformTypePtr(models.PlatformTypeVsphere)},
+				},
+				InstallConfig: types.InstallConfig{
+					Platform: types.Platform{
+						VSphere: &vsphere.Platform{
+							VCenters: []vsphere.VCenter{
+								{
+									Server:   "vcenterplaceholder",
+									Username: "usernameplaceholder",
+									Password: "passwordplaceholder",
+								},
+							},
+						},
+					},
+				},
+				HasValidvSphereCredentials: false,
+			},
+			{
+				TestName: "other platforms should return false",
+				Cluster: models.Cluster{
+					Platform: &models.Platform{Type: platformTypePtr(models.PlatformTypeBaremetal)},
+				},
+				InstallConfig: types.InstallConfig{
+					Platform: types.Platform{
+						VSphere: &vsphere.Platform{
+							VCenters: []vsphere.VCenter{
+								{
+									Server:   "good-server",
+									Username: "good-username",
+									Password: "good-password",
+								},
+							},
+						},
+					},
+				},
+				HasValidvSphereCredentials: false,
+			},
+		} {
+			Context("by cluster and install config", func() {
+				BeforeEach(func() {
+					out, err := yaml.Marshal(test.InstallConfig)
+					Expect(err).To(BeNil())
+
+					err = os.WriteFile(InstallConfigFile, out, 0600)
+					Expect(err).To(BeNil())
+
+					mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(&test.Cluster, nil).Times(1)
+				})
+
+				It("test HasValidvSphereCredentials", func() {
+
+					hasValidvSphereCredentials := HasValidvSphereCredentials(context.TODO(), mockbmclient, l)
+
+					Expect(hasValidvSphereCredentials).To(Equal(test.HasValidvSphereCredentials))
+				})
+			})
+
+		}
+	})
 })
+
+func platformTypePtr(p models.PlatformType) *models.PlatformType {
+	return &p
+}
 
 func GetKubeNodes(kubeNamesIds map[string]string) *v1.NodeList {
 	file, _ := os.ReadFile("../../test_files/node.json")
