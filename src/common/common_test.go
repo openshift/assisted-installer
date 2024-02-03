@@ -15,10 +15,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-service/models"
-	"github.com/openshift/installer/pkg/types"
-	"github.com/openshift/installer/pkg/types/vsphere"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -271,90 +268,45 @@ var _ = Describe("verify common", func() {
 			Expect(hasValidvSphereCredentials).To(BeFalse())
 		})
 
-		for _, test := range []struct {
+		tests := []struct {
 			TestName                   string
 			Cluster                    models.Cluster
-			InstallConfig              types.InstallConfig
 			HasValidvSphereCredentials bool
 		}{
 			{
 				TestName: "has valid vSphere credentials",
 				Cluster: models.Cluster{
-					Platform: &models.Platform{Type: platformTypePtr(models.PlatformTypeVsphere)},
-				},
-				InstallConfig: types.InstallConfig{
-					Platform: types.Platform{
-						VSphere: &vsphere.Platform{
-							VCenters: []vsphere.VCenter{
-								{
-									Server:   "good-server",
-									Username: "good-username",
-									Password: "good-password",
-								},
-							},
-						},
-					},
+					Platform:               &models.Platform{Type: platformTypePtr(models.PlatformTypeVsphere)},
+					InstallConfigOverrides: "{\"platform\":{\"vsphere\":{\"vcenters\":[{\"server\":\"server.openshift.com\",\"user\":\"some-user\",\"password\":\"some-password\",\"datacenters\":[\"datacenter\"]}],\"failureDomains\":[{\"name\":\"test-failure-baseDomain\",\"region\":\"changeme-region\",\"zone\":\"changeme-zone\",\"server\":\"server.openshift.com\",\"topology\":{\"datacenter\":\"datacenter\",\"computeCluster\":\"/datacenter/host/cluster\",\"networks\":[\"segment-a\"],\"datastore\":\"/datacenter/datastore/mystore\",\"resourcePool\":\"/datacenter/host/mycluster//Resources\",\"folder\":\"/datacenter/vm/folder\"}}]}}}",
 				},
 				HasValidvSphereCredentials: true,
 			},
 			{
 				TestName: "does not have valid vSphere credentials",
 				Cluster: models.Cluster{
-					Platform: &models.Platform{Type: platformTypePtr(models.PlatformTypeVsphere)},
-				},
-				InstallConfig: types.InstallConfig{
-					Platform: types.Platform{
-						VSphere: &vsphere.Platform{
-							VCenters: []vsphere.VCenter{
-								{
-									Server:   "vcenterplaceholder",
-									Username: "usernameplaceholder",
-									Password: "passwordplaceholder",
-								},
-							},
-						},
-					},
+					Platform:               &models.Platform{Type: platformTypePtr(models.PlatformTypeVsphere)},
+					InstallConfigOverrides: "{\"platform\":{\"vsphere\":{\"vcenters\":[{\"server\":\"\",\"user\":\"usernameplaceholder\",\"password\":\"some-password\",\"datacenters\":[\"datacenter\"]}],\"failureDomains\":[{\"name\":\"test-failure-baseDomain\",\"region\":\"changeme-region\",\"zone\":\"changeme-zone\",\"server\":\"server.openshift.com\",\"topology\":{\"datacenter\":\"datacenter\",\"computeCluster\":\"/datacenter/host/cluster\",\"networks\":[\"segment-a\"],\"datastore\":\"/datacenter/datastore/mystore\",\"resourcePool\":\"/datacenter/host/mycluster//Resources\",\"folder\":\"/datacenter/vm/folder\"}}]}}}",
 				},
 				HasValidvSphereCredentials: false,
 			},
 			{
 				TestName: "other platforms should return false",
 				Cluster: models.Cluster{
-					Platform: &models.Platform{Type: platformTypePtr(models.PlatformTypeBaremetal)},
-				},
-				InstallConfig: types.InstallConfig{
-					Platform: types.Platform{
-						VSphere: &vsphere.Platform{
-							VCenters: []vsphere.VCenter{
-								{
-									Server:   "good-server",
-									Username: "good-username",
-									Password: "good-password",
-								},
-							},
-						},
-					},
+					Platform:               &models.Platform{Type: platformTypePtr(models.PlatformTypeBaremetal)},
+					InstallConfigOverrides: "{\"fips\":\"false\",\"platform\":{\"baremetal\":{}}}",
 				},
 				HasValidvSphereCredentials: false,
 			},
-		} {
-			Context("by cluster and install config", func() {
-				BeforeEach(func() {
-					out, err := yaml.Marshal(test.InstallConfig)
-					Expect(err).To(BeNil())
+		}
 
-					err = os.WriteFile(InstallConfigFile, out, 0600)
-					Expect(err).To(BeNil())
+		for i := range tests {
+			test := tests[i]
+			It(test.TestName, func() {
+				mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(&test.Cluster, nil).Times(1)
 
-					mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(&test.Cluster, nil).Times(1)
-				})
+				hasValidvSphereCredentials := HasValidvSphereCredentials(context.TODO(), mockbmclient, l)
 
-				It("test HasValidvSphereCredentials", func() {
-
-					hasValidvSphereCredentials := HasValidvSphereCredentials(context.TODO(), mockbmclient, l)
-
-					Expect(hasValidvSphereCredentials).To(Equal(test.HasValidvSphereCredentials))
-				})
+				Expect(hasValidvSphereCredentials).To(Equal(test.HasValidvSphereCredentials))
 			})
 
 		}

@@ -3,6 +3,7 @@ package common
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -15,12 +16,11 @@ import (
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/models"
-	"github.com/openshift/installer/pkg/types"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/thoas/go-funk"
 	v1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -35,7 +35,6 @@ const (
 	installConfigMapAttribute      = "invoker"
 	InvokerAssisted                = "assisted-service"
 	InvokerAgent                   = "agent-installer"
-	InstallConfigFile              = "/tmp/install-config.yaml"
 )
 
 func GetHostsInStatus(hosts map[string]inventory_client.HostData, status []string, isMatch bool) map[string]inventory_client.HostData {
@@ -248,12 +247,11 @@ func parseOpenshiftVersionIntoMajorMinorZOnly(version string) string {
 	return versionHypenSplit[0]
 }
 
-// HasValidvSphereCredentials returns true if the
-// the platform is vSphere and the install-config.yaml contains
-// real credential values and not placeholder values.
+// HasValidvSphereCredentials returns true if the the platform is
+// vSphere and the install config overrides contains real
+// credential values and not placeholder values.
 func HasValidvSphereCredentials(ctx context.Context, ic inventory_client.InventoryClient, log logrus.FieldLogger) bool {
 	cluster, callErr := ic.GetCluster(ctx, false)
-	defer os.Remove(InstallConfigFile)
 
 	if callErr != nil {
 		log.WithError(callErr).Errorf("error getting cluster")
@@ -264,24 +262,43 @@ func HasValidvSphereCredentials(ctx context.Context, ic inventory_client.Invento
 		return false
 	}
 
-	downloadErr := ic.DownloadFile(ctx, "install-config.yaml", InstallConfigFile)
-	if downloadErr != nil {
-		log.Infof("downloading install-config.yaml to %v error: %v", InstallConfigFile, downloadErr)
+	if cluster.InstallConfigOverrides == "" {
 		return false
 	}
-	installConfigData, readErr := os.ReadFile(InstallConfigFile)
-	if readErr != nil {
-		log.Info("error reading %v: %v", InstallConfigFile, readErr)
+
+	overridesMap := make(map[string]interface{})
+
+	if err := json.Unmarshal([]byte(cluster.InstallConfigOverrides), &overridesMap); err != nil {
+		log.Infof("failed to unmarshal install config overrides: %v", err)
 		return false
 	}
-	config := &types.InstallConfig{}
-	if err := yaml.UnmarshalStrict(installConfigData, config, yaml.DisallowUnknownFields); err != nil {
-		log.Infof("failed to unmarshal %s", InstallConfigFile)
+
+	platformMap := overridesMap["platform"]
+
+	if platformMap == nil {
 		return false
 	}
-	if config.Platform.VSphere.VCenters[0].Username != "usernameplaceholder" &&
-		config.Platform.VSphere.VCenters[0].Password != "passwordplaceholder" &&
-		config.Platform.VSphere.VCenters[0].Server != "vcenterplaceholder" {
+
+	vsphereMap := platformMap.(map[string]interface{})["vsphere"]
+
+	if vsphereMap == nil {
+		return false
+	}
+
+	vcentersMap := vsphereMap.(map[string]interface{})["vcenters"]
+
+	if len(vcentersMap.([]interface{})) == 0 {
+		return false
+	}
+
+	firstVcenterMap := vcentersMap.([]interface{})[0].(map[string]interface{})
+	username := firstVcenterMap["user"]
+	password := firstVcenterMap["password"]
+	server := firstVcenterMap["server"]
+
+	if username != "usernameplaceholder" && username != "" &&
+		password != "passwordplaceholder" && password != "" &&
+		server != "vcenterplaceholder" && server != "" {
 		return true
 	}
 	return false

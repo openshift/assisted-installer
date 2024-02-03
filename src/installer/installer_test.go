@@ -574,10 +574,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 								{string(models.HostStageRebooting)},
 							})
 							extractIgnitionToFS("extract failure", fmt.Errorf("extract failed"))
-							if platformType == models.PlatformTypeVsphere {
-								mockbmclient.EXPECT().DownloadFile(gomock.Any(), "install-config.yaml", "/tmp/install-config.yaml").Return(nil).Times(1)
 
-							}
 							bootstrapSetup()
 							checkLocalHostname("not localhost", nil)
 							restartNetworkManager(nil)
