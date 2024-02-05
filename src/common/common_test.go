@@ -274,7 +274,7 @@ var _ = Describe("verify common", func() {
 			HasValidvSphereCredentials bool
 		}{
 			{
-				TestName: "has valid vSphere credentials",
+				TestName: "has valid vSphere credentials should return true",
 				Cluster: models.Cluster{
 					Platform:               &models.Platform{Type: platformTypePtr(models.PlatformTypeVsphere)},
 					InstallConfigOverrides: "{\"platform\":{\"vsphere\":{\"vcenters\":[{\"server\":\"server.openshift.com\",\"user\":\"some-user\",\"password\":\"some-password\",\"datacenters\":[\"datacenter\"]}],\"failureDomains\":[{\"name\":\"test-failure-baseDomain\",\"region\":\"changeme-region\",\"zone\":\"changeme-zone\",\"server\":\"server.openshift.com\",\"topology\":{\"datacenter\":\"datacenter\",\"computeCluster\":\"/datacenter/host/cluster\",\"networks\":[\"segment-a\"],\"datastore\":\"/datacenter/datastore/mystore\",\"resourcePool\":\"/datacenter/host/mycluster//Resources\",\"folder\":\"/datacenter/vm/folder\"}}]}}}",
@@ -282,7 +282,15 @@ var _ = Describe("verify common", func() {
 				HasValidvSphereCredentials: true,
 			},
 			{
-				TestName: "does not have valid vSphere credentials",
+				TestName: "does not have valid vSphere credentials should return false",
+				Cluster: models.Cluster{
+					Platform:               &models.Platform{Type: platformTypePtr(models.PlatformTypeVsphere)},
+					InstallConfigOverrides: "{\"platform\":{\"vsphere\":{\"username\":\"a-user\",\"password\":\"a-password\",\"vCenter\":\"a-server.com\"}}}",
+				},
+				HasValidvSphereCredentials: false,
+			},
+			{
+				TestName: "deprecated credentials should return false",
 				Cluster: models.Cluster{
 					Platform:               &models.Platform{Type: platformTypePtr(models.PlatformTypeVsphere)},
 					InstallConfigOverrides: "{\"platform\":{\"vsphere\":{\"vcenters\":[{\"server\":\"\",\"user\":\"usernameplaceholder\",\"password\":\"some-password\",\"datacenters\":[\"datacenter\"]}],\"failureDomains\":[{\"name\":\"test-failure-baseDomain\",\"region\":\"changeme-region\",\"zone\":\"changeme-zone\",\"server\":\"server.openshift.com\",\"topology\":{\"datacenter\":\"datacenter\",\"computeCluster\":\"/datacenter/host/cluster\",\"networks\":[\"segment-a\"],\"datastore\":\"/datacenter/datastore/mystore\",\"resourcePool\":\"/datacenter/host/mycluster//Resources\",\"folder\":\"/datacenter/vm/folder\"}}]}}}",

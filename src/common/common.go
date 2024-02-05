@@ -3,7 +3,6 @@ package common
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -20,6 +19,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/thoas/go-funk"
+	"github.com/tidwall/gjson"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -250,6 +250,7 @@ func parseOpenshiftVersionIntoMajorMinorZOnly(version string) string {
 // HasValidvSphereCredentials returns true if the the platform is
 // vSphere and the install config overrides contains real
 // credential values and not placeholder values.
+// Deprecated credential fields are not considered valid.
 func HasValidvSphereCredentials(ctx context.Context, ic inventory_client.InventoryClient, log logrus.FieldLogger) bool {
 	cluster, callErr := ic.GetCluster(ctx, false)
 
@@ -266,35 +267,9 @@ func HasValidvSphereCredentials(ctx context.Context, ic inventory_client.Invento
 		return false
 	}
 
-	overridesMap := make(map[string]interface{})
-
-	if err := json.Unmarshal([]byte(cluster.InstallConfigOverrides), &overridesMap); err != nil {
-		log.Infof("failed to unmarshal install config overrides: %v", err)
-		return false
-	}
-
-	platformMap := overridesMap["platform"]
-
-	if platformMap == nil {
-		return false
-	}
-
-	vsphereMap := platformMap.(map[string]interface{})["vsphere"]
-
-	if vsphereMap == nil {
-		return false
-	}
-
-	vcentersMap := vsphereMap.(map[string]interface{})["vcenters"]
-
-	if len(vcentersMap.([]interface{})) == 0 {
-		return false
-	}
-
-	firstVcenterMap := vcentersMap.([]interface{})[0].(map[string]interface{})
-	username := firstVcenterMap["user"]
-	password := firstVcenterMap["password"]
-	server := firstVcenterMap["server"]
+	username := gjson.Get(cluster.InstallConfigOverrides, `platform.vsphere.vcenters.0.user`).String()
+	password := gjson.Get(cluster.InstallConfigOverrides, `platform.vsphere.vcenters.0.password`).String()
+	server := gjson.Get(cluster.InstallConfigOverrides, `platform.vsphere.vcenters.0.server`).String()
 
 	if username != "usernameplaceholder" && username != "" &&
 		password != "passwordplaceholder" && password != "" &&
