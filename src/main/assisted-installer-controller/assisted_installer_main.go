@@ -167,11 +167,11 @@ func main() {
 
 	hasValidvSphereCredentials := common.HasValidvSphereCredentials(mainContext, client, logger)
 	if hasValidvSphereCredentials {
-		logger.Infof("hasValidvSphereCredentials: %v", hasValidvSphereCredentials)
+		logger.Infof("Has valid vSphere credentials: %v", hasValidvSphereCredentials)
 	}
 	removeUninitializedTaint := common.RemoveUninitializedTaint(cluster.Platform,
 		invoker, hasValidvSphereCredentials, cluster.OpenshiftVersion)
-	logger.Infof("removeUnitializedTaint %v", removeUninitializedTaint)
+	logger.Infof("Remove uninitialized taint: %v", removeUninitializedTaint)
 
 	go assistedController.WaitAndUpdateNodesStatus(mainContext, &wg, removeUninitializedTaint)
 	wg.Add(1)

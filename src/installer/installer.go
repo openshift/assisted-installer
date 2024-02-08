@@ -485,7 +485,7 @@ func (i *installer) waitForControlPlane(ctx context.Context) error {
 
 	hasValidvSphereCredentials := common.HasValidvSphereCredentials(ctx, i.inventoryClient, i.log)
 	if hasValidvSphereCredentials {
-		i.log.Infof("hasValidvSphereCredentials: %v", hasValidvSphereCredentials)
+		i.log.Infof("Has valid vSphere credentials: %v", hasValidvSphereCredentials)
 	}
 
 	cluster, callErr := i.inventoryClient.GetCluster(ctx, false)
@@ -690,7 +690,7 @@ func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, 
 			invoker := common.GetInvoker(kc, i.log)
 			removeUninitializedTaint := common.RemoveUninitializedTaint(platform, invoker,
 				hasValidvSphereCredentials, i.OpenshiftVersion)
-			i.log.Infof("removeUnitializedTaint %v", removeUninitializedTaint)
+			i.log.Infof("Remove uninitialized taint: %v", removeUninitializedTaint)
 			if removeUninitializedTaint {
 				for _, node := range nodes.Items {
 					if common.IsK8sNodeIsReady(node) {
