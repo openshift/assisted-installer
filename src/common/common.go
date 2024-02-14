@@ -10,13 +10,16 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/coreos/go-semver/semver"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/models"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/thoas/go-funk"
+	"github.com/tidwall/gjson"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -27,6 +30,11 @@ const (
 	ControllerLogFile              = "/tmp/controller_logs.log"
 	ControllerLogFileName          = "assisted-installer-controller.logs"
 	KubeconfigFileName             = "kubeconfig-noingress"
+	installConfigMapName           = "openshift-install-manifests"
+	installConfigMapNS             = "openshift-config"
+	installConfigMapAttribute      = "invoker"
+	InvokerAssisted                = "assisted-service"
+	InvokerAgent                   = "agent-installer"
 )
 
 func GetHostsInStatus(hosts map[string]inventory_client.HostData, status []string, isMatch bool) map[string]inventory_client.HostData {
@@ -207,9 +215,83 @@ func HostMatchByNameOrIPAddress(node v1.Node, namesMap, IPAddressMap map[string]
 // Returns True when uninitialized taint must be removed.
 // This is required for some external platforms (e.g. VSphere, Nutanix) to proceed
 // with the installation using fake credentials.
-func RemoveUninitializedTaint(platform *models.Platform) bool {
+func RemoveUninitializedTaint(platform *models.Platform, invoker string, hasValidCredentials bool, openshiftVersion string) bool {
 	removeUninitializedTaintForPlatforms := [...]models.PlatformType{models.PlatformTypeNutanix, models.PlatformTypeVsphere}
+	version := semver.New(parseOpenshiftVersionIntoMajorMinorZOnly(openshiftVersion))
+	if invoker == InvokerAgent &&
+		*platform.Type == models.PlatformTypeVsphere &&
+		version.Compare(*semver.New("4.15.0")) >= 0 &&
+		hasValidCredentials {
+		// Starting with OpenShift 4.15, the agent-installer can pass valid credentials
+		// to vSphere. Do not remove the taint if:
+		// 1) invoker == agent-installer
+		// 2) platform == vSphere
+		// 3) OpenShift version >= 4.15
+		// 4) and valid vSphere credentials were provided in install-config.yaml
+		// With valid credentials, the vSphere CCM will remove the uninitialized taints
+		// when it initializes the nodes.
+		return false
+	}
 	return platform != nil && funk.Contains(removeUninitializedTaintForPlatforms, *platform.Type)
+}
+
+// parseOpenshiftVersionIntoMajorMinorZOnly adds a .0 to verions that only specify
+// major and minor.
+func parseOpenshiftVersionIntoMajorMinorZOnly(version string) string {
+	versionHypenSplit := strings.Split(version, "-")
+	dotSplit := strings.Split(versionHypenSplit[0], ".")
+	if len(dotSplit) == 2 {
+		// Converts 4.7 to 4.7.0
+		return versionHypenSplit[0] + ".0"
+	}
+	return versionHypenSplit[0]
+}
+
+// HasValidvSphereCredentials returns true if the the platform is
+// vSphere and the install config overrides contains real
+// credential values and not placeholder values.
+// Deprecated credential fields are not considered valid.
+func HasValidvSphereCredentials(ctx context.Context, ic inventory_client.InventoryClient, log logrus.FieldLogger) bool {
+	cluster, callErr := ic.GetCluster(ctx, false)
+
+	if callErr != nil {
+		log.WithError(callErr).Errorf("error getting cluster")
+		return false
+	}
+
+	if cluster == nil || cluster.Platform == nil || *cluster.Platform.Type != models.PlatformTypeVsphere {
+		return false
+	}
+
+	if cluster.InstallConfigOverrides == "" {
+		return false
+	}
+
+	username := gjson.Get(cluster.InstallConfigOverrides, `platform.vsphere.vcenters.0.user`).String()
+	password := gjson.Get(cluster.InstallConfigOverrides, `platform.vsphere.vcenters.0.password`).String()
+	server := gjson.Get(cluster.InstallConfigOverrides, `platform.vsphere.vcenters.0.server`).String()
+
+	if username != "usernameplaceholder" && username != "" &&
+		password != "passwordplaceholder" && password != "" &&
+		server != "vcenterplaceholder" && server != "" {
+		return true
+	}
+	return false
+}
+
+func GetInvoker(kc k8s_client.K8SClient, log logrus.FieldLogger) string {
+	invoker := InvokerAssisted
+	invokerCM, err := kc.GetConfigMap(installConfigMapNS, installConfigMapName)
+	if err != nil {
+		log.Warnf("error retrieving %v ConfigMap, cannot determine invoker: %v", installConfigMapName, err)
+	}
+	if invokerCM == nil {
+		log.Warnf("%v ConfigMap is nil, cannot determine invoker: %v", installConfigMapName, err)
+	} else {
+		invoker = invokerCM.Data[installConfigMapAttribute]
+		log.Infof("%v ConfigMap attribute %v = %v", installConfigMapName, installConfigMapAttribute, invoker)
+	}
+	return invoker
 }
 
 func DownloadKubeconfigNoingress(ctx context.Context, dir string, ic inventory_client.InventoryClient, log logrus.FieldLogger) (string, error) {
