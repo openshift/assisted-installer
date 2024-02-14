@@ -182,12 +182,12 @@ var _ = Describe("verify common", func() {
 	})
 
 	Context("Verify RemoveUninitializedTaint", func() {
-		It("nil platform struct should not remove uninitiazed taint", func() {
+		It("nil platform struct should not remove uninitialized taint", func() {
 			removeUninitializedTaint := RemoveUninitializedTaint(nil, InvokerAssisted, false, "4.14.0")
 			Expect(removeUninitializedTaint).To(BeFalse())
 		})
 
-		for _, test := range []struct {
+		tests := []struct {
 			PlatformType                     models.PlatformType
 			ExpectedRemoveUninitializedTaint bool
 			Invoker                          string
@@ -247,16 +247,17 @@ var _ = Describe("verify common", func() {
 				VersionOpenshift:                 "4.14.0",
 				ExpectedRemoveUninitializedTaint: false,
 			},
-		} {
-			Context("by platform", func() {
-				It(fmt.Sprintf("platform %v, invoker %v, hasValidCredentials %v, version %v, expected remove uninitialized taint = %v", test.PlatformType, test.Invoker, test.HasValidvSphereCredentials, test.VersionOpenshift, test.ExpectedRemoveUninitializedTaint), func() {
-					platform := &models.Platform{
-						Type: &test.PlatformType,
-					}
-					removeUninitializedTaint := RemoveUninitializedTaint(platform, test.Invoker,
-						test.HasValidvSphereCredentials, test.VersionOpenshift)
-					Expect(removeUninitializedTaint).To(Equal(test.ExpectedRemoveUninitializedTaint))
-				})
+		}
+
+		for i := range tests {
+			test := tests[i]
+			It(fmt.Sprintf("platform %v, invoker %v, hasValidCredentials %v, version %v, expected remove uninitialized taint = %v", test.PlatformType, test.Invoker, test.HasValidvSphereCredentials, test.VersionOpenshift, test.ExpectedRemoveUninitializedTaint), func() {
+				platform := &models.Platform{
+					Type: &test.PlatformType,
+				}
+				removeUninitializedTaint := RemoveUninitializedTaint(platform, test.Invoker,
+					test.HasValidvSphereCredentials, test.VersionOpenshift)
+				Expect(removeUninitializedTaint).To(Equal(test.ExpectedRemoveUninitializedTaint))
 			})
 		}
 	})
