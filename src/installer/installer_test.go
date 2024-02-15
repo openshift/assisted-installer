@@ -308,7 +308,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 						"node1": "eb82821f-bf21-4614-9a3b-ecb07929f238"}
 					mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
 					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), inventoryNamesHost["node1"].Host.InfraEnvID.String(), inventoryNamesHost["node1"].Host.ID.String(), models.HostStageJoined, "").Times(1)
-					mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(&models.Cluster{}, nil).Times(1)
+					mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(&models.Cluster{}, nil).Times(2)
+					mockk8sclient.EXPECT().GetConfigMap(gomock.Any(), gomock.Any()).AnyTimes()
 				}
 				prepareControllerSuccess := func() {
 					mockops.EXPECT().PrepareController().Return(nil).Times(1)
@@ -586,7 +587,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), inventoryNamesHost["node0"].Host.InfraEnvID.String(), inventoryNamesHost["node0"].Host.ID.String(), models.HostStageJoined, "").Times(1)
 							// node not ready
 							mockk8sclient.EXPECT().ListMasterNodes().Return(GetNotReadyKubeNodes(kubeNamesIds), nil).Times(1)
-							mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(cluster, nil).Times(1)
+							mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(cluster, nil).Times(2)
+							mockk8sclient.EXPECT().GetConfigMap(gomock.Any(), gomock.Any()).AnyTimes()
 							if expectedRemoveUninitializedTaint {
 								mockk8sclient.EXPECT().UntaintNode("node0").Return(nil).Times(1)
 							} else {

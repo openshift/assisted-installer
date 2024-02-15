@@ -483,14 +483,18 @@ func (i *installer) waitForControlPlane(ctx context.Context) error {
 	}
 	i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, waitingForMastersStatusInfo)
 
+	hasValidvSphereCredentials := common.HasValidvSphereCredentials(ctx, i.inventoryClient, i.log)
+	if hasValidvSphereCredentials {
+		i.log.Infof("Has valid vSphere credentials: %v", hasValidvSphereCredentials)
+	}
+
 	cluster, callErr := i.inventoryClient.GetCluster(ctx, false)
 	if callErr != nil {
 		i.log.WithError(callErr).Errorf("Getting cluster %s", i.ClusterID)
 		return callErr
 	}
 
-	removeUninitializedTaint := common.RemoveUninitializedTaint(cluster.Platform)
-	if err = i.waitForMinMasterNodes(ctx, kc, removeUninitializedTaint); err != nil {
+	if err = i.waitForMinMasterNodes(ctx, kc, cluster.Platform, hasValidvSphereCredentials); err != nil {
 		return err
 	}
 
@@ -566,8 +570,8 @@ func (i *installer) workerWaitFor2ReadyMasters(ctx context.Context) error {
 	return nil
 }
 
-func (i *installer) waitForMinMasterNodes(ctx context.Context, kc k8s_client.K8SClient, removeUninitializedTaint bool) error {
-	i.waitForMasterNodes(ctx, minMasterNodes, kc, removeUninitializedTaint)
+func (i *installer) waitForMinMasterNodes(ctx context.Context, kc k8s_client.K8SClient, platform *models.Platform, hasValidCredentials bool) error {
+	i.waitForMasterNodes(ctx, minMasterNodes, kc, platform, hasValidCredentials)
 	return nil
 }
 
@@ -664,7 +668,7 @@ func (i *installer) wasControllerReadyEventSet(kc k8s_client.K8SClient, previous
 }
 
 // wait for minimum master nodes to be in ready status
-func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, kc k8s_client.K8SClient, removeUninitializedTaint bool) {
+func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, kc k8s_client.K8SClient, platform *models.Platform, hasValidvSphereCredentials bool) {
 	var readyMasters []string
 	var inventoryHostsMap map[string]inventory_client.HostData
 	i.log.Infof("Waiting for %d master nodes", minMasterNodes)
@@ -679,13 +683,22 @@ func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, 
 			i.log.Warnf("Still waiting for master nodes: %v", err)
 			return false
 		}
-		if removeUninitializedTaint {
-			for _, node := range nodes.Items {
-				if common.IsK8sNodeIsReady(node) {
-					continue
-				}
-				if err = kc.UntaintNode(node.Name); err != nil {
-					i.log.Warnf("Failed to untaint node %s: %v", node.Name, err)
+
+		if len(nodes.Items) > 0 {
+			// GetInvoker reads the openshift-install-manifests in the openshift-config namespace.
+			// This configmap exists after nodes start to appear in the cluster.
+			invoker := common.GetInvoker(kc, i.log)
+			removeUninitializedTaint := common.RemoveUninitializedTaint(platform, invoker,
+				hasValidvSphereCredentials, i.OpenshiftVersion)
+			i.log.Infof("Remove uninitialized taint: %v", removeUninitializedTaint)
+			if removeUninitializedTaint {
+				for _, node := range nodes.Items {
+					if common.IsK8sNodeIsReady(node) {
+						continue
+					}
+					if err = kc.UntaintNode(node.Name); err != nil {
+						i.log.Warnf("Failed to untaint node %s: %v", node.Name, err)
+					}
 				}
 			}
 		}
@@ -750,7 +763,7 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 
 			host, ok := common.HostMatchByNameOrIPAddress(node, inventoryHostsMap, knownIpAddresses)
 			if !ok {
-				return fmt.Errorf("Node %s is not in inventory hosts", node.Name)
+				return fmt.Errorf("node %s is not in inventory hosts", node.Name)
 			}
 			ctx = utils.GenerateRequestContext()
 			if err := i.inventoryClient.UpdateHostInstallProgress(ctx, host.Host.InfraEnvID.String(), host.Host.ID.String(), models.HostStageJoined, ""); err != nil {

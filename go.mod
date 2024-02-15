@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/PuerkitoBio/rehttp v1.3.0
 	github.com/ReneKroon/ttlcache/v2 v2.11.0
+	github.com/coreos/go-semver v0.3.1
 	github.com/coreos/ignition/v2 v2.17.0
 	github.com/go-openapi/runtime v0.26.0
 	github.com/go-openapi/strfmt v0.21.8
@@ -21,20 +22,21 @@ require (
 	github.com/openshift/assisted-service v1.0.10-0.20231029121121-0865a552b214
 	github.com/openshift/assisted-service/client v0.0.0
 	github.com/openshift/assisted-service/models v0.0.0
-	github.com/openshift/client-go v0.0.0-20230120202327-72f107311084
+	github.com/openshift/client-go v0.0.0-20230503144108-75015d2347cb
 	github.com/openshift/machine-config-operator v0.0.1-0.20230810165308-00f2deeebffb
 	github.com/operator-framework/api v0.20.0
 	github.com/operator-framework/operator-lifecycle-manager v0.22.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/thoas/go-funk v0.9.3
+	github.com/tidwall/gjson v1.17.0
 	github.com/vincent-petithory/dataurl v1.0.0
 	golang.org/x/net v0.19.0
 	golang.org/x/sync v0.5.0
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.28.0
-	k8s.io/apimachinery v0.28.0
-	k8s.io/client-go v0.28.0
+	k8s.io/api v0.28.4
+	k8s.io/apimachinery v0.28.4
+	k8s.io/client-go v0.28.4
 	sigs.k8s.io/controller-runtime v0.15.1
 )
 
@@ -55,7 +57,6 @@ require (
 	github.com/containers/image/v5 v5.24.2 // indirect
 	github.com/containers/storage v1.45.3 // indirect
 	github.com/coreos/go-json v0.0.0-20230131223807-18775e0fb4fb // indirect
-	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/coreos/vcontext v0.0.0-20230201181013-d72178a18687 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -70,7 +71,7 @@ require (
 	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/analysis v0.21.4 // indirect
-	github.com/go-openapi/errors v0.20.3 // indirect
+	github.com/go-openapi/errors v0.20.4 // indirect
 	github.com/go-openapi/jsonpointer v0.20.0 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/loads v0.21.2 // indirect
@@ -134,6 +135,8 @@ require (
 	github.com/ssgreg/journald v1.0.0 // indirect
 	github.com/stretchr/objx v0.5.1 // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
+	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
@@ -174,6 +177,7 @@ replace (
 	github.com/openshift/assisted-service/client => github.com/openshift/assisted-service/client v0.0.0-20231029121121-0865a552b214
 	github.com/openshift/assisted-service/models => github.com/openshift/assisted-service/models v0.0.0-20231029121121-0865a552b214
 	k8s.io/apimachinery => k8s.io/apimachinery v0.28.0
+	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v0.4.5
 	sigs.k8s.io/cluster-api-provider-aws => github.com/openshift/cluster-api-provider-aws v0.2.1-0.20201022175424-d30c7a274820
 	sigs.k8s.io/cluster-api-provider-azure => github.com/openshift/cluster-api-provider-azure v0.1.0-alpha.3.0.20201016155852-4090a6970205
 )
