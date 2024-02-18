@@ -40,10 +40,11 @@ var (
 
 var _ = Describe("installer HostRoleMaster role", func() {
 	var (
-		l            = logrus.New()
-		ctrl         *gomock.Controller
-		mockbmclient *inventory_client.MockInventoryClient
-		status       *assistedinstallercontroller.ControllerStatus
+		l              = logrus.New()
+		ctrl           *gomock.Controller
+		mockbmclient   *inventory_client.MockInventoryClient
+		mockController *assistedinstallercontroller.MockController
+		status         *assistedinstallercontroller.ControllerStatus
 	)
 
 	l.SetOutput(io.Discard)
@@ -51,8 +52,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockbmclient = inventory_client.NewMockInventoryClient(ctrl)
+		mockController = assistedinstallercontroller.NewMockController(ctrl)
 		waitForInstallationInterval = 10 * time.Millisecond
 		status = assistedinstallercontroller.NewControllerStatus()
+		mockController.EXPECT().GetStatus().Return(status).AnyTimes()
 	})
 	AfterEach(func() {
 		ctrl.Finish()
@@ -63,21 +66,21 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(nil, fmt.Errorf("dummy")).Times(1)
 		mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(&models.Cluster{Status: swag.String(models.ClusterStatusInstalled)},
 			nil).Times(1)
-		waitForInstallation(mockbmclient, l, status)
+		waitForInstallation(mockbmclient, l, mockController)
 		Expect(status.HasError()).Should(Equal(false))
 	})
 
 	It("Waiting for cluster cancelled", func() {
 		mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(&models.Cluster{Status: swag.String(models.ClusterStatusCancelled)},
 			nil).Times(1)
-		waitForInstallation(mockbmclient, l, status)
+		waitForInstallation(mockbmclient, l, mockController)
 		Expect(status.HasError()).Should(Equal(false))
 	})
 
 	It("Waiting for cluster error - should set error status", func() {
 		mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(&models.Cluster{Status: swag.String(models.ClusterStatusError)},
 			nil).Times(1)
-		waitForInstallation(mockbmclient, l, status)
+		waitForInstallation(mockbmclient, l, mockController)
 		Expect(status.HasError()).Should(Equal(true))
 	})
 
@@ -89,7 +92,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(nil, installer.NewV2GetClusterUnauthorized()).Times(maximumErrorsBeforeExit)
 		// added to make waitForInstallation exit
 		mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(&models.Cluster{Status: swag.String(models.ClusterStatusInstalled)}, nil).Times(1)
-		waitForInstallation(mockbmclient, l, status)
+		waitForInstallation(mockbmclient, l, mockController)
 		Expect(status.HasError()).Should(Equal(false))
 		Expect(exitCode).Should(Equal(0))
 	})
@@ -104,7 +107,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		// added to make waitForInstallation exit
 		mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(&models.Cluster{Status: swag.String(models.ClusterStatusInstalled)}, nil).Times(1)
 
-		waitForInstallation(mockbmclient, l, status)
+		waitForInstallation(mockbmclient, l, mockController)
 		Expect(status.HasError()).Should(Equal(false))
 		Expect(exitCode).Should(Equal(0))
 	})
@@ -118,7 +121,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		// added to make waitForInstallation exit
 		mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(&models.Cluster{Status: swag.String(models.ClusterStatusInstalled)}, nil).Times(1)
 
-		waitForInstallation(mockbmclient, l, status)
+		waitForInstallation(mockbmclient, l, mockController)
 		Expect(status.HasError()).Should(Equal(false))
 		Expect(exitCode).Should(Equal(0))
 	})
@@ -132,7 +135,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		// added to make waitForInstallation exit
 		mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(&models.Cluster{Status: swag.String(models.ClusterStatusInstalled)}, nil).Times(1)
 
-		waitForInstallation(mockbmclient, l, status)
+		waitForInstallation(mockbmclient, l, mockController)
 		Expect(status.HasError()).Should(Equal(false))
 		Expect(exitCode).Should(Equal(0))
 	})
@@ -146,7 +149,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		// added to make waitForInstallation exit
 		mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(&models.Cluster{Status: swag.String(models.ClusterStatusInstalled)}, nil).Times(1)
 
-		waitForInstallation(mockbmclient, l, status)
+		waitForInstallation(mockbmclient, l, mockController)
 		Expect(status.HasError()).Should(Equal(false))
 		Expect(exitCode).Should(Equal(1))
 	})
