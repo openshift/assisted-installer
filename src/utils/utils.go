@@ -40,6 +40,8 @@ const (
 	W_ALL
 )
 
+const maxDuration = time.Duration(1<<63 - 1)
+
 func (wm WalkMode) IncludeFiles() bool {
 	return wm == W_FILEONLY || wm == W_ALL
 }
@@ -201,7 +203,7 @@ func GetHostIpsFromInventory(inventory *models.Inventory) ([]string, error) {
 	return ips, nil
 }
 
-func WaitForPredicateWithTimer(ctx context.Context, timeout time.Duration, interval time.Duration, predicate func(timer *time.Timer) bool) error {
+func WaitForPredicateWithContext(ctx context.Context, timeout time.Duration, interval time.Duration, predicate func() bool) error {
 	timeoutTimer := time.NewTimer(timeout)
 	ticker := time.NewTicker(interval)
 
@@ -212,7 +214,7 @@ func WaitForPredicateWithTimer(ctx context.Context, timeout time.Duration, inter
 
 	// Keep trying until we're time out or get true
 	for {
-		if predicate(timeoutTimer) {
+		if predicate() {
 			return nil
 		}
 		select {
@@ -228,20 +230,30 @@ func WaitForPredicateWithTimer(ctx context.Context, timeout time.Duration, inter
 	}
 }
 
+func ToPredicate[E any](f func(E) bool, e E) func() bool {
+	return func() bool {
+		return f(e)
+	}
+}
+
+func WaitForeverForPredicateWithCancel(parent context.Context, interval time.Duration, workerPredicate, cancelPredicate func() bool) error {
+	ctxWithCancel, cancel := context.WithCancel(parent)
+	defer cancel()
+	return WaitForeverForPredicate(ctxWithCancel, interval, func() bool {
+		ret := workerPredicate()
+		if !ret && cancelPredicate() {
+			cancel()
+		}
+		return ret
+	})
+}
+
+func WaitForeverForPredicate(ctx context.Context, interval time.Duration, predicate func() bool) error {
+	return WaitForPredicateWithContext(ctx, maxDuration, interval, predicate)
+}
+
 func WaitForPredicate(timeout time.Duration, interval time.Duration, predicate func() bool) error {
 	return WaitForPredicateWithContext(context.TODO(), timeout, interval, predicate)
-}
-
-func WaitForPredicateWithContext(ctx context.Context, timeout time.Duration, interval time.Duration, predicate func() bool) error {
-	return WaitForPredicateWithTimer(ctx, timeout, interval, func(timer *time.Timer) bool {
-		return predicate()
-	})
-}
-
-func WaitForPredicateParamsWithContext(ctx context.Context, timeout time.Duration, interval time.Duration, predicate func(arg interface{}) bool, arg interface{}) error {
-	return WaitForPredicateWithTimer(ctx, timeout, interval, func(timer *time.Timer) bool {
-		return predicate(arg)
-	})
 }
 
 // ProxyFromEnvVars provides an alternative to http.ProxyFromEnvironment since it is being initialized only

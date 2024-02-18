@@ -2,7 +2,6 @@ package assisted_installer_controller
 
 import (
 	"context"
-	"time"
 
 	olmv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/sirupsen/logrus"
@@ -28,7 +27,7 @@ type OperatorHandler interface {
 	IsInitialized() bool
 }
 
-func (c controller) isOperatorAvailable(handler OperatorHandler) bool {
+func (c *controller) isOperatorAvailable(handler OperatorHandler) bool {
 	operatorName := handler.GetName()
 	c.log.Infof("Checking <%s> operator availability status", operatorName)
 	operatorStatusInService, isAvailable := c.isOperatorAvailableInService(operatorName, c.OpenshiftVersion)
@@ -62,7 +61,7 @@ func (c controller) isOperatorAvailable(handler OperatorHandler) bool {
 	return isAvailable
 }
 
-func (c controller) isOperatorAvailableInService(operatorName string, openshiftVersion string) (*models.MonitoredOperator, bool) {
+func (c *controller) isOperatorAvailableInService(operatorName string, openshiftVersion string) (*models.MonitoredOperator, bool) {
 	operatorStatusInService, err := c.ic.GetClusterMonitoredOperator(utils.GenerateRequestContext(), c.ClusterID, operatorName, openshiftVersion)
 	if err != nil {
 		c.log.WithError(err).Errorf("Failed to get cluster %s %s operator status", c.ClusterID, operatorName)
@@ -109,13 +108,12 @@ func (handler ClusterOperatorHandler) GetStatus() (models.OperatorStatus, string
 func (handler ClusterOperatorHandler) OnChange(_ models.OperatorStatus) bool { return true }
 
 type ClusterVersionHandler struct {
-	kc    k8s_client.K8SClient
-	timer *time.Timer
-	log   *logrus.Logger
+	kc  k8s_client.K8SClient
+	log *logrus.Logger
 }
 
-func NewClusterVersionHandler(log *logrus.Logger, kc k8s_client.K8SClient, timer *time.Timer) *ClusterVersionHandler {
-	return &ClusterVersionHandler{kc: kc, timer: timer, log: log}
+func NewClusterVersionHandler(log *logrus.Logger, kc k8s_client.K8SClient) *ClusterVersionHandler {
+	return &ClusterVersionHandler{kc: kc, log: log}
 }
 
 func (handler ClusterVersionHandler) GetName() string { return cvoOperatorName }
@@ -134,13 +132,6 @@ func (handler ClusterVersionHandler) GetStatus() (models.OperatorStatus, string,
 }
 
 func (handler ClusterVersionHandler) OnChange(_ models.OperatorStatus) bool {
-	// This is a common pattern to ensure the channel is empty after a stop has been called
-	// More info on time/sleep.go documentation
-	if !handler.timer.Stop() {
-		<-handler.timer.C
-	}
-	handler.timer.Reset(WaitTimeout)
-
 	return true
 }
 
@@ -184,7 +175,7 @@ func (handler ClusterServiceVersionHandler) IsInitialized() bool {
 
 // handleOLMEarlySetupBug cleans failed olm jobs as they will rerun by olm and
 // deletes install plans to force olm re-conciliation and job recreation.
-// Assisted Controller does this because subscriptions created too early in the installation
+// Assisted controller does this because subscriptions created too early in the installation
 // process might fail operator installation, and OLM will not retry installing
 // them.
 func (handler ClusterServiceVersionHandler) handleOLMEarlySetupBug() error {

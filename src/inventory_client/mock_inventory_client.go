@@ -235,6 +235,20 @@ func (mr *MockInventoryClientMockRecorder) UpdateClusterOperator(ctx, clusterId,
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateClusterOperator", reflect.TypeOf((*MockInventoryClient)(nil).UpdateClusterOperator), ctx, clusterId, operatorName, operatorVersion, operatorStatus, operatorStatusInfo)
 }
 
+// UpdateFinalizingProgress mocks base method.
+func (m *MockInventoryClient) UpdateFinalizingProgress(ctx context.Context, clusterId string, stage models.FinalizingStage) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateFinalizingProgress", ctx, clusterId, stage)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateFinalizingProgress indicates an expected call of UpdateFinalizingProgress.
+func (mr *MockInventoryClientMockRecorder) UpdateFinalizingProgress(ctx, clusterId, stage interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateFinalizingProgress", reflect.TypeOf((*MockInventoryClient)(nil).UpdateFinalizingProgress), ctx, clusterId, stage)
+}
+
 // UpdateHostInstallProgress mocks base method.
 func (m *MockInventoryClient) UpdateHostInstallProgress(ctx context.Context, infraEnvId, hostId string, newStage models.HostStage, info string) error {
 	m.ctrl.T.Helper()
