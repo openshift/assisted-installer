@@ -5,13 +5,12 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"reflect"
-
-	"errors"
 
 	"github.com/coreos/ignition/v2/config/v3_2/types"
 	"github.com/go-openapi/swag"
@@ -528,6 +527,62 @@ WkBKOclmOV2xlTVuPw==
 })
 
 var _ = Describe("overwrite OS image", func() {
+	const lsblkResultFormat = `{
+   "blockdevices": [
+		{
+         "name": "%s",
+         "size": 100000000000,
+         "ro": false,
+         "type": "disk",
+         "mountpoints": [
+             null
+         ],
+         "children": [
+            {
+               "name": "%s",
+               "maj:min": "8:1",
+               "rm": false,
+               "size": 1048576,
+               "ro": false,
+               "type": "part",
+               "mountpoints": [
+                   null
+               ]
+            },{
+               "name": "%s",
+               "maj:min": "8:2",
+               "rm": false,
+               "size": 133169152,
+               "ro": false,
+               "type": "part",
+               "mountpoints": [
+                   null
+               ]
+            },{
+               "name": "%s",
+               "maj:min": "8:3",
+               "rm": false,
+               "size": 402653184,
+               "ro": false,
+               "type": "part",
+               "mountpoints": [
+                   null
+               ]
+            },{
+               "name": "%s",
+               "maj:min": "8:4",
+               "rm": false,
+               "size": 3272588800,
+               "ro": false,
+               "type": "part",
+               "mountpoints": [
+                   null
+               ]
+            }
+         ]
+      }
+   ]
+}`
 	var (
 		l        = logrus.New()
 		ctrl     *gomock.Controller
@@ -554,7 +609,27 @@ var _ = Describe("overwrite OS image", func() {
 				"--pid",
 				"--"), args...)...).Times(1)
 	}
+	formatResult := func(device string) string {
+		deviceName := stripDev(device)
+		return fmt.Sprintf(lsblkResultFormat, deviceName,
+			partitionNameForDeviceName(deviceName, "1"),
+			partitionNameForDeviceName(deviceName, "2"),
+			partitionNameForDeviceName(deviceName, "3"),
+			partitionNameForDeviceName(deviceName, "4"))
+	}
 	runTest := func(device, part3, part4 string) {
+		execMock.EXPECT().ExecCommand(nil, "nsenter",
+			append([]interface{}{},
+				"--target",
+				"1",
+				"--cgroup",
+				"--mount",
+				"--ipc",
+				"--pid",
+				"--",
+				"lsblk",
+				"-b",
+				"-J")...).Return(formatResult(device), nil)
 		osImage := "quay.io/release-image:latest"
 		extraArgs := []string{
 			"--karg",
@@ -563,7 +638,7 @@ var _ = Describe("overwrite OS image", func() {
 		mockPrivileged("cat", "/proc/cmdline")
 		mockPrivileged("mount", part4, "/mnt")
 		mockPrivileged("mount", part3, "/mnt/boot")
-		mockPrivileged("growpart", device, "4")
+		mockPrivileged("growpart", "--free-percent=92", device, "4")
 		mockPrivileged("xfs_growfs", "/mnt")
 		mockPrivileged("setenforce", "0")
 		mockPrivileged("ostree",

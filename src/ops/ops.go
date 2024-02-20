@@ -1100,17 +1100,67 @@ func (o *ops) ignitionPlatformId() string {
 	return id
 }
 
-func getPartition(device, partitionNumber string) string {
+func stripDev(device string) string {
+	return strings.Replace(device, "/dev/", "", 1)
+}
+
+func partitionNameForDeviceName(deviceName, partitionNumber string) string {
 	var format string
 	switch {
-	case strings.HasPrefix(device, "/dev/nvme"):
+	case strings.HasPrefix(deviceName, "nvme"):
 		format = "%sp%s"
-	case strings.HasPrefix(device, "/dev/mmcblk"):
+	case strings.HasPrefix(deviceName, "mmcblk"):
 		format = "%sP%s"
 	default:
 		format = "%s%s"
 	}
-	return fmt.Sprintf(format, device, partitionNumber)
+	return fmt.Sprintf(format, deviceName, partitionNumber)
+}
+
+func partitionForDevice(device, partitionNumber string) string {
+	return "/dev/" + partitionNameForDeviceName(stripDev(device), partitionNumber)
+}
+
+func (o *ops) calculateFreePercent(device string) (int64, error) {
+	type node struct {
+		Name     string
+		Size     int64
+		Children []*node
+	}
+	var disks struct {
+		Blockdevices []*node
+	}
+	var (
+		diskNode, partitionNode *node
+		ok                      bool
+	)
+	ret, err := o.ExecPrivilegeCommand(nil, "lsblk", "-b", "-J")
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to run lsblk command")
+	}
+	if err = json.Unmarshal([]byte(ret), &disks); err != nil {
+		return 0, errors.Wrap(err, "failed to unmarshal lsblk output")
+	}
+	deviceName := stripDev(device)
+	diskNode, ok = funk.Find(disks.Blockdevices, func(n *node) bool { return deviceName == n.Name }).(*node)
+	if !ok {
+		return 0, errors.Errorf("failed to find device is %s in lsblk output", device)
+	}
+	partitionName := partitionNameForDeviceName(diskNode.Name, "4")
+	partitionNode, ok = funk.Find(diskNode.Children, func(n *node) bool { return partitionName == n.Name }).(*node)
+	if !ok {
+		return 0, errors.Errorf("failed to find partition node %s in lsblk output", device)
+	}
+	var usedSize int64
+	funk.ForEach(diskNode.Children, func(n *node) { usedSize += n.Size })
+
+	// The assumption is that the extra space needed for image overwrite is not more than the existing partition size.  So
+	// the partition size will be doubled, and the rest will remain as free space.
+	totalRequiredSize := usedSize + partitionNode.Size
+	if totalRequiredSize < diskNode.Size {
+		return ((diskNode.Size - totalRequiredSize) * 100) / diskNode.Size, nil
+	}
+	return 0, nil
 }
 
 func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error {
@@ -1122,10 +1172,20 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 	makecmd := func(commad string, args ...string) *cmd {
 		return &cmd{command: commad, args: args}
 	}
+	freePercent, err := o.calculateFreePercent(device)
+	if err != nil {
+		return err
+	}
+	var growpartcmd *cmd
+	if freePercent > 0 {
+		growpartcmd = makecmd("growpart", fmt.Sprintf("--free-percent=%d", freePercent), device, "4")
+	} else {
+		growpartcmd = makecmd("growpart", device, "4")
+	}
 	cmds := []*cmd{
-		makecmd("mount", getPartition(device, "4"), "/mnt"),
-		makecmd("mount", getPartition(device, "3"), "/mnt/boot"),
-		makecmd("growpart", device, "4"),
+		makecmd("mount", partitionForDevice(device, "4"), "/mnt"),
+		makecmd("mount", partitionForDevice(device, "3"), "/mnt/boot"),
+		growpartcmd,
 		makecmd("xfs_growfs", "/mnt"),
 
 		// On 4.14 ostree command fails if selinux is not disabled
