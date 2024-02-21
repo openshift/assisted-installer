@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/openshift/assisted-installer/src/main/drymock"
 	"github.com/openshift/assisted-service/pkg/secretdump"
+	"github.com/openshift/assisted-service/pkg/validations"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/thoas/go-funk"
@@ -370,7 +371,7 @@ func (i *installer) startBootstrap() error {
 	   remove the work done by 30-local-dns-prepender. This will cause DNS issue in bootkube and it will fail to complete
 	   successfully
 	*/
-	err = i.checkLocalhostName()
+	err = i.checkHostname()
 	if err != nil {
 		i.log.Error(err)
 		return err
@@ -935,24 +936,25 @@ func (i *installer) createSingleNodeMasterIgnition() (string, error) {
 	return singleNodeMasterIgnitionPath, nil
 }
 
-func (i *installer) checkLocalhostName() error {
+func (i *installer) checkHostname() error {
 	if i.DryRunEnabled {
 		return nil
 	}
 
-	i.log.Infof("Start checking localhostname")
+	i.log.Infof("Start checking hostname")
 	hostname, err := i.ops.GetHostname()
 	if err != nil {
 		i.log.Errorf("Failed to get hostname from kernel, err %s157", err)
 		return err
 	}
-	if hostname != "localhost" {
-		i.log.Infof("hostname is not localhost, no need to do anything")
+
+	if err := validations.ValidateHostname(hostname); err == nil && hostname != "localhost" {
+		i.log.Infof("hostname [%s] is not localhost or invalid, no need to do anything", hostname)
 		return nil
 	}
 
 	data := fmt.Sprintf("random-hostname-%s", uuid.New().String())
-	i.log.Infof("write data into /etc/hostname")
+	i.log.Infof("Hostname [%s] is invalid, generated random hostname [%s] and writing data into /etc/hostname")
 	return i.ops.CreateRandomHostname(data)
 }
 
