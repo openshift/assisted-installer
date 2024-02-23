@@ -428,6 +428,7 @@ github.com/openshift/assisted-service/pkg/ocm
 github.com/openshift/assisted-service/pkg/requestid
 github.com/openshift/assisted-service/pkg/secretdump
 github.com/openshift/assisted-service/pkg/transaction
+github.com/openshift/assisted-service/pkg/validations
 github.com/openshift/assisted-service/restapi
 github.com/openshift/assisted-service/restapi/operations
 github.com/openshift/assisted-service/restapi/operations/events

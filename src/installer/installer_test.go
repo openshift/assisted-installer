@@ -27,6 +27,7 @@ import (
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-service/models"
+	"github.com/openshift/assisted-service/pkg/validations"
 )
 
 func TestValidator(t *testing.T) {
@@ -239,7 +240,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		}
 		checkLocalHostname := func(hostname string, err error) {
 			mockops.EXPECT().GetHostname().Return(hostname, err).Times(1)
-			if hostname == "localhost" {
+			validateErr := validations.ValidateHostname(hostname)
+			if hostname == "localhost" || validateErr != nil {
 				mockops.EXPECT().CreateRandomHostname(gomock.Any()).Return(nil).Times(1)
 			}
 		}
@@ -319,7 +321,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 						{string(models.HostStageRebooting)},
 					})
 					bootstrapSetup()
-					checkLocalHostname("not localhost", nil)
+					checkLocalHostname("notlocalhost", nil)
 					restartNetworkManager(nil)
 					prepareControllerSuccess()
 					startServicesSuccess()
@@ -406,7 +408,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			})
 			extractIgnitionToFS("extract failure", fmt.Errorf("extract failed"))
 			bootstrapSetup()
-			checkLocalHostname("not localhost", nil)
+			checkLocalHostname("notlocalhost", nil)
 			restartNetworkManager(nil)
 			prepareControllerSuccess()
 			startServicesSuccess()
@@ -456,7 +458,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
 			})
 			bootstrapSetup()
-			checkLocalHostname("not localhost", nil)
+			checkLocalHostname("notlocalhost", nil)
 			err := fmt.Errorf("Failed to restart NetworkManager")
 			restartNetworkManager(err)
 			//HostRoleMaster flow:
@@ -512,7 +514,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					})
 					extractIgnitionToFS("extract failure", fmt.Errorf("extract failed"))
 					bootstrapSetup()
-					checkLocalHostname("not localhost", nil)
+					checkLocalHostname("notlocalhost", nil)
 					restartNetworkManager(nil)
 					prepareControllerSuccess()
 					startServicesSuccess()
@@ -931,7 +933,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		}
 		checkLocalHostname := func(hostname string, err error) {
 			mockops.EXPECT().GetHostname().Return(hostname, err).Times(1)
-			if hostname == "localhost" {
+			validateErr := validations.ValidateHostname(hostname)
+			if hostname == "localhost" || validateErr != nil {
 				mockops.EXPECT().CreateRandomHostname(gomock.Any()).Return(nil).Times(1)
 			}
 		}
@@ -993,6 +996,32 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(BeNil())
 		})
+		It("single node happy flow with invalid hostname", func() {
+			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+				{string(models.HostStageWritingImageToDisk)},
+				{string(models.HostStageRebooting)},
+			})
+			// single node bootstrap flow
+			singleNodeBootstrapSetup()
+			checkLocalHostname("InvalidHostname", nil)
+			prepareControllerSuccess()
+			startServicesSuccess()
+			waitForBootkubeSuccess()
+			bootkubeStatusSuccess()
+			//HostRoleMaster flow:
+			verifySingleNodeMasterIgnitionSuccess()
+			singleNodeMergeIgnitionSuccess()
+			downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
+			mockops.EXPECT().WriteImageToDisk(singleNodeMasterIgnitionPath, device, mockbmclient, nil).Return(nil).Times(1)
+			setBootOrderSuccess(gomock.Any())
+			uploadLogsSuccess(true)
+			reportLogProgressSuccess()
+			ironicAgentDoesntExist()
+			rebootNowSuccess()
+			ret := installerObj.InstallNode()
+			Expect(ret).Should(BeNil())
+		})
 		It("single node bootstrap fail", func() {
 			updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 				{string(models.HostStageInstalling), string(models.HostRoleMaster)},
@@ -1000,7 +1029,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			// single node bootstrap flow
 			singleNodeBootstrapSetup()
 			err := fmt.Errorf("Failed to restart NetworkManager")
-			checkLocalHostname("not localhost", err)
+			checkLocalHostname("notlocalhost", err)
 			ret := installerObj.InstallNode()
 			Expect(ret).Should(Equal(err))
 		})
