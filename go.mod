@@ -3,12 +3,12 @@ module github.com/openshift/assisted-installer
 go 1.20
 
 require (
-	github.com/PuerkitoBio/rehttp v1.3.0
+	github.com/PuerkitoBio/rehttp v1.4.0
 	github.com/ReneKroon/ttlcache/v2 v2.11.0
 	github.com/coreos/go-semver v0.3.1
 	github.com/coreos/ignition/v2 v2.17.0
 	github.com/go-openapi/runtime v0.27.1
-	github.com/go-openapi/strfmt v0.22.0
+	github.com/go-openapi/strfmt v0.22.1
 	github.com/go-openapi/swag v0.22.9
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
@@ -139,7 +139,7 @@ require (
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
-	go.mongodb.org/mongo-driver v1.13.1 // indirect
+	go.mongodb.org/mongo-driver v1.14.0 // indirect
 	go.opentelemetry.io/otel v1.20.0 // indirect
 	go.opentelemetry.io/otel/metric v1.20.0 // indirect
 	go.opentelemetry.io/otel/trace v1.20.0 // indirect
