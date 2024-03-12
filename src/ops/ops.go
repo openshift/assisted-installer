@@ -43,6 +43,7 @@ const (
 	dryRunCoreosInstallerExecutable = "dry-installer"
 	encapsulatedMachineConfigFile   = "/etc/ignition-machine-config-encapsulated.json"
 	defaultIgnitionPlatformId       = "ignition.platform.id=metal"
+	ignitionContent                 = "application/vnd.coreos.ignition+json; version=3.4.0"
 )
 
 //go:generate mockgen -source=ops.go -package=ops -destination=mock_ops.go
@@ -1024,7 +1025,12 @@ func (o *ops) getIgnitionFromBoostrap(source, ca string) ([]byte, error) {
 	}}
 	client := http.Client{Transport: tr}
 	o.log.Infof("Getting ignition from %s", source)
-	resp, err := client.Get(source)
+	req, err := http.NewRequest("GET", source, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Accept", ignitionContent)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get ignition from %s", source)
 	}
