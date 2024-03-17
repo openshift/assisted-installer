@@ -340,19 +340,28 @@ var _ = Describe("Set Boot Order", func() {
 		conf = &config.Config{}
 	})
 
-	It("Set boot order", func() {
-		m1 := MatcherContainsStringElements{[]string{"/usr/sbin/bootlist"}, true}
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m1).Times(1).Return("", errors.New("Bootlist is not exist."))
-		m2 := MatcherContainsStringElements{[]string{"test", "-d", "/sys/firmware/efi"}, true}
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m2).Times(1)
-		m3 := MatcherContainsStringElements{[]string{"efibootmgr", "/dev/sda", "Red Hat Enterprise Linux"}, true}
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m3).Times(1).Return("", nil)
-		m4 := MatcherContainsStringElements{[]string{"efibootmgr", "-l"}, true}
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m4).Times(1)
-		o := NewOpsWithConfig(conf, l, execMock)
-		err := o.SetBootOrder("/dev/sda")
-		Expect(err).ToNot(HaveOccurred())
-	})
+	for _, d := range []string{"redhat", "centos"} {
+		efiDirname := d
+		It(fmt.Sprintf("Set boot order for %s", efiDirname), func() {
+			m1 := MatcherContainsStringElements{[]string{"/usr/sbin/bootlist"}, true}
+			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m1).Times(1).Return("", errors.New("Bootlist is not exist."))
+			m2 := MatcherContainsStringElements{[]string{"test", "-d", "/sys/firmware/efi"}, true}
+			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m2).Times(1)
+			m3 := MatcherContainsStringElements{[]string{"efibootmgr", "/dev/sda", "Red Hat Enterprise Linux"}, true}
+			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m3).Times(1).Return("", nil)
+			m4 := MatcherContainsStringElements{[]string{"efibootmgr", "-l"}, true}
+			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m4).Times(1)
+			m5 := MatcherContainsStringElements{[]string{"mount", "/dev/sda2", "/mnt"}, true}
+			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m5).Times(1).Return("", nil)
+			m6 := MatcherContainsStringElements{[]string{"ls", "-1", "/mnt/EFI"}, true}
+			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m6).Times(1).Return(fmt.Sprintf("BOOT\n%s\n", efiDirname), nil)
+			m7 := MatcherContainsStringElements{[]string{"umount", "/mnt"}, true}
+			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m7).Times(1).Return("", nil)
+			o := NewOpsWithConfig(conf, l, execMock)
+			err := o.SetBootOrder("/dev/sda")
+			Expect(err).ToNot(HaveOccurred())
+		})
+	}
 
 	It("Set boot order for ppc64le", func() {
 		m1 := MatcherContainsStringElements{[]string{"/usr/sbin/bootlist"}, true}
