@@ -5,7 +5,17 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/go-openapi/swag"
 	"github.com/hashicorp/go-version"
+)
+
+type VersionFormat int
+
+const (
+	NoneVersion VersionFormat = iota
+	MajorVersion
+	MajorMinorVersion
+	MajorMinorPatchVersion
 )
 
 func createTwoVersions(version1, version2 string) (*version.Version, *version.Version, error) {
@@ -69,4 +79,46 @@ func GetMajorMinorVersion(version string) (*string, error) {
 
 	versionStr := fmt.Sprintf("%s.%s", splittedVersion[0], splittedVersion[1])
 	return &versionStr, nil
+}
+
+func IsVersionPreRelease(str string) (*bool, error) {
+	str = strings.TrimSuffix(str, "-multi")
+	semVersion, err := version.NewVersion(str)
+	if err != nil {
+		return nil, err
+	}
+
+	return swag.Bool(semVersion.Prerelease() != ""), nil
+}
+
+func GetMajorVersion(version string) (*string, error) {
+	version = strings.Split(version, "-")[0]
+	majorVersion := strings.Split(version, ".")[0]
+
+	if majorVersion == "" {
+		return nil, errors.New("invalid version")
+	}
+
+	return &majorVersion, nil
+}
+
+// GetVersionFormat retruns whether the given version is major / major.minor / major.minor.patch / none
+func GetVersionFormat(v string) VersionFormat {
+	// validate version
+	_, err := version.NewVersion(v)
+	if err != nil {
+		return NoneVersion
+	}
+
+	baseVersion := strings.Split(v, "-")[0]
+	switch len(strings.Split(baseVersion, ".")) {
+	case 1:
+		return MajorVersion
+	case 2:
+		return MajorMinorVersion
+	case 3:
+		return MajorMinorPatchVersion
+	default:
+		return NoneVersion
+	}
 }
