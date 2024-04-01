@@ -2,6 +2,7 @@ package installer
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -274,15 +275,17 @@ func convertToOverwriteKargs(args []string) []string {
 }
 
 func (i *installer) getEncapsulatedMC(ignitionPath string) (*mcfgv1.MachineConfig, error) {
-	interval := 5 * time.Second
 	var mc *mcfgv1.MachineConfig
-	err := utils.Retry(240, interval, i.log, func() error {
-		var gerr error
-		mc, gerr = i.ops.GetEncapsulatedMC(ignitionPath)
-		return gerr
+	var err error
+	waitErr := utils.WaitForPredicate(20*time.Minute, 5*time.Second, func() bool {
+		mc, err = i.ops.GetEncapsulatedMC(ignitionPath)
+		if err != nil {
+			i.log.WithError(err).Warningf("failed to get encapsulated Machine Config")
+		}
+		return err == nil
 	})
-	if err != nil {
-		return nil, err
+	if waitErr != nil {
+		return nil, stderrors.Join(waitErr, err)
 	}
 	return mc, nil
 }
