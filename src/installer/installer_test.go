@@ -11,6 +11,9 @@ import (
 	"testing"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/go-openapi/strfmt"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
@@ -21,8 +24,6 @@ import (
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/inventory_client"
@@ -51,6 +52,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockbmclient       *inventory_client.MockInventoryClient
 				mockk8sclient      *k8s_client.MockK8SClient
 				mockIgnition       *ignition.MockIgnition
+				diskOps            ops.DiskOps
 				installerObj       *installer
 				hostId             = "host-id"
 				infraEnvId         = "infra-env-id"
@@ -193,6 +195,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockbmclient = inventory_client.NewMockInventoryClient(ctrl)
 				mockk8sclient = k8s_client.NewMockK8SClient(ctrl)
 				mockIgnition = ignition.NewMockIgnition(ctrl)
+				diskOps = ops.NewDiskOps(l, mockops)
 				nodesInfraEnvId := strfmt.UUID("7916fa89-ea7a-443e-a862-b3e930309f50")
 				node0Id := strfmt.UUID("7916fa89-ea7a-443e-a862-b3e930309f65")
 				node1Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f238")
@@ -217,7 +220,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					EnableSkipMcoReboot: withEnableSkipMcoReboot,
 				}
 				BeforeEach(func() {
-					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition)
+					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, diskOps)
 				})
 
 				It("Should clean up the PV and all volume groups for a disk when asked to do so", func() {
@@ -230,7 +233,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					mockops.EXPECT().RemoveVG("vg2").Times(1)
 					mockops.EXPECT().RemoveAllPVsOnDevice("/dev/vda").Return(nil).Times(1)
 					mockops.EXPECT().RemoveAllDMDevicesOnDisk("/dev/vda").Return(nil).Times(1)
-					err := installerObj.cleanupDevice("/dev/vda")
+					mockops.EXPECT().IsRaidMember(device).Times(1).Return(false)
+					mockops.EXPECT().Wipefs(device).Times(1).Return(nil)
+					err := installerObj.diskOps.CleanupInstallDevice("/dev/vda")
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -246,7 +251,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					mockops.EXPECT().RemoveVG("vg3").Times(1)
 					mockops.EXPECT().RemoveAllPVsOnDevice("/dev/vda").Return(nil).Times(1)
 					mockops.EXPECT().RemoveAllDMDevicesOnDisk("/dev/vda").Return(nil).Times(1)
-					err := installerObj.cleanupDevice("/dev/vda")
+					mockops.EXPECT().IsRaidMember(device).Times(1).Return(false)
+					mockops.EXPECT().Wipefs(device).Times(1).Return(nil)
+					err := installerObj.diskOps.CleanupInstallDevice("/dev/vda")
 					Expect(err).To(HaveOccurred())
 				})
 
@@ -265,7 +272,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					EnableSkipMcoReboot: withEnableSkipMcoReboot,
 				}
 				BeforeEach(func() {
-					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition)
+					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, diskOps)
 					evaluateDiskSymlinkSuccess()
 				})
 				mcoImage := conf.MCOImage
@@ -672,7 +679,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					EnableSkipMcoReboot: withEnableSkipMcoReboot,
 				}
 				BeforeEach(func() {
-					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition)
+					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, diskOps)
 				})
 				It("waitForControlPlane reload resolv.conf failed", func() {
 					mockops.EXPECT().ReloadHostFile("/etc/resolv.conf").Return(fmt.Errorf("failed to load file")).Times(1)
@@ -758,7 +765,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					EnableSkipMcoReboot: withEnableSkipMcoReboot,
 				}
 				BeforeEach(func() {
-					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition)
+					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, diskOps)
 					evaluateDiskSymlinkSuccess()
 
 				})
@@ -970,7 +977,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					EnableSkipMcoReboot: withEnableSkipMcoReboot,
 				}
 				BeforeEach(func() {
-					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition)
+					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, diskOps)
 					evaluateDiskSymlinkSuccess()
 				})
 				It("worker role happy flow", func() {
@@ -1027,7 +1034,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					EnableSkipMcoReboot:  withEnableSkipMcoReboot,
 				}
 				BeforeEach(func() {
-					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition)
+					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, diskOps)
 					evaluateDiskSymlinkSuccess()
 				})
 				mcoImage := conf.MCOImage

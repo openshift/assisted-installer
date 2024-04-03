@@ -12,6 +12,9 @@ import (
 	"github.com/openshift/assisted-installer/src/ops/execute"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
+	"golang.org/x/sync/errgroup"
+	v1 "k8s.io/api/core/v1"
+
 	"github.com/go-openapi/swag"
 	"github.com/google/uuid"
 	"github.com/openshift/assisted-installer/src/main/drymock"
@@ -20,8 +23,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/thoas/go-funk"
-	"golang.org/x/sync/errgroup"
-	v1 "k8s.io/api/core/v1"
 
 	"github.com/openshift/assisted-installer/src/common"
 	"github.com/openshift/assisted-installer/src/config"
@@ -68,9 +69,10 @@ type installer struct {
 	inventoryClient inventory_client.InventoryClient
 	kcBuilder       k8s_client.K8SClientBuilder
 	ign             ignition.Ignition
+	diskOps         ops.DiskOps
 }
 
-func NewAssistedInstaller(log logrus.FieldLogger, cfg config.Config, ops ops.Ops, ic inventory_client.InventoryClient, kcb k8s_client.K8SClientBuilder, ign ignition.Ignition) *installer {
+func NewAssistedInstaller(log logrus.FieldLogger, cfg config.Config, ops ops.Ops, ic inventory_client.InventoryClient, kcb k8s_client.K8SClientBuilder, ign ignition.Ignition, diskOps ops.DiskOps) *installer {
 	return &installer{
 		log:             log,
 		Config:          cfg,
@@ -78,6 +80,7 @@ func NewAssistedInstaller(log logrus.FieldLogger, cfg config.Config, ops ops.Ops
 		inventoryClient: ic,
 		kcBuilder:       kcb,
 		ign:             ign,
+		diskOps:         diskOps,
 	}
 }
 
@@ -96,14 +99,8 @@ func (i *installer) InstallNode() error {
 
 	i.UpdateHostInstallProgress(models.HostStageStartingInstallation, i.Config.Role)
 	i.Config.Device = i.ops.EvaluateDiskSymlink(i.Config.Device)
-	err := i.cleanupInstallDevice()
-	if err != nil {
-		i.UpdateHostInstallProgress(models.HostStageStartingInstallation, fmt.Sprintf("Could not clean install device %s. The installation will continue. If the installation fails, clean the disk and try again", i.Device))
-		// Do not change the phrasing of this error message, as we rely on it in a triage signature
-		i.log.Errorf("failed to prepare install device %s, err %s", i.Device, err)
-	}
-
-	if err = i.ops.Mkdir(InstallDir); err != nil {
+	i.cleanupInstallDevice()
+	if err := i.ops.Mkdir(InstallDir); err != nil {
 		i.log.Errorf("Failed to create install dir: %s", err)
 		return err
 	}
@@ -123,6 +120,7 @@ func (i *installer) InstallNode() error {
 
 	i.UpdateHostInstallProgress(models.HostStageInstalling, i.Config.Role)
 	var ignitionPath string
+	var err error
 
 	// i.HighAvailabilityMode is set as an empty string for workers
 	// regardless of the availability mode of the cluster they are joining
@@ -272,6 +270,19 @@ func convertToOverwriteKargs(args []string) []string {
 		}
 	}
 	return ret
+}
+
+func (i *installer) cleanupInstallDevice() {
+	if i.DryRunEnabled || i.Config.SkipInstallationDiskCleanup {
+		i.log.Infof("skipping installation disk cleanup")
+	} else {
+		err := i.diskOps.CleanupInstallDevice(i.Config.Device)
+		if err != nil {
+			i.UpdateHostInstallProgress(models.HostStageStartingInstallation, fmt.Sprintf("Could not clean install device %s. The installation will continue. If the installation fails, clean the disk and try again", i.Device))
+			// Do not change the phrasing of this error message, as we rely on it in a triage signature
+			i.log.Errorf("failed to prepare install device %s, err %s", i.Device, err)
+		}
+	}
 }
 
 func (i *installer) getEncapsulatedMC(ignitionPath string) (*mcfgv1.MachineConfig, error) {
@@ -780,93 +791,6 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 	return nil
 }
 
-func (i *installer) cleanupInstallDevice() error {
-
-	if i.DryRunEnabled || i.Config.SkipInstallationDiskCleanup {
-		return nil
-	}
-
-	var ret error
-	i.log.Infof("Start cleaning up device %s", i.Device)
-	err := i.cleanupDevice(i.Device)
-
-	if err != nil {
-		ret = utils.CombineErrors(ret, err)
-	}
-
-	if i.ops.IsRaidMember(i.Device) {
-		i.log.Infof("A raid was detected on the device (%s) - cleaning", i.Device)
-		var devices []string
-		devices, err = i.ops.GetRaidDevices(i.Device)
-
-		if err != nil {
-			ret = utils.CombineErrors(ret, err)
-		}
-
-		for _, device := range devices {
-			// Cleaning the raid device itself before removing membership.
-			err = i.cleanupDevice(device)
-
-			if err != nil {
-				ret = utils.CombineErrors(ret, err)
-			}
-		}
-
-		err = i.ops.CleanRaidMembership(i.Device)
-
-		if err != nil {
-			ret = utils.CombineErrors(ret, err)
-		}
-		i.log.Infof("Finished cleaning up device %s", i.Device)
-	}
-
-	err = i.ops.Wipefs(i.Device)
-	if err != nil {
-		ret = utils.CombineErrors(ret, err)
-	}
-
-	return ret
-}
-
-func (i *installer) removeVolumeGroupsFromDevice(vgNames []string, device string) error {
-	var ret error
-	for _, vgName := range vgNames {
-		i.log.Infof("A volume group (%s) was detected on the installation device (%s) - cleaning", vgName, device)
-		err := i.ops.RemoveVG(vgName)
-
-		if err != nil {
-			i.log.Errorf("Could not delete volume group (%s) due to error: %w", vgName, err)
-			ret = utils.CombineErrors(ret, err)
-		}
-	}
-
-	return ret
-}
-
-func (i *installer) cleanupDevice(device string) error {
-	var ret error
-	vgNames, err := i.ops.GetVolumeGroupsByDisk(device)
-	if err != nil {
-		ret = err
-	}
-
-	if len(vgNames) > 0 {
-		if err = i.removeVolumeGroupsFromDevice(vgNames, device); err != nil {
-			ret = utils.CombineErrors(ret, err)
-		}
-	}
-
-	if err = i.ops.RemoveAllPVsOnDevice(device); err != nil {
-		ret = utils.CombineErrors(ret, err)
-	}
-
-	if err = i.ops.RemoveAllDMDevicesOnDisk(device); err != nil {
-		ret = utils.CombineErrors(ret, err)
-	}
-
-	return ret
-}
-
 func (i *installer) verifyHostCanMoveToConfigurationStatus(inventoryHostsMapWithIp map[string]inventory_client.HostData) {
 	logs, err := i.ops.GetMCSLogs()
 	if err != nil {
@@ -990,7 +914,7 @@ func RunInstaller(installerConfig *config.Config, logger logrus.FieldLogger) err
 
 	executor := execute.NewExecutor(installerConfig, logger, true)
 	o := ops.NewOpsWithConfig(installerConfig, logger, executor)
-
+	diskOps := ops.NewDiskOps(logger, o)
 	var k8sClientBuilder k8s_client.K8SClientBuilder
 	if !installerConfig.DryRunEnabled {
 		k8sClientBuilder = k8s_client.NewK8SClient
@@ -1004,6 +928,7 @@ func RunInstaller(installerConfig *config.Config, logger logrus.FieldLogger) err
 		client,
 		k8sClientBuilder,
 		ignition.NewIgnition(),
+		diskOps,
 	)
 
 	// Try to format requested disks. May fail formatting some disks, this is not an error.
