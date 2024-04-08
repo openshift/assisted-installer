@@ -10,7 +10,6 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	inventory_client "github.com/openshift/assisted-installer/src/inventory_client"
 	v1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
@@ -497,15 +496,15 @@ func (mr *MockOpsMockRecorder) Wipefs(device interface{}) *gomock.Call {
 }
 
 // WriteImageToDisk mocks base method.
-func (m *MockOps) WriteImageToDisk(ignitionPath, device string, progressReporter inventory_client.InventoryClient, extra []string) error {
+func (m *MockOps) WriteImageToDisk(liveLogger *CoreosInstallerLogWriter, ignitionPath, device string, extraArgs []string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WriteImageToDisk", ignitionPath, device, progressReporter, extra)
+	ret := m.ctrl.Call(m, "WriteImageToDisk", liveLogger, ignitionPath, device, extraArgs)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // WriteImageToDisk indicates an expected call of WriteImageToDisk.
-func (mr *MockOpsMockRecorder) WriteImageToDisk(ignitionPath, device, progressReporter, extra interface{}) *gomock.Call {
+func (mr *MockOpsMockRecorder) WriteImageToDisk(liveLogger, ignitionPath, device, extraArgs interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteImageToDisk", reflect.TypeOf((*MockOps)(nil).WriteImageToDisk), ignitionPath, device, progressReporter, extra)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteImageToDisk", reflect.TypeOf((*MockOps)(nil).WriteImageToDisk), liveLogger, ignitionPath, device, extraArgs)
 }
