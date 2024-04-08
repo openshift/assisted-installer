@@ -19,17 +19,16 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/openshift/assisted-installer/src/common"
-	"github.com/openshift/assisted-installer/src/ignition"
-	"github.com/openshift/assisted-service/pkg/validations"
-	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-
 	"github.com/openshift/assisted-installer/src/config"
+	"github.com/openshift/assisted-installer/src/ignition"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-service/models"
+	"github.com/openshift/assisted-service/pkg/validations"
+	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 func TestValidator(t *testing.T) {
@@ -114,7 +113,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			}
 
 			writeToDiskSuccess := func(extra interface{}) {
-				mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, "master-host-id.ign"), device, mockbmclient, extra).Return(nil).Times(1)
+				mockops.EXPECT().WriteImageToDisk(gomock.Any(), filepath.Join(InstallDir, "master-host-id.ign"), device, extra).Return(nil).Times(1)
 			}
 
 			setBootOrderSuccess := func(extra interface{}) {
@@ -939,7 +938,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					mkdirSuccess(InstallDir)
 					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 					err := fmt.Errorf("failed writing image to disk")
-					mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, "master-host-id.ign"), device, mockbmclient, installerArgs).Return(err).Times(3)
+					mockops.EXPECT().WriteImageToDisk(gomock.Any(), filepath.Join(InstallDir, "master-host-id.ign"), device, installerArgs).Return(err).Times(3)
 					ret := installerObj.InstallNode()
 					Expect(ret).To(HaveOccurred())
 					Expect(ret.Error()).Should(ContainSubstring("failed writing image to disk"))
@@ -1007,7 +1006,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					cleanInstallDevice()
 					mkdirSuccess(InstallDir)
 					downloadHostIgnitionSuccess(infraEnvId, hostId, "worker-host-id.ign")
-					mockops.EXPECT().WriteImageToDisk(filepath.Join(InstallDir, "worker-host-id.ign"), device, mockbmclient, nil).Return(nil).Times(1)
+					mockops.EXPECT().WriteImageToDisk(gomock.Any(), filepath.Join(InstallDir, "worker-host-id.ign"), device, nil).Return(nil).Times(1)
 					setBootOrderSuccess(gomock.Any())
 					// failure must do nothing
 					reportLogProgressSuccess()
@@ -1109,7 +1108,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					verifySingleNodeMasterIgnitionSuccess()
 					singleNodeMergeIgnitionSuccess()
 					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
-					mockops.EXPECT().WriteImageToDisk(singleNodeMasterIgnitionPath, device, mockbmclient, nil).Return(nil).Times(1)
+					mockops.EXPECT().WriteImageToDisk(gomock.Any(), singleNodeMasterIgnitionPath, device, nil).Return(nil).Times(1)
 					setBootOrderSuccess(gomock.Any())
 					uploadLogsSuccess(true)
 					reportLogProgressSuccess()
