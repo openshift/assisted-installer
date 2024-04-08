@@ -315,8 +315,9 @@ func (i *installer) writeImageToDisk(ignitionPath string) error {
 	i.UpdateHostInstallProgress(models.HostStageWritingImageToDisk, "")
 
 	interval := time.Second
+	liveLogger := ops.NewCoreosInstallerLogWriter(i.log, i.inventoryClient, i.Config.InfraEnvID, i.Config.HostID)
 	err := utils.Retry(3, interval, i.log, func() error {
-		return i.ops.WriteImageToDisk(ignitionPath, i.Device, i.inventoryClient, i.Config.InstallerArgs)
+		return i.ops.WriteImageToDisk(liveLogger, ignitionPath, i.Device, i.Config.InstallerArgs)
 	})
 	if err != nil {
 		i.log.WithError(err).Error("Failed to write image to disk")
