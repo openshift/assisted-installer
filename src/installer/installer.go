@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/openshift/assisted-installer/src/coreos_logger"
 	"github.com/openshift/assisted-installer/src/ops/execute"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
@@ -315,7 +316,7 @@ func (i *installer) writeImageToDisk(ignitionPath string) error {
 	i.UpdateHostInstallProgress(models.HostStageWritingImageToDisk, "")
 
 	interval := time.Second
-	liveLogger := ops.NewCoreosInstallerLogWriter(i.log, i.inventoryClient, i.Config.InfraEnvID, i.Config.HostID)
+	liveLogger := coreos_logger.NewCoreosInstallerLogWriter(i.log, i.inventoryClient, i.Config.InfraEnvID, i.Config.HostID)
 	err := utils.Retry(3, interval, i.log, func() error {
 		return i.ops.WriteImageToDisk(liveLogger, ignitionPath, i.Device, i.Config.InstallerArgs)
 	})

@@ -48,7 +48,7 @@ const (
 //go:generate mockgen -source=ops.go -package=ops -destination=mock_ops.go
 type Ops interface {
 	Mkdir(dirName string) error
-	WriteImageToDisk(liveLogger *CoreosInstallerLogWriter, ignitionPath string, device string, extraArgs []string) error
+	WriteImageToDisk(liveLogger io.Writer, ignitionPath string, device string, extraArgs []string) error
 	Reboot(delay string) error
 	SetBootOrder(device string) error
 	ExtractFromIgnition(ignitionPath string, fileToExtract string) error
@@ -133,7 +133,7 @@ func (o *ops) SystemctlAction(action string, args ...string) error {
 	return errors.Wrapf(err, "Failed executing systemctl %s %s", action, args)
 }
 
-func (o *ops) WriteImageToDisk(liveLogger *CoreosInstallerLogWriter, ignitionPath string, device string, extraArgs []string) error {
+func (o *ops) WriteImageToDisk(liveLogger io.Writer, ignitionPath string, device string, extraArgs []string) error {
 	allArgs := installerArgs(ignitionPath, device, extraArgs)
 	o.log.Infof("Writing image and ignition to disk with arguments: %v", allArgs)
 
