@@ -170,6 +170,7 @@ require (
 replace (
 	github.com/metal3-io/baremetal-operator/apis => github.com/openshift/baremetal-operator/apis v0.0.0-20230531194024-8dde0991ffdd
 	github.com/metal3-io/baremetal-operator/pkg/hardwareutils => github.com/openshift/baremetal-operator/pkg/hardwareutils v0.0.0-20230531194024-8dde0991ffdd
+	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.12
 	github.com/openshift/assisted-service/api => github.com/openshift/assisted-service/api v0.0.0-20240208201111-259f43b752bc
 	github.com/openshift/assisted-service/client => github.com/openshift/assisted-service/client v0.0.0-20240208201111-259f43b752bc
 	github.com/openshift/assisted-service/models => github.com/openshift/assisted-service/models v0.0.0-20240208201111-259f43b752bc
