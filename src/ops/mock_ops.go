@@ -496,7 +496,7 @@ func (mr *MockOpsMockRecorder) Wipefs(device interface{}) *gomock.Call {
 }
 
 // WriteImageToDisk mocks base method.
-func (m *MockOps) WriteImageToDisk(liveLogger *CoreosInstallerLogWriter, ignitionPath, device string, extraArgs []string) error {
+func (m *MockOps) WriteImageToDisk(liveLogger io.Writer, ignitionPath, device string, extraArgs []string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WriteImageToDisk", liveLogger, ignitionPath, device, extraArgs)
 	ret0, _ := ret[0].(error)
