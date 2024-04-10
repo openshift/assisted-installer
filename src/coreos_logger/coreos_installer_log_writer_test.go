@@ -1,4 +1,4 @@
-package ops
+package coreos_logger
 
 import (
 	"io"
