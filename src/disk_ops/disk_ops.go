@@ -1,23 +1,19 @@
 package disk_ops
 
 import (
-	"github.com/openshift/assisted-installer/src/ops/execute"
-	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"io"
 	"path/filepath"
 	"regexp"
 	"strings"
 )
 
 type DiskOps struct {
-	log       logrus.FieldLogger
-	logWriter *utils.LogWriter
-	executor  execute.Execute
+	log      logrus.Logger
+	executor Execute
 }
 
-func NewDiskOps(logger logrus.FieldLogger, executor execute.Execute) DiskOps {
+func NewDiskOps(logger logrus.Logger, executor Execute) DiskOps {
 	return DiskOps{log: logger, executor: executor}
 }
 
@@ -28,7 +24,7 @@ func (r *DiskOps) CleanupInstallDevice(device string) error {
 	err := r.cleanupDevice(device)
 
 	if err != nil {
-		ret = utils.CombineErrors(ret, err)
+		ret = CombineErrors(ret, err)
 	}
 
 	if r.IsRaidMember(device) {
@@ -37,7 +33,7 @@ func (r *DiskOps) CleanupInstallDevice(device string) error {
 		devices, err = r.GetRaidDevices(device)
 
 		if err != nil {
-			ret = utils.CombineErrors(ret, err)
+			ret = CombineErrors(ret, err)
 		}
 
 		for _, raidDevice := range devices {
@@ -45,21 +41,21 @@ func (r *DiskOps) CleanupInstallDevice(device string) error {
 			err = r.cleanupDevice(raidDevice)
 
 			if err != nil {
-				ret = utils.CombineErrors(ret, err)
+				ret = CombineErrors(ret, err)
 			}
 		}
 
 		err = r.CleanRaidMembership(device)
 
 		if err != nil {
-			ret = utils.CombineErrors(ret, err)
+			ret = CombineErrors(ret, err)
 		}
 		r.log.Infof("Finished cleaning up device %s", device)
 	}
 
 	err = r.Wipefs(device)
 	if err != nil {
-		ret = utils.CombineErrors(ret, err)
+		ret = CombineErrors(ret, err)
 	}
 
 	return ret
@@ -74,16 +70,16 @@ func (r *DiskOps) cleanupDevice(device string) error {
 
 	if len(vgNames) > 0 {
 		if err = r.RemoveVolumeGroupsFromDevice(vgNames, device); err != nil {
-			ret = utils.CombineErrors(ret, err)
+			ret = CombineErrors(ret, err)
 		}
 	}
 
 	if err = r.RemoveAllPVsOnDevice(device); err != nil {
-		ret = utils.CombineErrors(ret, err)
+		ret = CombineErrors(ret, err)
 	}
 
 	if err = r.RemoveAllDMDevicesOnDisk(device); err != nil {
-		ret = utils.CombineErrors(ret, err)
+		ret = CombineErrors(ret, err)
 	}
 
 	return ret
@@ -97,7 +93,7 @@ func (r *DiskOps) RemoveVolumeGroupsFromDevice(vgNames []string, device string) 
 
 		if err != nil {
 			r.log.Errorf("Could not delete volume group (%s) due to error: %w", vgName, err)
-			ret = utils.CombineErrors(ret, err)
+			ret = CombineErrors(ret, err)
 		}
 	}
 	return ret
@@ -167,7 +163,7 @@ func (r *DiskOps) GetRaidDevices(deviceName string) ([]string, error) {
 }
 
 func (r *DiskOps) getRaidDevices2Members() (map[string][]string, error) {
-	output, err := r.ExecPrivilegeCommand(r.logWriter, "mdadm", "-v", "--query", "--detail", "--scan")
+	output, err := r.ExecPrivilegeCommand("mdadm", "-v", "--query", "--detail", "--scan")
 
 	if err != nil {
 		return nil, err
@@ -229,7 +225,7 @@ func (r *DiskOps) removeDeviceFromRaidArray(deviceName string, raidDeviceName st
 			// Stop the raid device.
 			if !raidStopped {
 				r.log.Info("Stopping raid device: " + raidDeviceName)
-				_, err := r.ExecPrivilegeCommand(r.logWriter, "mdadm", "--stop", raidDeviceName)
+				_, err := r.ExecPrivilegeCommand("mdadm", "--stop", raidDeviceName)
 
 				if err != nil {
 					return err
@@ -240,7 +236,7 @@ func (r *DiskOps) removeDeviceFromRaidArray(deviceName string, raidDeviceName st
 
 			// Clean the raid superblock from the device
 			r.log.Infof("Cleaning raid member %s superblock", raidMember)
-			_, err := r.ExecPrivilegeCommand(r.logWriter, "mdadm", "--zero-superblock", raidMember)
+			_, err := r.ExecPrivilegeCommand("mdadm", "--zero-superblock", raidMember)
 
 			if err != nil {
 				return err
@@ -251,7 +247,7 @@ func (r *DiskOps) removeDeviceFromRaidArray(deviceName string, raidDeviceName st
 }
 
 // ExecPrivilegeCommand execute a command in the host environment via nsenter
-func (r *DiskOps) ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
+func (r *DiskOps) ExecPrivilegeCommand(command string, args ...string) (string, error) {
 	// nsenter is used here to launch processes inside the container in a way that makes said processes feel
 	// and behave as if they're running on the host directly rather than inside the container
 	commandBase := "nsenter"
@@ -275,14 +271,14 @@ func (r *DiskOps) ExecPrivilegeCommand(liveLogger io.Writer, command string, arg
 	}
 
 	arguments = append(arguments, args...)
-	return r.executor.ExecCommand(liveLogger, commandBase, arguments...)
+	return r.executor.ExecCommand(r.log.Writer(), commandBase, arguments...)
 }
 
 func (r *DiskOps) Wipefs(device string) error {
-	_, err := r.ExecPrivilegeCommand(r.logWriter, "wipefs", "--all", "--force", device)
+	_, err := r.ExecPrivilegeCommand("wipefs", "--all", "--force", device)
 
 	if err != nil {
-		_, err = r.ExecPrivilegeCommand(r.logWriter, "wipefs", "--all", device)
+		_, err = r.ExecPrivilegeCommand("wipefs", "--all", device)
 	}
 
 	return err
@@ -291,7 +287,7 @@ func (r *DiskOps) Wipefs(device string) error {
 func (r *DiskOps) GetVolumeGroupsByDisk(diskName string) ([]string, error) {
 	var vgs []string
 
-	output, err := r.ExecPrivilegeCommand(r.logWriter, "vgs", "--noheadings", "-o", "vg_name,pv_name")
+	output, err := r.ExecPrivilegeCommand("vgs", "--noheadings", "-o", "vg_name,pv_name")
 	if err != nil {
 		r.log.Errorf("Failed to list VGs in the system")
 		return vgs, err
@@ -316,7 +312,7 @@ func (r *DiskOps) GetVolumeGroupsByDisk(diskName string) ([]string, error) {
 
 func (r *DiskOps) getDiskPVs(diskName string) ([]string, error) {
 	var pvs []string
-	output, err := r.ExecPrivilegeCommand(r.logWriter, "pvs", "--noheadings", "-o", "pv_name")
+	output, err := r.ExecPrivilegeCommand("pvs", "--noheadings", "-o", "pv_name")
 	if err != nil {
 		r.log.Errorf("Failed to list PVs in the system")
 		return pvs, err
@@ -341,7 +337,7 @@ func (r *DiskOps) RemoveAllPVsOnDevice(diskName string) error {
 		err = r.RemovePV(pv)
 		if err != nil {
 			r.log.Errorf("Failed remove pv %s from disk %s", pv, diskName)
-			ret = utils.CombineErrors(ret, err)
+			ret = CombineErrors(ret, err)
 		}
 	}
 	return ret
@@ -349,7 +345,7 @@ func (r *DiskOps) RemoveAllPVsOnDevice(diskName string) error {
 
 func (r *DiskOps) getDMDevices(diskName string) ([]string, error) {
 	var dmDevices []string
-	output, err := r.ExecPrivilegeCommand(r.logWriter, "dmsetup", "ls")
+	output, err := r.ExecPrivilegeCommand("dmsetup", "ls")
 	if err != nil {
 		r.log.Errorf("Failed to list DM devices in the system")
 		return dmDevices, err
@@ -363,7 +359,7 @@ func (r *DiskOps) getDMDevices(diskName string) ([]string, error) {
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
 		dmDevice := strings.Split(line, "\t")[0]
-		output, err = r.ExecPrivilegeCommand(r.logWriter, "dmsetup", "deps", "-o", "devname", dmDevice)
+		output, err = r.ExecPrivilegeCommand("dmsetup", "deps", "-o", "devname", dmDevice)
 		if err != nil {
 			r.log.Errorf("Failed to get parent device for DM device %s", dmDevice)
 			return dmDevices, err
@@ -376,7 +372,7 @@ func (r *DiskOps) getDMDevices(diskName string) ([]string, error) {
 }
 
 func (r *DiskOps) RemoveDMDevice(dmDevice string) error {
-	output, err := r.ExecPrivilegeCommand(r.logWriter, "dmsetup", "remove", "--retry", dmDevice)
+	output, err := r.ExecPrivilegeCommand("dmsetup", "remove", "--retry", dmDevice)
 	if err != nil {
 		r.log.Errorf("Failed to remove DM device %s, output %s, error %s", dmDevice, output, err)
 	}
@@ -394,14 +390,14 @@ func (r *DiskOps) RemoveAllDMDevicesOnDisk(diskName string) error {
 		err = r.RemoveDMDevice(dmDevice)
 		if err != nil {
 			r.log.Errorf("Failed to remove DM device %s", dmDevice)
-			ret = utils.CombineErrors(ret, err)
+			ret = CombineErrors(ret, err)
 		}
 	}
 	return ret
 }
 
 func (r *DiskOps) RemoveVG(vgName string) error {
-	output, err := r.ExecPrivilegeCommand(r.logWriter, "vgremove", vgName, "-y")
+	output, err := r.ExecPrivilegeCommand("vgremove", vgName, "-y")
 	if err != nil {
 		r.log.Errorf("Failed to remove VG %s, output %s, error %s", vgName, output, err)
 	}
@@ -409,9 +405,16 @@ func (r *DiskOps) RemoveVG(vgName string) error {
 }
 
 func (r *DiskOps) RemovePV(pvName string) error {
-	output, err := r.ExecPrivilegeCommand(r.logWriter, "pvremove", pvName, "-y", "-ff")
+	output, err := r.ExecPrivilegeCommand("pvremove", pvName, "-y", "-ff")
 	if err != nil {
 		r.log.Errorf("Failed to remove PV %s, output %s, error %s", pvName, output, err)
 	}
 	return err
+}
+
+func CombineErrors(error1 error, error2 error) error {
+	if error1 != nil {
+		return errors.Wrapf(error1, "%s", error2)
+	}
+	return error2
 }
