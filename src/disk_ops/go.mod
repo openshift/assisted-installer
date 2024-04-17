@@ -1,4 +1,4 @@
-module github.com/assisted-installer/src/disk_ops
+module github.com/openshift/assisted-installer/src/disk_ops
 
 go 1.20
 
