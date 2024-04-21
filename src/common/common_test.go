@@ -9,13 +9,13 @@ import (
 	"testing"
 
 	"github.com/go-openapi/strfmt"
-	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-service/models"
 	"github.com/sirupsen/logrus"
+	gomock "go.uber.org/mock/gomock"
 	v1 "k8s.io/api/core/v1"
 )
 
