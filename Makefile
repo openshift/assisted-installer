@@ -37,12 +37,18 @@ format:
 format-check:
 	@test -z $(shell $(MAKE) format)
 
-generate:
+generate: generate-shared-ops 
 	go generate $(shell go list ./...)
 	$(MAKE) format
 
-unit-test:
+generate-shared-ops:
+	cd shared_ops && go generate $(shell cd shared_ops && go list ./...)
+
+unit-test: unit-test-shared-ops
 	$(MAKE) _test TEST_SCENARIO=unit TIMEOUT=30m TEST="$(or $(TEST),$(shell go list ./...))" || (docker kill postgres && /bin/false)
+
+unit-test-shared-ops:
+	cd shared_ops && TEST_SCENARIO=unit TEST="$(or $(TEST),$(shell cd shared_ops && go list ./...))" gotestsum $(GOTEST_FLAGS) $(TEST) $(GINKGO_FLAGS) -timeout 30m
 
 _test: $(REPORTS)
 	gotestsum $(GOTEST_FLAGS) $(TEST) $(GINKGO_FLAGS) -timeout $(TIMEOUT) || ($(MAKE) _post_test && /bin/false)

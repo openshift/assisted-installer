@@ -8,19 +8,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-openapi/swag"
-	"github.com/openshift/assisted-service/client/installer"
+	"github.com/openshift/assisted-installer/src/k8s_client"
 	v1 "k8s.io/api/core/v1"
 
-	"github.com/golang/mock/gomock"
+	"github.com/go-openapi/swag"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	configv1 "github.com/openshift/api/config/v1"
 	assistedinstallercontroller "github.com/openshift/assisted-installer/src/assisted_installer_controller"
 	"github.com/openshift/assisted-installer/src/inventory_client"
-	"github.com/openshift/assisted-installer/src/k8s_client"
+	"github.com/openshift/assisted-service/client/installer"
 	"github.com/openshift/assisted-service/models"
 	"github.com/sirupsen/logrus"
+	gomock "go.uber.org/mock/gomock"
 )
 
 func TestValidator(t *testing.T) {

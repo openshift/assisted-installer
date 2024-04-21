@@ -27,7 +27,7 @@ import (
 	"github.com/thoas/go-funk"
 	"github.com/vincent-petithory/dataurl"
 
-	"github.com/openshift/assisted-installer/src/ops/execute"
+	"github.com/openshift/assisted-installer/shared_ops"
 	"github.com/openshift/assisted-service/models"
 
 	"github.com/pkg/errors"
@@ -54,15 +54,6 @@ type Ops interface {
 	ExtractFromIgnition(ignitionPath string, fileToExtract string) error
 	SystemctlAction(action string, args ...string) error
 	PrepareController() error
-	GetVolumeGroupsByDisk(diskName string) ([]string, error)
-	RemoveAllPVsOnDevice(diskName string) error
-	RemoveAllDMDevicesOnDisk(diskName string) error
-	RemoveVG(vgName string) error
-	RemovePV(pvName string) error
-	Wipefs(device string) error
-	IsRaidMember(device string) bool
-	GetRaidDevices(device string) ([]string, error)
-	CleanRaidMembership(device string) error
 	GetMCSLogs() (string, error)
 	UploadInstallationLogs(isBootstrap bool) (string, error)
 	ReloadHostFile(filepath string) error
@@ -97,15 +88,15 @@ type ops struct {
 	log             logrus.FieldLogger
 	logWriter       *utils.LogWriter
 	installerConfig *config.Config
-	executor        execute.Execute
+	executor        shared_ops.Execute
 }
 
-func NewOps(logger *logrus.Logger, executor execute.Execute) Ops {
+func NewOps(logger *logrus.Logger, executor shared_ops.Execute) Ops {
 	return NewOpsWithConfig(&config.Config{}, logger, executor)
 }
 
 // NewOps return a new ops interface
-func NewOpsWithConfig(installerConfig *config.Config, logger logrus.FieldLogger, executor execute.Execute) Ops {
+func NewOpsWithConfig(installerConfig *config.Config, logger logrus.FieldLogger, executor shared_ops.Execute) Ops {
 	return &ops{
 		log:             logger,
 		logWriter:       utils.NewLogWriter(logger),
@@ -430,291 +421,6 @@ func (o *ops) renderDeploymentFiles(srcTemplate string, params map[string]interf
 	if err = os.WriteFile(renderedControllerYaml, buf.Bytes(), 0644); err != nil {
 		o.log.Errorf("Error occurred while trying to write rendered data to %s : %e", renderedControllerYaml, err)
 		return err
-	}
-	return nil
-}
-
-func (o *ops) GetVolumeGroupsByDisk(diskName string) ([]string, error) {
-	var vgs []string
-
-	output, err := o.ExecPrivilegeCommand(o.logWriter, "vgs", "--noheadings", "-o", "vg_name,pv_name")
-	if err != nil {
-		o.log.Errorf("Failed to list VGs in the system")
-		return vgs, err
-	}
-
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
-		res := strings.Fields(line)
-		if len(res) < 2 {
-			continue
-		}
-
-		o.log.Infof("Found LVM Volume Group %s in disk %s", res[0], res[1])
-		if strings.Contains(res[1], diskName) {
-			vgs = append(vgs, res[0])
-		} else {
-			o.log.Infof("Skipping removal of Volume Group %s, does not belong to disk %s", res[0], diskName)
-		}
-	}
-	return vgs, nil
-}
-
-func (o *ops) getDiskPVs(diskName string) ([]string, error) {
-	var pvs []string
-	output, err := o.ExecPrivilegeCommand(o.logWriter, "pvs", "--noheadings", "-o", "pv_name")
-	if err != nil {
-		o.log.Errorf("Failed to list PVs in the system")
-		return pvs, err
-	}
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
-		if strings.Contains(line, diskName) {
-			pvs = append(pvs, strings.TrimSpace(line))
-		}
-	}
-	return pvs, nil
-}
-
-func (o *ops) RemoveAllPVsOnDevice(diskName string) error {
-	var ret error
-	pvs, err := o.getDiskPVs(diskName)
-	if err != nil {
-		return err
-	}
-	for _, pv := range pvs {
-		o.log.Infof("Removing pv %s from disk %s", pv, diskName)
-		err = o.RemovePV(pv)
-		if err != nil {
-			o.log.Errorf("Failed remove pv %s from disk %s", pv, diskName)
-			ret = utils.CombineErrors(ret, err)
-		}
-	}
-	return ret
-}
-
-func (o *ops) getDMDevices(diskName string) ([]string, error) {
-	var dmDevices []string
-	output, err := o.ExecPrivilegeCommand(o.logWriter, "dmsetup", "ls")
-	if err != nil {
-		o.log.Errorf("Failed to list DM devices in the system")
-		return dmDevices, err
-	}
-
-	if strings.TrimSuffix(output, "\n") == "No devices found" {
-		return dmDevices, nil
-	}
-
-	diskBasename := filepath.Base(diskName)
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
-		dmDevice := strings.Split(line, "\t")[0]
-		output, err = o.ExecPrivilegeCommand(o.logWriter, "dmsetup", "deps", "-o", "devname", dmDevice)
-		if err != nil {
-			o.log.Errorf("Failed to get parent device for DM device %s", dmDevice)
-			return dmDevices, err
-		}
-		if strings.Contains(output, "("+diskBasename) {
-			dmDevices = append(dmDevices, dmDevice)
-		}
-	}
-	return dmDevices, nil
-}
-
-func (o *ops) RemoveDMDevice(dmDevice string) error {
-	output, err := o.ExecPrivilegeCommand(o.logWriter, "dmsetup", "remove", "--retry", dmDevice)
-	if err != nil {
-		o.log.Errorf("Failed to remove DM device %s, output %s, error %s", dmDevice, output, err)
-	}
-	return err
-}
-
-func (o *ops) RemoveAllDMDevicesOnDisk(diskName string) error {
-	var ret error
-	dmDevices, err := o.getDMDevices(diskName)
-	if err != nil {
-		return err
-	}
-	for _, dmDevice := range dmDevices {
-		o.log.Infof("Removing DM device %s", dmDevice)
-		err = o.RemoveDMDevice(dmDevice)
-		if err != nil {
-			o.log.Errorf("Failed to remove DM device %s", dmDevice)
-			ret = utils.CombineErrors(ret, err)
-		}
-	}
-	return ret
-}
-
-func (o *ops) RemoveVG(vgName string) error {
-	output, err := o.ExecPrivilegeCommand(o.logWriter, "vgremove", vgName, "-y")
-	if err != nil {
-		o.log.Errorf("Failed to remove VG %s, output %s, error %s", vgName, output, err)
-	}
-	return err
-}
-
-func (o *ops) RemovePV(pvName string) error {
-	output, err := o.ExecPrivilegeCommand(o.logWriter, "pvremove", pvName, "-y", "-ff")
-	if err != nil {
-		o.log.Errorf("Failed to remove PV %s, output %s, error %s", pvName, output, err)
-	}
-	return err
-}
-
-func (o *ops) Wipefs(device string) error {
-	_, err := o.ExecPrivilegeCommand(o.logWriter, "wipefs", "--all", "--force", device)
-
-	if err != nil {
-		_, err = o.ExecPrivilegeCommand(o.logWriter, "wipefs", "--all", device)
-	}
-
-	return err
-}
-
-func (o *ops) IsRaidMember(device string) bool {
-	raidDevices, err := o.getRaidDevices2Members()
-
-	if err != nil {
-		o.log.WithError(err).Errorf("Error occurred while trying to get list of raid devices - continue without cleaning")
-		return false
-	}
-
-	// The device itself or one of its partitions
-	expression, _ := regexp.Compile(device + "[\\d]*")
-
-	for _, raidArrayMembers := range raidDevices {
-		for _, raidMember := range raidArrayMembers {
-			if expression.MatchString(raidMember) {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-func (o *ops) CleanRaidMembership(device string) error {
-	raidDevices, err := o.getRaidDevices2Members()
-
-	if err != nil {
-		return err
-	}
-
-	for raidDeviceName, raidArrayMembers := range raidDevices {
-		err = o.removeDeviceFromRaidArray(device, raidDeviceName, raidArrayMembers)
-
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (o *ops) GetRaidDevices(deviceName string) ([]string, error) {
-	raidDevices, err := o.getRaidDevices2Members()
-	var result []string
-
-	if err != nil {
-		return result, err
-	}
-
-	for raidDeviceName, raidArrayMembers := range raidDevices {
-		expression, _ := regexp.Compile(deviceName + "[\\d]*")
-
-		for _, raidMember := range raidArrayMembers {
-			// A partition or the device itself is part of the raid array.
-			if expression.MatchString(raidMember) {
-				result = append(result, raidDeviceName)
-				break
-			}
-		}
-	}
-
-	return result, nil
-}
-
-func (o *ops) getRaidDevices2Members() (map[string][]string, error) {
-	output, err := o.ExecPrivilegeCommand(o.logWriter, "mdadm", "-v", "--query", "--detail", "--scan")
-
-	if err != nil {
-		return nil, err
-	}
-
-	lines := strings.Split(output, "\n")
-	result := make(map[string][]string)
-
-	/*
-		The output pattern is:
-		ARRAY /dev/md0 level=raid1 num-devices=2 metadata=1.2 name=0 UUID=77e1b6f2:56530ebd:38bd6808:17fd01c4
-		   devices=/dev/vda2,/dev/vda3
-		ARRAY /dev/md1 level=raid1 num-devices=1 metadata=1.2 name=1 UUID=aad7aca9:81db82f3:2f1fedb1:f89ddb43
-		   devices=/dev/vda1
-	*/
-	for i := 0; i < len(lines); {
-		if !strings.Contains(lines[i], "ARRAY") {
-			i++
-			continue
-		}
-
-		fields := strings.Fields(lines[i])
-		// In case of symlink, get real file path
-		raidDeviceName, err := filepath.EvalSymlinks(fields[1])
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to evaluate raid symlink")
-		}
-
-		i++
-
-		// Ensuring that we have at least two lines per device.
-		if len(lines) == i {
-			break
-		}
-
-		raidArrayMembersStr := strings.TrimSpace(lines[i])
-		prefix := "devices="
-
-		if !strings.HasPrefix(raidArrayMembersStr, prefix) {
-			continue
-		}
-
-		raidArrayMembersStr = raidArrayMembersStr[len(prefix):]
-		result[raidDeviceName] = strings.Split(raidArrayMembersStr, ",")
-		i++
-	}
-
-	return result, nil
-}
-
-func (o *ops) removeDeviceFromRaidArray(deviceName string, raidDeviceName string, raidArrayMembers []string) error {
-	raidStopped := false
-
-	expression, _ := regexp.Compile(deviceName + "[\\d]*")
-
-	for _, raidMember := range raidArrayMembers {
-		// A partition or the device itself is part of the raid array.
-		if expression.MatchString(raidMember) {
-			// Stop the raid device.
-			if !raidStopped {
-				o.log.Info("Stopping raid device: " + raidDeviceName)
-				_, err := o.ExecPrivilegeCommand(o.logWriter, "mdadm", "--stop", raidDeviceName)
-
-				if err != nil {
-					return err
-				}
-
-				raidStopped = true
-			}
-
-			// Clean the raid superblock from the device
-			o.log.Infof("Cleaning raid member %s superblock", raidMember)
-			_, err := o.ExecPrivilegeCommand(o.logWriter, "mdadm", "--zero-superblock", raidMember)
-
-			if err != nil {
-				return err
-			}
-		}
 	}
 	return nil
 }

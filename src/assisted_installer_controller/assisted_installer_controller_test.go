@@ -29,10 +29,10 @@ import (
 	certificatesv1 "k8s.io/api/certificates/v1"
 
 	"github.com/go-openapi/strfmt"
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
+	gomock "go.uber.org/mock/gomock"
 
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/assisted-installer/src/inventory_client"

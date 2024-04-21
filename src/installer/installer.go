@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/openshift/assisted-installer/src/coreos_logger"
-	"github.com/openshift/assisted-installer/src/ops/execute"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	"golang.org/x/sync/errgroup"
@@ -25,12 +23,15 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/thoas/go-funk"
 
+	"github.com/openshift/assisted-installer/shared_ops"
 	"github.com/openshift/assisted-installer/src/common"
 	"github.com/openshift/assisted-installer/src/config"
+	"github.com/openshift/assisted-installer/src/coreos_logger"
 	"github.com/openshift/assisted-installer/src/ignition"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/ops"
+	"github.com/openshift/assisted-installer/src/ops/execute"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/models"
 )
@@ -70,10 +71,10 @@ type installer struct {
 	inventoryClient inventory_client.InventoryClient
 	kcBuilder       k8s_client.K8SClientBuilder
 	ign             ignition.Ignition
-	diskOps         ops.DiskOps
+	cleanupDevice   shared_ops.CleanupDevice
 }
 
-func NewAssistedInstaller(log logrus.FieldLogger, cfg config.Config, ops ops.Ops, ic inventory_client.InventoryClient, kcb k8s_client.K8SClientBuilder, ign ignition.Ignition, diskOps ops.DiskOps) *installer {
+func NewAssistedInstaller(log logrus.FieldLogger, cfg config.Config, ops ops.Ops, ic inventory_client.InventoryClient, kcb k8s_client.K8SClientBuilder, ign ignition.Ignition, cleanupDevice shared_ops.CleanupDevice) *installer {
 	return &installer{
 		log:             log,
 		Config:          cfg,
@@ -81,7 +82,7 @@ func NewAssistedInstaller(log logrus.FieldLogger, cfg config.Config, ops ops.Ops
 		inventoryClient: ic,
 		kcBuilder:       kcb,
 		ign:             ign,
-		diskOps:         diskOps,
+		cleanupDevice:   cleanupDevice,
 	}
 }
 
@@ -277,7 +278,7 @@ func (i *installer) cleanupInstallDevice() {
 	if i.DryRunEnabled || i.Config.SkipInstallationDiskCleanup {
 		i.log.Infof("skipping installation disk cleanup")
 	} else {
-		err := i.diskOps.CleanupInstallDevice(i.Config.Device)
+		err := i.cleanupDevice.CleanupInstallDevice(i.Config.Device)
 		if err != nil {
 			i.UpdateHostInstallProgress(models.HostStageStartingInstallation, fmt.Sprintf("Could not clean install device %s. The installation will continue. If the installation fails, clean the disk and try again", i.Device))
 			// Do not change the phrasing of this error message, as we rely on it in a triage signature
@@ -887,7 +888,7 @@ func (i *installer) checkHostname() error {
 	return i.ops.CreateRandomHostname(data)
 }
 
-func RunInstaller(installerConfig *config.Config, logger logrus.FieldLogger) error {
+func RunInstaller(installerConfig *config.Config, logger *logrus.Logger) error {
 	logger.Infof("Assisted installer started. Configuration is:\n %s", secretdump.DumpSecretStruct(*installerConfig))
 	logger.Infof("Dry configuration is:\n %s", secretdump.DumpSecretStruct(installerConfig.DryRunConfig))
 
@@ -916,7 +917,7 @@ func RunInstaller(installerConfig *config.Config, logger logrus.FieldLogger) err
 
 	executor := execute.NewExecutor(installerConfig, logger, true)
 	o := ops.NewOpsWithConfig(installerConfig, logger, executor)
-	diskOps := ops.NewDiskOps(logger, o)
+	cleanupDevice := shared_ops.NewCleanupDevice(logger, shared_ops.NewDiskOps(logger, executor))
 	var k8sClientBuilder k8s_client.K8SClientBuilder
 	if !installerConfig.DryRunEnabled {
 		k8sClientBuilder = k8s_client.NewK8SClient
@@ -930,7 +931,7 @@ func RunInstaller(installerConfig *config.Config, logger logrus.FieldLogger) err
 		client,
 		k8sClientBuilder,
 		ignition.NewIgnition(),
-		diskOps,
+		cleanupDevice,
 	)
 
 	// Try to format requested disks. May fail formatting some disks, this is not an error.
