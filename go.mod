@@ -16,7 +16,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/metal3-io/baremetal-operator/apis v0.2.0
 	github.com/onsi/ginkgo v1.16.5
-	github.com/onsi/gomega v1.32.0
+	github.com/onsi/gomega v1.33.0
 	github.com/openshift/api v0.0.0-20231031181504-3be12e93388f
 	github.com/openshift/assisted-installer-agent v1.0.9
 	github.com/openshift/assisted-service v1.0.10-0.20240326114557-cf7218d8ce3c
