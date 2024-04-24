@@ -609,8 +609,8 @@ func (o *ops) GetMustGatherLogs(workDir, kubeconfigPath string, images ...string
 }
 
 func (o *ops) CreateRandomHostname(hostname string) error {
-	command := fmt.Sprintf("echo %s > /etc/hostname", hostname)
-	o.log.Infof("create random hostname with command %s", command)
+	command := fmt.Sprintf("hostnamectl set-hostname %s", hostname)
+	o.log.Infof("applying random hostname with command %s", command)
 	_, err := o.ExecPrivilegeCommand(o.logWriter, "bash", "-c", command)
 	return err
 }
