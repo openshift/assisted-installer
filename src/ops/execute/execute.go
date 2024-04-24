@@ -10,11 +10,16 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/sirupsen/logrus"
-
-	"github.com/openshift/assisted-installer/shared_ops"
 	"github.com/openshift/assisted-installer/src/config"
+	"github.com/sirupsen/logrus"
 )
+
+//go:generate mockgen -source=execute.go -package=execute -destination=mock_execute.go
+type Execute interface {
+	ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error)
+	ExecCommandWithContext(ctx context.Context, liveLogger io.Writer, command string, args ...string) (string, error)
+	Execute(command string, args ...string) (string, error)
+}
 
 type executor struct {
 	cmdEnv          []string
@@ -22,7 +27,7 @@ type executor struct {
 	installerConfig *config.Config
 }
 
-func NewExecutor(installerConfig *config.Config, logger *logrus.Logger, proxySet bool) shared_ops.Execute {
+func NewExecutor(installerConfig *config.Config, logger *logrus.Logger, proxySet bool) Execute {
 	cmdEnv := os.Environ()
 	if proxySet && (installerConfig.HTTPProxy != "" || installerConfig.HTTPSProxy != "") {
 		if installerConfig.HTTPProxy != "" {

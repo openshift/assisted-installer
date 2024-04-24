@@ -21,13 +21,14 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/openshift/assisted-installer/src/ops/execute"
+
 	config_latest "github.com/coreos/ignition/v2/config/v3_2"
 	"github.com/go-openapi/swag"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/thoas/go-funk"
 	"github.com/vincent-petithory/dataurl"
 
-	"github.com/openshift/assisted-installer/shared_ops"
 	"github.com/openshift/assisted-service/models"
 
 	"github.com/pkg/errors"
@@ -88,15 +89,15 @@ type ops struct {
 	log             logrus.FieldLogger
 	logWriter       *utils.LogWriter
 	installerConfig *config.Config
-	executor        shared_ops.Execute
+	executor        execute.Execute
 }
 
-func NewOps(logger *logrus.Logger, executor shared_ops.Execute) Ops {
+func NewOps(logger *logrus.Logger, executor execute.Execute) Ops {
 	return NewOpsWithConfig(&config.Config{}, logger, executor)
 }
 
 // NewOps return a new ops interface
-func NewOpsWithConfig(installerConfig *config.Config, logger logrus.FieldLogger, executor shared_ops.Execute) Ops {
+func NewOpsWithConfig(installerConfig *config.Config, logger logrus.FieldLogger, executor execute.Execute) Ops {
 	return &ops{
 		log:             logger,
 		logWriter:       utils.NewLogWriter(logger),

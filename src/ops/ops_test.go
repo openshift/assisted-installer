@@ -12,12 +12,13 @@ import (
 	"os"
 	"reflect"
 
+	"github.com/openshift/assisted-installer/src/ops/execute"
+
 	"github.com/coreos/ignition/v2/config/v3_2/types"
 	"github.com/go-openapi/swag"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
-	"github.com/openshift/assisted-installer/shared_ops"
 	"github.com/openshift/assisted-installer/src/config"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/sirupsen/logrus"
@@ -86,13 +87,13 @@ var _ = Describe("Upload logs", func() {
 	var (
 		l        = logrus.New()
 		ctrl     *gomock.Controller
-		execMock *shared_ops.MockExecute
+		execMock *execute.MockExecute
 		conf     *config.Config
 	)
 
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
-		execMock = shared_ops.NewMockExecute(ctrl)
+		execMock = execute.NewMockExecute(ctrl)
 		conf = &config.Config{}
 	})
 
@@ -118,13 +119,13 @@ var _ = Describe("Set Boot Order", func() {
 	var (
 		l        = logrus.New()
 		ctrl     *gomock.Controller
-		execMock *shared_ops.MockExecute
+		execMock *execute.MockExecute
 		conf     *config.Config
 	)
 
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
-		execMock = shared_ops.NewMockExecute(ctrl)
+		execMock = execute.NewMockExecute(ctrl)
 		conf = &config.Config{}
 	})
 
@@ -383,14 +384,14 @@ var _ = Describe("overwrite OS image", func() {
 	var (
 		l        = logrus.New()
 		ctrl     *gomock.Controller
-		execMock *shared_ops.MockExecute
+		execMock *execute.MockExecute
 		conf     *config.Config
 		o        Ops
 	)
 
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
-		execMock = shared_ops.NewMockExecute(ctrl)
+		execMock = execute.NewMockExecute(ctrl)
 		conf = &config.Config{}
 		o = NewOpsWithConfig(conf, l, execMock)
 	})
@@ -482,14 +483,14 @@ var _ = Describe("get number of reboots", func() {
 	var (
 		l        = logrus.New()
 		ctrl     *gomock.Controller
-		execMock *shared_ops.MockExecute
+		execMock *execute.MockExecute
 		conf     *config.Config
 		o        Ops
 	)
 
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
-		execMock = shared_ops.NewMockExecute(ctrl)
+		execMock = execute.NewMockExecute(ctrl)
 		conf = &config.Config{}
 		o = NewOpsWithConfig(conf, l, execMock)
 	})

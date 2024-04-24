@@ -9,8 +9,6 @@
 package shared_ops
 
 import (
-	context "context"
-	io "io"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
@@ -37,46 +35,6 @@ func NewMockExecute(ctrl *gomock.Controller) *MockExecute {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockExecute) EXPECT() *MockExecuteMockRecorder {
 	return m.recorder
-}
-
-// ExecCommand mocks base method.
-func (m *MockExecute) ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
-	m.ctrl.T.Helper()
-	varargs := []any{liveLogger, command}
-	for _, a := range args {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "ExecCommand", varargs...)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ExecCommand indicates an expected call of ExecCommand.
-func (mr *MockExecuteMockRecorder) ExecCommand(liveLogger, command any, args ...any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{liveLogger, command}, args...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecCommand", reflect.TypeOf((*MockExecute)(nil).ExecCommand), varargs...)
-}
-
-// ExecCommandWithContext mocks base method.
-func (m *MockExecute) ExecCommandWithContext(ctx context.Context, liveLogger io.Writer, command string, args ...string) (string, error) {
-	m.ctrl.T.Helper()
-	varargs := []any{ctx, liveLogger, command}
-	for _, a := range args {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "ExecCommandWithContext", varargs...)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ExecCommandWithContext indicates an expected call of ExecCommandWithContext.
-func (mr *MockExecuteMockRecorder) ExecCommandWithContext(ctx, liveLogger, command any, args ...any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, liveLogger, command}, args...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecCommandWithContext", reflect.TypeOf((*MockExecute)(nil).ExecCommandWithContext), varargs...)
 }
 
 // Execute mocks base method.
