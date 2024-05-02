@@ -12,7 +12,6 @@ import (
 
 	"github.com/openshift/assisted-installer/src/ops/execute"
 
-	"github.com/golang/mock/gomock"
 	"github.com/kelseyhightower/envconfig"
 	assistedinstallercontroller "github.com/openshift/assisted-installer/src/assisted_installer_controller"
 	"github.com/openshift/assisted-installer/src/config"
@@ -25,6 +24,7 @@ import (
 	"github.com/openshift/assisted-service/models"
 	"github.com/openshift/assisted-service/pkg/secretdump"
 	"github.com/sirupsen/logrus"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // Added this way to be able to test it

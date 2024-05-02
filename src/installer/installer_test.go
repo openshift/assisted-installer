@@ -11,11 +11,12 @@ import (
 	"testing"
 	"time"
 
+	preinstallUtils "github.com/rh-ecosystem-edge/preinstall-utils/pkg"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/go-openapi/strfmt"
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/openshift/assisted-installer/src/common"
@@ -29,6 +30,7 @@ import (
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	gomock "go.uber.org/mock/gomock"
 )
 
 func TestValidator(t *testing.T) {
@@ -51,7 +53,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockbmclient       *inventory_client.MockInventoryClient
 				mockk8sclient      *k8s_client.MockK8SClient
 				mockIgnition       *ignition.MockIgnition
-				diskOps            ops.DiskOps
+				cleanupDevice      *preinstallUtils.MockCleanupDevice
 				installerObj       *installer
 				hostId             = "host-id"
 				infraEnvId         = "infra-env-id"
@@ -95,11 +97,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			}
 
 			cleanInstallDevice := func() {
-				mockops.EXPECT().GetVolumeGroupsByDisk(device).Return([]string{}, nil).Times(1)
-				mockops.EXPECT().RemoveAllPVsOnDevice(device).Return(nil).Times(1)
-				mockops.EXPECT().RemoveAllDMDevicesOnDisk(device).Return(nil).Times(1)
-				mockops.EXPECT().IsRaidMember(device).Return(false).Times(1)
-				mockops.EXPECT().Wipefs(device).Return(nil).Times(1)
+				cleanupDevice.EXPECT().CleanupInstallDevice(device).Return(nil).Times(1)
 			}
 
 			updateProgressSuccess := func(stages [][]string) {
@@ -194,7 +192,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockbmclient = inventory_client.NewMockInventoryClient(ctrl)
 				mockk8sclient = k8s_client.NewMockK8SClient(ctrl)
 				mockIgnition = ignition.NewMockIgnition(ctrl)
-				diskOps = ops.NewDiskOps(l, mockops)
+				cleanupDevice = preinstallUtils.NewMockCleanupDevice(ctrl)
 				nodesInfraEnvId := strfmt.UUID("7916fa89-ea7a-443e-a862-b3e930309f50")
 				node0Id := strfmt.UUID("7916fa89-ea7a-443e-a862-b3e930309f65")
 				node1Id := strfmt.UUID("eb82821f-bf21-4614-9a3b-ecb07929f238")
@@ -206,57 +204,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			k8sBuilder := func(configPath string, logger logrus.FieldLogger) (k8s_client.K8SClient, error) {
 				return mockk8sclient, nil
 			}
-
-			Context("LVM volume group cleanup", func() {
-				conf := config.Config{Role: string(models.HostRoleBootstrap),
-					ClusterID:           "cluster-id",
-					InfraEnvID:          "infra-env-id",
-					HostID:              "host-id",
-					Device:              "/dev/vda",
-					URL:                 "https://assisted-service.com:80",
-					OpenshiftVersion:    openShiftVersion,
-					MCOImage:            "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:dc1a34f55c712b2b9c5e5a14dd85e67cbdae11fd147046ac2fef9eaf179ab221",
-					EnableSkipMcoReboot: withEnableSkipMcoReboot,
-				}
-				BeforeEach(func() {
-					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, diskOps)
-				})
-
-				It("Should clean up the PV and all volume groups for a disk when asked to do so", func() {
-					mockedVgsResult := []string{
-						"vg1",
-						"vg2",
-					}
-					mockops.EXPECT().GetVolumeGroupsByDisk("/dev/vda").Times(1).Return(mockedVgsResult, nil)
-					mockops.EXPECT().RemoveVG("vg1").Times(1)
-					mockops.EXPECT().RemoveVG("vg2").Times(1)
-					mockops.EXPECT().RemoveAllPVsOnDevice("/dev/vda").Return(nil).Times(1)
-					mockops.EXPECT().RemoveAllDMDevicesOnDisk("/dev/vda").Return(nil).Times(1)
-					mockops.EXPECT().IsRaidMember(device).Times(1).Return(false)
-					mockops.EXPECT().Wipefs(device).Times(1).Return(nil)
-					err := installerObj.diskOps.CleanupInstallDevice("/dev/vda")
-					Expect(err).ToNot(HaveOccurred())
-				})
-
-				It("If there is a failure during the removal of a volume group, the PV removal and subsequent volume group removal should proceed anyways", func() {
-					mockedVgsResult := []string{
-						"vg1",
-						"vg2",
-						"vg3",
-					}
-					mockops.EXPECT().GetVolumeGroupsByDisk("/dev/vda").Times(1).Return(mockedVgsResult, nil)
-					mockops.EXPECT().RemoveVG("vg1").Times(1)
-					mockops.EXPECT().RemoveVG("vg2").Times(1).Return(errors.New(fmt.Sprintf("Failed to remove VG %s, output %s, error %s", "vg2", "some arbitrary output", "some arbitrary error")))
-					mockops.EXPECT().RemoveVG("vg3").Times(1)
-					mockops.EXPECT().RemoveAllPVsOnDevice("/dev/vda").Return(nil).Times(1)
-					mockops.EXPECT().RemoveAllDMDevicesOnDisk("/dev/vda").Return(nil).Times(1)
-					mockops.EXPECT().IsRaidMember(device).Times(1).Return(false)
-					mockops.EXPECT().Wipefs(device).Times(1).Return(nil)
-					err := installerObj.diskOps.CleanupInstallDevice("/dev/vda")
-					Expect(err).To(HaveOccurred())
-				})
-
-			})
 
 			Context("Bootstrap role", func() {
 
@@ -271,7 +218,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					EnableSkipMcoReboot: withEnableSkipMcoReboot,
 				}
 				BeforeEach(func() {
-					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, diskOps)
+					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, cleanupDevice)
 					evaluateDiskSymlinkSuccess()
 				})
 				mcoImage := conf.MCOImage
@@ -678,7 +625,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					EnableSkipMcoReboot: withEnableSkipMcoReboot,
 				}
 				BeforeEach(func() {
-					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, diskOps)
+					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, cleanupDevice)
 				})
 				It("waitForControlPlane reload resolv.conf failed", func() {
 					mockops.EXPECT().ReloadHostFile("/etc/resolv.conf").Return(fmt.Errorf("failed to load file")).Times(1)
@@ -752,7 +699,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			})
 			Context("Master role", func() {
 				installerArgs := []string{"-n", "--append-karg", "nameserver=8.8.8.8"}
-				raidDevice := "/dev/md0"
 				conf := config.Config{Role: string(models.HostRoleMaster),
 					ClusterID:           "cluster-id",
 					InfraEnvID:          "infra-env-id",
@@ -764,7 +710,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					EnableSkipMcoReboot: withEnableSkipMcoReboot,
 				}
 				BeforeEach(func() {
-					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, diskOps)
+					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, cleanupDevice)
 					evaluateDiskSymlinkSuccess()
 
 				})
@@ -791,12 +737,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 				It("HostRoleMaster role happy flow with skipping disk cleanup", func() {
 					installerObj.Config.SkipInstallationDiskCleanup = true
-					// verify none of cleanup function runs
-					mockops.EXPECT().GetVolumeGroupsByDisk(device).Return([]string{"vg1"}, nil).Times(0)
-					mockops.EXPECT().RemoveVG("vg1").Return(nil).Times(0)
-					mockops.EXPECT().IsRaidMember(device).Return(false).Times(0)
-					mockops.EXPECT().Wipefs(device).Return(nil).Times(0)
-					mockops.EXPECT().RemovePV(device).Return(nil).Times(0)
+					cleanupDevice.EXPECT().CleanupInstallDevice(gomock.Any()).Return(nil).Times(0)
+
 					updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 						{string(models.HostStageInstalling), conf.Role},
 						{string(models.HostStageWritingImageToDisk)},
@@ -818,12 +760,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 				It("HostRoleMaster role happy flow with disk cleanup", func() {
 					cleanInstallDeviceClean := func() {
-						mockops.EXPECT().GetVolumeGroupsByDisk(device).Return([]string{"vg1"}, nil).Times(1)
-						mockops.EXPECT().RemoveVG("vg1").Return(nil).Times(1)
-						mockops.EXPECT().IsRaidMember(device).Return(false).Times(1)
-						mockops.EXPECT().Wipefs(device).Return(nil).Times(1)
-						mockops.EXPECT().RemoveAllPVsOnDevice(device).Return(nil).Times(1)
-						mockops.EXPECT().RemoveAllDMDevicesOnDisk(device).Return(nil).Times(1)
+						cleanupDevice.EXPECT().CleanupInstallDevice(device).Return(nil).Times(1)
 					}
 					updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
 					cleanInstallDeviceClean()
@@ -836,12 +773,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					err := fmt.Errorf("Failed to remove vg")
 					cleanupErrorText := fmt.Sprintf("Could not clean install device %s. The installation will continue. If the installation fails, clean the disk and try again", device)
 					cleanInstallDeviceError := func() {
-						mockops.EXPECT().GetVolumeGroupsByDisk(device).Return([]string{"vg1"}, nil).Times(1)
-						mockops.EXPECT().RemoveVG("vg1").Return(err).Times(1)
-						mockops.EXPECT().RemoveAllPVsOnDevice(device).Times(1)
-						mockops.EXPECT().RemoveAllDMDevicesOnDisk(device).Times(1)
-						mockops.EXPECT().IsRaidMember(device).Times(1)
-						mockops.EXPECT().Wipefs(device).Times(1)
+						cleanupDevice.EXPECT().CleanupInstallDevice(device).Return(err).Times(1)
 						mockops.EXPECT().Mkdir(InstallDir).Return(err).Times(1)
 					}
 					updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}, {string(models.HostStageStartingInstallation), cleanupErrorText}})
@@ -851,16 +783,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				})
 				It("HostRoleMaster role raid cleanup disk - happy flow", func() {
 					cleanInstallDeviceClean := func() {
-						mockops.EXPECT().GetVolumeGroupsByDisk(device).Return([]string{}, nil).Times(1)
-						mockops.EXPECT().RemoveAllPVsOnDevice(device).Return(nil).Times(1)
-						mockops.EXPECT().RemoveAllDMDevicesOnDisk(device).Return(nil).Times(1)
-						mockops.EXPECT().IsRaidMember(device).Return(true).Times(1)
-						mockops.EXPECT().GetRaidDevices(device).Return([]string{raidDevice}, nil).Times(1)
-						mockops.EXPECT().GetVolumeGroupsByDisk(raidDevice).Return([]string{}, nil).Times(1)
-						mockops.EXPECT().RemoveAllPVsOnDevice(raidDevice).Return(nil).Times(1)
-						mockops.EXPECT().RemoveAllDMDevicesOnDisk(raidDevice).Return(nil).Times(1)
-						mockops.EXPECT().CleanRaidMembership(device).Return(nil).Times(1)
-						mockops.EXPECT().Wipefs(device).Return(nil).Times(1)
+						cleanupDevice.EXPECT().CleanupInstallDevice(device).Return(nil).Times(1)
 					}
 					updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
 					cleanInstallDeviceClean()
@@ -873,16 +796,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					err := fmt.Errorf("failed cleaning raid device")
 					cleanupErrorText := fmt.Sprintf("Could not clean install device %s. The installation will continue. If the installation fails, clean the disk and try again", device)
 					cleanInstallDeviceClean := func() {
-						mockops.EXPECT().GetVolumeGroupsByDisk(device).Return([]string{}, nil).Times(1)
-						mockops.EXPECT().RemoveAllPVsOnDevice(device).Return(nil).Times(1)
-						mockops.EXPECT().RemoveAllDMDevicesOnDisk(device).Return(nil).Times(1)
-						mockops.EXPECT().IsRaidMember(device).Return(true).Times(1)
-						mockops.EXPECT().GetRaidDevices(device).Return([]string{raidDevice}, nil).Times(1)
-						mockops.EXPECT().GetVolumeGroupsByDisk(raidDevice).Return([]string{}, nil).Times(1)
-						mockops.EXPECT().RemoveAllPVsOnDevice(raidDevice).Return(nil).Times(1)
-						mockops.EXPECT().RemoveAllDMDevicesOnDisk(raidDevice).Return(nil).Times(1)
-						mockops.EXPECT().CleanRaidMembership(device).Return(err).Times(1)
-						mockops.EXPECT().Wipefs(device).Return(nil).Times(1)
+						cleanupDevice.EXPECT().CleanupInstallDevice(device).Return(err).Times(1)
 						mockops.EXPECT().Mkdir(InstallDir).Return(err).Times(1)
 					}
 					updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}, {string(models.HostStageStartingInstallation), cleanupErrorText}})
@@ -976,7 +890,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					EnableSkipMcoReboot: withEnableSkipMcoReboot,
 				}
 				BeforeEach(func() {
-					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, diskOps)
+					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, cleanupDevice)
 					evaluateDiskSymlinkSuccess()
 				})
 				It("worker role happy flow", func() {
@@ -1033,7 +947,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					EnableSkipMcoReboot:  withEnableSkipMcoReboot,
 				}
 				BeforeEach(func() {
-					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, diskOps)
+					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, cleanupDevice)
 					evaluateDiskSymlinkSuccess()
 				})
 				mcoImage := conf.MCOImage
