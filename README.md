@@ -1,4 +1,5 @@
 # OpenShift Assisted Installer
+
 The OpenShift Assisted Installer provides for easy provisioning of new bare metal machines and creation of OpenShift clusters.
 The Assisted Installer is meant to run on FCOS or RHCOS liveCD images.
 The Assisted Installer uses CoreOS Ignition as a configuration format. The ignition files are created and stored by [Assisted Installation Service](https://github.com/openshift/assisted-service).
