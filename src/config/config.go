@@ -39,6 +39,7 @@ type Config struct {
 	DisksToFormat               ArrayFlags
 	SkipInstallationDiskCleanup bool
 	EnableSkipMcoReboot         bool
+	NotifyNumReboots            bool
 }
 
 func printHelpAndExit(err error) {
@@ -77,6 +78,7 @@ func (c *Config) ProcessArgs(args []string) {
 	flagSet.Var(&c.DisksToFormat, "format-disk", "Disk to format. Can be specified multiple times")
 	flagSet.BoolVar(&c.SkipInstallationDiskCleanup, "skip-installation-disk-cleanup", false, "Skip installation disk cleanup gives disk management to coreos-installer in case needed")
 	flagSet.BoolVar(&c.EnableSkipMcoReboot, "enable-skip-mco-reboot", false, "indicate assisted installer to generate settings to match MCO requirements for skipping reboot after firstboot")
+	flagSet.BoolVar(&c.NotifyNumReboots, "notify-num-reboots", false, "indicate number of reboots should be notified as event")
 
 	var installerArgs string
 	flagSet.StringVar(&installerArgs, "installer-args", "", "JSON array of additional coreos-installer arguments")
