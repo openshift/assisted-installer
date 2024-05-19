@@ -96,6 +96,7 @@ type ControllerConfig struct {
 	DryRunEnabled           bool   `envconfig:"DRY_ENABLE" required:"false" default:"false"`
 	DryFakeRebootMarkerPath string `envconfig:"DRY_FAKE_REBOOT_MARKER_PATH" required:"false" default:""`
 	DryRunClusterHostsPath  string `envconfig:"DRY_CLUSTER_HOSTS_PATH"`
+	NotifyNumReboots        bool   `evconfig:"NOTIFY_NUM_REBOOTS" default:"false"`
 	// DryRunClusterHostsPath gets read parsed into ParsedClusterHosts by DryParseClusterHosts
 	ParsedClusterHosts config.DryClusterHosts
 }
