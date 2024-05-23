@@ -383,10 +383,10 @@ func (i *installer) startBootstrap() error {
 		return err
 	}
 
-	/* in case hostname is localhost, we need to set hostname to some random value, in order to
-	   disable network manager activating hostname service, which will in turn may reset /etc/resolv.conf and
-	   remove the work done by 30-local-dns-prepender. This will cause DNS issue in bootkube and it will fail to complete
-	   successfully
+	/* in case hostname is illegal (localhost, contains capital letters, etc.), we need to set hostname to
+	   some random value, in order to disable network manager activating hostname service, which will in
+	   turn may reset /etc/resolv.conf and remove the work done by 30-local-dns-prepender. This will cause
+	   DNS issue in bootkube and it will fail to complete successfully
 	*/
 	err = i.checkHostname()
 	if err != nil {
@@ -886,8 +886,12 @@ func (i *installer) checkHostname() error {
 	}
 
 	data := fmt.Sprintf("random-hostname-%s", uuid.New().String())
-	i.log.Infof("Hostname [%s] is invalid, generated random hostname [%s] and writing data into /etc/hostname")
-	return i.ops.CreateRandomHostname(data)
+	i.log.Infof("Hostname [%s] is invalid, generated random hostname [%s]", hostname, data)
+	if err := i.ops.CreateRandomHostname(data); err != nil {
+		i.log.Errorf("Failed to generate random hostname", err)
+		return err
+	}
+	return nil
 }
 
 func RunInstaller(installerConfig *config.Config, logger *logrus.Logger) error {
