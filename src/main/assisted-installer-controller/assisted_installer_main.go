@@ -117,7 +117,7 @@ func main() {
 		log.Fatalf("Failed to create inventory client %v", err)
 	}
 
-	rn := assistedinstallercontroller.NewRebootsNotifier(o, client, logger)
+	rn := assistedinstallercontroller.NewRebootsNotifier(o, client, Options.ControllerConfig.NotifyNumReboots, logger)
 	defer rn.Finalize()
 	assistedController := assistedinstallercontroller.NewController(logger,
 		Options.ControllerConfig,

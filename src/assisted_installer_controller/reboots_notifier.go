@@ -39,14 +39,16 @@ type rebootsNotifier struct {
 	kubeconfigPath string
 	ops            ops.Ops
 	ic             inventory_client.InventoryClient
+	enabled        bool
 	mu             sync.Mutex
 }
 
-func NewRebootsNotifier(ops ops.Ops, ic inventory_client.InventoryClient, log logrus.FieldLogger) RebootsNotifier {
+func NewRebootsNotifier(ops ops.Ops, ic inventory_client.InventoryClient, enabled bool, log logrus.FieldLogger) RebootsNotifier {
 	return &rebootsNotifier{
-		log: log,
-		ops: ops,
-		ic:  ic,
+		log:     log,
+		ops:     ops,
+		ic:      ic,
+		enabled: enabled,
 	}
 }
 
@@ -105,6 +107,9 @@ func (r *rebootsNotifier) run(ctx context.Context, nodeName string, hostId, infr
 }
 
 func (r *rebootsNotifier) Start(ctx context.Context, nodeName string, hostId, infraenvId, clusterId *strfmt.UUID) {
+	if !r.enabled {
+		return
+	}
 	execCtx, cancel := context.WithTimeout(ctx, getNumRebootsTimeout)
 	r.cancelers = append(r.cancelers, cancel)
 	r.wg.Add(1)
