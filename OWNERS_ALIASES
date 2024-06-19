@@ -1,27 +1,12 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 aliases:
-  approvers:
-    - avishayt
-    - eranco74
-    - eliorerz
-    - gamli75
-    - ori-amizur
+    - openshift-edge-bot
     - romfreiman
-    - tsorya
-    - carbonin
-    - danielerez
-    - omertuc
-    - paul-maidment
+    - oourfali
+    - gamli75
+    - eliorerz
     - rccrdpccl
-    - jhernand
     - adriengentil
-    - javipolo
-    - CrystalChun
     - danmanor
-  emeritus_approvers:
-    - empovit
-    - celebdor
-    - yevgeny-shnaidman
-    - lranjbar
-    - ybettan
+    - eifrach
