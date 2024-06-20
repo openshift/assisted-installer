@@ -100,7 +100,6 @@ func (i *installer) InstallNode() error {
 	i.log.Infof("Installing node with role: %s", i.Config.Role)
 
 	i.UpdateHostInstallProgress(models.HostStageStartingInstallation, i.Config.Role)
-	i.Config.Device = i.ops.EvaluateDiskSymlink(i.Config.Device)
 	i.cleanupInstallDevice()
 	if err := i.ops.Mkdir(InstallDir); err != nil {
 		i.log.Errorf("Failed to create install dir: %s", err)
@@ -319,7 +318,7 @@ func (i *installer) writeImageToDisk(ignitionPath string) error {
 	interval := time.Second
 	liveLogger := coreos_logger.NewCoreosInstallerLogWriter(i.log, i.inventoryClient, i.Config.InfraEnvID, i.Config.HostID)
 	err := utils.Retry(3, interval, i.log, func() error {
-		return i.ops.WriteImageToDisk(liveLogger, ignitionPath, i.Device, i.Config.InstallerArgs)
+		return i.ops.WriteImageToDisk(liveLogger, ignitionPath, i.ops.EvaluateDiskSymlink(i.Config.Device), i.Config.InstallerArgs)
 	})
 	if err != nil {
 		i.log.WithError(err).Error("Failed to write image to disk")

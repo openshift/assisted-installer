@@ -111,6 +111,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			}
 
 			writeToDiskSuccess := func(extra interface{}) {
+				evaluateDiskSymlinkSuccess()
 				mockops.EXPECT().WriteImageToDisk(gomock.Any(), filepath.Join(InstallDir, "master-host-id.ign"), device, extra).Return(nil).Times(1)
 			}
 
@@ -219,7 +220,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				}
 				BeforeEach(func() {
 					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, cleanupDevice)
-					evaluateDiskSymlinkSuccess()
 				})
 				mcoImage := conf.MCOImage
 				extractIgnitionToFS := func(out string, err error) {
@@ -711,7 +711,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				}
 				BeforeEach(func() {
 					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, cleanupDevice)
-					evaluateDiskSymlinkSuccess()
 
 				})
 				It("master role happy flow", func() {
@@ -852,6 +851,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					mkdirSuccess(InstallDir)
 					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 					err := fmt.Errorf("failed writing image to disk")
+					mockops.EXPECT().EvaluateDiskSymlink(device).Return(device).Times(3)
 					mockops.EXPECT().WriteImageToDisk(gomock.Any(), filepath.Join(InstallDir, "master-host-id.ign"), device, installerArgs).Return(err).Times(3)
 					ret := installerObj.InstallNode()
 					Expect(ret).To(HaveOccurred())
@@ -891,7 +891,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				}
 				BeforeEach(func() {
 					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, cleanupDevice)
-					evaluateDiskSymlinkSuccess()
 				})
 				It("worker role happy flow", func() {
 					updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
@@ -920,6 +919,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					cleanInstallDevice()
 					mkdirSuccess(InstallDir)
 					downloadHostIgnitionSuccess(infraEnvId, hostId, "worker-host-id.ign")
+					evaluateDiskSymlinkSuccess()
 					mockops.EXPECT().WriteImageToDisk(gomock.Any(), filepath.Join(InstallDir, "worker-host-id.ign"), device, nil).Return(nil).Times(1)
 					setBootOrderSuccess(gomock.Any())
 					// failure must do nothing
@@ -948,7 +948,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				}
 				BeforeEach(func() {
 					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, cleanupDevice)
-					evaluateDiskSymlinkSuccess()
 				})
 				mcoImage := conf.MCOImage
 				extractIgnitionToFS := func(out string, err error) {
@@ -1022,6 +1021,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					verifySingleNodeMasterIgnitionSuccess()
 					singleNodeMergeIgnitionSuccess()
 					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
+					evaluateDiskSymlinkSuccess()
 					mockops.EXPECT().WriteImageToDisk(gomock.Any(), singleNodeMasterIgnitionPath, device, nil).Return(nil).Times(1)
 					setBootOrderSuccess(gomock.Any())
 					uploadLogsSuccess(true)
