@@ -1,10 +1,11 @@
-FROM registry.ci.openshift.org/openshift/release:golang-1.20
+FROM registry.access.redhat.com/ubi9/go-toolset:1.20
+
+USER 0
+
 ENV GO111MODULE=on
 ENV GOFLAGS=""
-
-RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b /usr/bin v1.53.2
-RUN yum install -y docker && \
-    yum clean all
+ENV GOPATH="/go"
+ENV PATH="$PATH:$GOPATH/bin"
 
 RUN go install golang.org/x/tools/cmd/goimports@v0.1.0 && \
     go install github.com/onsi/ginkgo/ginkgo@v1.16.1 && \
@@ -12,3 +13,7 @@ RUN go install golang.org/x/tools/cmd/goimports@v0.1.0 && \
     go install gotest.tools/gotestsum@v1.6.3 && \
     go install github.com/axw/gocov/gocov@latest && \
     go install github.com/AlekSi/gocov-xml@latest
+
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b /usr/bin v1.53.2
+RUN dnf install -y docker && \
+    dnf clean all
