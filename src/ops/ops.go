@@ -363,6 +363,7 @@ func (o *ops) renderControllerPod() error {
 		"ControllerImage":  o.installerConfig.ControllerImage,
 		"CACertPath":       o.installerConfig.CACertPath,
 		"OpenshiftVersion": o.installerConfig.OpenshiftVersion,
+		"NotifyNumReboots": o.installerConfig.NotifyNumReboots,
 	}
 
 	if o.installerConfig.ServiceIPs != "" {

@@ -31,14 +31,15 @@ var _ = Describe("Reboots notifier", func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockops = ops.NewMockOps(ctrl)
 		mockclient = inventory_client.NewMockInventoryClient(ctrl)
-		notifier = NewRebootsNotifier(mockops, mockclient, logrus.New())
 		hostId = strfmt.UUID(uuid.New().String())
 		infraenvId = strfmt.UUID(uuid.New().String())
 		clusterId = strfmt.UUID(uuid.New().String())
 	})
 	AfterEach(func() {
 		ctrl.Finish()
-		notifier.Finalize()
+		if notifier != nil {
+			notifier.Finalize()
+		}
 	})
 	It("retry kubeconfig", func() {
 		notifierImpl := &rebootsNotifier{
@@ -57,24 +58,39 @@ var _ = Describe("Reboots notifier", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(kc).To(Equal(kc2))
 	})
-	It("happy flow", func() {
-		mockclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-		mockops.EXPECT().GetNumberOfReboots(gomock.Any(), nodeName, gomock.Any()).Return(1, nil)
-		mockclient.EXPECT().TriggerEvent(gomock.Any(), &models.Event{
-			Category:   models.EventCategoryUser,
-			ClusterID:  &clusterId,
-			HostID:     &hostId,
-			InfraEnvID: &infraenvId,
-			Message:    swag.String(fmt.Sprintf(eventMessageTemplate, nodeName, 1)),
-			Name:       eventName,
-			Severity:   swag.String(models.EventSeverityInfo),
-		}).Return(nil)
-		notifier.Start(context.TODO(), nodeName, &hostId, &infraenvId, &clusterId)
-		notifier.Finalize()
+	Context("enabled reboots notifier", func() {
+		BeforeEach(func() {
+			notifier = NewRebootsNotifier(mockops, mockclient, true, logrus.New())
+		})
+
+		It("happy flow", func() {
+			mockclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			mockops.EXPECT().GetNumberOfReboots(gomock.Any(), nodeName, gomock.Any()).Return(1, nil)
+			mockclient.EXPECT().TriggerEvent(gomock.Any(), &models.Event{
+				Category:   models.EventCategoryUser,
+				ClusterID:  &clusterId,
+				HostID:     &hostId,
+				InfraEnvID: &infraenvId,
+				Message:    swag.String(fmt.Sprintf(eventMessageTemplate, nodeName, 1)),
+				Name:       eventName,
+				Severity:   swag.String(models.EventSeverityInfo),
+			}).Return(nil)
+			notifier.Start(context.TODO(), nodeName, &hostId, &infraenvId, &clusterId)
+			notifier.Finalize()
+		})
+		It("fail to download kubeconfig", func() {
+			mockclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("error"))
+			notifier.Start(context.TODO(), nodeName, &hostId, &infraenvId, &clusterId)
+			notifier.Finalize()
+		})
 	})
-	It("fail to download kubeconfig", func() {
-		mockclient.EXPECT().DownloadClusterCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("error"))
-		notifier.Start(context.TODO(), nodeName, &hostId, &infraenvId, &clusterId)
-		notifier.Finalize()
+	Context("reboots notifier disabled", func() {
+		BeforeEach(func() {
+			notifier = NewRebootsNotifier(mockops, mockclient, false, logrus.New())
+		})
+		It("expect notifier to return immediately", func() {
+			notifier.Start(context.TODO(), nodeName, &hostId, &infraenvId, &clusterId)
+			notifier.Finalize()
+		})
 	})
 })
