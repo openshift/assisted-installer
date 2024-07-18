@@ -1,4 +1,4 @@
-FROM quay.io/openshift/origin-cli-artifacts:latest as cli-artifacts
+FROM registry.redhat.io/openshift4/ose-cli-artifacts:latest as cli-artifacts
 ARG TARGETPLATFORM
 RUN mkdir -p /usr/share/openshift/assisted
 RUN case $TARGETPLATFORM in "") dir=linux_amd64;; *) dir=`echo $TARGETPLATFORM | sed 's@/@_@'` ;; esac ;  ln /usr/share/openshift/${dir}/oc /usr/share/openshift/assisted
