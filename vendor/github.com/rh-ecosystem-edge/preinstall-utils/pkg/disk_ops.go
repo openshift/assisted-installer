@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/thoas/go-funk"
 )
 
 //go:generate mockgen -source=disk_ops.go -package=shared_ops -destination=mock_disk_ops.go
@@ -396,12 +397,46 @@ func (r *diskOps) RemoveDMDevice(dmDevice string) error {
 	return err
 }
 
+// sortDMDevicesForDeletion orders devices in a manner that ensures they can be deleted
+// When using thin provisioning we have to contend with _tdata and _tmeta dmsetup records
+// These cannot be deleted until the main dmsetup record is deleted
+func (r *diskOps) sortDMDevicesForDeletion(dmDevices []string) []string {
+	rootDevices := []string{}
+	dependentDevices := []string{}
+	for _, dmDevice := range dmDevices {
+		if strings.HasSuffix(dmDevice, "_tdata") || strings.HasSuffix(dmDevice, "_tmeta") {
+			dependentDevices = append(dependentDevices, dmDevice)
+			continue
+		}
+		rootDevices = append(rootDevices, dmDevice)
+	}
+	return append(rootDevices, dependentDevices...)
+}
+
+// getBaseDMDevicesForThinProvisioning derives missing DM Devices;
+// When checking the disk dependencies for thin provisioning.
+// The base device will not report a dependency on a specific disk
+// So we need to derive the base device from the already matchd _data of the thin provisioning.
+func (r *diskOps) getBaseDMDevicesForThinProvisioning(dmDevices []string) []string {
+	baseDevices := []string{}
+	for _, dmDevice := range dmDevices {
+		if strings.HasSuffix(dmDevice, "_tdata") {
+			baseDevice := strings.Replace(dmDevice, "_tdata", "", 1)
+			if !funk.Contains(baseDevices, baseDevice) {
+				baseDevices = append(baseDevices, baseDevice)
+			}
+		}
+	}
+	return baseDevices
+}
+
 func (r *diskOps) RemoveAllDMDevicesOnDisk(diskName string) error {
 	var ret error
 	dmDevices, err := r.getDMDevices(diskName)
 	if err != nil {
 		return err
 	}
+	dmDevices = r.sortDMDevicesForDeletion(append(dmDevices, r.getBaseDMDevicesForThinProvisioning(dmDevices)...))
 	for _, dmDevice := range dmDevices {
 		r.log.Infof("Removing DM device %s", dmDevice)
 		err = r.RemoveDMDevice(dmDevice)

@@ -597,7 +597,7 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/rh-ecosystem-edge/preinstall-utils v0.0.0-20240501121109-c0e46154d36b
+# github.com/rh-ecosystem-edge/preinstall-utils v0.0.0-20240722132034-cf015589a8b3
 ## explicit; go 1.20
 github.com/rh-ecosystem-edge/preinstall-utils/pkg
 # github.com/shirou/gopsutil/v3 v3.23.12
