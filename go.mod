@@ -26,7 +26,7 @@ require (
 	github.com/operator-framework/api v0.23.0
 	github.com/operator-framework/operator-lifecycle-manager v0.22.0
 	github.com/pkg/errors v0.9.1
-	github.com/rh-ecosystem-edge/preinstall-utils v0.0.0-20240501121109-c0e46154d36b
+	github.com/rh-ecosystem-edge/preinstall-utils v0.0.0-20240722132034-cf015589a8b3
 	github.com/sirupsen/logrus v1.9.3
 	github.com/thoas/go-funk v0.9.3
 	github.com/tidwall/gjson v1.17.1
