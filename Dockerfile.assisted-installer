@@ -1,4 +1,8 @@
-FROM registry.ci.openshift.org/openshift/release:golang-1.20 AS builder
+FROM registry.access.redhat.com/ubi9/go-toolset:1.20 AS builder
+
+# Workaround for creating build folder
+USER root
+
 ARG TARGETPLATFORM
 ENV GOFLAGS=-mod=mod
 WORKDIR /go/src/github.com/openshift/assisted-installer
@@ -10,7 +14,8 @@ COPY go.sum go.sum
 RUN go mod download
 
 COPY . .
-RUN TARGETPLATFORM=$TARGETPLATFORM make installer
+RUN git config --global --add safe.directory '*'; \
+    TARGETPLATFORM=$TARGETPLATFORM make installer
 
 FROM quay.io/centos/centos:stream9
 
@@ -21,4 +26,3 @@ COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/instal
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/deploy/assisted-installer-controller /assisted-installer-controller/deploy
 
 ENTRYPOINT ["/usr/bin/installer"]
-
