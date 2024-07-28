@@ -1,12 +1,11 @@
-FROM quay.io/openshift/origin-cli-artifacts:latest as cli-artifacts
-ARG TARGETPLATFORM
-RUN mkdir -p /usr/share/openshift/assisted
-RUN case $TARGETPLATFORM in "") dir=linux_amd64;; *) dir=`echo $TARGETPLATFORM | sed 's@/@_@'` ;; esac ;  ln /usr/share/openshift/${dir}/oc /usr/share/openshift/assisted
+FROM registry.access.redhat.com/ubi9/go-toolset:1.20 AS builder
 
-FROM registry.ci.openshift.org/openshift/release:golang-1.20 AS builder
 ARG TARGETPLATFORM
 ENV GOFLAGS=-mod=mod
 WORKDIR /go/src/github.com/openshift/assisted-installer
+
+# Workaround for creating build folder
+USER root
 
 # Bring in the go dependencies before anything else so we can take
 # advantage of caching these layers in future builds.
@@ -15,11 +14,18 @@ COPY go.sum go.sum
 RUN go mod download
 
 COPY . .
-RUN TARGETPLATFORM=$TARGETPLATFORM make controller
+RUN git config --global --add safe.directory '*'; \
+    TARGETPLATFORM=$TARGETPLATFORM make controller
 
 FROM quay.io/centos/centos:stream9
 
-COPY --from=cli-artifacts /usr/share/openshift/assisted/oc /usr/bin/oc
+ARG TARGETPLATFORM
+
+# openshift clients
+RUN case $TARGETPLATFORM in "") platform=amd64;; *) platform=`echo $TARGETPLATFORM | sed 's#linux/##'` ;; esac ; \
+    curl -k -L -s "https://mirror.openshift.com/pub/openshift-v4/multi/clients/ocp/latest/amd64/openshift-client-linux-${platform}-rhel9.tar.gz" | tar xvz -C /usr/bin; \
+    chmod +x /usr/bin/oc /usr/bin/kubectl
+
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/assisted-installer-controller /usr/bin/assisted-installer-controller
 
 ENTRYPOINT ["/usr/bin/assisted-installer-controller"]
