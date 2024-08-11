@@ -163,7 +163,7 @@ var FeatureSets = map[FeatureSet]*FeatureGateEnabledDisabled{
 		Disabled: []FeatureGateDescription{},
 	},
 	TechPreviewNoUpgrade: newDefaultFeatures().
-		with(validatingAdmissionPolicy).
+		without(validatingAdmissionPolicy).
 		with(externalCloudProvider).
 		with(externalCloudProviderGCP).
 		with(csiDriverSharedResource).
@@ -173,7 +173,6 @@ var FeatureSets = map[FeatureSet]*FeatureGateEnabledDisabled{
 		with(retroactiveDefaultStorageClass).
 		with(dynamicResourceAllocation).
 		with(admissionWebhookMatchConditions).
-		with(azureWorkloadIdentity).
 		with(gateGatewayAPI).
 		with(maxUnavailableStatefulSet).
 		without(eventedPleg).
@@ -184,6 +183,7 @@ var FeatureSets = map[FeatureSet]*FeatureGateEnabledDisabled{
 		with(automatedEtcdBackup).
 		without(machineAPIOperatorDisableMachineHealthCheckController).
 		with(adminNetworkPolicy).
+		with(openShiftPodSecurityAdmission).
 		toFeatures(defaultFeatures),
 	LatencySensitive: newDefaultFeatures().
 		toFeatures(defaultFeatures),
@@ -191,8 +191,8 @@ var FeatureSets = map[FeatureSet]*FeatureGateEnabledDisabled{
 
 var defaultFeatures = &FeatureGateEnabledDisabled{
 	Enabled: []FeatureGateDescription{
-		openShiftPodSecurityAdmission,
 		alibabaPlatform, // This is a bug, it should be TechPreviewNoUpgrade. This must be downgraded before 4.14 is shipped.
+		azureWorkloadIdentity,
 		cloudDualStackNodeIPs,
 		externalCloudProviderAzure,
 		externalCloudProviderExternal,

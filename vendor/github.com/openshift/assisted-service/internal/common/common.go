@@ -52,6 +52,8 @@ const (
 	PowerCPUArchitecture   = "ppc64le"
 	S390xCPUArchitecture   = "s390x"
 	MultiCPUArchitecture   = "multi"
+
+	ExternalPlatformNameOci = "oci"
 )
 
 var (
@@ -451,8 +453,14 @@ func GetTagFromImageRef(ref string) string {
 func GetConvertedClusterAPIVipDNSName(c *Cluster) string {
 	// In case cluster that isn't configured with user-managed-networking
 	// and api vip is set we should set api vip as APIVipDNSName
-	if !swag.BoolValue(c.Cluster.UserManagedNetworking) && c.Cluster.APIVip != "" {
-		return c.Cluster.APIVip
+
+	apiVip := ""
+	if len(c.APIVips) > 0 {
+		apiVip = string(c.APIVips[0].IP)
+	}
+
+	if !swag.BoolValue(c.Cluster.UserManagedNetworking) && apiVip != "" {
+		return apiVip
 	}
 	return fmt.Sprintf("api.%s.%s", c.Cluster.Name, c.Cluster.BaseDNSDomain)
 }
@@ -570,4 +578,34 @@ func GetDefaultV2GetEventsParams(clusterID *strfmt.UUID, hostIds []strfmt.UUID, 
 		Offset:     NoOffsetEvents,
 		Categories: selectedCategories,
 	}
+}
+
+func IsPlatformExternal(platform *models.Platform) bool {
+	if platform == nil || platform.Type == nil {
+		return false
+	}
+	return IsPlatformTypeExternal(*platform.Type)
+}
+
+func IsPlatformTypeExternal(platformType models.PlatformType) bool {
+	return platformType == models.PlatformTypeExternal
+}
+
+func IsExternalIntegrationEnabled(platform *models.Platform, platformName string) bool {
+	if platform == nil ||
+		platform.Type == nil {
+		return false
+	}
+
+	if *platform.Type == models.PlatformTypeExternal &&
+		platform.External != nil &&
+		swag.StringValue(platform.External.PlatformName) == platformName {
+		return true
+	}
+
+	return false
+}
+
+func IsOciExternalIntegrationEnabled(platform *models.Platform) bool {
+	return IsExternalIntegrationEnabled(platform, ExternalPlatformNameOci)
 }

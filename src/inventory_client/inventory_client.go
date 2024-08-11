@@ -61,6 +61,7 @@ type InventoryClient interface {
 	HostLogProgressReport(ctx context.Context, infraEnvId string, hostId string, progress models.LogsState)
 	UpdateClusterOperator(ctx context.Context, clusterId string, operatorName string, operatorVersion string, operatorStatus models.OperatorStatus, operatorStatusInfo string) error
 	TriggerEvent(ctx context.Context, ev *models.Event) error
+	UpdateFinalizingProgress(ctx context.Context, clusterId string, stage models.FinalizingStage) error
 }
 
 type inventoryClient struct {
@@ -119,11 +120,15 @@ func CreateInventoryClientWithDelay(clusterId string, inventoryURL string, pullS
 		rehttp.RetryAny(
 			rehttp.RetryAll(
 				rehttp.RetryMaxRetries(minRetries),
-				rehttp.RetryStatusInterval(400, 404),
+				rehttp.RetryStatuses(404, 423, 425),
 			),
 			rehttp.RetryAll(
 				rehttp.RetryMaxRetries(maxRetries),
-				rehttp.RetryStatusInterval(405, 600),
+				rehttp.RetryStatuses(408, 429),
+			),
+			rehttp.RetryAll(
+				rehttp.RetryMaxRetries(maxRetries),
+				rehttp.RetryStatusInterval(500, 600),
 			),
 			rehttp.RetryAll(
 				rehttp.RetryMaxRetries(maxRetries),
@@ -483,5 +488,16 @@ func (c *inventoryClient) TriggerEvent(ctx context.Context, ev *models.Event) er
 	_, err := c.ai.Events.V2TriggerEvent(ctx, &events.V2TriggerEventParams{
 		TriggerEventParams: ev,
 	})
+	return err
+}
+
+func (c *inventoryClient) UpdateFinalizingProgress(ctx context.Context, clusterId string, stage models.FinalizingStage) error {
+	params := &installer.V2UpdateClusterFinalizingProgressParams{
+		ClusterID: strfmt.UUID(clusterId),
+		FinalizingProgress: &models.ClusterFinalizingProgress{
+			FinalizingStage: stage,
+		},
+	}
+	_, err := c.ai.Installer.V2UpdateClusterFinalizingProgress(ctx, params)
 	return err
 }

@@ -50,6 +50,8 @@ spec:
                   optional: true
             - name: OPENSHIFT_VERSION
               value: "{{.OpenshiftVersion}}"
+            - name: NOTIFY_NUM_REBOOTS
+              value: "{{.NotifyNumReboots}}"
             - name: HIGH_AVAILABILITY_MODE
               valueFrom:
                 configMapKeyRef:

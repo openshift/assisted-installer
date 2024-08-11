@@ -12,7 +12,6 @@ import (
 
 	"github.com/openshift/assisted-installer/src/ops/execute"
 
-	"github.com/golang/mock/gomock"
 	"github.com/kelseyhightower/envconfig"
 	assistedinstallercontroller "github.com/openshift/assisted-installer/src/assisted_installer_controller"
 	"github.com/openshift/assisted-installer/src/config"
@@ -25,6 +24,7 @@ import (
 	"github.com/openshift/assisted-service/models"
 	"github.com/openshift/assisted-service/pkg/secretdump"
 	"github.com/sirupsen/logrus"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // Added this way to be able to test it
@@ -41,9 +41,6 @@ const (
 	maximumInventoryClientRetries = 15
 	maximumErrorsBeforeExit       = 3
 	bootstrapKubeconfigForSNO     = "/tmp/bootstrap-secrets/kubeconfig"
-	installConfigMapName          = "openshift-install-manifests"
-	installConfigMapNS            = "openshift-config"
-	installConfigMapAttribute     = "invoker"
 )
 
 func DryRebootComplete() bool {
@@ -80,7 +77,7 @@ func main() {
 	mw := io.MultiWriter(os.Stdout, logFile)
 	logger.SetOutput(mw)
 
-	logger.Infof("Start running Assisted-Controller. Configuration is:\n %s", secretdump.DumpSecretStruct(Options.ControllerConfig))
+	logger.Infof("Start running Assisted-controller. Configuration is:\n %s", secretdump.DumpSecretStruct(Options.ControllerConfig))
 
 	executor := execute.NewExecutor(&config.Config{}, logger, false)
 	o := ops.NewOps(logger, executor)
@@ -120,15 +117,7 @@ func main() {
 		log.Fatalf("Failed to create inventory client %v", err)
 	}
 
-	invoker := ""
-	invokerCM, err := kc.GetConfigMap(installConfigMapNS, installConfigMapName)
-	if err != nil {
-		logger.Warnf("error retrieving %v ConfigMap, cannot determine invoker: %v", installConfigMapName, err)
-	}
-	invoker = invokerCM.Data[installConfigMapAttribute]
-	logger.Infof("%v ConfigMap attribute %v = %v", installConfigMapName, installConfigMapAttribute, invoker)
-
-	rn := assistedinstallercontroller.NewRebootsNotifier(o, client, logger)
+	rn := assistedinstallercontroller.NewRebootsNotifier(o, client, Options.ControllerConfig.NotifyNumReboots, logger)
 	defer rn.Finalize()
 	assistedController := assistedinstallercontroller.NewController(logger,
 		Options.ControllerConfig,
@@ -148,8 +137,9 @@ func main() {
 		go assistedController.HackDNSAddressConflict(&wg)
 		wg.Add(1)
 	}
+	invoker := common.GetInvoker(kc, logger)
 	cluster := assistedController.SetReadyState()
-	if cluster == nil && invoker == assistedinstallercontroller.InvokerAgent {
+	if cluster == nil && invoker == common.InvokerAgent {
 		// When the agent-based installer installs a SNO cluster, assisted-service
 		// will never be reachable because it will not be running after the boostrap
 		// node reboots to become the SNO cluster. SetReadyState will never be
@@ -175,7 +165,13 @@ func main() {
 		logger.Infof("Finished all")
 	}()
 
-	removeUninitializedTaint := common.RemoveUninitializedTaint(cluster.Platform)
+	hasValidvSphereCredentials := common.HasValidvSphereCredentials(mainContext, client, logger)
+	if hasValidvSphereCredentials {
+		logger.Infof("Has valid vSphere credentials: %v", hasValidvSphereCredentials)
+	}
+	removeUninitializedTaint := common.RemoveUninitializedTaint(cluster.Platform,
+		invoker, hasValidvSphereCredentials, cluster.OpenshiftVersion)
+	logger.Infof("Remove uninitialized taint: %v", removeUninitializedTaint)
 
 	go assistedController.WaitAndUpdateNodesStatus(mainContext, &wg, removeUninitializedTaint)
 	wg.Add(1)
@@ -197,10 +193,10 @@ func main() {
 
 	// monitoring installation by cluster status
 	switch invoker {
-	case assistedinstallercontroller.InvokerAgent:
+	case common.InvokerAgent:
 		waitForInstallationAgentBasedInstaller(kc, logger, removeUninitializedTaint)
 	default:
-		waitForInstallation(client, logger, assistedController.Status)
+		waitForInstallation(client, logger, assistedController)
 	}
 }
 
@@ -208,7 +204,7 @@ func main() {
 // if cluster status is (cancelled,installed) there is no need to continue and we will exit.
 // if cluster is in error, in addition to stop waiting we need to set error status to tell upload logs to send must-gather.
 // if we have maximumErrorsBeforeExit GetClusterNotFound/GetClusterUnauthorized errors in a row we force exiting controller
-func waitForInstallation(client inventory_client.InventoryClient, log logrus.FieldLogger, status *assistedinstallercontroller.ControllerStatus) {
+func waitForInstallation(client inventory_client.InventoryClient, log logrus.FieldLogger, controller assistedinstallercontroller.Controller) {
 	log.Infof("monitor cluster installation status")
 	reqCtx := utils.GenerateRequestContext()
 	errCounter := 0
@@ -241,7 +237,7 @@ func waitForInstallation(client inventory_client.InventoryClient, log logrus.Fie
 		}
 		// reset error counter in case no error occurred
 		errCounter = 0
-		finished := didInstallationFinish(*cluster.Status, log, status)
+		finished := didInstallationFinish(*cluster.Status, log, controller.GetStatus())
 		if finished {
 			return
 		}

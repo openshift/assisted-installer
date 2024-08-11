@@ -2,33 +2,38 @@ package installer
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"net/http"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/openshift/assisted-installer/src/ops/execute"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+
+	"golang.org/x/sync/errgroup"
+	v1 "k8s.io/api/core/v1"
 
 	"github.com/go-openapi/swag"
 	"github.com/google/uuid"
 	"github.com/openshift/assisted-installer/src/main/drymock"
 	"github.com/openshift/assisted-service/pkg/secretdump"
+	"github.com/openshift/assisted-service/pkg/validations"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/thoas/go-funk"
-	"golang.org/x/sync/errgroup"
-	v1 "k8s.io/api/core/v1"
 
 	"github.com/openshift/assisted-installer/src/common"
 	"github.com/openshift/assisted-installer/src/config"
+	"github.com/openshift/assisted-installer/src/coreos_logger"
 	"github.com/openshift/assisted-installer/src/ignition"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/ops"
+	"github.com/openshift/assisted-installer/src/ops/execute"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/models"
+	preinstallUtils "github.com/rh-ecosystem-edge/preinstall-utils/pkg"
 )
 
 // In dry run mode we prefer to get quick feedback about errors rather
@@ -66,9 +71,10 @@ type installer struct {
 	inventoryClient inventory_client.InventoryClient
 	kcBuilder       k8s_client.K8SClientBuilder
 	ign             ignition.Ignition
+	cleanupDevice   preinstallUtils.CleanupDevice
 }
 
-func NewAssistedInstaller(log logrus.FieldLogger, cfg config.Config, ops ops.Ops, ic inventory_client.InventoryClient, kcb k8s_client.K8SClientBuilder, ign ignition.Ignition) *installer {
+func NewAssistedInstaller(log logrus.FieldLogger, cfg config.Config, ops ops.Ops, ic inventory_client.InventoryClient, kcb k8s_client.K8SClientBuilder, ign ignition.Ignition, cleanupDevice preinstallUtils.CleanupDevice) *installer {
 	return &installer{
 		log:             log,
 		Config:          cfg,
@@ -76,6 +82,7 @@ func NewAssistedInstaller(log logrus.FieldLogger, cfg config.Config, ops ops.Ops
 		inventoryClient: ic,
 		kcBuilder:       kcb,
 		ign:             ign,
+		cleanupDevice:   cleanupDevice,
 	}
 }
 
@@ -94,14 +101,8 @@ func (i *installer) InstallNode() error {
 
 	i.UpdateHostInstallProgress(models.HostStageStartingInstallation, i.Config.Role)
 	i.Config.Device = i.ops.EvaluateDiskSymlink(i.Config.Device)
-	err := i.cleanupInstallDevice()
-	if err != nil {
-		i.UpdateHostInstallProgress(models.HostStageStartingInstallation, fmt.Sprintf("Could not clean install device %s. The installation will continue. If the installation fails, clean the disk and try again", i.Device))
-		// Do not change the phrasing of this error message, as we rely on it in a triage signature
-		i.log.Errorf("failed to prepare install device %s, err %s", i.Device, err)
-	}
-
-	if err = i.ops.Mkdir(InstallDir); err != nil {
+	i.cleanupInstallDevice()
+	if err := i.ops.Mkdir(InstallDir); err != nil {
 		i.log.Errorf("Failed to create install dir: %s", err)
 		return err
 	}
@@ -121,6 +122,7 @@ func (i *installer) InstallNode() error {
 
 	i.UpdateHostInstallProgress(models.HostStageInstalling, i.Config.Role)
 	var ignitionPath string
+	var err error
 
 	// i.HighAvailabilityMode is set as an empty string for workers
 	// regardless of the availability mode of the cluster they are joining
@@ -272,16 +274,31 @@ func convertToOverwriteKargs(args []string) []string {
 	return ret
 }
 
+func (i *installer) cleanupInstallDevice() {
+	if i.DryRunEnabled || i.Config.SkipInstallationDiskCleanup {
+		i.log.Infof("skipping installation disk cleanup")
+	} else {
+		err := i.cleanupDevice.CleanupInstallDevice(i.Config.Device)
+		if err != nil {
+			i.UpdateHostInstallProgress(models.HostStageStartingInstallation, fmt.Sprintf("Could not clean install device %s. The installation will continue. If the installation fails, clean the disk and try again", i.Device))
+			// Do not change the phrasing of this error message, as we rely on it in a triage signature
+			i.log.Errorf("failed to prepare install device %s, err %s", i.Device, err)
+		}
+	}
+}
+
 func (i *installer) getEncapsulatedMC(ignitionPath string) (*mcfgv1.MachineConfig, error) {
-	interval := 5 * time.Second
 	var mc *mcfgv1.MachineConfig
-	err := utils.Retry(240, interval, i.log, func() error {
-		var gerr error
-		mc, gerr = i.ops.GetEncapsulatedMC(ignitionPath)
-		return gerr
+	var err error
+	waitErr := utils.WaitForPredicate(20*time.Minute, 5*time.Second, func() bool {
+		mc, err = i.ops.GetEncapsulatedMC(ignitionPath)
+		if err != nil {
+			i.log.WithError(err).Warningf("failed to get encapsulated Machine Config")
+		}
+		return err == nil
 	})
-	if err != nil {
-		return nil, err
+	if waitErr != nil {
+		return nil, stderrors.Join(waitErr, err)
 	}
 	return mc, nil
 }
@@ -300,8 +317,9 @@ func (i *installer) writeImageToDisk(ignitionPath string) error {
 	i.UpdateHostInstallProgress(models.HostStageWritingImageToDisk, "")
 
 	interval := time.Second
+	liveLogger := coreos_logger.NewCoreosInstallerLogWriter(i.log, i.inventoryClient, i.Config.InfraEnvID, i.Config.HostID)
 	err := utils.Retry(3, interval, i.log, func() error {
-		return i.ops.WriteImageToDisk(ignitionPath, i.Device, i.inventoryClient, i.Config.InstallerArgs)
+		return i.ops.WriteImageToDisk(liveLogger, ignitionPath, i.Device, i.Config.InstallerArgs)
 	})
 	if err != nil {
 		i.log.WithError(err).Error("Failed to write image to disk")
@@ -365,12 +383,12 @@ func (i *installer) startBootstrap() error {
 		return err
 	}
 
-	/* in case hostname is localhost, we need to set hostname to some random value, in order to
-	   disable network manager activating hostname service, which will in turn may reset /etc/resolv.conf and
-	   remove the work done by 30-local-dns-prepender. This will cause DNS issue in bootkube and it will fail to complete
-	   successfully
+	/* in case hostname is illegal (localhost, contains capital letters, etc.), we need to set hostname to
+	   some random value, in order to disable network manager activating hostname service, which will in
+	   turn may reset /etc/resolv.conf and remove the work done by 30-local-dns-prepender. This will cause
+	   DNS issue in bootkube and it will fail to complete successfully
 	*/
-	err = i.checkLocalhostName()
+	err = i.checkHostname()
 	if err != nil {
 		i.log.Error(err)
 		return err
@@ -483,14 +501,18 @@ func (i *installer) waitForControlPlane(ctx context.Context) error {
 	}
 	i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, waitingForMastersStatusInfo)
 
+	hasValidvSphereCredentials := common.HasValidvSphereCredentials(ctx, i.inventoryClient, i.log)
+	if hasValidvSphereCredentials {
+		i.log.Infof("Has valid vSphere credentials: %v", hasValidvSphereCredentials)
+	}
+
 	cluster, callErr := i.inventoryClient.GetCluster(ctx, false)
 	if callErr != nil {
 		i.log.WithError(callErr).Errorf("Getting cluster %s", i.ClusterID)
 		return callErr
 	}
 
-	removeUninitializedTaint := common.RemoveUninitializedTaint(cluster.Platform)
-	if err = i.waitForMinMasterNodes(ctx, kc, removeUninitializedTaint); err != nil {
+	if err = i.waitForMinMasterNodes(ctx, kc, cluster.Platform, hasValidvSphereCredentials); err != nil {
 		return err
 	}
 
@@ -566,8 +588,8 @@ func (i *installer) workerWaitFor2ReadyMasters(ctx context.Context) error {
 	return nil
 }
 
-func (i *installer) waitForMinMasterNodes(ctx context.Context, kc k8s_client.K8SClient, removeUninitializedTaint bool) error {
-	i.waitForMasterNodes(ctx, minMasterNodes, kc, removeUninitializedTaint)
+func (i *installer) waitForMinMasterNodes(ctx context.Context, kc k8s_client.K8SClient, platform *models.Platform, hasValidCredentials bool) error {
+	i.waitForMasterNodes(ctx, minMasterNodes, kc, platform, hasValidCredentials)
 	return nil
 }
 
@@ -664,7 +686,7 @@ func (i *installer) wasControllerReadyEventSet(kc k8s_client.K8SClient, previous
 }
 
 // wait for minimum master nodes to be in ready status
-func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, kc k8s_client.K8SClient, removeUninitializedTaint bool) {
+func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, kc k8s_client.K8SClient, platform *models.Platform, hasValidvSphereCredentials bool) {
 	var readyMasters []string
 	var inventoryHostsMap map[string]inventory_client.HostData
 	i.log.Infof("Waiting for %d master nodes", minMasterNodes)
@@ -679,18 +701,29 @@ func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, 
 			i.log.Warnf("Still waiting for master nodes: %v", err)
 			return false
 		}
-		if removeUninitializedTaint {
-			for _, node := range nodes.Items {
-				if common.IsK8sNodeIsReady(node) {
-					continue
-				}
-				if err = kc.UntaintNode(node.Name); err != nil {
-					i.log.Warnf("Failed to untaint node %s: %v", node.Name, err)
+
+		if len(nodes.Items) > 0 {
+			// GetInvoker reads the openshift-install-manifests in the openshift-config namespace.
+			// This configmap exists after nodes start to appear in the cluster.
+			invoker := common.GetInvoker(kc, i.log)
+			removeUninitializedTaint := common.RemoveUninitializedTaint(platform, invoker,
+				hasValidvSphereCredentials, i.OpenshiftVersion)
+			i.log.Infof("Remove uninitialized taint: %v", removeUninitializedTaint)
+			if removeUninitializedTaint {
+				for _, node := range nodes.Items {
+					if common.IsK8sNodeIsReady(node) {
+						continue
+					}
+					if err = kc.UntaintNode(node.Name); err != nil {
+						i.log.Warnf("Failed to untaint node %s: %v", node.Name, err)
+					}
 				}
 			}
 		}
 		if err = i.updateReadyMasters(nodes, &readyMasters, inventoryHostsMap); err != nil {
 			i.log.WithError(err).Warnf("Failed to update ready with masters")
+			// Re-fetch inventory on next invocation
+			inventoryHostsMap = nil
 			return false
 		}
 		i.log.Infof("Found %d ready master nodes", len(readyMasters))
@@ -746,108 +779,23 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 			ctx := utils.GenerateRequestContext()
 			log := utils.RequestIDLogger(ctx, i.log)
 			log.Infof("Found a new ready master node %s with id %s", node.Name, node.Status.NodeInfo.SystemUUID)
-			*readyMasters = append(*readyMasters, node.Name)
 
 			host, ok := common.HostMatchByNameOrIPAddress(node, inventoryHostsMap, knownIpAddresses)
-			if !ok {
-				return fmt.Errorf("Node %s is not in inventory hosts", node.Name)
+			if ok && (host.Host.Status == nil || *host.Host.Status != models.HostStatusInstalled) {
+				if err := i.inventoryClient.UpdateHostInstallProgress(ctx, host.Host.InfraEnvID.String(), host.Host.ID.String(), models.HostStageJoined, ""); err != nil {
+					log.Errorf("Failed to update node installation status, %s", err)
+					return err
+				}
 			}
-			ctx = utils.GenerateRequestContext()
-			if err := i.inventoryClient.UpdateHostInstallProgress(ctx, host.Host.InfraEnvID.String(), host.Host.ID.String(), models.HostStageJoined, ""); err != nil {
-				utils.RequestIDLogger(ctx, i.log).Errorf("Failed to update node installation status, %s", err)
+			*readyMasters = append(*readyMasters, node.Name)
+			if !ok {
+				return fmt.Errorf("node %s is not in inventory hosts", node.Name)
 			}
 		}
 	}
 
 	i.log.Infof("Found %d master nodes: %+v", len(nodes.Items), nodeNameAndCondition)
 	return nil
-}
-
-func (i *installer) cleanupInstallDevice() error {
-
-	if i.DryRunEnabled || i.Config.SkipInstallationDiskCleanup {
-		return nil
-	}
-
-	var ret error
-	i.log.Infof("Start cleaning up device %s", i.Device)
-	err := i.cleanupDevice(i.Device)
-
-	if err != nil {
-		ret = utils.CombineErrors(ret, err)
-	}
-
-	if i.ops.IsRaidMember(i.Device) {
-		i.log.Infof("A raid was detected on the device (%s) - cleaning", i.Device)
-		var devices []string
-		devices, err = i.ops.GetRaidDevices(i.Device)
-
-		if err != nil {
-			ret = utils.CombineErrors(ret, err)
-		}
-
-		for _, device := range devices {
-			// Cleaning the raid device itself before removing membership.
-			err = i.cleanupDevice(device)
-
-			if err != nil {
-				ret = utils.CombineErrors(ret, err)
-			}
-		}
-
-		err = i.ops.CleanRaidMembership(i.Device)
-
-		if err != nil {
-			ret = utils.CombineErrors(ret, err)
-		}
-		i.log.Infof("Finished cleaning up device %s", i.Device)
-	}
-
-	err = i.ops.Wipefs(i.Device)
-	if err != nil {
-		ret = utils.CombineErrors(ret, err)
-	}
-
-	return ret
-}
-
-func (i *installer) removeVolumeGroupsFromDevice(vgNames []string, device string) error {
-	var ret error
-	for _, vgName := range vgNames {
-		i.log.Infof("A volume group (%s) was detected on the installation device (%s) - cleaning", vgName, device)
-		err := i.ops.RemoveVG(vgName)
-
-		if err != nil {
-			i.log.Errorf("Could not delete volume group (%s) due to error: %w", vgName, err)
-			ret = utils.CombineErrors(ret, err)
-		}
-	}
-
-	return ret
-}
-
-func (i *installer) cleanupDevice(device string) error {
-	var ret error
-	vgNames, err := i.ops.GetVolumeGroupsByDisk(device)
-	if err != nil {
-		ret = err
-	}
-
-	if len(vgNames) > 0 {
-		if err = i.removeVolumeGroupsFromDevice(vgNames, device); err != nil {
-			ret = utils.CombineErrors(ret, err)
-		}
-	}
-
-	if err = i.ops.RemoveAllPVsOnDevice(device); err != nil {
-		ret = utils.CombineErrors(ret, err)
-	}
-
-	if err = i.ops.RemoveAllDMDevicesOnDisk(device); err != nil {
-		ret = utils.CombineErrors(ret, err)
-	}
-
-	return ret
 }
 
 func (i *installer) verifyHostCanMoveToConfigurationStatus(inventoryHostsMapWithIp map[string]inventory_client.HostData) {
@@ -922,28 +870,33 @@ func (i *installer) createSingleNodeMasterIgnition() (string, error) {
 	return singleNodeMasterIgnitionPath, nil
 }
 
-func (i *installer) checkLocalhostName() error {
+func (i *installer) checkHostname() error {
 	if i.DryRunEnabled {
 		return nil
 	}
 
-	i.log.Infof("Start checking localhostname")
+	i.log.Infof("Start checking hostname")
 	hostname, err := i.ops.GetHostname()
 	if err != nil {
 		i.log.Errorf("Failed to get hostname from kernel, err %s157", err)
 		return err
 	}
-	if hostname != "localhost" {
-		i.log.Infof("hostname is not localhost, no need to do anything")
+
+	if err := validations.ValidateHostname(hostname); err == nil && hostname != "localhost" {
+		i.log.Infof("hostname [%s] is not localhost or invalid, no need to do anything", hostname)
 		return nil
 	}
 
 	data := fmt.Sprintf("random-hostname-%s", uuid.New().String())
-	i.log.Infof("write data into /etc/hostname")
-	return i.ops.CreateRandomHostname(data)
+	i.log.Infof("Hostname [%s] is invalid, generated random hostname [%s]", hostname, data)
+	if err := i.ops.CreateRandomHostname(data); err != nil {
+		i.log.Errorf("Failed to generate random hostname", err)
+		return err
+	}
+	return nil
 }
 
-func RunInstaller(installerConfig *config.Config, logger logrus.FieldLogger) error {
+func RunInstaller(installerConfig *config.Config, logger *logrus.Logger) error {
 	logger.Infof("Assisted installer started. Configuration is:\n %s", secretdump.DumpSecretStruct(*installerConfig))
 	logger.Infof("Dry configuration is:\n %s", secretdump.DumpSecretStruct(installerConfig.DryRunConfig))
 
@@ -972,7 +925,7 @@ func RunInstaller(installerConfig *config.Config, logger logrus.FieldLogger) err
 
 	executor := execute.NewExecutor(installerConfig, logger, true)
 	o := ops.NewOpsWithConfig(installerConfig, logger, executor)
-
+	cleanupDevice := preinstallUtils.NewCleanupDevice(logger, preinstallUtils.NewDiskOps(logger, executor))
 	var k8sClientBuilder k8s_client.K8SClientBuilder
 	if !installerConfig.DryRunEnabled {
 		k8sClientBuilder = k8s_client.NewK8SClient
@@ -986,6 +939,7 @@ func RunInstaller(installerConfig *config.Config, logger logrus.FieldLogger) err
 		client,
 		k8sClientBuilder,
 		ignition.NewIgnition(),
+		cleanupDevice,
 	)
 
 	// Try to format requested disks. May fail formatting some disks, this is not an error.
