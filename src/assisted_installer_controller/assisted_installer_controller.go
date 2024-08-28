@@ -114,7 +114,7 @@ type Controller interface {
 	UpdateNodeLabels(ctx context.Context, wg *sync.WaitGroup)
 	UpdateBMHs(ctx context.Context, wg *sync.WaitGroup)
 	UploadLogs(ctx context.Context, wg *sync.WaitGroup, invoker string)
-	SetReadyState() *models.Cluster
+	SetReadyState(waitTimeout time.Duration) *models.Cluster
 	GetStatus() *ControllerStatus
 }
 
@@ -1470,11 +1470,11 @@ func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup, invoker
 	}
 }
 
-func (c *controller) SetReadyState() *models.Cluster {
+func (c controller) SetReadyState(waitTimeout time.Duration) *models.Cluster {
 	c.log.Infof("Start waiting to be ready")
 	var cluster *models.Cluster
 	var err error
-	_ = utils.WaitForPredicate(WaitTimeout, 1*time.Second, func() bool {
+	_ = utils.WaitForPredicate(waitTimeout, 1*time.Second, func() bool {
 		cluster, err = c.ic.GetCluster(context.TODO(), false)
 		if err != nil {
 			c.log.WithError(err).Warningf("Failed to connect to assisted service")
