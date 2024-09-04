@@ -14,8 +14,8 @@ import (
 	"golang.org/x/sync/errgroup"
 	v1 "k8s.io/api/core/v1"
 
-	"github.com/go-openapi/swag"
 	"github.com/google/uuid"
+	"github.com/openshift/assisted-installer/src/convert"
 	"github.com/openshift/assisted-installer/src/main/drymock"
 	"github.com/openshift/assisted-service/pkg/secretdump"
 	"github.com/openshift/assisted-service/pkg/validations"
@@ -51,6 +51,8 @@ const (
 	singleNodeMasterIgnitionPath = "/opt/openshift/master.ign"
 	waitingForMastersStatusInfo  = "Waiting for masters to join bootstrap control plane"
 	waitingForBootstrapToPrepare = "Waiting for bootstrap node preparation"
+	ECPrivateKeyBlockType        = "EC PRIVATE KEY"
+	nodePublicKeysNamespace      = "assisted-node-public-keys"
 )
 
 var generalWaitTimeout = 30 * time.Second
@@ -96,9 +98,20 @@ func (i *installer) FormatDisks() {
 	}
 }
 
+func (i *installer) StorePublicKeyInControlPlane(publicKey []byte, client k8s_client.K8SClient) error {
+	err := client.CreateNamespace(nodePublicKeysNamespace)
+	if err != nil {
+		i.log.WithError(err).Errorf("unable to create %s namespace on control plane", nodePublicKeysNamespace)
+	}
+	err = client.CreateConfigMap(fmt.Sprintf("node-key-%s", i.HostID), nodePublicKeysNamespace, map[string]string{"content": string(publicKey[:])})
+	if err != nil {
+		i.log.WithError(err).Errorf("unable to create config map for host ID %s for on control plane", i.HostID)
+	}
+	return nil
+}
+
 func (i *installer) InstallNode() error {
 	i.log.Infof("Installing node with role: %s", i.Config.Role)
-
 	i.UpdateHostInstallProgress(models.HostStageStartingInstallation, i.Config.Role)
 	i.Config.Device = i.ops.EvaluateDiskSymlink(i.Config.Device)
 	i.cleanupInstallDevice()
@@ -141,6 +154,14 @@ func (i *installer) InstallNode() error {
 
 	}
 
+	// privateKeyBytes, publicKeyBytes, err := ignition.MakePrivatePublicKeyPairForKubelet()
+	privateKeyBytes, publicKeyBytes, err := common.MakeEllipticPrivatePublicKeyPems()
+	if err != nil {
+		return errors.Wrap(err, "could not generate private/public key pair for temporary kubelet certificate")
+	}
+	ign := ignition.NewIgnition()
+	ign.InjectKubeletTempPrivateKey(ignitionPath, privateKeyBytes, "/var/lib/kubelet/pki/kubelet-client.key.tmp")
+
 	if err = i.writeImageToDisk(ignitionPath); err != nil {
 		return err
 	}
@@ -149,6 +170,15 @@ func (i *installer) InstallNode() error {
 		// Wait for 2 masters to be ready before rebooting
 		if err = i.workerWaitFor2ReadyMasters(ctx); err != nil {
 			return err
+		}
+
+		kc, err := i.kcBuilder(KubeconfigPath, i.log)
+		if err != nil {
+			i.log.Error(err)
+			return err
+		}
+		if err := i.StorePublicKeyInControlPlane(publicKeyBytes, kc); err != nil {
+			return errors.Wrap(err, "unable to store public key for node in control plane")
 		}
 	}
 
@@ -170,6 +200,14 @@ func (i *installer) InstallNode() error {
 		}
 		if err = i.waitForControlPlane(ctx); err != nil {
 			return err
+		}
+		kc, err := i.kcBuilder(KubeconfigPath, i.log)
+		if err != nil {
+			i.log.Error(err)
+			return err
+		}
+		if err := i.StorePublicKeyInControlPlane(publicKeyBytes, kc); err != nil {
+			return errors.Wrap(err, "unable to store public key for node in control plane")
 		}
 		i.log.Info("Setting bootstrap node new role to master")
 	}
@@ -517,7 +555,7 @@ func (i *installer) waitForControlPlane(ctx context.Context) error {
 	}
 
 	i.waitForBootkube(ctx)
-	if err = i.waitForETCDBootstrap(ctx); err != nil {
+	if err = i.waitForETCDBootstrap(); err != nil {
 		i.log.Error(err)
 		return err
 	}
@@ -531,7 +569,7 @@ func (i *installer) waitForControlPlane(ctx context.Context) error {
 	return nil
 }
 
-func (i *installer) waitForETCDBootstrap(ctx context.Context) error {
+func (i *installer) waitForETCDBootstrap() error {
 	i.UpdateHostInstallProgress(models.HostStageWaitingForBootkube, "waiting for ETCD bootstrap to be complete")
 	i.log.Infof("Started waiting for ETCD bootstrap to complete")
 	return utils.WaitForPredicate(waitForeverTimeout, generalWaitInterval, func() bool {
@@ -572,7 +610,7 @@ func (i *installer) workerWaitFor2ReadyMasters(ctx context.Context) error {
 				return false
 			}
 		}
-		if swag.StringValue(cluster.Kind) == models.ClusterKindAddHostsCluster {
+		if convert.StringValue(cluster.Kind) == models.ClusterKindAddHostsCluster {
 			return true
 		}
 

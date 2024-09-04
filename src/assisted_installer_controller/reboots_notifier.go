@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/go-openapi/strfmt"
-	"github.com/go-openapi/swag"
 	"github.com/openshift/assisted-installer/src/common"
+	"github.com/openshift/assisted-installer/src/convert"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-installer/src/utils"
@@ -97,8 +97,8 @@ func (r *rebootsNotifier) run(ctx context.Context, nodeName string, hostId, infr
 		ClusterID:  clusterId,
 		Name:       eventName,
 		Category:   models.EventCategoryUser,
-		Severity:   swag.String(models.EventSeverityInfo),
-		Message:    swag.String(fmt.Sprintf(eventMessageTemplate, nodeName, numberOfReboots)),
+		Severity:   convert.String(models.EventSeverityInfo),
+		Message:    convert.String(fmt.Sprintf(eventMessageTemplate, nodeName, numberOfReboots)),
 	}
 
 	if err = r.ic.TriggerEvent(ctx, ev); err != nil {

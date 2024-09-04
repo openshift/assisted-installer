@@ -61,6 +61,20 @@ func (mr *MockK8SClientMockRecorder) ApproveCsr(csr any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApproveCsr", reflect.TypeOf((*MockK8SClient)(nil).ApproveCsr), csr)
 }
 
+// CreateConfigMap mocks base method.
+func (m *MockK8SClient) CreateConfigMap(name, namespace string, data map[string]string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateConfigMap", name, namespace, data)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateConfigMap indicates an expected call of CreateConfigMap.
+func (mr *MockK8SClientMockRecorder) CreateConfigMap(name, namespace, data interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateConfigMap", reflect.TypeOf((*MockK8SClient)(nil).CreateConfigMap), name, namespace, data)
+}
+
 // CreateEvent mocks base method.
 func (m *MockK8SClient) CreateEvent(namespace, name, message, component string) (*v12.Event, error) {
 	m.ctrl.T.Helper()
@@ -74,6 +88,20 @@ func (m *MockK8SClient) CreateEvent(namespace, name, message, component string) 
 func (mr *MockK8SClientMockRecorder) CreateEvent(namespace, name, message, component any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEvent", reflect.TypeOf((*MockK8SClient)(nil).CreateEvent), namespace, name, message, component)
+}
+
+// CreateNamespace mocks base method.
+func (m *MockK8SClient) CreateNamespace(name string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateNamespace", name)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateNamespace indicates an expected call of CreateNamespace.
+func (mr *MockK8SClientMockRecorder) CreateNamespace(name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateNamespace", reflect.TypeOf((*MockK8SClient)(nil).CreateNamespace), name)
 }
 
 // DeleteInstallPlan mocks base method.

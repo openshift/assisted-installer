@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/go-openapi/strfmt"
-	"github.com/go-openapi/swag"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/openshift/assisted-installer/src/convert"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-service/models"
@@ -71,9 +71,9 @@ var _ = Describe("Reboots notifier", func() {
 				ClusterID:  &clusterId,
 				HostID:     &hostId,
 				InfraEnvID: &infraenvId,
-				Message:    swag.String(fmt.Sprintf(eventMessageTemplate, nodeName, 1)),
+				Message:    convert.String(fmt.Sprintf(eventMessageTemplate, nodeName, 1)),
 				Name:       eventName,
-				Severity:   swag.String(models.EventSeverityInfo),
+				Severity:   convert.String(models.EventSeverityInfo),
 			}).Return(nil)
 			notifier.Start(context.TODO(), nodeName, &hostId, &infraenvId, &clusterId)
 			notifier.Finalize()
