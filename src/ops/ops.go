@@ -65,7 +65,7 @@ type Ops interface {
 	EvaluateDiskSymlink(string) string
 	FormatDisk(string) error
 	CreateManifests(string, []byte) error
-	DryRebootHappened(markerPath string) bool
+	FileExists(markerPath string) bool
 	ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error)
 	ReadFile(filePath string) ([]byte, error)
 	GetEncapsulatedMC(ignitionPath string) (*mcfgv1.MachineConfig, error)
@@ -434,7 +434,7 @@ func (o *ops) GetMCSLogs() (string, error) {
 		mcsLogs := ""
 		for _, clusterHost := range o.installerConfig.ParsedClusterHosts {
 			// Add IP access log for each IP, this is how the installer determines which node has downloaded the ignition
-			if !o.DryRebootHappened(clusterHost.RebootMarkerPath) {
+			if !o.FileExists(clusterHost.RebootMarkerPath) {
 				// Host didn't even reboot yet, don't pretend it fetched the ignition
 				continue
 			}
@@ -648,11 +648,12 @@ func (o *ops) CreateManifests(kubeconfig string, content []byte) error {
 	return nil
 }
 
-// DryRebootHappened checks if a reboot happened according to a particular reboot marker path
-// The dry run installer creates this file on "Reboot" (instead of actually rebooting)
-// We use this function to check whether the given node in the cluster have already rebooted
-func (o *ops) DryRebootHappened(markerPath string) bool {
-	_, err := o.ExecPrivilegeCommand(nil, "stat", markerPath)
+// FileExists checks if a file exists. It's notably used to check if a
+// dry reboot happened. The dry run installer creates the marker file on
+// "Reboot" (instead of actually rebooting) We use this function to check
+// whether the given node in the cluster have already rebooted
+func (o *ops) FileExists(path string) bool {
+	_, err := o.ExecPrivilegeCommand(nil, "stat", path)
 
 	return err == nil
 }
