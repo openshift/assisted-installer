@@ -297,7 +297,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				}
 				waitForBootkubeSuccess := func() {
 					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), infraEnvId, hostId, models.HostStageWaitingForBootkube, "").Return(nil).Times(1)
-					mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "stat", "/opt/openshift/.bootkube.done").Return("OK", nil).Times(1)
+					mockops.EXPECT().FileExists("/opt/openshift/.bootkube.done").Return(true).Times(1)
 				}
 				bootkubeStatusSuccess := func() {
 					mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "systemctl", "status", "bootkube.service").Return("1", nil).Times(1)
@@ -1048,7 +1048,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				}
 				waitForBootkubeSuccess := func() {
 					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), infraEnvId, hostId, models.HostStageWaitingForBootkube, "").Return(nil).Times(1)
-					mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "stat", "/opt/openshift/.bootkube.done").Return("OK", nil).Times(1)
+					mockops.EXPECT().FileExists("/opt/openshift/.bootkube.done").Return(true).Times(1)
 				}
 				bootkubeStatusSuccess := func() {
 					mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "systemctl", "status", "bootkube.service").Return("1", nil).Times(1)
