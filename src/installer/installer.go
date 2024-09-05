@@ -51,6 +51,9 @@ const (
 	singleNodeMasterIgnitionPath = "/opt/openshift/master.ign"
 	waitingForMastersStatusInfo  = "Waiting for masters to join bootstrap control plane"
 	waitingForBootstrapToPrepare = "Waiting for bootstrap node preparation"
+	nodeImagePullService         = "node-image-pull.service"
+	nodeImageOverlayService      = "node-image-overlay.service"
+	openshiftClientBin           = "/usr/bin/oc"
 )
 
 var generalWaitTimeout = 30 * time.Second
@@ -453,6 +456,30 @@ func (i *installer) startBootstrap() error {
 		return err
 	}
 
+	// If we're in a pure RHEL/CentOS environment, we need to overlay the node image
+	// first to have access to e.g. oc, kubelet, cri-o, etc...
+	// https://github.com/openshift/enhancements/pull/1637
+	if !i.ops.FileExists(openshiftClientBin) {
+		err = i.ops.SystemctlAction("start", "--no-block", nodeImagePullService, nodeImageOverlayService)
+		if err != nil {
+			return err
+		}
+
+		if err = i.waitForActiveService(nodeImagePullService, context.Background()); err != nil {
+			return err
+		}
+
+		if err = i.waitForActiveService(nodeImageOverlayService, context.Background()); err != nil {
+			return err
+		}
+
+		// This is a sanity-check; the overlay was successful so we never expect this to
+		// fail unless there's a bug somewhere.
+		if !i.ops.FileExists(openshiftClientBin) {
+			return errors.Errorf("%s successful but missing %s", nodeImageOverlayService, openshiftClientBin)
+		}
+	}
+
 	servicesToStart := []string{"bootkube.service", "approve-csr.service", "progress.service"}
 	for _, service := range servicesToStart {
 		err = i.ops.SystemctlAction("start", service)
@@ -667,6 +694,35 @@ func (i *installer) waitForBootkube(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func (i *installer) waitForActiveService(service string, ctx context.Context) error {
+	i.log.Infof("Waiting for %s to complete", service)
+
+	var rErr error
+	waitErr := utils.WaitForPredicate(waitForeverTimeout, generalWaitInterval, func() bool {
+		// Check if service has completed every 5 seconds. Use `show -P ActiveState`
+		// instead of `is-active` because the latter has exit code semantics we don't want.
+		if result, err := i.ops.ExecPrivilegeCommand(nil, "systemctl", "show", "-P", "ActiveState", service); err != nil {
+			i.log.WithError(err).Warnf("error occurred checking state of %s", service)
+		} else {
+			i.log.Infof("%s status: %s", service, result)
+			switch result {
+			case "active":
+				return true
+			case "failed":
+				out, _ := i.ops.ExecPrivilegeCommand(nil, "systemctl", "status", service)
+				i.log.Info(out)
+				rErr = errors.Errorf("service %s failed", service)
+				return true
+			default:
+				break
+			}
+		}
+		return false
+	})
+
+	return stderrors.Join(rErr, waitErr)
 }
 
 func (i *installer) waitForController(kc k8s_client.K8SClient) error {
