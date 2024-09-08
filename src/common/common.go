@@ -3,6 +3,10 @@ package common
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"os"
@@ -15,6 +19,8 @@ import (
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/models"
+
+	cryptorand "crypto/rand"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -35,6 +41,7 @@ const (
 	installConfigMapAttribute      = "invoker"
 	InvokerAssisted                = "assisted-service"
 	InvokerAgent                   = "agent-installer"
+	ECPrivateKeyPEMLabel           = "EC PRIVATE KEY"
 )
 
 func GetHostsInStatus(hosts map[string]inventory_client.HostData, status []string, isMatch bool) map[string]inventory_client.HostData {
@@ -305,4 +312,23 @@ func DownloadKubeconfigNoingress(ctx context.Context, dir string, ic inventory_c
 	log.Infof("Downloaded %s to %s.", KubeconfigFileName, kubeconfigPath)
 
 	return kubeconfigPath, nil
+}
+
+func MakeEllipticPrivatePublicKeyPems() ([]byte, []byte, error) {
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
+	if err != nil {
+		return nil, nil, err
+	}
+	derBytes, err := x509.MarshalECPrivateKey(privateKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	publicKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	return pem.EncodeToMemory(&pem.Block{
+		Type:  ECPrivateKeyPEMLabel,
+		Bytes: derBytes,
+	}), publicKeyBytes, nil
 }
