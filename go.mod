@@ -18,7 +18,7 @@ require (
 	github.com/onsi/gomega v1.33.1
 	github.com/openshift/api v0.0.0-20240521212423-414cf30d37be
 	github.com/openshift/assisted-installer-agent v1.0.9
-	github.com/openshift/assisted-service v1.0.10-0.20240915200858-9bf402a8f0e1
+	github.com/openshift/assisted-service v1.0.10-0.20240919024611-0b2ee1464ca5
 	github.com/openshift/assisted-service/client v0.0.0
 	github.com/openshift/assisted-service/models v0.0.0
 	github.com/openshift/client-go v0.0.0-20230926161409-848405da69e1
@@ -35,9 +35,9 @@ require (
 	golang.org/x/net v0.26.0
 	golang.org/x/sync v0.7.0
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.29.5
-	k8s.io/apimachinery v0.29.5
-	k8s.io/client-go v0.29.5
+	k8s.io/api v0.29.9
+	k8s.io/apimachinery v0.29.9
+	k8s.io/client-go v0.29.9
 	sigs.k8s.io/controller-runtime v0.17.2
 )
 
@@ -96,10 +96,10 @@ require (
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
-	github.com/jackc/pgconn v1.14.1 // indirect
+	github.com/jackc/pgconn v1.14.3 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
-	github.com/jackc/pgproto3/v2 v2.3.2 // indirect
+	github.com/jackc/pgproto3/v2 v2.3.3 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
 	github.com/jackc/pgtype v1.14.0 // indirect
 	github.com/jackc/pgx/v4 v4.16.0 // indirect
@@ -174,7 +174,7 @@ require (
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/driver/postgres v1.3.5 // indirect
-	gorm.io/gorm v1.25.7 // indirect
+	gorm.io/gorm v1.25.8 // indirect
 	k8s.io/klog/v2 v2.120.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240221221325-2ac9dc51f3f1 // indirect
 	k8s.io/utils v0.0.0-20240102154912-e7106e64919e // indirect
@@ -187,9 +187,9 @@ replace (
 	github.com/metal3-io/baremetal-operator/apis => github.com/openshift/baremetal-operator/apis v0.0.0-20230531194024-8dde0991ffdd
 	github.com/metal3-io/baremetal-operator/pkg/hardwareutils => github.com/openshift/baremetal-operator/pkg/hardwareutils v0.0.0-20230531194024-8dde0991ffdd
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.12
-	github.com/openshift/assisted-service/api => github.com/openshift/assisted-service/api v0.0.0-20240915200858-9bf402a8f0e1
-	github.com/openshift/assisted-service/client => github.com/openshift/assisted-service/client v0.0.0-20240915200858-9bf402a8f0e1
-	github.com/openshift/assisted-service/models => github.com/openshift/assisted-service/models v0.0.0-20240915200858-9bf402a8f0e1
+	github.com/openshift/assisted-service/api => github.com/openshift/assisted-service/api v0.0.0-20240919024611-0b2ee1464ca5
+	github.com/openshift/assisted-service/client => github.com/openshift/assisted-service/client v0.0.0-20240919024611-0b2ee1464ca5
+	github.com/openshift/assisted-service/models => github.com/openshift/assisted-service/models v0.0.0-20240919024611-0b2ee1464ca5
 	golang.org/x/net => golang.org/x/net v0.24.0
 	k8s.io/apimachinery => k8s.io/apimachinery v0.28.0
 	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v0.4.5
