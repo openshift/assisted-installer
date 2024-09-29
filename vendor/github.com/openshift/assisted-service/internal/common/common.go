@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/containers/image/v5/docker/reference"
+	"github.com/docker/distribution/reference"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
 	yamlpatch "github.com/krishicks/yaml-patch"
@@ -608,4 +608,8 @@ func IsExternalIntegrationEnabled(platform *models.Platform, platformName string
 
 func IsOciExternalIntegrationEnabled(platform *models.Platform) bool {
 	return IsExternalIntegrationEnabled(platform, ExternalPlatformNameOci)
+}
+
+func IsMultiNodeNonePlatformCluster(cluster *Cluster) bool {
+	return !IsSingleNodeCluster(cluster) && swag.BoolValue(cluster.UserManagedNetworking)
 }
