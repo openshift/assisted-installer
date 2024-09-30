@@ -17,7 +17,7 @@ import (
 	"github.com/openshift/assisted-service/models"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	gomock "go.uber.org/mock/gomock"
+	"go.uber.org/mock/gomock"
 	v1 "k8s.io/api/core/v1"
 )
 
