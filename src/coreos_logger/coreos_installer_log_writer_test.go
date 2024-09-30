@@ -5,7 +5,7 @@ import (
 
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-service/models"
-	gomock "go.uber.org/mock/gomock"
+	"go.uber.org/mock/gomock"
 
 	"github.com/sirupsen/logrus/hooks/test"
 

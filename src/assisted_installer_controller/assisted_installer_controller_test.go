@@ -32,7 +32,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
-	gomock "go.uber.org/mock/gomock"
+	"go.uber.org/mock/gomock"
 
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/assisted-installer/src/inventory_client"
