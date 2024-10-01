@@ -18,7 +18,7 @@ require (
 	github.com/onsi/gomega v1.33.1
 	github.com/openshift/api v0.0.0-20240521212423-414cf30d37be
 	github.com/openshift/assisted-installer-agent v1.0.9
-	github.com/openshift/assisted-service v1.0.10-0.20240923161925-bd04d82baa14
+	github.com/openshift/assisted-service v1.0.10-0.20241001115954-5557d644ebe6
 	github.com/openshift/assisted-service/client v0.0.0
 	github.com/openshift/assisted-service/models v0.0.0
 	github.com/openshift/client-go v0.0.0-20230926161409-848405da69e1
@@ -95,10 +95,10 @@ require (
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
-	github.com/jackc/pgconn v1.14.1 // indirect
+	github.com/jackc/pgconn v1.14.3 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
-	github.com/jackc/pgproto3/v2 v2.3.2 // indirect
+	github.com/jackc/pgproto3/v2 v2.3.3 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
 	github.com/jackc/pgtype v1.14.0 // indirect
 	github.com/jackc/pgx/v4 v4.16.0 // indirect
@@ -184,12 +184,13 @@ require (
 )
 
 replace (
+	github.com/jackc/pgx/v4 => github.com/jackc/pgx/v4 v4.18.3
 	github.com/metal3-io/baremetal-operator/apis => github.com/openshift/baremetal-operator/apis v0.0.0-20230531194024-8dde0991ffdd
 	github.com/metal3-io/baremetal-operator/pkg/hardwareutils => github.com/openshift/baremetal-operator/pkg/hardwareutils v0.0.0-20230531194024-8dde0991ffdd
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.12
-	github.com/openshift/assisted-service/api => github.com/openshift/assisted-service/api v0.0.0-20240923161925-bd04d82baa14
-	github.com/openshift/assisted-service/client => github.com/openshift/assisted-service/client v0.0.0-20240923161925-bd04d82baa14
-	github.com/openshift/assisted-service/models => github.com/openshift/assisted-service/models v0.0.0-20240923161925-bd04d82baa14
+	github.com/openshift/assisted-service/api => github.com/openshift/assisted-service/api v0.0.0-20241001115954-5557d644ebe6
+	github.com/openshift/assisted-service/client => github.com/openshift/assisted-service/client v0.0.0-20241001115954-5557d644ebe6
+	github.com/openshift/assisted-service/models => github.com/openshift/assisted-service/models v0.0.0-20241001115954-5557d644ebe6
 	golang.org/x/net => golang.org/x/net v0.24.0
 	k8s.io/apimachinery => k8s.io/apimachinery v0.28.0
 	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v0.4.5
