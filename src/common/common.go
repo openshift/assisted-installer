@@ -21,6 +21,7 @@ import (
 	"github.com/thoas/go-funk"
 	"github.com/tidwall/gjson"
 	v1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -33,6 +34,9 @@ const (
 	installConfigMapName           = "openshift-install-manifests"
 	installConfigMapNS             = "openshift-config"
 	installConfigMapAttribute      = "invoker"
+	clusterConfigCMName            = "cluster-config-v1"
+	clusterConfigCMNamespace       = "kube-system"
+	clusterConfigCMAttribute       = "install-config"
 	InvokerAssisted                = "assisted-service"
 	InvokerAgent                   = "agent-installer"
 )
@@ -215,24 +219,23 @@ func HostMatchByNameOrIPAddress(node v1.Node, namesMap, IPAddressMap map[string]
 // Returns True when uninitialized taint must be removed.
 // This is required for some external platforms (e.g. VSphere, Nutanix) to proceed
 // with the installation using fake credentials.
-func RemoveUninitializedTaint(platform *models.Platform, invoker string, hasValidCredentials bool, openshiftVersion string) bool {
+func RemoveUninitializedTaint(ctx context.Context, ic inventory_client.InventoryClient, kc k8s_client.K8SClient,
+	log logrus.FieldLogger, platformType models.PlatformType, openshiftVersion, invoker string) bool {
 	removeUninitializedTaintForPlatforms := [...]models.PlatformType{models.PlatformTypeNutanix, models.PlatformTypeVsphere}
-	version := semver.New(parseOpenshiftVersionIntoMajorMinorZOnly(openshiftVersion))
-	if invoker == InvokerAgent &&
-		*platform.Type == models.PlatformTypeVsphere &&
-		version.Compare(*semver.New("4.15.0")) >= 0 &&
-		hasValidCredentials {
-		// Starting with OpenShift 4.15, the agent-installer can pass valid credentials
-		// to vSphere. Do not remove the taint if:
-		// 1) invoker == agent-installer
-		// 2) platform == vSphere
-		// 3) OpenShift version >= 4.15
-		// 4) and valid vSphere credentials were provided in install-config.yaml
-		// With valid credentials, the vSphere CCM will remove the uninitialized taints
-		// when it initializes the nodes.
-		return false
+	if invoker == InvokerAgent && platformType == models.PlatformTypeVsphere {
+		hasValidvSphereCredentials := HasValidvSphereCredentials(ctx, ic, kc, log)
+		if hasValidvSphereCredentials {
+			log.Infof("Has valid vSphere credentials: %v", hasValidvSphereCredentials)
+		}
+		version := semver.New(parseOpenshiftVersionIntoMajorMinorZOnly(openshiftVersion))
+		if hasValidvSphereCredentials && version.Compare(*semver.New("4.15.0")) >= 0 {
+			// Starting with OpenShift 4.15, vSphere credentials can be used with ABI.
+			// In such cases, we should not remove the taints because the vSphere CCM will
+			// remove them after it initializes the nodes.
+			return false
+		}
 	}
-	return platform != nil && funk.Contains(removeUninitializedTaintForPlatforms, *platform.Type)
+	return funk.Contains(removeUninitializedTaintForPlatforms, platformType)
 }
 
 // parseOpenshiftVersionIntoMajorMinorZOnly adds a .0 to verions that only specify
@@ -248,35 +251,87 @@ func parseOpenshiftVersionIntoMajorMinorZOnly(version string) string {
 }
 
 // HasValidvSphereCredentials returns true if the the platform is
-// vSphere and the install config overrides contains real
+// vSphere and the install config or equivalent overrides contains real
 // credential values and not placeholder values.
 // Deprecated credential fields are not considered valid.
-func HasValidvSphereCredentials(ctx context.Context, ic inventory_client.InventoryClient, log logrus.FieldLogger) bool {
+func HasValidvSphereCredentials(ctx context.Context, ic inventory_client.InventoryClient, kc k8s_client.K8SClient, log logrus.FieldLogger) bool {
 	cluster, callErr := ic.GetCluster(ctx, false)
+	if cluster != nil {
+		// assisted-service is available, check install config overrides for credentials
+		if cluster.Platform == nil || *cluster.Platform.Type != models.PlatformTypeVsphere {
+			return false
+		}
 
-	if callErr != nil {
-		log.WithError(callErr).Errorf("error getting cluster")
-		return false
-	}
+		if cluster.InstallConfigOverrides == "" {
+			return false
+		}
 
-	if cluster == nil || cluster.Platform == nil || *cluster.Platform.Type != models.PlatformTypeVsphere {
-		return false
-	}
+		username := gjson.Get(cluster.InstallConfigOverrides, `platform.vsphere.vcenters.0.user`).String()
+		password := gjson.Get(cluster.InstallConfigOverrides, `platform.vsphere.vcenters.0.password`).String()
+		server := gjson.Get(cluster.InstallConfigOverrides, `platform.vsphere.vcenters.0.server`).String()
 
-	if cluster.InstallConfigOverrides == "" {
-		return false
-	}
+		if username != "usernameplaceholder" && username != "" &&
+			password != "passwordplaceholder" && password != "" &&
+			server != "vcenterplaceholder" && server != "" {
+			return true
+		}
+	} else {
+		// With ABI, after the bootstrap node reboots, assisted-service becomes
+		// unavailable. If the controller restarts after the bootstrap node reboots,
+		// the cluster is unavailable. In this case, we instead check the
+		// install-config for credentials.
+		log.WithError(callErr).Warnf("error getting cluster, assisted-service was unavailable")
 
-	username := gjson.Get(cluster.InstallConfigOverrides, `platform.vsphere.vcenters.0.user`).String()
-	password := gjson.Get(cluster.InstallConfigOverrides, `platform.vsphere.vcenters.0.password`).String()
-	server := gjson.Get(cluster.InstallConfigOverrides, `platform.vsphere.vcenters.0.server`).String()
-
-	if username != "usernameplaceholder" && username != "" &&
-		password != "passwordplaceholder" && password != "" &&
-		server != "vcenterplaceholder" && server != "" {
-		return true
+		installConfig, err := getInstallConfigYAML(kc, log)
+		if err != nil {
+			return false
+		}
+		icJSON, err := yaml.YAMLToJSON([]byte(installConfig))
+		if err != nil {
+			log.Warnf("error parsing install config into json: %v", err)
+			return false
+		}
+		server := gjson.Get(string(icJSON), `platform.vsphere.vcenters.0.server`).String()
+		if server != "vcenterplaceholder" && server != "" {
+			return true
+		}
 	}
 	return false
+}
+
+func GetPlatformTypeFromInstallConfig(kc k8s_client.K8SClient, log logrus.FieldLogger) (models.PlatformType, error) {
+	installConfigYAML, err := getInstallConfigYAML(kc, log)
+	if err != nil {
+		return "", err
+	}
+
+	var data map[string]interface{}
+	err = yaml.Unmarshal([]byte(installConfigYAML), &data)
+	if err != nil {
+		return "", err
+	}
+
+	platformMap, ok := data["platform"].(map[string]interface{})
+	if !ok {
+		return "", errors.New("platform not found in install config")
+	}
+
+	platformType := ""
+	for key := range platformMap {
+		platformType = key
+		break
+	}
+
+	return models.PlatformType(platformType), nil
+}
+
+func getInstallConfigYAML(kc k8s_client.K8SClient, log logrus.FieldLogger) (string, error) {
+	clusterConfigCM, err := kc.GetConfigMap(clusterConfigCMNamespace, clusterConfigCMName)
+	if err != nil {
+		log.Warnf("error retrieving %v ConfigMap", clusterConfigCMName)
+		return "", err
+	}
+	return clusterConfigCM.Data[clusterConfigCMAttribute], nil
 }
 
 func GetInvoker(kc k8s_client.K8SClient, log logrus.FieldLogger) string {

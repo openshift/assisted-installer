@@ -544,7 +544,7 @@ func (i *installer) waitForControlPlane(ctx context.Context) error {
 	}
 	i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, waitingForMastersStatusInfo)
 
-	hasValidvSphereCredentials := common.HasValidvSphereCredentials(ctx, i.inventoryClient, i.log)
+	hasValidvSphereCredentials := common.HasValidvSphereCredentials(ctx, i.inventoryClient, kc, i.log)
 	if hasValidvSphereCredentials {
 		i.log.Infof("Has valid vSphere credentials: %v", hasValidvSphereCredentials)
 	}
@@ -749,8 +749,10 @@ func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, 
 			// GetInvoker reads the openshift-install-manifests in the openshift-config namespace.
 			// This configmap exists after nodes start to appear in the cluster.
 			invoker := common.GetInvoker(kc, i.log)
-			removeUninitializedTaint := common.RemoveUninitializedTaint(platform, invoker,
-				hasValidvSphereCredentials, i.OpenshiftVersion)
+			removeUninitializedTaint := false
+			if platform != nil {
+				removeUninitializedTaint = common.RemoveUninitializedTaint(ctx, i.inventoryClient, kc, i.log, *platform.Type, i.OpenshiftVersion, invoker)
+			}
 			i.log.Infof("Remove uninitialized taint: %v", removeUninitializedTaint)
 			if removeUninitializedTaint {
 				for _, node := range nodes.Items {

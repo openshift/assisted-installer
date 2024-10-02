@@ -13,7 +13,9 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/openshift/assisted-installer/src/inventory_client"
+	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-service/models"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	gomock "go.uber.org/mock/gomock"
 	v1 "k8s.io/api/core/v1"
@@ -28,9 +30,15 @@ var _ = Describe("verify common", func() {
 	var (
 		l            = logrus.New()
 		mockbmclient *inventory_client.MockInventoryClient
+		mockkcclient *k8s_client.MockK8SClient
 	)
-	mockbmclient = inventory_client.NewMockInventoryClient(gomock.NewController(GinkgoT()))
+
 	l.SetOutput(io.Discard)
+	BeforeEach(func() {
+		mockbmclient = inventory_client.NewMockInventoryClient(gomock.NewController(GinkgoT()))
+		mockkcclient = k8s_client.NewMockK8SClient(gomock.NewController(GinkgoT()))
+	})
+
 	Context("Verify SetConfiguringStatusForHosts", func() {
 
 		It("test SetConfiguringStatusForHosts", func() {
@@ -181,144 +189,180 @@ var _ = Describe("verify common", func() {
 		})
 	})
 
+	vSphereClusterWithValidCredentials := &models.Cluster{
+		Platform:               &models.Platform{Type: platformTypePtr(models.PlatformTypeVsphere)},
+		InstallConfigOverrides: "{\"platform\":{\"vsphere\":{\"vcenters\":[{\"server\":\"server.openshift.com\",\"user\":\"some-user\",\"password\":\"some-password\",\"datacenters\":[\"datacenter\"]}],\"failureDomains\":[{\"name\":\"test-failure-baseDomain\",\"region\":\"changeme-region\",\"zone\":\"changeme-zone\",\"server\":\"server.openshift.com\",\"topology\":{\"datacenter\":\"datacenter\",\"computeCluster\":\"/datacenter/host/cluster\",\"networks\":[\"segment-a\"],\"datastore\":\"/datacenter/datastore/mystore\",\"resourcePool\":\"/datacenter/host/mycluster//Resources\",\"folder\":\"/datacenter/vm/folder\"}}]}}}",
+	}
+	vSphereClusterWithInvalidCredentials := &models.Cluster{
+		Platform:               &models.Platform{Type: platformTypePtr(models.PlatformTypeVsphere)},
+		InstallConfigOverrides: "{\"platform\":{\"vsphere\":{\"username\":\"a-user\",\"password\":\"a-password\",\"vCenter\":\"a-server.com\"}}}",
+	}
+
 	Context("Verify RemoveUninitializedTaint", func() {
-		It("nil platform struct should not remove uninitialized taint", func() {
-			removeUninitializedTaint := RemoveUninitializedTaint(nil, InvokerAssisted, false, "4.14.0")
+		It("empty platform string should not remove uninitialized taint", func() {
+			removeUninitializedTaint := RemoveUninitializedTaint(context.TODO(), mockbmclient, mockkcclient, l, "", "", "")
 			Expect(removeUninitializedTaint).To(BeFalse())
 		})
 
 		tests := []struct {
 			PlatformType                     models.PlatformType
-			ExpectedRemoveUninitializedTaint bool
 			Invoker                          string
-			HasValidvSphereCredentials       bool
 			VersionOpenshift                 string
+			Cluster                          *models.Cluster
+			ExpectedRemoveUninitializedTaint bool
 		}{
 			{
 				PlatformType:                     models.PlatformTypeNutanix,
-				Invoker:                          InvokerAssisted,
-				VersionOpenshift:                 "4.14.0",
 				ExpectedRemoveUninitializedTaint: true,
 			},
 			{
 				PlatformType:                     models.PlatformTypeVsphere,
-				Invoker:                          InvokerAssisted,
-				HasValidvSphereCredentials:       false,
-				VersionOpenshift:                 "4.14.0-rc0",
+				Cluster:                          vSphereClusterWithInvalidCredentials,
 				ExpectedRemoveUninitializedTaint: true,
-			},
-			{
-				PlatformType:                     models.PlatformTypeVsphere,
-				Invoker:                          InvokerAgent,
-				HasValidvSphereCredentials:       false,
-				VersionOpenshift:                 "4.14.0-rc0",
-				ExpectedRemoveUninitializedTaint: true,
-			},
-			{
-				PlatformType:                     models.PlatformTypeVsphere,
-				Invoker:                          InvokerAgent,
-				HasValidvSphereCredentials:       false,
-				VersionOpenshift:                 "4.15.0",
-				ExpectedRemoveUninitializedTaint: true,
-			},
-			{
-				PlatformType:                     models.PlatformTypeVsphere,
-				Invoker:                          InvokerAgent,
-				HasValidvSphereCredentials:       true,
-				VersionOpenshift:                 "4.14.0",
-				ExpectedRemoveUninitializedTaint: true,
-			},
-			{
-				PlatformType:                     models.PlatformTypeVsphere,
-				Invoker:                          InvokerAgent,
-				HasValidvSphereCredentials:       true,
-				VersionOpenshift:                 "4.15",
-				ExpectedRemoveUninitializedTaint: false,
 			},
 			{
 				PlatformType:                     models.PlatformTypeNone,
-				Invoker:                          InvokerAssisted,
-				VersionOpenshift:                 "4.14.0-rc10-z10",
 				ExpectedRemoveUninitializedTaint: false,
 			},
 			{
 				PlatformType:                     models.PlatformTypeBaremetal,
-				Invoker:                          InvokerAssisted,
+				ExpectedRemoveUninitializedTaint: false,
+			},
+			{
+				PlatformType:                     models.PlatformTypeVsphere,
+				Invoker:                          InvokerAgent,
+				VersionOpenshift:                 "4.14.0-rc0",
+				Cluster:                          vSphereClusterWithInvalidCredentials,
+				ExpectedRemoveUninitializedTaint: true,
+			},
+			{
+				PlatformType:                     models.PlatformTypeVsphere,
+				Invoker:                          InvokerAgent,
+				VersionOpenshift:                 "4.15.0",
+				Cluster:                          vSphereClusterWithInvalidCredentials,
+				ExpectedRemoveUninitializedTaint: true,
+			},
+			{
+				PlatformType:                     models.PlatformTypeVsphere,
+				Invoker:                          InvokerAgent,
 				VersionOpenshift:                 "4.14.0",
+				Cluster:                          vSphereClusterWithValidCredentials,
+				ExpectedRemoveUninitializedTaint: true,
+			},
+			{
+				PlatformType:                     models.PlatformTypeVsphere,
+				Invoker:                          InvokerAgent,
+				VersionOpenshift:                 "4.15",
+				Cluster:                          vSphereClusterWithValidCredentials,
 				ExpectedRemoveUninitializedTaint: false,
 			},
 		}
 
-		for i := range tests {
-			test := tests[i]
-			It(fmt.Sprintf("platform %v, invoker %v, hasValidCredentials %v, version %v, expected remove uninitialized taint = %v", test.PlatformType, test.Invoker, test.HasValidvSphereCredentials, test.VersionOpenshift, test.ExpectedRemoveUninitializedTaint), func() {
-				platform := &models.Platform{
-					Type: &test.PlatformType,
+		for _, test := range tests {
+			test := test
+			It(fmt.Sprintf("platform %v, invoker %v, version %v, cluster %v, is expected to remove uninitialized taint = %v", test.PlatformType, test.Invoker, test.VersionOpenshift, test.Cluster, test.ExpectedRemoveUninitializedTaint), func() {
+				if test.PlatformType == models.PlatformTypeVsphere {
+					mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(test.Cluster, nil).Times(1)
 				}
-				removeUninitializedTaint := RemoveUninitializedTaint(platform, test.Invoker,
-					test.HasValidvSphereCredentials, test.VersionOpenshift)
+				removeUninitializedTaint := RemoveUninitializedTaint(context.TODO(), mockbmclient, mockkcclient, l, test.PlatformType, test.VersionOpenshift, test.Invoker)
 				Expect(removeUninitializedTaint).To(Equal(test.ExpectedRemoveUninitializedTaint))
 			})
 		}
 	})
 
 	Context("Verify HasValidvSphereCredentials", func() {
-		It("nil cluster struct should not cause nil pointer exception", func() {
-			mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(nil, nil).Times(1)
-			hasValidvSphereCredentials := HasValidvSphereCredentials(context.TODO(), mockbmclient, l)
-			Expect(hasValidvSphereCredentials).To(BeFalse())
+		Context("cluster is available from assisted-service", func() {
+			tests := []struct {
+				TestName                   string
+				Cluster                    *models.Cluster
+				HasValidvSphereCredentials bool
+			}{
+				{
+					TestName:                   "has valid vSphere credentials should return true",
+					Cluster:                    vSphereClusterWithValidCredentials,
+					HasValidvSphereCredentials: true,
+				},
+				{
+					TestName:                   "does not have valid vSphere credentials should return false",
+					Cluster:                    vSphereClusterWithInvalidCredentials,
+					HasValidvSphereCredentials: false,
+				},
+				{
+					TestName: "deprecated credentials should return false",
+					Cluster: &models.Cluster{
+						Platform:               &models.Platform{Type: platformTypePtr(models.PlatformTypeVsphere)},
+						InstallConfigOverrides: "{\"platform\":{\"vsphere\":{\"vcenters\":[{\"server\":\"\",\"user\":\"usernameplaceholder\",\"password\":\"some-password\",\"datacenters\":[\"datacenter\"]}],\"failureDomains\":[{\"name\":\"test-failure-baseDomain\",\"region\":\"changeme-region\",\"zone\":\"changeme-zone\",\"server\":\"server.openshift.com\",\"topology\":{\"datacenter\":\"datacenter\",\"computeCluster\":\"/datacenter/host/cluster\",\"networks\":[\"segment-a\"],\"datastore\":\"/datacenter/datastore/mystore\",\"resourcePool\":\"/datacenter/host/mycluster//Resources\",\"folder\":\"/datacenter/vm/folder\"}}]}}}",
+					},
+					HasValidvSphereCredentials: false,
+				},
+				{
+					TestName: "other platforms should return false",
+					Cluster: &models.Cluster{
+						Platform:               &models.Platform{Type: platformTypePtr(models.PlatformTypeBaremetal)},
+						InstallConfigOverrides: "{\"fips\":\"false\",\"platform\":{\"baremetal\":{}}}",
+					},
+					HasValidvSphereCredentials: false,
+				},
+			}
+
+			for _, test := range tests {
+				test := test
+				It(test.TestName, func() {
+					mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(test.Cluster, nil).Times(1)
+					hasValidvSphereCredentials := HasValidvSphereCredentials(context.TODO(), mockbmclient, mockkcclient, l)
+
+					Expect(hasValidvSphereCredentials).To(Equal(test.HasValidvSphereCredentials))
+				})
+			}
 		})
 
-		tests := []struct {
-			TestName                   string
-			Cluster                    models.Cluster
-			HasValidvSphereCredentials bool
-		}{
-			{
-				TestName: "has valid vSphere credentials should return true",
-				Cluster: models.Cluster{
-					Platform:               &models.Platform{Type: platformTypePtr(models.PlatformTypeVsphere)},
-					InstallConfigOverrides: "{\"platform\":{\"vsphere\":{\"vcenters\":[{\"server\":\"server.openshift.com\",\"user\":\"some-user\",\"password\":\"some-password\",\"datacenters\":[\"datacenter\"]}],\"failureDomains\":[{\"name\":\"test-failure-baseDomain\",\"region\":\"changeme-region\",\"zone\":\"changeme-zone\",\"server\":\"server.openshift.com\",\"topology\":{\"datacenter\":\"datacenter\",\"computeCluster\":\"/datacenter/host/cluster\",\"networks\":[\"segment-a\"],\"datastore\":\"/datacenter/datastore/mystore\",\"resourcePool\":\"/datacenter/host/mycluster//Resources\",\"folder\":\"/datacenter/vm/folder\"}}]}}}",
+		Context("cluster is unavailable from assisted-service, install-config ConfigMap is used", func() {
+			configMapTests := []struct {
+				TestName                   string
+				ConfigMap                  *v1.ConfigMap
+				HasValidvSphereCredentials bool
+			}{
+				{
+					TestName: "has server defined in install-config should return true",
+					ConfigMap: &v1.ConfigMap{
+						Data: map[string]string{
+							"install-config": "platform:\n  vsphere:\n    apiVIPs:\n    - 192.168.111.5\n    failureDomains:\n    - name: generated-failure-domain\n      region: generated-region\n      server: server.openshift.com\n      topology:\n        computeCluster: compute-cluster\n        datacenter: datacenter\n        datastore: datastore\n        folder: /my-folder\n        networks:\n        - test-network-1\n        resourcePool: /datacenter/host/cluster/resource-pool\n      zone: generated-zone\n    ingressVIPs:\n    - 192.168.111.4\n    vcenters:\n    - datacenters:\n      - datacenter\n      password: \"\"\n      server: machine1.server.com\n      user: \"\"\npublish: External\n",
+						},
+					},
+					HasValidvSphereCredentials: true,
 				},
-				HasValidvSphereCredentials: true,
-			},
-			{
-				TestName: "does not have valid vSphere credentials should return false",
-				Cluster: models.Cluster{
-					Platform:               &models.Platform{Type: platformTypePtr(models.PlatformTypeVsphere)},
-					InstallConfigOverrides: "{\"platform\":{\"vsphere\":{\"username\":\"a-user\",\"password\":\"a-password\",\"vCenter\":\"a-server.com\"}}}",
+				{
+					TestName: "has deprecated server value in install-config should return false",
+					ConfigMap: &v1.ConfigMap{
+						Data: map[string]string{
+							"install-config": "platform:\n  vsphere:\n    apiVIPs:\n    - 192.168.111.5\n    failureDomains:\n    - name: generated-failure-domain\n      region: generated-region\n      server: vcenterplaceholder\n      topology:\n        computeCluster: compute-cluster\n        datacenter: datacenter\n        datastore: datastore\n        folder: /my-folder\n        networks:\n        - test-network-1\n        resourcePool: /datacenter/host/cluster/resource-pool\n      zone: generated-zone\n    ingressVIPs:\n    - 192.168.111.4\n    vcenters:\n    - datacenters:\n      - datacenter\n      password: \"\"\n      server: vcenterplaceholder\n      user: \"\"\npublish: External\n",
+						},
+					},
+					HasValidvSphereCredentials: false,
 				},
-				HasValidvSphereCredentials: false,
-			},
-			{
-				TestName: "deprecated credentials should return false",
-				Cluster: models.Cluster{
-					Platform:               &models.Platform{Type: platformTypePtr(models.PlatformTypeVsphere)},
-					InstallConfigOverrides: "{\"platform\":{\"vsphere\":{\"vcenters\":[{\"server\":\"\",\"user\":\"usernameplaceholder\",\"password\":\"some-password\",\"datacenters\":[\"datacenter\"]}],\"failureDomains\":[{\"name\":\"test-failure-baseDomain\",\"region\":\"changeme-region\",\"zone\":\"changeme-zone\",\"server\":\"server.openshift.com\",\"topology\":{\"datacenter\":\"datacenter\",\"computeCluster\":\"/datacenter/host/cluster\",\"networks\":[\"segment-a\"],\"datastore\":\"/datacenter/datastore/mystore\",\"resourcePool\":\"/datacenter/host/mycluster//Resources\",\"folder\":\"/datacenter/vm/folder\"}}]}}}",
+				{
+					TestName: "username and password are redacted in install-config and are ignored, should return false",
+					ConfigMap: &v1.ConfigMap{
+						Data: map[string]string{
+							"install-config": "platform:\n  vsphere:\n    apiVIPs:\n    - 192.168.111.5\n    failureDomains:\n    - name: generated-failure-domain\n      region: generated-region\n      server: vcenterplaceholder\n      topology:\n        computeCluster: compute-cluster\n        datacenter: datacenter\n        datastore: datastore\n        folder: /my-folder\n        networks:\n        - test-network-1\n        resourcePool: /datacenter/host/cluster/resource-pool\n      zone: generated-zone\n    ingressVIPs:\n    - 192.168.111.4\n    vcenters:\n    - datacenters:\n      - datacenter\n      password: \"goodpassword\"\n      server: vcenterplaceholder\n      user: \"goodusername\"\npublish: External\n",
+						},
+					},
+					HasValidvSphereCredentials: false,
 				},
-				HasValidvSphereCredentials: false,
-			},
-			{
-				TestName: "other platforms should return false",
-				Cluster: models.Cluster{
-					Platform:               &models.Platform{Type: platformTypePtr(models.PlatformTypeBaremetal)},
-					InstallConfigOverrides: "{\"fips\":\"false\",\"platform\":{\"baremetal\":{}}}",
-				},
-				HasValidvSphereCredentials: false,
-			},
-		}
+			}
 
-		for i := range tests {
-			test := tests[i]
-			It(test.TestName, func() {
-				mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(&test.Cluster, nil).Times(1)
+			for _, test := range configMapTests {
+				test := test
+				It(test.TestName, func() {
+					mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(nil, errors.New("some error")).Times(1)
+					mockkcclient.EXPECT().GetConfigMap(gomock.Any(), gomock.Any()).Return(test.ConfigMap, nil).Times(1)
 
-				hasValidvSphereCredentials := HasValidvSphereCredentials(context.TODO(), mockbmclient, l)
+					hasValidvSphereCredentials := HasValidvSphereCredentials(context.TODO(), mockbmclient, mockkcclient, l)
 
-				Expect(hasValidvSphereCredentials).To(Equal(test.HasValidvSphereCredentials))
-			})
-
-		}
+					Expect(hasValidvSphereCredentials).To(Equal(test.HasValidvSphereCredentials))
+				})
+			}
+		})
 	})
 })
 
