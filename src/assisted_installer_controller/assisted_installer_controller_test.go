@@ -338,7 +338,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().CreateEvent(assistedController.Namespace, common.AssistedControllerIsReadyEvent, gomock.Any(), common.AssistedControllerPrefix).Return(nil, fmt.Errorf("dummy")).Times(1)
 			mockk8sclient.EXPECT().CreateEvent(assistedController.Namespace, common.AssistedControllerIsReadyEvent, gomock.Any(), common.AssistedControllerPrefix).Return(nil, nil).Times(1)
 
-			assistedController.SetReadyState()
+			assistedController.SetReadyState(WaitTimeout)
 			Expect(assistedController.status.HasError()).Should(Equal(false))
 		})
 

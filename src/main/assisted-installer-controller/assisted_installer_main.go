@@ -137,22 +137,55 @@ func main() {
 		go assistedController.HackDNSAddressConflict(&wg)
 		wg.Add(1)
 	}
+
 	invoker := common.GetInvoker(kc, logger)
-	cluster := assistedController.SetReadyState()
-	if cluster == nil && invoker == common.InvokerAgent {
-		// When the agent-based installer installs a SNO cluster, assisted-service
-		// will never be reachable because it will not be running after the boostrap
-		// node reboots to become the SNO cluster. SetReadyState will never be
-		// able to get a connection to assisted-service in this circumstance.
-		//
-		// Instead of exiting with panic with "invalid memory address or nil pointer
-		// dereference" and having the controller restart because cluster is nil,
-		// log warning and exit 0. Otherwise the controller will keep restarting
-		// leaving the controller in a running state, even through the cluster
-		// has finished install.
-		logger.Warnf("SetReadyState timed out fetching cluster from assisted-service, invoker = %v", invoker)
-		return
+	var cluster *models.Cluster
+	var platformType models.PlatformType
+	removeUninitializedTaint := false
+	if invoker == common.InvokerAgent {
+		if Options.ControllerConfig.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone {
+			// When the agent-based installer installs a SNO cluster, assisted-service
+			// will never be reachable because it will not be running after the boostrap
+			// node reboots to become the SNO cluster. SetReadyState will never be
+			// able to get a connection to assisted-service in this circumstance.
+			//
+			// Instead of exiting with panic with "invalid memory address or nil pointer
+			// dereference" and having the controller restart because cluster is nil,
+			// log warning and exit 0. Otherwise the controller will keep restarting
+			// leaving the controller in a running state, even through the cluster
+			// has finished install.
+			logger.Warnf("cluster is SNO and invoker = %v, skipping assisted-installer-controller", invoker)
+			return
+		}
+		// With the agent-based installer, assisted-service runs on the bootstrap node.
+		// We do not need to wait for an extended amount of time to reach assisted-service
+		// because it should be running on the local network.
+		cluster = assistedController.SetReadyState(5 * time.Minute)
+		if cluster == nil {
+			// assisted-service may no longer be available after bootstrap node reboots
+			// and assisted-installer-controller is restarted. In this case, we try
+			// to determine the platform type by looking at the install-config stored
+			// in the cluster-config-v1 ConfigMap.
+			logger.Warnf("SetReadyState timed out fetching cluster from assisted-service, invoker = %v", invoker)
+			pt, err := common.GetPlatformTypeFromInstallConfig(kc, logger)
+			if err != nil {
+				logger.Warnf("error determining platform type from install-config: %v", err)
+			} else {
+				platformType = pt
+				logger.Infof("platform type from install-config: %v", platformType)
+			}
+		}
+	} else {
+		cluster = assistedController.SetReadyState(assistedinstallercontroller.WaitTimeout)
+		if cluster == nil {
+			logger.Fatal("Failed to retrieve cluster from assisted service")
+		}
 	}
+	if cluster != nil {
+		platformType = *cluster.Platform.Type
+	}
+	removeUninitializedTaint = common.RemoveUninitializedTaint(mainContext, client, kc, logger, platformType, Options.ControllerConfig.OpenshiftVersion, invoker)
+	logger.Infof("Remove uninitialized taint: %v", removeUninitializedTaint)
 
 	// While adding new routine don't miss to add wg.add(1)
 	// without adding it will panic
@@ -165,20 +198,12 @@ func main() {
 		logger.Infof("Finished all")
 	}()
 
-	hasValidvSphereCredentials := common.HasValidvSphereCredentials(mainContext, client, logger)
-	if hasValidvSphereCredentials {
-		logger.Infof("Has valid vSphere credentials: %v", hasValidvSphereCredentials)
-	}
-	removeUninitializedTaint := common.RemoveUninitializedTaint(cluster.Platform,
-		invoker, hasValidvSphereCredentials, cluster.OpenshiftVersion)
-	logger.Infof("Remove uninitialized taint: %v", removeUninitializedTaint)
-
 	go assistedController.WaitAndUpdateNodesStatus(mainContext, &wg, removeUninitializedTaint)
 	wg.Add(1)
 	go assistedController.PostInstallConfigs(mainContext, &wg)
 	wg.Add(1)
 
-	if *cluster.Platform.Type == models.PlatformTypeBaremetal {
+	if cluster != nil && *cluster.Platform.Type == models.PlatformTypeBaremetal {
 		go assistedController.UpdateBMHs(mainContext, &wg)
 		wg.Add(1)
 	} else {
