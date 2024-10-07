@@ -5,6 +5,7 @@
 //
 //	mockgen -source=assisted_installer_controller.go -package=assisted_installer_controller -destination=mock_controller.go
 //
+
 // Package assisted_installer_controller is a generated GoMock package.
 package assisted_installer_controller
 
@@ -12,6 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 	sync "sync"
+	time "time"
 
 	models "github.com/openshift/assisted-service/models"
 	gomock "go.uber.org/mock/gomock"
@@ -79,17 +81,17 @@ func (mr *MockControllerMockRecorder) PostInstallConfigs(ctx, wg any) *gomock.Ca
 }
 
 // SetReadyState mocks base method.
-func (m *MockController) SetReadyState() *models.Cluster {
+func (m *MockController) SetReadyState(waitTimeout time.Duration) *models.Cluster {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetReadyState")
+	ret := m.ctrl.Call(m, "SetReadyState", waitTimeout)
 	ret0, _ := ret[0].(*models.Cluster)
 	return ret0
 }
 
 // SetReadyState indicates an expected call of SetReadyState.
-func (mr *MockControllerMockRecorder) SetReadyState() *gomock.Call {
+func (mr *MockControllerMockRecorder) SetReadyState(waitTimeout any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetReadyState", reflect.TypeOf((*MockController)(nil).SetReadyState))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetReadyState", reflect.TypeOf((*MockController)(nil).SetReadyState), waitTimeout)
 }
 
 // UpdateBMHs mocks base method.
