@@ -49,6 +49,7 @@ const (
 type Ops interface {
 	Mkdir(dirName string) error
 	WriteImageToDisk(liveLogger io.Writer, ignitionPath string, device string, extraArgs []string) error
+	WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string) error
 	Reboot(delay string) error
 	SetBootOrder(device string) error
 	ExtractFromIgnition(ignitionPath string, fileToExtract string) error
@@ -123,6 +124,71 @@ func (o *ops) SystemctlAction(action string, args ...string) error {
 		o.log.Errorf("Failed executing systemctl %s %s", action, args)
 	}
 	return errors.Wrapf(err, "Failed executing systemctl %s %s", action, args)
+}
+
+var ostreeOutputRegex = regexp.MustCompile(`Imported: (\w+)`)
+
+func (o *ops) importOSTreeCommit(liveLogger io.Writer) (string, error) {
+	ostreeReleasePullSpec := fmt.Sprintf("ostree-unverified-registry:%s", o.installerConfig.CoreosImage)
+	out, err := o.ExecPrivilegeCommand(liveLogger, "ostree", "container", "unencapsulate", "--authfile", "/root/.docker/config.json", "--quiet", "--repo", "/ostree/repo", ostreeReleasePullSpec)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to unencapsulate rhcos payload image: %s", out)
+	}
+
+	matches := ostreeOutputRegex.FindStringSubmatch(out)
+	if matches == nil {
+		return "", fmt.Errorf("got unexpected output from unencapsulate: \"%s\"", out)
+	}
+
+	return matches[1], nil
+}
+
+func (o *ops) WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string) error {
+	out, err := o.ExecPrivilegeCommand(liveLogger, "mount", "/sysroot", "-o", "remount,rw")
+	if err != nil {
+		return errors.Wrapf(err, "failed to remount sysroot: %s", out)
+	}
+	out, err = o.ExecPrivilegeCommand(liveLogger, "mount", "/boot", "-o", "remount,rw")
+	if err != nil {
+		return errors.Wrapf(err, "failed to remount boot: %s", out)
+	}
+
+	out, err = o.ExecPrivilegeCommand(liveLogger, "ostree", "admin", "stateroot-init", "install")
+	if err != nil {
+		return errors.Wrapf(err, "failed creating new stateroot: %s", out)
+	}
+
+	commit, err := o.importOSTreeCommit(liveLogger)
+	if err != nil {
+		return err
+	}
+	o.log.Infof("imported commit %s", commit)
+
+	out, err = o.ExecPrivilegeCommand(liveLogger, "ostree", "admin", "deploy",
+		"--stateroot", "install",
+		"--karg", "$ignition_firstboot",
+		"--karg", defaultIgnitionPlatformId,
+		commit)
+	if err != nil {
+		return errors.Wrapf(err, "failed to deploy commit to stateroot: %s", out)
+	}
+
+	out, err = o.ExecPrivilegeCommand(liveLogger, "mkdir", "/boot/ignition")
+	if err != nil {
+		return errors.Wrapf(err, "failed to create ignition directory: %s", out)
+	}
+
+	out, err = o.ExecPrivilegeCommand(liveLogger, "cp", ignitionPath, "/boot/ignition/config.ign")
+	if err != nil {
+		return errors.Wrapf(err, "failed to copy ignition file: %s", out)
+	}
+
+	out, err = o.ExecPrivilegeCommand(liveLogger, "touch", "/boot/ignition.firstboot")
+	if err != nil {
+		return errors.Wrapf(err, "failed to write ignition marker file: %s", out)
+	}
+
+	return nil
 }
 
 func (o *ops) WriteImageToDisk(liveLogger io.Writer, ignitionPath string, device string, extraArgs []string) error {

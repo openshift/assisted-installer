@@ -114,7 +114,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockops.EXPECT().WriteImageToDisk(gomock.Any(), filepath.Join(InstallDir, "master-host-id.ign"), device, extra).Return(nil).Times(1)
 			}
 
-			setBootOrderSuccess := func(extra interface{}) {
+			setBootOrderSuccess := func() {
 				mockops.EXPECT().SetBootOrder(device).Return(nil).Times(1)
 			}
 
@@ -389,7 +389,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 							writeToDiskSuccess(gomock.Any())
 							reportLogProgressSuccess()
-							setBootOrderSuccess(gomock.Any())
+							setBootOrderSuccess()
 							uploadLogsSuccess(true)
 							ironicAgentDoesntExist()
 							rebootSuccess()
@@ -425,7 +425,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 							writeToDiskSuccess(gomock.Any())
 							reportLogProgressSuccess()
-							setBootOrderSuccess(gomock.Any())
+							setBootOrderSuccess()
 							uploadLogsSuccess(true)
 							ironicAgentDoesntExist()
 							rebootSuccess()
@@ -449,7 +449,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							//HostRoleMaster flow:
 							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 							writeToDiskSuccess(gomock.Any())
-							setBootOrderSuccess(gomock.Any())
+							setBootOrderSuccess()
 							getEncapsulatedMcSuccess(nil)
 							overwriteImageSuccess()
 							ret := installerObj.InstallNode()
@@ -480,7 +480,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 							writeToDiskSuccess(gomock.Any())
 							reportLogProgressSuccess()
-							setBootOrderSuccess(gomock.Any())
+							setBootOrderSuccess()
 							uploadLogsSuccess(true)
 							ironicAgentDoesntExist()
 							rebootSuccess()
@@ -513,7 +513,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							//HostRoleMaster flow:
 							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 							writeToDiskSuccess(gomock.Any())
-							setBootOrderSuccess(gomock.Any())
+							setBootOrderSuccess()
 							uploadLogsSuccess(true)
 							reportLogProgressSuccess()
 							ironicAgentDoesntExist()
@@ -554,7 +554,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 							writeToDiskSuccess(gomock.Any())
 							reportLogProgressSuccess()
-							setBootOrderSuccess(gomock.Any())
+							setBootOrderSuccess()
 							uploadLogsSuccess(true)
 							ironicAgentDoesntExist()
 							rebootSuccess()
@@ -584,7 +584,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					//HostRoleMaster flow:
 					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 					writeToDiskSuccess(gomock.Any())
-					setBootOrderSuccess(gomock.Any())
+					setBootOrderSuccess()
 					getEncapsulatedMcSuccess(nil)
 					overwriteImageSuccess()
 					ret := installerObj.InstallNode()
@@ -615,7 +615,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					//HostRoleMaster flow:
 					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 					writeToDiskSuccess(gomock.Any())
-					setBootOrderSuccess(gomock.Any())
+					setBootOrderSuccess()
 					uploadLogsSuccess(true)
 					reportLogProgressSuccess()
 					ironicAgentDoesntExist()
@@ -637,7 +637,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					downloadFileSuccess(bootstrapIgn)
 					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 					writeToDiskSuccess(gomock.Any())
-					setBootOrderSuccess(gomock.Any())
+					setBootOrderSuccess()
 					extractSecretFromIgnitionSuccess()
 					getEncapsulatedMcSuccess(nil)
 					overwriteImageSuccess()
@@ -661,7 +661,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					//HostRoleMaster flow:
 					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 					writeToDiskSuccess(gomock.Any())
-					setBootOrderSuccess(gomock.Any())
+					setBootOrderSuccess()
 					getEncapsulatedMcSuccess(nil)
 					overwriteImageSuccess()
 					ret := installerObj.InstallNode()
@@ -748,7 +748,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							//HostRoleMaster flow:
 							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 							writeToDiskSuccess(gomock.Any())
-							setBootOrderSuccess(gomock.Any())
+							setBootOrderSuccess()
 							uploadLogsSuccess(true)
 							reportLogProgressSuccess()
 							ironicAgentDoesntExist()
@@ -847,18 +847,23 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				})
 			})
 			Context("Master role", func() {
-				installerArgs := []string{"-n", "--append-karg", "nameserver=8.8.8.8"}
-				conf := config.Config{Role: string(models.HostRoleMaster),
-					ClusterID:           "cluster-id",
-					InfraEnvID:          "infra-env-id",
-					HostID:              "host-id",
-					Device:              "/dev/vda",
-					URL:                 "https://assisted-service.com:80",
-					OpenshiftVersion:    openShiftVersion,
-					InstallerArgs:       installerArgs,
-					EnableSkipMcoReboot: withEnableSkipMcoReboot,
-				}
+				var (
+					conf          config.Config
+					installerArgs []string
+				)
+
 				BeforeEach(func() {
+					installerArgs = []string{"-n", "--append-karg", "nameserver=8.8.8.8"}
+					conf = config.Config{Role: string(models.HostRoleMaster),
+						ClusterID:           "cluster-id",
+						InfraEnvID:          "infra-env-id",
+						HostID:              "host-id",
+						Device:              "/dev/vda",
+						URL:                 "https://assisted-service.com:80",
+						OpenshiftVersion:    openShiftVersion,
+						InstallerArgs:       installerArgs,
+						EnableSkipMcoReboot: withEnableSkipMcoReboot,
+					}
 					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, cleanupDevice)
 					evaluateDiskSymlinkSuccess()
 
@@ -873,13 +878,35 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					mkdirSuccess(InstallDir)
 					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 					writeToDiskSuccess(installerArgs)
-					setBootOrderSuccess(gomock.Any())
+					setBootOrderSuccess()
 					uploadLogsSuccess(false)
 					reportLogProgressSuccess()
 					ironicAgentDoesntExist()
 					rebootSuccess()
 					getEncapsulatedMcSuccess(nil)
 					overwriteImageSuccess()
+					ret := installerObj.InstallNode()
+					Expect(ret).Should(BeNil())
+				})
+
+				It("installs to the existing root and does not skip reboot, clean install device, or set boot order when coreosImage is set", func() {
+					installerObj.Config.CoreosImage = "example.com/coreos/os:latest"
+					updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+						{string(models.HostStageInstalling), conf.Role},
+						{string(models.HostStageWritingImageToDisk)},
+						{string(models.HostStageRebooting)},
+					})
+					cleanupDevice.EXPECT().CleanupInstallDevice(device).Times(0)
+					mkdirSuccess(InstallDir)
+					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
+					mockops.EXPECT().WriteImageToExistingRoot(gomock.Any(), filepath.Join(InstallDir, "master-host-id.ign")).Return(nil).Times(1)
+					mockops.EXPECT().SetBootOrder(device).Times(0)
+					uploadLogsSuccess(false)
+					reportLogProgressSuccess()
+					ironicAgentDoesntExist()
+					rebootSuccess()
+					mockops.EXPECT().GetEncapsulatedMC(gomock.Any()).Times(0)
+					mockops.EXPECT().OverwriteOsImage(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					ret := installerObj.InstallNode()
 					Expect(ret).Should(BeNil())
 				})
@@ -896,7 +923,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					mkdirSuccess(InstallDir)
 					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 					writeToDiskSuccess(installerArgs)
-					setBootOrderSuccess(gomock.Any())
+					setBootOrderSuccess()
 					uploadLogsSuccess(false)
 					reportLogProgressSuccess()
 					ironicAgentDoesntExist()
@@ -963,7 +990,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					mkdirSuccess(InstallDir)
 					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 					writeToDiskSuccess(installerArgs)
-					setBootOrderSuccess(gomock.Any())
+					setBootOrderSuccess()
 					uploadLogsSuccess(false)
 					reportLogProgressSuccess()
 					getEncapsulatedMcSuccess(nil)
@@ -1018,7 +1045,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					uploadLogsSuccess(false)
 					reportLogProgressSuccess()
 					writeToDiskSuccess(installerArgs)
-					setBootOrderSuccess(gomock.Any())
+					setBootOrderSuccess()
 					getEncapsulatedMcSuccess(nil)
 					overwriteImageSuccess()
 					ironicAgentDoesntExist()
@@ -1070,7 +1097,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					mkdirSuccess(InstallDir)
 					downloadHostIgnitionSuccess(infraEnvId, hostId, "worker-host-id.ign")
 					mockops.EXPECT().WriteImageToDisk(gomock.Any(), filepath.Join(InstallDir, "worker-host-id.ign"), device, nil).Return(nil).Times(1)
-					setBootOrderSuccess(gomock.Any())
+					setBootOrderSuccess()
 					// failure must do nothing
 					reportLogProgressSuccess()
 					mockops.EXPECT().UploadInstallationLogs(false).Return("", errors.Errorf("Dummy")).Times(1)
@@ -1176,7 +1203,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					singleNodeMergeIgnitionSuccess()
 					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 					mockops.EXPECT().WriteImageToDisk(gomock.Any(), singleNodeMasterIgnitionPath, device, nil).Return(nil).Times(1)
-					setBootOrderSuccess(gomock.Any())
+					setBootOrderSuccess()
 					uploadLogsSuccess(true)
 					reportLogProgressSuccess()
 					ironicAgentDoesntExist()

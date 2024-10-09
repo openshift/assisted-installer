@@ -399,3 +399,17 @@ func (mr *MockOpsMockRecorder) WriteImageToDisk(liveLogger, ignitionPath, device
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteImageToDisk", reflect.TypeOf((*MockOps)(nil).WriteImageToDisk), liveLogger, ignitionPath, device, extraArgs)
 }
+
+// WriteImageToExistingRoot mocks base method.
+func (m *MockOps) WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WriteImageToExistingRoot", liveLogger, ignitionPath)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WriteImageToExistingRoot indicates an expected call of WriteImageToExistingRoot.
+func (mr *MockOpsMockRecorder) WriteImageToExistingRoot(liveLogger, ignitionPath any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteImageToExistingRoot", reflect.TypeOf((*MockOps)(nil).WriteImageToExistingRoot), liveLogger, ignitionPath)
+}

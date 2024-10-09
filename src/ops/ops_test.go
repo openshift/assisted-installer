@@ -13,6 +13,7 @@ import (
 	"reflect"
 
 	"github.com/openshift/assisted-installer/src/ops/execute"
+	"github.com/openshift/assisted-installer/src/utils"
 
 	"github.com/coreos/ignition/v2/config/v3_2/types"
 	"github.com/go-openapi/swag"
@@ -522,6 +523,86 @@ var _ = Describe("get number of reboots", func() {
 	It("with error", func() {
 		expect("", errors.New("An error"))
 		_, err := o.GetNumberOfReboots(context.TODO(), nodeName, kubeconfigPath)
+		Expect(err).To(HaveOccurred())
+	})
+})
+
+var _ = Describe("importOSTreeCommit", func() {
+	const osImage = "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:d21f2ed754a66d18b0a13a59434fa4dc36abd4320e78f3be83a3e29e21e3c2f9"
+	var (
+		l        = logrus.New()
+		ctrl     *gomock.Controller
+		execMock *execute.MockExecute
+		o        *ops
+	)
+
+	BeforeEach(func() {
+		ctrl = gomock.NewController(GinkgoT())
+		execMock = execute.NewMockExecute(ctrl)
+		o = &ops{
+			log:       l,
+			logWriter: utils.NewLogWriter(l),
+			installerConfig: &config.Config{
+				CoreosImage: osImage,
+			},
+			executor: execMock,
+		}
+	})
+
+	It("returns the commit when successful", func() {
+		pullSpec := "ostree-unverified-registry:" + osImage
+		execMock.EXPECT().ExecCommand(gomock.Any(),
+			"nsenter", "--target", "1", "--cgroup", "--mount", "--ipc", "--pid", "--",
+			"ostree", "container", "unencapsulate",
+			"--authfile", "/root/.docker/config.json",
+			"--quiet",
+			"--repo", "/ostree/repo",
+			pullSpec,
+		).Return("Imported: bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25\n", nil)
+		commit, err := o.importOSTreeCommit(io.Discard)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(commit).To(Equal("bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25"))
+	})
+
+	It("fails when the command fails", func() {
+		pullSpec := "ostree-unverified-registry:" + osImage
+		execMock.EXPECT().ExecCommand(gomock.Any(),
+			"nsenter", "--target", "1", "--cgroup", "--mount", "--ipc", "--pid", "--",
+			"ostree", "container", "unencapsulate",
+			"--authfile", "/root/.docker/config.json",
+			"--quiet",
+			"--repo", "/ostree/repo",
+			pullSpec,
+		).Return("", fmt.Errorf("failed"))
+		_, err := o.importOSTreeCommit(io.Discard)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("fails when the output is not as expected", func() {
+		pullSpec := "ostree-unverified-registry:" + osImage
+		execMock.EXPECT().ExecCommand(gomock.Any(),
+			"nsenter", "--target", "1", "--cgroup", "--mount", "--ipc", "--pid", "--",
+			"ostree", "container", "unencapsulate",
+			"--authfile", "/root/.docker/config.json",
+			"--quiet",
+			"--repo", "/ostree/repo",
+			pullSpec,
+		).Return("commit bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25\n", nil)
+		_, err := o.importOSTreeCommit(io.Discard)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("fails when the output cannot be parsed", func() {
+		pullSpec := "ostree-unverified-registry:" + osImage
+		execMock.EXPECT().ExecCommand(gomock.Any(),
+			"nsenter", "--target", "1", "--cgroup", "--mount", "--ipc", "--pid", "--",
+			"ostree", "container", "unencapsulate",
+			"--authfile", "/root/.docker/config.json",
+			"--quiet",
+			"--repo", "/ostree/repo",
+			pullSpec,
+		).Return("some nonsense here", nil)
+		_, err := o.importOSTreeCommit(io.Discard)
 		Expect(err).To(HaveOccurred())
 	})
 })
