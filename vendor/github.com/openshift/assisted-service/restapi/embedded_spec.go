@@ -7320,10 +7320,16 @@ func init() {
           "description": "Whether the disk appears to be an installation media or not",
           "type": "boolean"
         },
+        "iscsi": {
+          "$ref": "#/definitions/iscsi"
+        },
         "model": {
           "type": "string"
         },
         "name": {
+          "type": "string"
+        },
+        "partitionTypes": {
           "type": "string"
         },
         "path": {
@@ -7508,6 +7514,13 @@ func init() {
               "domain_name"
             ],
             "properties": {
+              "cnames": {
+                "description": "The cnames that were resolved for the domain, empty if none",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "domain_name": {
                 "description": "The domain that was resolved",
                 "type": "string"
@@ -8799,6 +8812,11 @@ func init() {
         "kernel_arguments": {
           "$ref": "#/definitions/kernel_arguments"
         },
+        "openshift_version": {
+          "description": "Version of the OS image",
+          "type": "string",
+          "x-nullable": true
+        },
         "proxy": {
           "$ref": "#/definitions/proxy"
         },
@@ -8941,6 +8959,10 @@ func init() {
         "must_gather_image": {
           "description": "Must-gather images to use",
           "type": "string"
+        },
+        "notify_num_reboots": {
+          "description": "If true, notify number of reboots by assisted controller",
+          "type": "boolean"
         },
         "openshift_version": {
           "description": "Version of the OpenShift cluster.",
@@ -9110,6 +9132,15 @@ func init() {
       "type": "string",
       "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))?$",
       "x-go-custom-tag": "gorm:\"primaryKey\""
+    },
+    "iscsi": {
+      "type": "object",
+      "properties": {
+        "host_ip_address": {
+          "description": "Host IP address used to reach iSCSI target",
+          "type": "string"
+        }
+      }
     },
     "kernel_argument": {
       "description": "pair of [operation, argument] specifying the argument and what operation should be applied on it.",
@@ -9367,6 +9398,14 @@ func init() {
           "enum": [
             "manifests",
             "openshift"
+          ]
+        },
+        "manifest_source": {
+          "description": "Describes whether manifest is sourced from a user or created by the system.",
+          "type": "string",
+          "enum": [
+            "user",
+            "system"
           ]
         }
       }
@@ -16696,6 +16735,13 @@ func init() {
         "domain_name"
       ],
       "properties": {
+        "cnames": {
+          "description": "The cnames that were resolved for the domain, empty if none",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "domain_name": {
           "description": "The domain that was resolved",
           "type": "string"
@@ -18098,10 +18144,16 @@ func init() {
           "description": "Whether the disk appears to be an installation media or not",
           "type": "boolean"
         },
+        "iscsi": {
+          "$ref": "#/definitions/iscsi"
+        },
         "model": {
           "type": "string"
         },
         "name": {
+          "type": "string"
+        },
+        "partitionTypes": {
           "type": "string"
         },
         "path": {
@@ -19553,6 +19605,11 @@ func init() {
         "kernel_arguments": {
           "$ref": "#/definitions/kernel_arguments"
         },
+        "openshift_version": {
+          "description": "Version of the OS image",
+          "type": "string",
+          "x-nullable": true
+        },
         "proxy": {
           "$ref": "#/definitions/proxy"
         },
@@ -19695,6 +19752,10 @@ func init() {
         "must_gather_image": {
           "description": "Must-gather images to use",
           "type": "string"
+        },
+        "notify_num_reboots": {
+          "description": "If true, notify number of reboots by assisted controller",
+          "type": "boolean"
         },
         "openshift_version": {
           "description": "Version of the OpenShift cluster.",
@@ -19864,6 +19925,15 @@ func init() {
       "type": "string",
       "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))?$",
       "x-go-custom-tag": "gorm:\"primaryKey\""
+    },
+    "iscsi": {
+      "type": "object",
+      "properties": {
+        "host_ip_address": {
+          "description": "Host IP address used to reach iSCSI target",
+          "type": "string"
+        }
+      }
     },
     "kernel_argument": {
       "description": "pair of [operation, argument] specifying the argument and what operation should be applied on it.",
@@ -20110,6 +20180,14 @@ func init() {
           "enum": [
             "manifests",
             "openshift"
+          ]
+        },
+        "manifest_source": {
+          "description": "Describes whether manifest is sourced from a user or created by the system.",
+          "type": "string",
+          "enum": [
+            "user",
+            "system"
           ]
         }
       }
