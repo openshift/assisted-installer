@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-jose/go-jose"
+	"github.com/go-jose/go-jose/json"
 	"github.com/golang-jwt/jwt/v4"
-	"gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/json"
 )
 
 func GetTokenAndCert(withLateIat bool) (string, []byte) {
@@ -34,7 +34,7 @@ func GetTokenAndCert(withLateIat bool) (string, []byte) {
 		"email":          "jdoe123@example.com",
 		"username":       "jdoe123@example.com",
 		"is_org_admin":   false,
-		"clientId":       "1234",
+		"client_id":      "1234",
 	}
 	if withLateIat {
 		mapClaims["iat"] = time.Now().Add(5 * time.Minute).Unix()
