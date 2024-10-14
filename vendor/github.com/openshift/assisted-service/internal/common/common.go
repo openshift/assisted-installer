@@ -2,18 +2,20 @@ package common
 
 import (
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 
-	"github.com/containers/image/v5/docker/reference"
+	"github.com/docker/distribution/reference"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
 	yamlpatch "github.com/krishicks/yaml-patch"
 	"github.com/openshift/assisted-service/models"
 	"github.com/thoas/go-funk"
+	"golang.org/x/sys/unix"
 	"gorm.io/gorm"
 )
 
@@ -39,9 +41,6 @@ const (
 
 	IgnitionTokenKeyInSecret = "ignition-token"
 
-	FamilyIPv4 int32 = 4
-	FamilyIPv6 int32 = 6
-
 	AMD64CPUArchitecture   = "amd64"
 	X86CPUArchitecture     = "x86_64"
 	DefaultCPUArchitecture = X86CPUArchitecture
@@ -49,7 +48,33 @@ const (
 	// rchos is sending aarch64 and not arm as arm64 arch
 	AARCH64CPUArchitecture = "aarch64"
 	PowerCPUArchitecture   = "ppc64le"
+	S390xCPUArchitecture   = "s390x"
 	MultiCPUArchitecture   = "multi"
+
+	ExternalPlatformNameOci = "oci"
+)
+
+type AddressFamily int
+
+const (
+	IPv4 AddressFamily = unix.AF_INET
+	IPv6 AddressFamily = unix.AF_INET6
+)
+
+func (a AddressFamily) String() string {
+	switch a {
+	case IPv4:
+		return "IPv4"
+	case IPv6:
+		return "IPv6"
+	default:
+		return fmt.Sprintf("Unexpected family value %d", a)
+	}
+}
+
+var (
+	UnlimitedEvents *int64 = swag.Int64(-1)
+	NoOffsetEvents  *int64 = swag.Int64(0)
 )
 
 // Configuration to be injected by discovery ignition.  It will cause IPv6 DHCP client identifier to be the same
@@ -92,6 +117,36 @@ const NMDebugModeConf = `
 [logging]
 domains=ALL:DEBUG
 `
+
+const ValidationTypeHost = "host"
+const ValidationTypeCluster = "cluster"
+
+func GetIgnoredValidations(validationsJSON string, clusterID string) ([]string, bool) {
+	ignoredValidations := []string{}
+	if validationsJSON != "" {
+		var err error
+		ignoredValidations, err = DeserializeJSONList(validationsJSON)
+		if err != nil {
+			return nil, false
+		}
+	}
+	return ignoredValidations, true
+}
+
+func IgnoredValidationsAreSet(cluster *Cluster) bool {
+	return cluster.IgnoredClusterValidations != "" || cluster.IgnoredHostValidations != ""
+}
+
+func DeserializeJSONList(jsonString string) ([]string, error) {
+	var list []string
+	if jsonString != "" {
+		err := json.Unmarshal([]byte(jsonString), &list)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return list, nil
+}
 
 func NormalizeCPUArchitecture(arch string) string {
 	switch arch {
@@ -226,7 +281,7 @@ func IsSliceNonEmpty(arg interface{}) bool {
 		funk.ForEach(arg, func(elem interface{}) {
 			v := reflect.ValueOf(elem)
 			if v.Kind() == reflect.Ptr {
-				v = v.Elem()
+				v = reflect.Indirect(v.Elem())
 			}
 			for i := 0; i < v.NumField(); i++ {
 				res = res || !v.Field(i).IsZero()
@@ -414,8 +469,14 @@ func GetTagFromImageRef(ref string) string {
 func GetConvertedClusterAPIVipDNSName(c *Cluster) string {
 	// In case cluster that isn't configured with user-managed-networking
 	// and api vip is set we should set api vip as APIVipDNSName
-	if !swag.BoolValue(c.Cluster.UserManagedNetworking) && c.Cluster.APIVip != "" {
-		return c.Cluster.APIVip
+
+	apiVip := ""
+	if len(c.APIVips) > 0 {
+		apiVip = string(c.APIVips[0].IP)
+	}
+
+	if !swag.BoolValue(c.Cluster.UserManagedNetworking) && apiVip != "" {
+		return apiVip
 	}
 	return fmt.Sprintf("api.%s.%s", c.Cluster.Name, c.Cluster.BaseDNSDomain)
 }
@@ -445,4 +506,126 @@ func ApplyYamlPatch(src []byte, ops []byte) ([]byte, error) {
 	}
 
 	return patched, nil
+}
+
+/*Count of events of each severity*/
+type EventSeverityCount map[string]int64
+
+type V2GetEventsParams struct {
+	/*
+	   A comma-separated list of event categories.
+	*/
+	Categories []string
+	/*
+	   The cluster to return events for.
+	   Format: uuid
+	*/
+	ClusterID *strfmt.UUID
+	/*
+	   Cluster level events flag.
+	*/
+	ClusterLevel *bool
+	/*
+	   Deleted hosts flag.
+	*/
+	DeletedHosts *bool
+	/*
+	   Hosts in the specified cluster to return events for.
+	*/
+	HostIds []strfmt.UUID
+	/*
+	   The infra-env to return events for.
+	   Format: uuid
+	*/
+	InfraEnvID *strfmt.UUID
+	/*
+	   The maximum number of records to retrieve.
+	*/
+	Limit *int64
+	/*
+	   Retrieved events message pattern.
+	*/
+	Message *string
+	/*
+	   Number of records to skip before starting to return the records.
+	*/
+	Offset *int64
+
+	/*
+	   Order by event_time of events retrieved.
+	   Default: "ascending"
+	*/
+	Order *string
+	/*
+	   Retrieved events severities.
+	*/
+	Severities []string
+}
+
+type V2GetEventsResponse struct {
+	/*Retrieved events*/
+	Events             []*Event
+	EventSeverityCount *EventSeverityCount
+	EventCount         *int64
+}
+
+func (r V2GetEventsResponse) GetEvents() []*Event {
+	return r.Events
+}
+
+func (r V2GetEventsResponse) GetEventSeverityCount() *EventSeverityCount {
+	return r.EventSeverityCount
+}
+
+func (r V2GetEventsResponse) GetEventCount() *int64 {
+	return r.EventCount
+}
+
+func GetDefaultV2GetEventsParams(clusterID *strfmt.UUID, hostIds []strfmt.UUID, infraEnvID *strfmt.UUID, categories ...string) *V2GetEventsParams {
+	selectedCategories := make([]string, 0)
+	if len(categories) > 0 {
+		selectedCategories = categories[:]
+	}
+	return &V2GetEventsParams{
+		ClusterID:  clusterID,
+		HostIds:    hostIds,
+		InfraEnvID: infraEnvID,
+		Limit:      UnlimitedEvents,
+		Offset:     NoOffsetEvents,
+		Categories: selectedCategories,
+	}
+}
+
+func IsPlatformExternal(platform *models.Platform) bool {
+	if platform == nil || platform.Type == nil {
+		return false
+	}
+	return IsPlatformTypeExternal(*platform.Type)
+}
+
+func IsPlatformTypeExternal(platformType models.PlatformType) bool {
+	return platformType == models.PlatformTypeExternal
+}
+
+func IsExternalIntegrationEnabled(platform *models.Platform, platformName string) bool {
+	if platform == nil ||
+		platform.Type == nil {
+		return false
+	}
+
+	if *platform.Type == models.PlatformTypeExternal &&
+		platform.External != nil &&
+		swag.StringValue(platform.External.PlatformName) == platformName {
+		return true
+	}
+
+	return false
+}
+
+func IsOciExternalIntegrationEnabled(platform *models.Platform) bool {
+	return IsExternalIntegrationEnabled(platform, ExternalPlatformNameOci)
+}
+
+func IsMultiNodeNonePlatformCluster(cluster *Cluster) bool {
+	return !IsSingleNodeCluster(cluster) && swag.BoolValue(cluster.UserManagedNetworking)
 }

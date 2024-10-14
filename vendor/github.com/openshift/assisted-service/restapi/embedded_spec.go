@@ -238,7 +238,7 @@ func init() {
     },
     "/v2/clusters/import": {
       "post": {
-        "description": "Import an AI cluster using minimal data assosiated with existing OCP cluster, in order to allow adding day2 hosts to that cluster",
+        "description": "Import an AI cluster using minimal data associated with existing OCP cluster, in order to allow adding day2 hosts to that cluster",
         "tags": [
           "installer"
         ],
@@ -1772,7 +1772,6 @@ func init() {
             "enum": [
               "host",
               "controller",
-              "node-boot",
               "all"
             ],
             "type": "string",
@@ -1867,8 +1866,7 @@ func init() {
           {
             "enum": [
               "host",
-              "controller",
-              "node-boot"
+              "controller"
             ],
             "type": "string",
             "description": "The type of log file to be uploaded.",
@@ -2040,6 +2038,13 @@ func init() {
             "name": "cluster_id",
             "in": "path",
             "required": true
+          },
+          {
+            "type": "boolean",
+            "default": false,
+            "description": "Include system generated manifests in results? Default is false.",
+            "name": "include_system_generated",
+            "in": "query"
           }
         ],
         "responses": {
@@ -2205,6 +2210,87 @@ func init() {
         "responses": {
           "200": {
             "description": "Success."
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "403": {
+            "description": "Forbidden.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "404": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "405": {
+            "description": "Method Not Allowed.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "409": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "500": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          }
+        }
+      },
+      "patch": {
+        "security": [
+          {
+            "userAuth": []
+          }
+        ],
+        "description": "Updates a manifest for customizing cluster installation.",
+        "tags": [
+          "manifests"
+        ],
+        "operationId": "V2UpdateClusterManifest",
+        "parameters": [
+          {
+            "type": "string",
+            "format": "uuid",
+            "description": "The cluster for which a new manifest should be updated.",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "description": "The manifest to be updated.",
+            "name": "UpdateManifestParams",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/update-manifest-params"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "schema": {
+              "$ref": "#/definitions/manifest"
+            }
+          },
+          "400": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
           },
           "401": {
             "description": "Unauthorized.",
@@ -2554,6 +2640,80 @@ func init() {
         }
       }
     },
+    "/v2/clusters/{cluster_id}/progress": {
+      "put": {
+        "security": [
+          {
+            "agentAuth": []
+          }
+        ],
+        "description": "Update installation finalizing progress.",
+        "tags": [
+          "installer"
+        ],
+        "operationId": "v2UpdateClusterFinalizingProgress",
+        "parameters": [
+          {
+            "type": "string",
+            "format": "uuid",
+            "description": "The cluster being updated.",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "description": "New progress value.",
+            "name": "finalizing-progress",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/cluster-finalizing-progress"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Update install progress."
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "403": {
+            "description": "Forbidden.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "404": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "405": {
+            "description": "Method Not Allowed.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "500": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "503": {
+            "description": "Unavailable.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          }
+        }
+      }
+    },
     "/v2/clusters/{cluster_id}/supported-platforms": {
       "get": {
         "security": [
@@ -2588,6 +2748,127 @@ func init() {
               "items": {
                 "$ref": "#/definitions/platform_type"
               }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "403": {
+            "description": "Forbidden.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "404": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "500": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          }
+        }
+      }
+    },
+    "/v2/clusters/{cluster_id}/ui-settings": {
+      "get": {
+        "description": "Fetch cluster specific UI settings.",
+        "tags": [
+          "installer"
+        ],
+        "operationId": "V2GetClusterUISettings",
+        "parameters": [
+          {
+            "type": "string",
+            "format": "uuid",
+            "description": "The cluster for which UI settings should be retrieved.",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "400": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "403": {
+            "description": "Forbidden.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "404": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "500": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          }
+        }
+      },
+      "put": {
+        "description": "Update cluster specific UI settings.",
+        "tags": [
+          "installer"
+        ],
+        "operationId": "V2UpdateClusterUISettings",
+        "parameters": [
+          {
+            "type": "string",
+            "format": "uuid",
+            "description": "The cluster for which UI settings should be updated.",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "description": "Settings for the installer UI.",
+            "name": "ui-settings",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "400": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
             }
           },
           "401": {
@@ -2791,8 +3072,18 @@ func init() {
           {
             "type": "string",
             "format": "uuid",
-            "description": "A host in the specified cluster to return events for.",
+            "description": "A host in the specified cluster to return events for (DEPRECATED. Use ` + "`" + `host_ids` + "`" + ` instead).",
             "name": "host_id",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Hosts in the specified cluster to return events for.",
+            "name": "host_ids",
             "in": "query"
           },
           {
@@ -2800,6 +3091,62 @@ func init() {
             "format": "uuid",
             "description": "The infra-env to return events for.",
             "name": "infra_env_id",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "description": "The maximum number of records to retrieve.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "description": "Number of records to skip before starting to return the records.",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "enum": [
+              "ascending",
+              "descending"
+            ],
+            "type": "string",
+            "default": "ascending",
+            "description": "Order by event_time of events retrieved.",
+            "name": "order",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "enum": [
+                "info",
+                "warning",
+                "error",
+                "critical"
+              ],
+              "type": "string"
+            },
+            "description": "Retrieved events severities.",
+            "name": "severities",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Retrieved events message pattern.",
+            "name": "message",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "Deleted hosts flag.",
+            "name": "deleted_hosts",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "Cluster level events flag.",
+            "name": "cluster_level",
             "in": "query"
           },
           {
@@ -2817,6 +3164,28 @@ func init() {
             "description": "Success.",
             "schema": {
               "$ref": "#/definitions/event-list"
+            },
+            "headers": {
+              "Event-Count": {
+                "type": "integer",
+                "description": "Count of events retrieved."
+              },
+              "Severity-Count-Critical": {
+                "type": "integer",
+                "description": "Count of events with severity 'critical'."
+              },
+              "Severity-Count-Error": {
+                "type": "integer",
+                "description": "Count of events with severity 'error'."
+              },
+              "Severity-Count-Info": {
+                "type": "integer",
+                "description": "Count of events with severity 'info'."
+              },
+              "Severity-Count-Warning": {
+                "type": "integer",
+                "description": "Count of events with severity 'warning'."
+              }
             }
           },
           "401": {
@@ -2850,29 +3219,37 @@ func init() {
             }
           }
         }
-      }
-    },
-    "/v2/feature-support-levels": {
-      "get": {
+      },
+      "post": {
         "security": [
           {
-            "userAuth": [
-              "admin",
-              "read-only-admin",
-              "user"
-            ]
+            "agentAuth": []
           }
         ],
-        "description": "Retrieves the support levels for features for each OpenShift version.",
+        "description": "Add new assisted installer event.",
         "tags": [
-          "installer"
+          "events"
         ],
-        "operationId": "v2ListFeatureSupportLevels",
-        "responses": {
-          "200": {
-            "description": "Success.",
+        "operationId": "v2TriggerEvent",
+        "parameters": [
+          {
+            "description": "The event to be created.",
+            "name": "trigger-event-params",
+            "in": "body",
+            "required": true,
             "schema": {
-              "$ref": "#/definitions/feature-support-levels"
+              "$ref": "#/definitions/event"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success."
+          },
+          "400": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
             }
           },
           "401": {
@@ -2885,6 +3262,36 @@ func init() {
             "description": "Forbidden.",
             "schema": {
               "$ref": "#/definitions/infra_error"
+            }
+          },
+          "404": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "405": {
+            "description": "Method Not Allowed.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "409": {
+            "description": "Cluster cannot accept new agents due to its current state.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "500": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "501": {
+            "description": "Not implemented.",
+            "schema": {
+              "$ref": "#/definitions/error"
             }
           },
           "503": {
@@ -5256,6 +5663,20 @@ func init() {
           "versions"
         ],
         "operationId": "v2ListSupportedOpenshiftVersions",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Retrieves only the versions that contain the specified substring in their display name.",
+            "name": "version",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "If true, returns only the latest version for each minor.",
+            "name": "only_latest",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success.",
@@ -5270,6 +5691,208 @@ func init() {
             }
           },
           "500": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "503": {
+            "description": "Unavailable.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          }
+        }
+      }
+    },
+    "/v2/release-sources": {
+      "get": {
+        "security": [
+          {
+            "userAuth": [
+              "admin",
+              "read-only-admin",
+              "user"
+            ]
+          }
+        ],
+        "description": "Retrieves openshift release sources configuration.",
+        "tags": [
+          "versions"
+        ],
+        "operationId": "v2ListReleaseSources",
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "schema": {
+              "$ref": "#/definitions/release-sources"
+            }
+          }
+        }
+      }
+    },
+    "/v2/support-levels/architectures": {
+      "get": {
+        "security": [
+          {
+            "userAuth": [
+              "admin",
+              "read-only-admin",
+              "user"
+            ]
+          }
+        ],
+        "description": "Retrieves the architecture support-levels for each OpenShift version.",
+        "tags": [
+          "installer"
+        ],
+        "operationId": "GetSupportedArchitectures",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Version of the OpenShift cluster.",
+            "name": "openshift_version",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "architectures": {
+                  "description": "Keys will be one of architecture-support-level-id enum.",
+                  "$ref": "#/definitions/support-levels"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "403": {
+            "description": "Forbidden.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "404": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "503": {
+            "description": "Unavailable.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          }
+        }
+      }
+    },
+    "/v2/support-levels/features": {
+      "get": {
+        "security": [
+          {
+            "userAuth": [
+              "admin",
+              "read-only-admin",
+              "user"
+            ]
+          }
+        ],
+        "description": "Retrieves the features support levels for each OpenShift version.",
+        "tags": [
+          "installer"
+        ],
+        "operationId": "GetSupportedFeatures",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Version of the OpenShift cluster.",
+            "name": "openshift_version",
+            "in": "query",
+            "required": true
+          },
+          {
+            "enum": [
+              "x86_64",
+              "aarch64",
+              "arm64",
+              "ppc64le",
+              "s390x",
+              "multi"
+            ],
+            "type": "string",
+            "default": "x86_64",
+            "description": "The CPU architecture of the image (x86_64/arm64/etc).",
+            "name": "cpu_architecture",
+            "in": "query"
+          },
+          {
+            "enum": [
+              "baremetal",
+              "none",
+              "nutanix",
+              "vsphere",
+              "external"
+            ],
+            "type": "string",
+            "description": "The provider platform type.",
+            "name": "platform_type",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "External platform name when platform type is set to external. The value of this parameter will be ignored if platform_type is not external.",
+            "name": "external_platform_name",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "features": {
+                  "description": "Keys will be one of features-support-level-id enum.",
+                  "$ref": "#/definitions/support-levels"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "403": {
+            "description": "Forbidden.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "404": {
             "description": "Error.",
             "schema": {
               "$ref": "#/definitions/error"
@@ -5403,6 +6026,19 @@ func init() {
         }
       }
     },
+    "api_vip_connectivity_additional_request_header": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "description": "Value of the header's key when making a request",
+          "type": "string"
+        },
+        "value": {
+          "description": "The value corresponding to the header key",
+          "type": "string"
+        }
+      }
+    },
     "api_vip_connectivity_request": {
       "type": "object",
       "required": [
@@ -5415,9 +6051,18 @@ func init() {
           "x-nullable": true
         },
         "ignition_endpoint_token": {
-          "description": "A string which will be used as Authorization Bearer token to fetch the ignition from ignition_endpoint_url.",
+          "description": "A string which will be used as Authorization Bearer token to fetch the ignition from ignition_endpoint_url (DEPRECATED use request_headers to pass this token).",
           "type": "string",
           "x-nullable": true
+        },
+        "request_headers": {
+          "description": "Additional request headers to include when fetching the ignition from ignition_endpoint_url.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/api_vip_connectivity_additional_request_header"
+          },
+          "x-nullable": true,
+          "x-omitempty": true
         },
         "url": {
           "description": "URL address of the API.",
@@ -5451,6 +6096,16 @@ func init() {
         }
       }
     },
+    "architecture-support-level-id": {
+      "type": "string",
+      "enum": [
+        "X86_64_ARCHITECTURE",
+        "ARM64_ARCHITECTURE",
+        "PPC64LE_ARCHITECTURE",
+        "S390X_ARCHITECTURE",
+        "MULTIARCH_RELEASE_IMAGE"
+      ]
+    },
     "bind-host-params": {
       "required": [
         "cluster_id"
@@ -5465,6 +6120,9 @@ func init() {
     "boot": {
       "type": "object",
       "properties": {
+        "command_line": {
+          "type": "string"
+        },
         "current_boot_mode": {
           "type": "string"
         },
@@ -5492,11 +6150,6 @@ func init() {
           "description": "Unique identifier of the AMS subscription in OCM.",
           "type": "string",
           "format": "uuid"
-        },
-        "api_vip": {
-          "description": "(DEPRECATED) The virtual IP used to reach the OpenShift cluster's API.",
-          "type": "string",
-          "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))$"
         },
         "api_vip_dns_name": {
           "description": "The domain name used to reach the OpenShift cluster API.",
@@ -5671,6 +6324,16 @@ func init() {
           "description": "Explicit ignition endpoint overrides the default ignition endpoint.",
           "$ref": "#/definitions/ignition-endpoint"
         },
+        "ignored_cluster_validations": {
+          "description": "Json formatted string containing a list of cluster validations to be ignored. May also contain a list with a single string \"all\" to ignore all cluster validations. Some validations cannot be ignored.",
+          "type": "string",
+          "x-go-custom-tag": "gorm:\"type:text\""
+        },
+        "ignored_host_validations": {
+          "description": "Json formatted string containing a list of host validations to be ignored. May also contain a list with a single string \"all\" to ignore all host validations. Some validations cannot be ignored.",
+          "type": "string",
+          "x-go-custom-tag": "gorm:\"type:text\""
+        },
         "image_info": {
           "$ref": "#/definitions/image_info"
         },
@@ -5678,11 +6341,6 @@ func init() {
           "description": "Indicates whether this cluster is an imported day-2 cluster or a\nregular cluster. Clusters are considered imported when they are\ncreated via the ../clusters/import endpoint. Day-2 clusters converted\nfrom day-1 clusters by kube-api controllers or the\n../clusters/\u003ccluster_id\u003e/actions/allow-add-hosts endpoint are not\nconsidered imported. Imported clusters usually lack a lot of\ninformation and are filled with default values that don't necessarily\nreflect the actual cluster they represent",
           "type": "boolean",
           "default": false
-        },
-        "ingress_vip": {
-          "description": "(DEPRECATED) The virtual IP used for cluster ingress traffic.",
-          "type": "string",
-          "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))$"
         },
         "ingress_vips": {
           "description": "The virtual IPs used for cluster ingress traffic. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.",
@@ -5723,6 +6381,9 @@ func init() {
             "Cluster",
             "AddHostsCluster"
           ]
+        },
+        "last-installation-preparation": {
+          "$ref": "#/definitions/last-installation-preparation"
         },
         "logs_info": {
           "description": "The progress of log collection or empty if logs are not applicable",
@@ -5782,6 +6443,10 @@ func init() {
         },
         "org_id": {
           "type": "string"
+        },
+        "org_soft_timeouts_enabled": {
+          "description": "Indication if organization soft timeouts is enabled for the cluster.",
+          "type": "boolean"
         },
         "platform": {
           "$ref": "#/definitions/platform"
@@ -5882,7 +6547,7 @@ func init() {
           }
         },
         "user_managed_networking": {
-          "description": "Indicate if the networking is managed by the user.",
+          "description": "(DEPRECATED) Indicate if the networking is managed by the user.",
           "type": "boolean",
           "x-nullable": true
         },
@@ -5913,11 +6578,6 @@ func init() {
           "description": "A comma-separated list of NTP sources (name or IP) going to be added to all the hosts.",
           "type": "string",
           "x-nullable": true
-        },
-        "api_vip": {
-          "description": "(DEPRECATED) The virtual IP used to reach the OpenShift cluster's API.",
-          "type": "string",
-          "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))?$"
         },
         "api_vips": {
           "description": "The virtual IPs used to reach the OpenShift cluster's API. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.",
@@ -6002,11 +6662,6 @@ func init() {
         "ignition_endpoint": {
           "description": "Explicit ignition endpoint overrides the default ignition endpoint.",
           "$ref": "#/definitions/ignition-endpoint"
-        },
-        "ingress_vip": {
-          "description": "(DEPRECATED) The virtual IP used for cluster ingress traffic.",
-          "type": "string",
-          "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))$"
         },
         "ingress_vips": {
           "description": "The virtual IPs used for cluster ingress traffic. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.",
@@ -6095,7 +6750,7 @@ func init() {
           "x-nullable": true
         },
         "user_managed_networking": {
-          "description": "Indicate if the networking is managed by the user.",
+          "description": "(DEPRECATED) Indicate if the networking is managed by the user.",
           "type": "boolean",
           "default": false,
           "x-nullable": true
@@ -6105,6 +6760,14 @@ func init() {
           "type": "boolean",
           "default": false,
           "x-nullable": true
+        }
+      }
+    },
+    "cluster-finalizing-progress": {
+      "type": "object",
+      "properties": {
+        "finalizing_stage": {
+          "$ref": "#/definitions/finalizing-stage"
         }
       }
     },
@@ -6185,8 +6848,19 @@ func init() {
     "cluster-progress-info": {
       "type": "object",
       "properties": {
+        "finalizing_stage": {
+          "$ref": "#/definitions/finalizing-stage"
+        },
         "finalizing_stage_percentage": {
           "type": "integer"
+        },
+        "finalizing_stage_started_at": {
+          "type": "string",
+          "format": "date-time",
+          "x-go-custom-tag": "gorm:\"type:timestamp with time zone\""
+        },
+        "finalizing_stage_timed_out": {
+          "type": "boolean"
         },
         "installing_stage_percentage": {
           "type": "integer"
@@ -6224,7 +6898,9 @@ func init() {
         "odf-requirements-satisfied",
         "cnv-requirements-satisfied",
         "lvm-requirements-satisfied",
-        "network-type-valid"
+        "mce-requirements-satisfied",
+        "network-type-valid",
+        "platform-requirements-satisfied"
       ]
     },
     "cluster_default_config": {
@@ -6503,7 +7179,7 @@ func init() {
         "file_name": {
           "description": "The name of the manifest to customize the installed OCP cluster.",
           "type": "string",
-          "pattern": "^[^/]*\\.(yaml|yml|json)$"
+          "pattern": "^[^\\/]*\\.(json|ya?ml(\\.patch_?[a-zA-Z0-9_]*)?)$"
         },
         "folder": {
           "description": "The folder that contains the files. Manifests can be placed in 'manifests' or 'openshift' directories.",
@@ -6644,10 +7320,16 @@ func init() {
           "description": "Whether the disk appears to be an installation media or not",
           "type": "boolean"
         },
+        "iscsi": {
+          "$ref": "#/definitions/iscsi"
+        },
         "model": {
           "type": "string"
         },
         "name": {
+          "type": "string"
+        },
+        "partitionTypes": {
           "type": "string"
         },
         "path": {
@@ -6808,17 +7490,12 @@ func init() {
           "type": "array",
           "items": {
             "type": "object",
-            "required": [
-              "domain_name"
-            ],
-            "properties": {
-              "domain_name": {
-                "description": "The domain name that should be resolved",
-                "type": "string",
-                "pattern": "^([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*[.])+[a-zA-Z]{2,}$"
-              }
-            },
-            "x-go-name": "DomainResolutionRequestDomain"
+            "x-go-type": {
+              "import": {
+                "path": "github.com/openshift/assisted-service/models"
+              },
+              "type": "DomainResolutionRequestDomain"
+            }
           }
         }
       }
@@ -6837,6 +7514,13 @@ func init() {
               "domain_name"
             ],
             "properties": {
+              "cnames": {
+                "description": "The cnames that were resolved for the domain, empty if none",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "domain_name": {
                 "description": "The domain that was resolved",
                 "type": "string"
@@ -6904,7 +7588,10 @@ func init() {
         "iSCSI",
         "FC",
         "LVM",
-        "RAID"
+        "RAID",
+        "ECKD",
+        "ECKD (ESE)",
+        "FBA"
       ]
     },
     "error": {
@@ -7022,71 +7709,47 @@ func init() {
         "$ref": "#/definitions/event"
       }
     },
-    "feature-support-level": {
-      "type": "object",
-      "properties": {
-        "features": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": [
-              "feature_id",
-              "support_level"
-            ],
-            "properties": {
-              "feature_id": {
-                "description": "The ID of the feature",
-                "type": "string",
-                "enum": [
-                  "ADDITIONAL_NTP_SOURCE",
-                  "REQUESTED_HOSTNAME",
-                  "PROXY",
-                  "SNO",
-                  "DAY2_HOSTS",
-                  "VIP_AUTO_ALLOC",
-                  "DISK_SELECTION",
-                  "OVN_NETWORK_TYPE",
-                  "SDN_NETWORK_TYPE",
-                  "PLATFORM_SELECTION",
-                  "SCHEDULABLE_MASTERS",
-                  "AUTO_ASSIGN_ROLE",
-                  "CUSTOM_MANIFEST",
-                  "DISK_ENCRYPTION",
-                  "CLUSTER_MANAGED_NETWORKING_WITH_VMS",
-                  "ARM64_ARCHITECTURE",
-                  "ARM64_ARCHITECTURE_WITH_CLUSTER_MANAGED_NETWORKING",
-                  "SINGLE_NODE_EXPANSION",
-                  "LVM",
-                  "DUAL_STACK_NETWORKING",
-                  "MULTIARCH_RELEASE_IMAGE",
-                  "NUTANIX_INTEGRATION",
-                  "DUAL_STACK_VIPS",
-                  "USER_MANAGED_NETWORKING_WITH_MULTI_NODE"
-                ]
-              },
-              "support_level": {
-                "type": "string",
-                "enum": [
-                  "supported",
-                  "unsupported",
-                  "tech-preview",
-                  "dev-preview"
-                ]
-              }
-            }
-          }
-        },
-        "openshift_version": {
-          "description": "Version of the OpenShift cluster.",
-          "type": "string"
-        }
-      }
+    "feature-support-level-id": {
+      "type": "string",
+      "enum": [
+        "SNO",
+        "VIP_AUTO_ALLOC",
+        "CUSTOM_MANIFEST",
+        "SINGLE_NODE_EXPANSION",
+        "LVM",
+        "ODF",
+        "LSO",
+        "CNV",
+        "MCE",
+        "NUTANIX_INTEGRATION",
+        "BAREMETAL_PLATFORM",
+        "NONE_PLATFORM",
+        "VSPHERE_INTEGRATION",
+        "DUAL_STACK_VIPS",
+        "CLUSTER_MANAGED_NETWORKING",
+        "USER_MANAGED_NETWORKING",
+        "MINIMAL_ISO",
+        "FULL_ISO",
+        "EXTERNAL_PLATFORM_OCI",
+        "DUAL_STACK",
+        "PLATFORM_MANAGED_NETWORKING",
+        "SKIP_MCO_REBOOT",
+        "EXTERNAL_PLATFORM",
+        "OVN_NETWORK_TYPE",
+        "SDN_NETWORK_TYPE"
+      ]
     },
-    "feature-support-levels": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/feature-support-level"
-      }
+    "finalizing-stage": {
+      "description": "Cluster finalizing stage managed by controller",
+      "type": "string",
+      "enum": [
+        "Waiting for cluster operators",
+        "Adding router ca",
+        "Applying olm manifests",
+        "Waiting for olm operators csv initialization",
+        "Waiting for olm operators csv",
+        "Done"
+      ]
     },
     "free-addresses-list": {
       "type": "array",
@@ -7179,6 +7842,10 @@ func init() {
           "format": "uuid",
           "x-go-custom-tag": "gorm:\"foreignkey:Cluster\"",
           "x-nullable": true
+        },
+        "connection_timed_out": {
+          "description": "Indicate that connection to assisted service was timed out when soft timeout is enabled.",
+          "type": "boolean"
         },
         "connectivity": {
           "type": "string",
@@ -7506,6 +8173,10 @@ func init() {
           "format": "date-time",
           "x-go-custom-tag": "gorm:\"type:timestamp with time zone\""
         },
+        "stage_timed_out": {
+          "description": "Indicate of the current stage has been timed out.",
+          "type": "boolean"
+        },
         "stage_updated_at": {
           "description": "Time at which the current progress stage was last updated.",
           "type": "string",
@@ -7609,6 +8280,14 @@ func init() {
           ],
           "x-nullable": true
         },
+        "ignition_endpoint_http_headers": {
+          "description": "JSON-formatted string of additional HTTP headers when fetching the ignition.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ignition-endpoint-http-headers-params"
+          },
+          "x-nullable": true
+        },
         "ignition_endpoint_token": {
           "description": "A string which will be used as Authorization Bearer token to fetch the ignition from ignition_endpoint_url.",
           "type": "string",
@@ -7653,6 +8332,7 @@ func init() {
         "ocs-requirements-satisfied",
         "odf-requirements-satisfied",
         "lvm-requirements-satisfied",
+        "mce-requirements-satisfied",
         "sufficient-installation-disk-speed",
         "cnv-requirements-satisfied",
         "sufficient-network-latency-requirement-for-role",
@@ -7661,6 +8341,7 @@ func init() {
         "api-domain-name-resolved-correctly",
         "api-int-domain-name-resolved-correctly",
         "apps-domain-name-resolved-correctly",
+        "release-domain-name-resolved-correctly",
         "compatible-with-cluster-platform",
         "dns-wildcard-not-configured",
         "disk-encryption-requirements-satisfied",
@@ -7746,6 +8427,23 @@ func init() {
         }
       },
       "x-go-custom-tag": "gorm:\"embedded;embeddedPrefix:ignition_endpoint_\""
+    },
+    "ignition-endpoint-http-headers-params": {
+      "type": "object",
+      "required": [
+        "key",
+        "value"
+      ],
+      "properties": {
+        "key": {
+          "description": "The key for the http header's key-value pair.",
+          "type": "string"
+        },
+        "value": {
+          "description": "The value for the http header's key-value pair.",
+          "type": "string"
+        }
+      }
     },
     "ignored-validations": {
       "type": "object",
@@ -7897,8 +8595,7 @@ func init() {
             "aarch64",
             "arm64",
             "ppc64le",
-            "s390x",
-            "multi"
+            "s390x"
           ],
           "x-nullable": false
         },
@@ -8025,6 +8722,7 @@ func init() {
         "additional_trust_bundle": {
           "description": "PEM-encoded X.509 certificate bundle. Hosts discovered by this\ninfra-env will trust the certificates in this bundle. Clusters formed\nfrom the hosts discovered by this infra-env will also trust the\ncertificates in this bundle.",
           "type": "string",
+          "maxLength": 65535,
           "x-nullable": false
         },
         "cluster_id": {
@@ -8042,8 +8740,7 @@ func init() {
             "aarch64",
             "arm64",
             "ppc64le",
-            "s390x",
-            "multi"
+            "s390x"
           ],
           "x-nullable": false
         },
@@ -8102,6 +8799,7 @@ func init() {
         "additional_trust_bundle": {
           "description": "Allows users to change the additional_trust_bundle infra-env field",
           "type": "string",
+          "maxLength": 65535,
           "x-nullable": true
         },
         "ignition_config_override": {
@@ -8113,6 +8811,11 @@ func init() {
         },
         "kernel_arguments": {
           "$ref": "#/definitions/kernel_arguments"
+        },
+        "openshift_version": {
+          "description": "Version of the OS image",
+          "type": "string",
+          "x-nullable": true
         },
         "proxy": {
           "$ref": "#/definitions/proxy"
@@ -8216,6 +8919,10 @@ func init() {
             "type": "string"
           }
         },
+        "enable_skip_mco_reboot": {
+          "description": "If true, assisted service will attempt to skip MCO reboot",
+          "type": "boolean"
+        },
         "high_availability_mode": {
           "description": "Guaranteed availability of the installed cluster. 'Full' installs a Highly-Available cluster\nover multiple master nodes whereas 'None' installs a full cluster over one node.\n",
           "type": "string",
@@ -8252,6 +8959,10 @@ func init() {
         "must_gather_image": {
           "description": "Must-gather images to use",
           "type": "string"
+        },
+        "notify_num_reboots": {
+          "description": "If true, notify number of reboots by assisted controller",
+          "type": "boolean"
         },
         "openshift_version": {
           "description": "Version of the OpenShift cluster.",
@@ -8422,6 +9133,15 @@ func init() {
       "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))?$",
       "x-go-custom-tag": "gorm:\"primaryKey\""
     },
+    "iscsi": {
+      "type": "object",
+      "properties": {
+        "host_ip_address": {
+          "description": "Host IP address used to reach iSCSI target",
+          "type": "string"
+        }
+      }
+    },
     "kernel_argument": {
       "description": "pair of [operation, argument] specifying the argument and what operation should be applied on it.",
       "type": "object",
@@ -8494,6 +9214,29 @@ func init() {
           "type": "boolean"
         }
       }
+    },
+    "last-installation-preparation": {
+      "description": "Gives the status of the last installation preparation (if any)",
+      "type": "object",
+      "properties": {
+        "reason": {
+          "description": "The reason for the preparation status if applicable",
+          "type": "string"
+        },
+        "status": {
+          "description": "The last installation preparation status",
+          "type": "string",
+          "default": "not_started",
+          "enum": [
+            "not_started",
+            "failed",
+            "success"
+          ],
+          "x-nullable": false
+        }
+      },
+      "x-go-custom-tag": "gorm:\"embedded;embeddedPrefix:last_installation_preparation_\"",
+      "x-nullable": false
     },
     "list-managed-domains": {
       "type": "array",
@@ -8590,7 +9333,6 @@ func init() {
       "type": "string",
       "enum": [
         "host",
-        "node-boot",
         "controller",
         "all",
         ""
@@ -8656,6 +9398,14 @@ func init() {
           "enum": [
             "manifests",
             "openshift"
+          ]
+        },
+        "manifest_source": {
+          "description": "Describes whether manifest is sourced from a user or created by the system.",
+          "type": "string",
+          "enum": [
+            "user",
+            "system"
           ]
         }
       }
@@ -8848,7 +9598,8 @@ func init() {
           "enum": [
             "beta",
             "production",
-            "maintenance"
+            "maintenance",
+            "end-of-life"
           ]
         }
       }
@@ -9035,11 +9786,38 @@ func init() {
         "type"
       ],
       "properties": {
+        "external": {
+          "x-nullable": true,
+          "$ref": "#/definitions/platform_external"
+        },
         "type": {
           "$ref": "#/definitions/platform_type"
         }
       },
       "x-go-custom-tag": "gorm:\"embedded;embeddedPrefix:platform_\""
+    },
+    "platform_external": {
+      "description": "Configuration used when installing with an external platform type.",
+      "type": "object",
+      "properties": {
+        "cloud_controller_manager": {
+          "description": "When set to external, this property will enable an external cloud provider.",
+          "type": "string",
+          "default": "",
+          "enum": [
+            "",
+            "External"
+          ],
+          "x-nullable": true
+        },
+        "platform_name": {
+          "description": "Holds the arbitrary string representing the infrastructure provider name.",
+          "type": "string",
+          "minLength": 1,
+          "x-nullable": true
+        }
+      },
+      "x-go-custom-tag": "gorm:\"embedded;embeddedPrefix:external_\""
     },
     "platform_type": {
       "type": "string",
@@ -9047,7 +9825,8 @@ func init() {
         "baremetal",
         "nutanix",
         "vsphere",
-        "none"
+        "none",
+        "external"
       ]
     },
     "preflight-hardware-requirements": {
@@ -9118,6 +9897,16 @@ func init() {
         }
       }
     },
+    "release-channel": {
+      "description": "Release channel.",
+      "type": "string",
+      "enum": [
+        "candidate",
+        "fast",
+        "stable",
+        "eus"
+      ]
+    },
     "release-image": {
       "type": "object",
       "required": [
@@ -9146,6 +9935,16 @@ func init() {
           "type": "array",
           "items": {
             "type": "string"
+          },
+          "x-go-custom-tag": "gorm:\"type:text[]\"",
+          "x-go-type": {
+            "hints": {
+              "noValidation": true
+            },
+            "import": {
+              "package": "github.com/lib/pq"
+            },
+            "type": "StringArray"
           }
         },
         "default": {
@@ -9162,12 +9961,14 @@ func init() {
           "enum": [
             "beta",
             "production",
-            "maintenance"
+            "maintenance",
+            "end-of-life"
           ]
         },
         "url": {
           "description": "The installation image of the OpenShift cluster.",
-          "type": "string"
+          "type": "string",
+          "x-go-custom-tag": "gorm:\"primarykey\""
         },
         "version": {
           "description": "OCP version from the release metadata.",
@@ -9179,6 +9980,47 @@ func init() {
       "type": "array",
       "items": {
         "$ref": "#/definitions/release-image"
+      }
+    },
+    "release-source": {
+      "type": "object",
+      "required": [
+        "openshift_version",
+        "multi_cpu_architectures",
+        "upgrade_channels"
+      ],
+      "properties": {
+        "multi_cpu_architectures": {
+          "type": "array",
+          "items": {
+            "description": "Supported CPU architecture for multi-architecture releases in this OpenShift version..",
+            "type": "string",
+            "enum": [
+              "x86_64",
+              "aarch64",
+              "arm64",
+              "ppc64le",
+              "s390x"
+            ]
+          }
+        },
+        "openshift_version": {
+          "description": "Version of the OpenShift cluster.",
+          "type": "string",
+          "example": "4.14"
+        },
+        "upgrade_channels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/upgrade-channel"
+          }
+        }
+      }
+    },
+    "release-sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/release-source"
       }
     },
     "route": {
@@ -9330,6 +10172,23 @@ func init() {
       "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\/(?:(?:[0-9])|(?:[1-2][0-9])|(?:3[0-2])))|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,})/(?:(?:[0-9])|(?:[1-9][0-9])|(?:1[0-1][0-9])|(?:12[0-8])))$",
       "x-go-custom-tag": "gorm:\"primaryKey\""
     },
+    "support-level": {
+      "type": "string",
+      "enum": [
+        "supported",
+        "unsupported",
+        "tech-preview",
+        "dev-preview",
+        "unavailable"
+      ]
+    },
+    "support-levels": {
+      "description": "Map of feature ID or CPU architecture alongside their support level",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/support-level"
+      }
+    },
     "system_vendor": {
       "type": "object",
       "properties": {
@@ -9401,6 +10260,79 @@ func init() {
         }
       }
     },
+    "update-manifest-params": {
+      "type": "object",
+      "required": [
+        "folder",
+        "file_name"
+      ],
+      "properties": {
+        "file_name": {
+          "description": "The file name for the manifest to modify.",
+          "type": "string",
+          "pattern": "^[^\\/]*\\.(json|ya?ml(\\.patch_?[a-zA-Z0-9_]*)?)$",
+          "x-nullable": false
+        },
+        "folder": {
+          "description": "The folder for the manifest to modify.",
+          "type": "string",
+          "default": "manifests",
+          "enum": [
+            "manifests",
+            "openshift"
+          ],
+          "x-nullable": false
+        },
+        "updated_content": {
+          "description": "The new base64 encoded manifest content.",
+          "type": "string",
+          "x-nullable": true
+        },
+        "updated_file_name": {
+          "description": "The new file name for the manifest.",
+          "type": "string",
+          "pattern": "^[^\\/]*\\.(json|ya?ml(\\.patch_?[a-zA-Z0-9_]*)?)$",
+          "x-nullable": true
+        },
+        "updated_folder": {
+          "description": "The new folder for the manifest. Manifests can be placed in 'manifests' or 'openshift' directories.",
+          "type": "string",
+          "default": "manifests",
+          "enum": [
+            "manifests",
+            "openshift"
+          ],
+          "x-nullable": true
+        }
+      }
+    },
+    "upgrade-channel": {
+      "type": "object",
+      "required": [
+        "cpu_architecture",
+        "channels"
+      ],
+      "properties": {
+        "channels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/release-channel"
+          }
+        },
+        "cpu_architecture": {
+          "description": "The CPU architecture of the image.",
+          "type": "string",
+          "enum": [
+            "x86_64",
+            "aarch64",
+            "arm64",
+            "ppc64le",
+            "s390x",
+            "multi"
+          ]
+        }
+      }
+    },
     "upgrade_agent_request": {
       "type": "object",
       "properties": {
@@ -9456,12 +10388,6 @@ func init() {
         "additional_ntp_source": {
           "description": "A comma-separated list of NTP sources (name or IP) going to be added to all the hosts.",
           "type": "string",
-          "x-nullable": true
-        },
-        "api_vip": {
-          "description": "(DEPRECATED) The virtual IP used to reach the OpenShift cluster's API.",
-          "type": "string",
-          "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))?$",
           "x-nullable": true
         },
         "api_vip_dns_name": {
@@ -9531,12 +10457,6 @@ func init() {
         "ignition_endpoint": {
           "description": "Explicit ignition endpoint overrides the default ignition endpoint.",
           "$ref": "#/definitions/ignition-endpoint"
-        },
-        "ingress_vip": {
-          "description": "(DEPRECATED) The virtual IP used for cluster ingress traffic.",
-          "type": "string",
-          "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))?$",
-          "x-nullable": true
         },
         "ingress_vips": {
           "description": "The virtual IPs used for cluster ingress traffic. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.",
@@ -9626,7 +10546,7 @@ func init() {
           "x-nullable": true
         },
         "user_managed_networking": {
-          "description": "Indicate if the networking is managed by the user.",
+          "description": "(DEPRECATED) Indicate if the networking is managed by the user.",
           "type": "boolean",
           "x-nullable": true
         },
@@ -10019,7 +10939,7 @@ func init() {
     },
     "/v2/clusters/import": {
       "post": {
-        "description": "Import an AI cluster using minimal data assosiated with existing OCP cluster, in order to allow adding day2 hosts to that cluster",
+        "description": "Import an AI cluster using minimal data associated with existing OCP cluster, in order to allow adding day2 hosts to that cluster",
         "tags": [
           "installer"
         ],
@@ -11553,7 +12473,6 @@ func init() {
             "enum": [
               "host",
               "controller",
-              "node-boot",
               "all"
             ],
             "type": "string",
@@ -11648,8 +12567,7 @@ func init() {
           {
             "enum": [
               "host",
-              "controller",
-              "node-boot"
+              "controller"
             ],
             "type": "string",
             "description": "The type of log file to be uploaded.",
@@ -11821,6 +12739,13 @@ func init() {
             "name": "cluster_id",
             "in": "path",
             "required": true
+          },
+          {
+            "type": "boolean",
+            "default": false,
+            "description": "Include system generated manifests in results? Default is false.",
+            "name": "include_system_generated",
+            "in": "query"
           }
         ],
         "responses": {
@@ -11986,6 +12911,87 @@ func init() {
         "responses": {
           "200": {
             "description": "Success."
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "403": {
+            "description": "Forbidden.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "404": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "405": {
+            "description": "Method Not Allowed.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "409": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "500": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          }
+        }
+      },
+      "patch": {
+        "security": [
+          {
+            "userAuth": []
+          }
+        ],
+        "description": "Updates a manifest for customizing cluster installation.",
+        "tags": [
+          "manifests"
+        ],
+        "operationId": "V2UpdateClusterManifest",
+        "parameters": [
+          {
+            "type": "string",
+            "format": "uuid",
+            "description": "The cluster for which a new manifest should be updated.",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "description": "The manifest to be updated.",
+            "name": "UpdateManifestParams",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/update-manifest-params"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "schema": {
+              "$ref": "#/definitions/manifest"
+            }
+          },
+          "400": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
           },
           "401": {
             "description": "Unauthorized.",
@@ -12335,6 +13341,80 @@ func init() {
         }
       }
     },
+    "/v2/clusters/{cluster_id}/progress": {
+      "put": {
+        "security": [
+          {
+            "agentAuth": []
+          }
+        ],
+        "description": "Update installation finalizing progress.",
+        "tags": [
+          "installer"
+        ],
+        "operationId": "v2UpdateClusterFinalizingProgress",
+        "parameters": [
+          {
+            "type": "string",
+            "format": "uuid",
+            "description": "The cluster being updated.",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "description": "New progress value.",
+            "name": "finalizing-progress",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/cluster-finalizing-progress"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Update install progress."
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "403": {
+            "description": "Forbidden.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "404": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "405": {
+            "description": "Method Not Allowed.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "500": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "503": {
+            "description": "Unavailable.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          }
+        }
+      }
+    },
     "/v2/clusters/{cluster_id}/supported-platforms": {
       "get": {
         "security": [
@@ -12369,6 +13449,127 @@ func init() {
               "items": {
                 "$ref": "#/definitions/platform_type"
               }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "403": {
+            "description": "Forbidden.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "404": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "500": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          }
+        }
+      }
+    },
+    "/v2/clusters/{cluster_id}/ui-settings": {
+      "get": {
+        "description": "Fetch cluster specific UI settings.",
+        "tags": [
+          "installer"
+        ],
+        "operationId": "V2GetClusterUISettings",
+        "parameters": [
+          {
+            "type": "string",
+            "format": "uuid",
+            "description": "The cluster for which UI settings should be retrieved.",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "400": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "403": {
+            "description": "Forbidden.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "404": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "500": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          }
+        }
+      },
+      "put": {
+        "description": "Update cluster specific UI settings.",
+        "tags": [
+          "installer"
+        ],
+        "operationId": "V2UpdateClusterUISettings",
+        "parameters": [
+          {
+            "type": "string",
+            "format": "uuid",
+            "description": "The cluster for which UI settings should be updated.",
+            "name": "cluster_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "description": "Settings for the installer UI.",
+            "name": "ui-settings",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          "400": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
             }
           },
           "401": {
@@ -12572,8 +13773,18 @@ func init() {
           {
             "type": "string",
             "format": "uuid",
-            "description": "A host in the specified cluster to return events for.",
+            "description": "A host in the specified cluster to return events for (DEPRECATED. Use ` + "`" + `host_ids` + "`" + ` instead).",
             "name": "host_id",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Hosts in the specified cluster to return events for.",
+            "name": "host_ids",
             "in": "query"
           },
           {
@@ -12581,6 +13792,62 @@ func init() {
             "format": "uuid",
             "description": "The infra-env to return events for.",
             "name": "infra_env_id",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "description": "The maximum number of records to retrieve.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "description": "Number of records to skip before starting to return the records.",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "enum": [
+              "ascending",
+              "descending"
+            ],
+            "type": "string",
+            "default": "ascending",
+            "description": "Order by event_time of events retrieved.",
+            "name": "order",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "enum": [
+                "info",
+                "warning",
+                "error",
+                "critical"
+              ],
+              "type": "string"
+            },
+            "description": "Retrieved events severities.",
+            "name": "severities",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Retrieved events message pattern.",
+            "name": "message",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "Deleted hosts flag.",
+            "name": "deleted_hosts",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "Cluster level events flag.",
+            "name": "cluster_level",
             "in": "query"
           },
           {
@@ -12598,6 +13865,33 @@ func init() {
             "description": "Success.",
             "schema": {
               "$ref": "#/definitions/event-list"
+            },
+            "headers": {
+              "Event-Count": {
+                "minimum": 0,
+                "type": "integer",
+                "description": "Count of events retrieved."
+              },
+              "Severity-Count-Critical": {
+                "minimum": 0,
+                "type": "integer",
+                "description": "Count of events with severity 'critical'."
+              },
+              "Severity-Count-Error": {
+                "minimum": 0,
+                "type": "integer",
+                "description": "Count of events with severity 'error'."
+              },
+              "Severity-Count-Info": {
+                "minimum": 0,
+                "type": "integer",
+                "description": "Count of events with severity 'info'."
+              },
+              "Severity-Count-Warning": {
+                "minimum": 0,
+                "type": "integer",
+                "description": "Count of events with severity 'warning'."
+              }
             }
           },
           "401": {
@@ -12631,29 +13925,37 @@ func init() {
             }
           }
         }
-      }
-    },
-    "/v2/feature-support-levels": {
-      "get": {
+      },
+      "post": {
         "security": [
           {
-            "userAuth": [
-              "admin",
-              "read-only-admin",
-              "user"
-            ]
+            "agentAuth": []
           }
         ],
-        "description": "Retrieves the support levels for features for each OpenShift version.",
+        "description": "Add new assisted installer event.",
         "tags": [
-          "installer"
+          "events"
         ],
-        "operationId": "v2ListFeatureSupportLevels",
-        "responses": {
-          "200": {
-            "description": "Success.",
+        "operationId": "v2TriggerEvent",
+        "parameters": [
+          {
+            "description": "The event to be created.",
+            "name": "trigger-event-params",
+            "in": "body",
+            "required": true,
             "schema": {
-              "$ref": "#/definitions/feature-support-levels"
+              "$ref": "#/definitions/event"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success."
+          },
+          "400": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
             }
           },
           "401": {
@@ -12666,6 +13968,36 @@ func init() {
             "description": "Forbidden.",
             "schema": {
               "$ref": "#/definitions/infra_error"
+            }
+          },
+          "404": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "405": {
+            "description": "Method Not Allowed.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "409": {
+            "description": "Cluster cannot accept new agents due to its current state.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "500": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "501": {
+            "description": "Not implemented.",
+            "schema": {
+              "$ref": "#/definitions/error"
             }
           },
           "503": {
@@ -15037,6 +16369,20 @@ func init() {
           "versions"
         ],
         "operationId": "v2ListSupportedOpenshiftVersions",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Retrieves only the versions that contain the specified substring in their display name.",
+            "name": "version",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "If true, returns only the latest version for each minor.",
+            "name": "only_latest",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success.",
@@ -15051,6 +16397,208 @@ func init() {
             }
           },
           "500": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "503": {
+            "description": "Unavailable.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          }
+        }
+      }
+    },
+    "/v2/release-sources": {
+      "get": {
+        "security": [
+          {
+            "userAuth": [
+              "admin",
+              "read-only-admin",
+              "user"
+            ]
+          }
+        ],
+        "description": "Retrieves openshift release sources configuration.",
+        "tags": [
+          "versions"
+        ],
+        "operationId": "v2ListReleaseSources",
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "schema": {
+              "$ref": "#/definitions/release-sources"
+            }
+          }
+        }
+      }
+    },
+    "/v2/support-levels/architectures": {
+      "get": {
+        "security": [
+          {
+            "userAuth": [
+              "admin",
+              "read-only-admin",
+              "user"
+            ]
+          }
+        ],
+        "description": "Retrieves the architecture support-levels for each OpenShift version.",
+        "tags": [
+          "installer"
+        ],
+        "operationId": "GetSupportedArchitectures",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Version of the OpenShift cluster.",
+            "name": "openshift_version",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "architectures": {
+                  "description": "Keys will be one of architecture-support-level-id enum.",
+                  "$ref": "#/definitions/support-levels"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "403": {
+            "description": "Forbidden.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "404": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "503": {
+            "description": "Unavailable.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          }
+        }
+      }
+    },
+    "/v2/support-levels/features": {
+      "get": {
+        "security": [
+          {
+            "userAuth": [
+              "admin",
+              "read-only-admin",
+              "user"
+            ]
+          }
+        ],
+        "description": "Retrieves the features support levels for each OpenShift version.",
+        "tags": [
+          "installer"
+        ],
+        "operationId": "GetSupportedFeatures",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Version of the OpenShift cluster.",
+            "name": "openshift_version",
+            "in": "query",
+            "required": true
+          },
+          {
+            "enum": [
+              "x86_64",
+              "aarch64",
+              "arm64",
+              "ppc64le",
+              "s390x",
+              "multi"
+            ],
+            "type": "string",
+            "default": "x86_64",
+            "description": "The CPU architecture of the image (x86_64/arm64/etc).",
+            "name": "cpu_architecture",
+            "in": "query"
+          },
+          {
+            "enum": [
+              "baremetal",
+              "none",
+              "nutanix",
+              "vsphere",
+              "external"
+            ],
+            "type": "string",
+            "description": "The provider platform type.",
+            "name": "platform_type",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "External platform name when platform type is set to external. The value of this parameter will be ignored if platform_type is not external.",
+            "name": "external_platform_name",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "features": {
+                  "description": "Keys will be one of features-support-level-id enum.",
+                  "$ref": "#/definitions/support-levels"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "403": {
+            "description": "Forbidden.",
+            "schema": {
+              "$ref": "#/definitions/infra_error"
+            }
+          },
+          "404": {
             "description": "Error.",
             "schema": {
               "$ref": "#/definitions/error"
@@ -15181,26 +16729,19 @@ func init() {
       },
       "x-nullable": false
     },
-    "DomainResolutionRequestDomainsItems0": {
-      "type": "object",
-      "required": [
-        "domain_name"
-      ],
-      "properties": {
-        "domain_name": {
-          "description": "The domain name that should be resolved",
-          "type": "string",
-          "pattern": "^([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*[.])+[a-zA-Z]{2,}$"
-        }
-      },
-      "x-go-name": "DomainResolutionRequestDomain"
-    },
     "DomainResolutionResponseResolutionsItems0": {
       "type": "object",
       "required": [
         "domain_name"
       ],
       "properties": {
+        "cnames": {
+          "description": "The cnames that were resolved for the domain, empty if none",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "domain_name": {
           "description": "The domain that was resolved",
           "type": "string"
@@ -15223,54 +16764,6 @@ func init() {
         }
       },
       "x-go-name": "DomainResolutionResponseDomain"
-    },
-    "FeatureSupportLevelFeaturesItems0": {
-      "type": "object",
-      "required": [
-        "feature_id",
-        "support_level"
-      ],
-      "properties": {
-        "feature_id": {
-          "description": "The ID of the feature",
-          "type": "string",
-          "enum": [
-            "ADDITIONAL_NTP_SOURCE",
-            "REQUESTED_HOSTNAME",
-            "PROXY",
-            "SNO",
-            "DAY2_HOSTS",
-            "VIP_AUTO_ALLOC",
-            "DISK_SELECTION",
-            "OVN_NETWORK_TYPE",
-            "SDN_NETWORK_TYPE",
-            "PLATFORM_SELECTION",
-            "SCHEDULABLE_MASTERS",
-            "AUTO_ASSIGN_ROLE",
-            "CUSTOM_MANIFEST",
-            "DISK_ENCRYPTION",
-            "CLUSTER_MANAGED_NETWORKING_WITH_VMS",
-            "ARM64_ARCHITECTURE",
-            "ARM64_ARCHITECTURE_WITH_CLUSTER_MANAGED_NETWORKING",
-            "SINGLE_NODE_EXPANSION",
-            "LVM",
-            "DUAL_STACK_NETWORKING",
-            "MULTIARCH_RELEASE_IMAGE",
-            "NUTANIX_INTEGRATION",
-            "DUAL_STACK_VIPS",
-            "USER_MANAGED_NETWORKING_WITH_MULTI_NODE"
-          ]
-        },
-        "support_level": {
-          "type": "string",
-          "enum": [
-            "supported",
-            "unsupported",
-            "tech-preview",
-            "dev-preview"
-          ]
-        }
-      }
     },
     "HostRegistrationResponseAO1NextStepRunnerCommand": {
       "description": "Command for starting the next step runner",
@@ -15357,6 +16850,19 @@ func init() {
         }
       }
     },
+    "api_vip_connectivity_additional_request_header": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "description": "Value of the header's key when making a request",
+          "type": "string"
+        },
+        "value": {
+          "description": "The value corresponding to the header key",
+          "type": "string"
+        }
+      }
+    },
     "api_vip_connectivity_request": {
       "type": "object",
       "required": [
@@ -15369,9 +16875,18 @@ func init() {
           "x-nullable": true
         },
         "ignition_endpoint_token": {
-          "description": "A string which will be used as Authorization Bearer token to fetch the ignition from ignition_endpoint_url.",
+          "description": "A string which will be used as Authorization Bearer token to fetch the ignition from ignition_endpoint_url (DEPRECATED use request_headers to pass this token).",
           "type": "string",
           "x-nullable": true
+        },
+        "request_headers": {
+          "description": "Additional request headers to include when fetching the ignition from ignition_endpoint_url.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/api_vip_connectivity_additional_request_header"
+          },
+          "x-nullable": true,
+          "x-omitempty": true
         },
         "url": {
           "description": "URL address of the API.",
@@ -15405,6 +16920,16 @@ func init() {
         }
       }
     },
+    "architecture-support-level-id": {
+      "type": "string",
+      "enum": [
+        "X86_64_ARCHITECTURE",
+        "ARM64_ARCHITECTURE",
+        "PPC64LE_ARCHITECTURE",
+        "S390X_ARCHITECTURE",
+        "MULTIARCH_RELEASE_IMAGE"
+      ]
+    },
     "bind-host-params": {
       "required": [
         "cluster_id"
@@ -15419,6 +16944,9 @@ func init() {
     "boot": {
       "type": "object",
       "properties": {
+        "command_line": {
+          "type": "string"
+        },
         "current_boot_mode": {
           "type": "string"
         },
@@ -15446,11 +16974,6 @@ func init() {
           "description": "Unique identifier of the AMS subscription in OCM.",
           "type": "string",
           "format": "uuid"
-        },
-        "api_vip": {
-          "description": "(DEPRECATED) The virtual IP used to reach the OpenShift cluster's API.",
-          "type": "string",
-          "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))$"
         },
         "api_vip_dns_name": {
           "description": "The domain name used to reach the OpenShift cluster API.",
@@ -15625,6 +17148,16 @@ func init() {
           "description": "Explicit ignition endpoint overrides the default ignition endpoint.",
           "$ref": "#/definitions/ignition-endpoint"
         },
+        "ignored_cluster_validations": {
+          "description": "Json formatted string containing a list of cluster validations to be ignored. May also contain a list with a single string \"all\" to ignore all cluster validations. Some validations cannot be ignored.",
+          "type": "string",
+          "x-go-custom-tag": "gorm:\"type:text\""
+        },
+        "ignored_host_validations": {
+          "description": "Json formatted string containing a list of host validations to be ignored. May also contain a list with a single string \"all\" to ignore all host validations. Some validations cannot be ignored.",
+          "type": "string",
+          "x-go-custom-tag": "gorm:\"type:text\""
+        },
         "image_info": {
           "$ref": "#/definitions/image_info"
         },
@@ -15632,11 +17165,6 @@ func init() {
           "description": "Indicates whether this cluster is an imported day-2 cluster or a\nregular cluster. Clusters are considered imported when they are\ncreated via the ../clusters/import endpoint. Day-2 clusters converted\nfrom day-1 clusters by kube-api controllers or the\n../clusters/\u003ccluster_id\u003e/actions/allow-add-hosts endpoint are not\nconsidered imported. Imported clusters usually lack a lot of\ninformation and are filled with default values that don't necessarily\nreflect the actual cluster they represent",
           "type": "boolean",
           "default": false
-        },
-        "ingress_vip": {
-          "description": "(DEPRECATED) The virtual IP used for cluster ingress traffic.",
-          "type": "string",
-          "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))$"
         },
         "ingress_vips": {
           "description": "The virtual IPs used for cluster ingress traffic. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.",
@@ -15677,6 +17205,9 @@ func init() {
             "Cluster",
             "AddHostsCluster"
           ]
+        },
+        "last-installation-preparation": {
+          "$ref": "#/definitions/last-installation-preparation"
         },
         "logs_info": {
           "description": "The progress of log collection or empty if logs are not applicable",
@@ -15736,6 +17267,10 @@ func init() {
         },
         "org_id": {
           "type": "string"
+        },
+        "org_soft_timeouts_enabled": {
+          "description": "Indication if organization soft timeouts is enabled for the cluster.",
+          "type": "boolean"
         },
         "platform": {
           "$ref": "#/definitions/platform"
@@ -15836,7 +17371,7 @@ func init() {
           }
         },
         "user_managed_networking": {
-          "description": "Indicate if the networking is managed by the user.",
+          "description": "(DEPRECATED) Indicate if the networking is managed by the user.",
           "type": "boolean",
           "x-nullable": true
         },
@@ -15867,11 +17402,6 @@ func init() {
           "description": "A comma-separated list of NTP sources (name or IP) going to be added to all the hosts.",
           "type": "string",
           "x-nullable": true
-        },
-        "api_vip": {
-          "description": "(DEPRECATED) The virtual IP used to reach the OpenShift cluster's API.",
-          "type": "string",
-          "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))?$"
         },
         "api_vips": {
           "description": "The virtual IPs used to reach the OpenShift cluster's API. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.",
@@ -15956,11 +17486,6 @@ func init() {
         "ignition_endpoint": {
           "description": "Explicit ignition endpoint overrides the default ignition endpoint.",
           "$ref": "#/definitions/ignition-endpoint"
-        },
-        "ingress_vip": {
-          "description": "(DEPRECATED) The virtual IP used for cluster ingress traffic.",
-          "type": "string",
-          "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))$"
         },
         "ingress_vips": {
           "description": "The virtual IPs used for cluster ingress traffic. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.",
@@ -16049,7 +17574,7 @@ func init() {
           "x-nullable": true
         },
         "user_managed_networking": {
-          "description": "Indicate if the networking is managed by the user.",
+          "description": "(DEPRECATED) Indicate if the networking is managed by the user.",
           "type": "boolean",
           "default": false,
           "x-nullable": true
@@ -16059,6 +17584,14 @@ func init() {
           "type": "boolean",
           "default": false,
           "x-nullable": true
+        }
+      }
+    },
+    "cluster-finalizing-progress": {
+      "type": "object",
+      "properties": {
+        "finalizing_stage": {
+          "$ref": "#/definitions/finalizing-stage"
         }
       }
     },
@@ -16139,8 +17672,19 @@ func init() {
     "cluster-progress-info": {
       "type": "object",
       "properties": {
+        "finalizing_stage": {
+          "$ref": "#/definitions/finalizing-stage"
+        },
         "finalizing_stage_percentage": {
           "type": "integer"
+        },
+        "finalizing_stage_started_at": {
+          "type": "string",
+          "format": "date-time",
+          "x-go-custom-tag": "gorm:\"type:timestamp with time zone\""
+        },
+        "finalizing_stage_timed_out": {
+          "type": "boolean"
         },
         "installing_stage_percentage": {
           "type": "integer"
@@ -16178,7 +17722,9 @@ func init() {
         "odf-requirements-satisfied",
         "cnv-requirements-satisfied",
         "lvm-requirements-satisfied",
-        "network-type-valid"
+        "mce-requirements-satisfied",
+        "network-type-valid",
+        "platform-requirements-satisfied"
       ]
     },
     "cluster_default_config": {
@@ -16457,7 +18003,7 @@ func init() {
         "file_name": {
           "description": "The name of the manifest to customize the installed OCP cluster.",
           "type": "string",
-          "pattern": "^[^/]*\\.(yaml|yml|json)$"
+          "pattern": "^[^\\/]*\\.(json|ya?ml(\\.patch_?[a-zA-Z0-9_]*)?)$"
         },
         "folder": {
           "description": "The folder that contains the files. Manifests can be placed in 'manifests' or 'openshift' directories.",
@@ -16598,10 +18144,16 @@ func init() {
           "description": "Whether the disk appears to be an installation media or not",
           "type": "boolean"
         },
+        "iscsi": {
+          "$ref": "#/definitions/iscsi"
+        },
         "model": {
           "type": "string"
         },
         "name": {
+          "type": "string"
+        },
+        "partitionTypes": {
           "type": "string"
         },
         "path": {
@@ -16761,7 +18313,13 @@ func init() {
         "domains": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/DomainResolutionRequestDomainsItems0"
+            "type": "object",
+            "x-go-type": {
+              "import": {
+                "path": "github.com/openshift/assisted-service/models"
+              },
+              "type": "DomainResolutionRequestDomain"
+            }
           }
         }
       }
@@ -16821,7 +18379,10 @@ func init() {
         "iSCSI",
         "FC",
         "LVM",
-        "RAID"
+        "RAID",
+        "ECKD",
+        "ECKD (ESE)",
+        "FBA"
       ]
     },
     "error": {
@@ -16939,26 +18500,47 @@ func init() {
         "$ref": "#/definitions/event"
       }
     },
-    "feature-support-level": {
-      "type": "object",
-      "properties": {
-        "features": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/FeatureSupportLevelFeaturesItems0"
-          }
-        },
-        "openshift_version": {
-          "description": "Version of the OpenShift cluster.",
-          "type": "string"
-        }
-      }
+    "feature-support-level-id": {
+      "type": "string",
+      "enum": [
+        "SNO",
+        "VIP_AUTO_ALLOC",
+        "CUSTOM_MANIFEST",
+        "SINGLE_NODE_EXPANSION",
+        "LVM",
+        "ODF",
+        "LSO",
+        "CNV",
+        "MCE",
+        "NUTANIX_INTEGRATION",
+        "BAREMETAL_PLATFORM",
+        "NONE_PLATFORM",
+        "VSPHERE_INTEGRATION",
+        "DUAL_STACK_VIPS",
+        "CLUSTER_MANAGED_NETWORKING",
+        "USER_MANAGED_NETWORKING",
+        "MINIMAL_ISO",
+        "FULL_ISO",
+        "EXTERNAL_PLATFORM_OCI",
+        "DUAL_STACK",
+        "PLATFORM_MANAGED_NETWORKING",
+        "SKIP_MCO_REBOOT",
+        "EXTERNAL_PLATFORM",
+        "OVN_NETWORK_TYPE",
+        "SDN_NETWORK_TYPE"
+      ]
     },
-    "feature-support-levels": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/feature-support-level"
-      }
+    "finalizing-stage": {
+      "description": "Cluster finalizing stage managed by controller",
+      "type": "string",
+      "enum": [
+        "Waiting for cluster operators",
+        "Adding router ca",
+        "Applying olm manifests",
+        "Waiting for olm operators csv initialization",
+        "Waiting for olm operators csv",
+        "Done"
+      ]
     },
     "free-addresses-list": {
       "type": "array",
@@ -17051,6 +18633,10 @@ func init() {
           "format": "uuid",
           "x-go-custom-tag": "gorm:\"foreignkey:Cluster\"",
           "x-nullable": true
+        },
+        "connection_timed_out": {
+          "description": "Indicate that connection to assisted service was timed out when soft timeout is enabled.",
+          "type": "boolean"
         },
         "connectivity": {
           "type": "string",
@@ -17378,6 +18964,10 @@ func init() {
           "format": "date-time",
           "x-go-custom-tag": "gorm:\"type:timestamp with time zone\""
         },
+        "stage_timed_out": {
+          "description": "Indicate of the current stage has been timed out.",
+          "type": "boolean"
+        },
         "stage_updated_at": {
           "description": "Time at which the current progress stage was last updated.",
           "type": "string",
@@ -17481,6 +19071,14 @@ func init() {
           ],
           "x-nullable": true
         },
+        "ignition_endpoint_http_headers": {
+          "description": "JSON-formatted string of additional HTTP headers when fetching the ignition.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ignition-endpoint-http-headers-params"
+          },
+          "x-nullable": true
+        },
         "ignition_endpoint_token": {
           "description": "A string which will be used as Authorization Bearer token to fetch the ignition from ignition_endpoint_url.",
           "type": "string",
@@ -17525,6 +19123,7 @@ func init() {
         "ocs-requirements-satisfied",
         "odf-requirements-satisfied",
         "lvm-requirements-satisfied",
+        "mce-requirements-satisfied",
         "sufficient-installation-disk-speed",
         "cnv-requirements-satisfied",
         "sufficient-network-latency-requirement-for-role",
@@ -17533,6 +19132,7 @@ func init() {
         "api-domain-name-resolved-correctly",
         "api-int-domain-name-resolved-correctly",
         "apps-domain-name-resolved-correctly",
+        "release-domain-name-resolved-correctly",
         "compatible-with-cluster-platform",
         "dns-wildcard-not-configured",
         "disk-encryption-requirements-satisfied",
@@ -17618,6 +19218,23 @@ func init() {
         }
       },
       "x-go-custom-tag": "gorm:\"embedded;embeddedPrefix:ignition_endpoint_\""
+    },
+    "ignition-endpoint-http-headers-params": {
+      "type": "object",
+      "required": [
+        "key",
+        "value"
+      ],
+      "properties": {
+        "key": {
+          "description": "The key for the http header's key-value pair.",
+          "type": "string"
+        },
+        "value": {
+          "description": "The value for the http header's key-value pair.",
+          "type": "string"
+        }
+      }
     },
     "ignored-validations": {
       "type": "object",
@@ -17770,8 +19387,7 @@ func init() {
             "aarch64",
             "arm64",
             "ppc64le",
-            "s390x",
-            "multi"
+            "s390x"
           ],
           "x-nullable": false
         },
@@ -17899,6 +19515,7 @@ func init() {
         "additional_trust_bundle": {
           "description": "PEM-encoded X.509 certificate bundle. Hosts discovered by this\ninfra-env will trust the certificates in this bundle. Clusters formed\nfrom the hosts discovered by this infra-env will also trust the\ncertificates in this bundle.",
           "type": "string",
+          "maxLength": 65535,
           "x-nullable": false
         },
         "cluster_id": {
@@ -17916,8 +19533,7 @@ func init() {
             "aarch64",
             "arm64",
             "ppc64le",
-            "s390x",
-            "multi"
+            "s390x"
           ],
           "x-nullable": false
         },
@@ -17976,6 +19592,7 @@ func init() {
         "additional_trust_bundle": {
           "description": "Allows users to change the additional_trust_bundle infra-env field",
           "type": "string",
+          "maxLength": 65535,
           "x-nullable": true
         },
         "ignition_config_override": {
@@ -17987,6 +19604,11 @@ func init() {
         },
         "kernel_arguments": {
           "$ref": "#/definitions/kernel_arguments"
+        },
+        "openshift_version": {
+          "description": "Version of the OS image",
+          "type": "string",
+          "x-nullable": true
         },
         "proxy": {
           "$ref": "#/definitions/proxy"
@@ -18090,6 +19712,10 @@ func init() {
             "type": "string"
           }
         },
+        "enable_skip_mco_reboot": {
+          "description": "If true, assisted service will attempt to skip MCO reboot",
+          "type": "boolean"
+        },
         "high_availability_mode": {
           "description": "Guaranteed availability of the installed cluster. 'Full' installs a Highly-Available cluster\nover multiple master nodes whereas 'None' installs a full cluster over one node.\n",
           "type": "string",
@@ -18126,6 +19752,10 @@ func init() {
         "must_gather_image": {
           "description": "Must-gather images to use",
           "type": "string"
+        },
+        "notify_num_reboots": {
+          "description": "If true, notify number of reboots by assisted controller",
+          "type": "boolean"
         },
         "openshift_version": {
           "description": "Version of the OpenShift cluster.",
@@ -18296,6 +19926,15 @@ func init() {
       "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))?$",
       "x-go-custom-tag": "gorm:\"primaryKey\""
     },
+    "iscsi": {
+      "type": "object",
+      "properties": {
+        "host_ip_address": {
+          "description": "Host IP address used to reach iSCSI target",
+          "type": "string"
+        }
+      }
+    },
     "kernel_argument": {
       "description": "pair of [operation, argument] specifying the argument and what operation should be applied on it.",
       "type": "object",
@@ -18368,6 +20007,29 @@ func init() {
           "type": "boolean"
         }
       }
+    },
+    "last-installation-preparation": {
+      "description": "Gives the status of the last installation preparation (if any)",
+      "type": "object",
+      "properties": {
+        "reason": {
+          "description": "The reason for the preparation status if applicable",
+          "type": "string"
+        },
+        "status": {
+          "description": "The last installation preparation status",
+          "type": "string",
+          "default": "not_started",
+          "enum": [
+            "not_started",
+            "failed",
+            "success"
+          ],
+          "x-nullable": false
+        }
+      },
+      "x-go-custom-tag": "gorm:\"embedded;embeddedPrefix:last_installation_preparation_\"",
+      "x-nullable": false
     },
     "list-managed-domains": {
       "type": "array",
@@ -18464,7 +20126,6 @@ func init() {
       "type": "string",
       "enum": [
         "host",
-        "node-boot",
         "controller",
         "all",
         ""
@@ -18519,6 +20180,14 @@ func init() {
           "enum": [
             "manifests",
             "openshift"
+          ]
+        },
+        "manifest_source": {
+          "description": "Describes whether manifest is sourced from a user or created by the system.",
+          "type": "string",
+          "enum": [
+            "user",
+            "system"
           ]
         }
       }
@@ -18711,7 +20380,8 @@ func init() {
           "enum": [
             "beta",
             "production",
-            "maintenance"
+            "maintenance",
+            "end-of-life"
           ]
         }
       }
@@ -18898,11 +20568,38 @@ func init() {
         "type"
       ],
       "properties": {
+        "external": {
+          "x-nullable": true,
+          "$ref": "#/definitions/platform_external"
+        },
         "type": {
           "$ref": "#/definitions/platform_type"
         }
       },
       "x-go-custom-tag": "gorm:\"embedded;embeddedPrefix:platform_\""
+    },
+    "platform_external": {
+      "description": "Configuration used when installing with an external platform type.",
+      "type": "object",
+      "properties": {
+        "cloud_controller_manager": {
+          "description": "When set to external, this property will enable an external cloud provider.",
+          "type": "string",
+          "default": "",
+          "enum": [
+            "",
+            "External"
+          ],
+          "x-nullable": true
+        },
+        "platform_name": {
+          "description": "Holds the arbitrary string representing the infrastructure provider name.",
+          "type": "string",
+          "minLength": 1,
+          "x-nullable": true
+        }
+      },
+      "x-go-custom-tag": "gorm:\"embedded;embeddedPrefix:external_\""
     },
     "platform_type": {
       "type": "string",
@@ -18910,7 +20607,8 @@ func init() {
         "baremetal",
         "nutanix",
         "vsphere",
-        "none"
+        "none",
+        "external"
       ]
     },
     "preflight-hardware-requirements": {
@@ -18981,6 +20679,16 @@ func init() {
         }
       }
     },
+    "release-channel": {
+      "description": "Release channel.",
+      "type": "string",
+      "enum": [
+        "candidate",
+        "fast",
+        "stable",
+        "eus"
+      ]
+    },
     "release-image": {
       "type": "object",
       "required": [
@@ -19009,6 +20717,16 @@ func init() {
           "type": "array",
           "items": {
             "type": "string"
+          },
+          "x-go-custom-tag": "gorm:\"type:text[]\"",
+          "x-go-type": {
+            "hints": {
+              "noValidation": true
+            },
+            "import": {
+              "package": "github.com/lib/pq"
+            },
+            "type": "StringArray"
           }
         },
         "default": {
@@ -19025,12 +20743,14 @@ func init() {
           "enum": [
             "beta",
             "production",
-            "maintenance"
+            "maintenance",
+            "end-of-life"
           ]
         },
         "url": {
           "description": "The installation image of the OpenShift cluster.",
-          "type": "string"
+          "type": "string",
+          "x-go-custom-tag": "gorm:\"primarykey\""
         },
         "version": {
           "description": "OCP version from the release metadata.",
@@ -19042,6 +20762,47 @@ func init() {
       "type": "array",
       "items": {
         "$ref": "#/definitions/release-image"
+      }
+    },
+    "release-source": {
+      "type": "object",
+      "required": [
+        "openshift_version",
+        "multi_cpu_architectures",
+        "upgrade_channels"
+      ],
+      "properties": {
+        "multi_cpu_architectures": {
+          "type": "array",
+          "items": {
+            "description": "Supported CPU architecture for multi-architecture releases in this OpenShift version..",
+            "type": "string",
+            "enum": [
+              "x86_64",
+              "aarch64",
+              "arm64",
+              "ppc64le",
+              "s390x"
+            ]
+          }
+        },
+        "openshift_version": {
+          "description": "Version of the OpenShift cluster.",
+          "type": "string",
+          "example": "4.14"
+        },
+        "upgrade_channels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/upgrade-channel"
+          }
+        }
+      }
+    },
+    "release-sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/release-source"
       }
     },
     "route": {
@@ -19193,6 +20954,23 @@ func init() {
       "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\/(?:(?:[0-9])|(?:[1-2][0-9])|(?:3[0-2])))|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,})/(?:(?:[0-9])|(?:[1-9][0-9])|(?:1[0-1][0-9])|(?:12[0-8])))$",
       "x-go-custom-tag": "gorm:\"primaryKey\""
     },
+    "support-level": {
+      "type": "string",
+      "enum": [
+        "supported",
+        "unsupported",
+        "tech-preview",
+        "dev-preview",
+        "unavailable"
+      ]
+    },
+    "support-levels": {
+      "description": "Map of feature ID or CPU architecture alongside their support level",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/support-level"
+      }
+    },
     "system_vendor": {
       "type": "object",
       "properties": {
@@ -19235,6 +21013,79 @@ func init() {
           "items": {
             "$ref": "#/definitions/TangConnectivityResponseTangServerResponseItems0"
           }
+        }
+      }
+    },
+    "update-manifest-params": {
+      "type": "object",
+      "required": [
+        "folder",
+        "file_name"
+      ],
+      "properties": {
+        "file_name": {
+          "description": "The file name for the manifest to modify.",
+          "type": "string",
+          "pattern": "^[^\\/]*\\.(json|ya?ml(\\.patch_?[a-zA-Z0-9_]*)?)$",
+          "x-nullable": false
+        },
+        "folder": {
+          "description": "The folder for the manifest to modify.",
+          "type": "string",
+          "default": "manifests",
+          "enum": [
+            "manifests",
+            "openshift"
+          ],
+          "x-nullable": false
+        },
+        "updated_content": {
+          "description": "The new base64 encoded manifest content.",
+          "type": "string",
+          "x-nullable": true
+        },
+        "updated_file_name": {
+          "description": "The new file name for the manifest.",
+          "type": "string",
+          "pattern": "^[^\\/]*\\.(json|ya?ml(\\.patch_?[a-zA-Z0-9_]*)?)$",
+          "x-nullable": true
+        },
+        "updated_folder": {
+          "description": "The new folder for the manifest. Manifests can be placed in 'manifests' or 'openshift' directories.",
+          "type": "string",
+          "default": "manifests",
+          "enum": [
+            "manifests",
+            "openshift"
+          ],
+          "x-nullable": true
+        }
+      }
+    },
+    "upgrade-channel": {
+      "type": "object",
+      "required": [
+        "cpu_architecture",
+        "channels"
+      ],
+      "properties": {
+        "channels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/release-channel"
+          }
+        },
+        "cpu_architecture": {
+          "description": "The CPU architecture of the image.",
+          "type": "string",
+          "enum": [
+            "x86_64",
+            "aarch64",
+            "arm64",
+            "ppc64le",
+            "s390x",
+            "multi"
+          ]
         }
       }
     },
@@ -19293,12 +21144,6 @@ func init() {
         "additional_ntp_source": {
           "description": "A comma-separated list of NTP sources (name or IP) going to be added to all the hosts.",
           "type": "string",
-          "x-nullable": true
-        },
-        "api_vip": {
-          "description": "(DEPRECATED) The virtual IP used to reach the OpenShift cluster's API.",
-          "type": "string",
-          "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))?$",
           "x-nullable": true
         },
         "api_vip_dns_name": {
@@ -19368,12 +21213,6 @@ func init() {
         "ignition_endpoint": {
           "description": "Explicit ignition endpoint overrides the default ignition endpoint.",
           "$ref": "#/definitions/ignition-endpoint"
-        },
-        "ingress_vip": {
-          "description": "(DEPRECATED) The virtual IP used for cluster ingress traffic.",
-          "type": "string",
-          "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))?$",
-          "x-nullable": true
         },
         "ingress_vips": {
           "description": "The virtual IPs used for cluster ingress traffic. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.",
@@ -19463,7 +21302,7 @@ func init() {
           "x-nullable": true
         },
         "user_managed_networking": {
-          "description": "Indicate if the networking is managed by the user.",
+          "description": "(DEPRECATED) Indicate if the networking is managed by the user.",
           "type": "boolean",
           "x-nullable": true
         },

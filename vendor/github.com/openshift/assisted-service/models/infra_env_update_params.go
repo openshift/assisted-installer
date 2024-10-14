@@ -12,6 +12,7 @@ import (
 	"github.com/go-openapi/errors"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
+	"github.com/go-openapi/validate"
 )
 
 // InfraEnvUpdateParams infra env update params
@@ -23,6 +24,7 @@ type InfraEnvUpdateParams struct {
 	AdditionalNtpSources *string `json:"additional_ntp_sources,omitempty"`
 
 	// Allows users to change the additional_trust_bundle infra-env field
+	// Max Length: 65535
 	AdditionalTrustBundle *string `json:"additional_trust_bundle,omitempty"`
 
 	// JSON formatted string containing the user overrides for the initial ignition config.
@@ -33,6 +35,9 @@ type InfraEnvUpdateParams struct {
 
 	// kernel arguments
 	KernelArguments KernelArguments `json:"kernel_arguments"`
+
+	// Version of the OS image
+	OpenshiftVersion *string `json:"openshift_version,omitempty"`
 
 	// proxy
 	Proxy *Proxy `json:"proxy,omitempty" gorm:"embedded;embeddedPrefix:proxy_"`
@@ -50,6 +55,10 @@ type InfraEnvUpdateParams struct {
 // Validate validates this infra env update params
 func (m *InfraEnvUpdateParams) Validate(formats strfmt.Registry) error {
 	var res []error
+
+	if err := m.validateAdditionalTrustBundle(formats); err != nil {
+		res = append(res, err)
+	}
 
 	if err := m.validateImageType(formats); err != nil {
 		res = append(res, err)
@@ -70,6 +79,18 @@ func (m *InfraEnvUpdateParams) Validate(formats strfmt.Registry) error {
 	if len(res) > 0 {
 		return errors.CompositeValidationError(res...)
 	}
+	return nil
+}
+
+func (m *InfraEnvUpdateParams) validateAdditionalTrustBundle(formats strfmt.Registry) error {
+	if swag.IsZero(m.AdditionalTrustBundle) { // not required
+		return nil
+	}
+
+	if err := validate.MaxLength("additional_trust_bundle", "body", *m.AdditionalTrustBundle, 65535); err != nil {
+		return err
+	}
+
 	return nil
 }
 

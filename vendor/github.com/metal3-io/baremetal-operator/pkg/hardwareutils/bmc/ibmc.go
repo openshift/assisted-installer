@@ -6,8 +6,14 @@ import (
 	"strings"
 )
 
+const (
+	noRaid = "no-raid"
+	ibmc   = "ibmc"
+	ipxe   = "ipxe"
+)
+
 func init() {
-	RegisterFactory("ibmc", newIbmcAccessDetails, []string{"http", "https"})
+	RegisterFactory(ibmc, newIbmcAccessDetails, []string{"http", "https"})
 }
 
 func newIbmcAccessDetails(parsedURL *url.URL, disableCertificateVerification bool) (AccessDetails, error) {
@@ -39,7 +45,7 @@ func (a *ibmcAccessDetails) NeedsMAC() bool {
 }
 
 func (a *ibmcAccessDetails) Driver() string {
-	return "ibmc"
+	return ibmc
 }
 
 func (a *ibmcAccessDetails) DisableCertificateVerification() bool {
@@ -54,7 +60,6 @@ const ibmcDefaultScheme = "https"
 // expected to add any other information that might be needed (such as
 // the kernel and ramdisk locations).
 func (a *ibmcAccessDetails) DriverInfo(bmcCreds Credentials) map[string]interface{} {
-
 	ibmcAddress := []string{}
 	schemes := strings.Split(a.bmcType, "+")
 	if len(schemes) > 1 {
@@ -84,19 +89,23 @@ func (a *ibmcAccessDetails) BIOSInterface() string {
 }
 
 func (a *ibmcAccessDetails) BootInterface() string {
-	return "pxe"
+	return ipxe
+}
+
+func (a *ibmcAccessDetails) FirmwareInterface() string {
+	return ""
 }
 
 func (a *ibmcAccessDetails) ManagementInterface() string {
-	return "ibmc"
+	return ibmc
 }
 
 func (a *ibmcAccessDetails) PowerInterface() string {
-	return "ibmc"
+	return ibmc
 }
 
 func (a *ibmcAccessDetails) RAIDInterface() string {
-	return "no-raid"
+	return noRaid
 }
 
 func (a *ibmcAccessDetails) VendorInterface() string {
