@@ -180,9 +180,10 @@ func LogIfHostIpChanged(log logrus.FieldLogger, node v1.Node, IPAddressMap map[s
 }
 
 // Matching of the host happens based on 2 rules
-//   * if the name of the host and in the inventory is exactly the same, use use it
-//   * if the name is not known in the inventory, we check if the IP address of the
+//   - if the name of the host and in the inventory is exactly the same, use use it
+//   - if the name is not known in the inventory, we check if the IP address of the
 //     reporting host is known to the inventory
+//
 // Using those rules we can cover the cases where e.g. inventory expects a short
 // hostname, but the host reports itself using its FQDN
 func HostMatchByNameOrIPAddress(node v1.Node, namesMap, IPAddressMap map[string]inventory_client.HostData) (inventory_client.HostData, bool) {

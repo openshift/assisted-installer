@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-jose/go-jose"
+	"github.com/go-jose/go-jose/json"
 	"github.com/golang-jwt/jwt/v4"
-	"gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/json"
 )
 
 func GetTokenAndCert(withLateIat bool) (string, []byte) {
@@ -89,6 +89,6 @@ func GenJSJWKS(privKey crypto.PublicKey, pubKey crypto.PublicKey) ([]byte, []byt
 
 func GetConfigRHSSO() *Config {
 	_, cert := GetTokenAndCert(false)
-	cfg := &Config{JwkCert: string(cert), AuthType: TypeRHSSO, EnableOrgTenancy: true}
+	cfg := &Config{JwkCert: string(cert), AuthType: TypeRHSSO, EnableOrgTenancy: true, EnableOrgBasedFeatureGates: false}
 	return cfg
 }

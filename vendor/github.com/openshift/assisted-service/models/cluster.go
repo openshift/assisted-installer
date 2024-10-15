@@ -30,12 +30,15 @@ type Cluster struct {
 	// Format: uuid
 	AmsSubscriptionID strfmt.UUID `json:"ams_subscription_id,omitempty"`
 
-	// The virtual IP used to reach the OpenShift cluster's API.
+	// (DEPRECATED) The virtual IP used to reach the OpenShift cluster's API.
 	// Pattern: ^(?:(?:(?:[0-9]{1,3}\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))$
 	APIVip string `json:"api_vip,omitempty"`
 
 	// The domain name used to reach the OpenShift cluster API.
 	APIVipDNSName *string `json:"api_vip_dns_name,omitempty"`
+
+	// The virtual IPs used to reach the OpenShift cluster's API. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.
+	APIVips []*APIVip `json:"api_vips" gorm:"foreignkey:ClusterID;references:ID"`
 
 	// Base domain of the cluster. All DNS records must be sub-domains of this base and include the cluster name.
 	BaseDNSDomain string `json:"base_dns_domain,omitempty"`
@@ -120,10 +123,6 @@ type Cluster struct {
 	// Format: uuid
 	ID *strfmt.UUID `json:"id" gorm:"primaryKey"`
 
-	// Json formatted string containing the user overrides for the initial ignition config
-	// Example: {\"ignition\": {\"version\": \"3.1.0\"}, \"storage\": {\"files\": [{\"path\": \"/tmp/example\", \"contents\": {\"source\": \"data:text/plain;base64,aGVscGltdHJhcHBlZGluYXN3YWdnZXJzcGVj\"}}]}}
-	IgnitionConfigOverrides string `json:"ignition_config_overrides,omitempty" gorm:"type:text"`
-
 	// Explicit ignition endpoint overrides the default ignition endpoint.
 	IgnitionEndpoint *IgnitionEndpoint `json:"ignition_endpoint,omitempty" gorm:"embedded;embeddedPrefix:ignition_endpoint_"`
 
@@ -131,9 +130,22 @@ type Cluster struct {
 	// Required: true
 	ImageInfo *ImageInfo `json:"image_info" gorm:"embedded;embeddedPrefix:image_"`
 
-	// The virtual IP used for cluster ingress traffic.
+	// Indicates whether this cluster is an imported day-2 cluster or a
+	// regular cluster. Clusters are considered imported when they are
+	// created via the ../clusters/import endpoint. Day-2 clusters converted
+	// from day-1 clusters by kube-api controllers or the
+	// ../clusters/<cluster_id>/actions/allow-add-workers endpoint are not
+	// considered imported. Imported clusters usually lack a lot of
+	// information and are filled with default values that don't necessarily
+	// reflect the actual cluster they represent
+	Imported *bool `json:"imported,omitempty"`
+
+	// (DEPRECATED) The virtual IP used for cluster ingress traffic.
 	// Pattern: ^(?:(?:(?:[0-9]{1,3}\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))$
 	IngressVip string `json:"ingress_vip,omitempty"`
+
+	// The virtual IPs used for cluster ingress traffic. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.
+	IngressVips []*IngressVip `json:"ingress_vips" gorm:"foreignkey:ClusterID;references:ID"`
 
 	// The time that this cluster completed installation.
 	// Format: date-time
@@ -205,6 +217,11 @@ type Cluster struct {
 	// Schedule workloads on masters
 	SchedulableMasters *bool `json:"schedulable_masters,omitempty"`
 
+	// Indicates if schedule workloads on masters will be enabled regardless the value of 'schedulable_masters' property.
+	// Set to 'true' when not enough hosts are associated with this cluster to disable the scheduling on masters.
+	//
+	SchedulableMastersForcedTrue *bool `json:"schedulable_masters_forced_true,omitempty"`
+
 	// The IP address pool to use for service IP addresses. You can enter only one IP address pool. If you need to access the services from an external network, configure load balancers and routers to manage the traffic.
 	// Pattern: ^(?:(?:(?:[0-9]{1,3}\.){3}[0-9]{1,3}\/(?:(?:[0-9])|(?:[1-2][0-9])|(?:3[0-2])))|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,})/(?:(?:[0-9])|(?:[1-9][0-9])|(?:1[0-1][0-9])|(?:12[0-8])))$
 	ServiceNetworkCidr string `json:"service_network_cidr,omitempty"`
@@ -227,6 +244,9 @@ type Cluster struct {
 	// The last time that the cluster status was updated.
 	// Format: date-time
 	StatusUpdatedAt strfmt.DateTime `json:"status_updated_at,omitempty" gorm:"type:timestamp with time zone"`
+
+	// A comma-separated list of tags that are associated to the cluster.
+	Tags string `json:"tags,omitempty"`
 
 	// All hosts associated to this cluster.
 	TotalHostCount int64 `json:"total_host_count,omitempty" gorm:"-"`
@@ -257,6 +277,10 @@ func (m *Cluster) Validate(formats strfmt.Registry) error {
 	}
 
 	if err := m.validateAPIVip(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateAPIVips(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -321,6 +345,10 @@ func (m *Cluster) Validate(formats strfmt.Registry) error {
 	}
 
 	if err := m.validateIngressVip(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateIngressVips(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -417,6 +445,32 @@ func (m *Cluster) validateAPIVip(formats strfmt.Registry) error {
 
 	if err := validate.Pattern("api_vip", "body", m.APIVip, `^(?:(?:(?:[0-9]{1,3}\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))$`); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (m *Cluster) validateAPIVips(formats strfmt.Registry) error {
+	if swag.IsZero(m.APIVips) { // not required
+		return nil
+	}
+
+	for i := 0; i < len(m.APIVips); i++ {
+		if swag.IsZero(m.APIVips[i]) { // not required
+			continue
+		}
+
+		if m.APIVips[i] != nil {
+			if err := m.APIVips[i].Validate(formats); err != nil {
+				if ve, ok := err.(*errors.Validation); ok {
+					return ve.ValidateName("api_vips" + "." + strconv.Itoa(i))
+				} else if ce, ok := err.(*errors.CompositeError); ok {
+					return ce.ValidateName("api_vips" + "." + strconv.Itoa(i))
+				}
+				return err
+			}
+		}
+
 	}
 
 	return nil
@@ -741,6 +795,32 @@ func (m *Cluster) validateIngressVip(formats strfmt.Registry) error {
 
 	if err := validate.Pattern("ingress_vip", "body", m.IngressVip, `^(?:(?:(?:[0-9]{1,3}\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))$`); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (m *Cluster) validateIngressVips(formats strfmt.Registry) error {
+	if swag.IsZero(m.IngressVips) { // not required
+		return nil
+	}
+
+	for i := 0; i < len(m.IngressVips); i++ {
+		if swag.IsZero(m.IngressVips[i]) { // not required
+			continue
+		}
+
+		if m.IngressVips[i] != nil {
+			if err := m.IngressVips[i].Validate(formats); err != nil {
+				if ve, ok := err.(*errors.Validation); ok {
+					return ve.ValidateName("ingress_vips" + "." + strconv.Itoa(i))
+				} else if ce, ok := err.(*errors.CompositeError); ok {
+					return ce.ValidateName("ingress_vips" + "." + strconv.Itoa(i))
+				}
+				return err
+			}
+		}
+
 	}
 
 	return nil
@@ -1131,6 +1211,10 @@ func (m *Cluster) validateUpdatedAt(formats strfmt.Registry) error {
 func (m *Cluster) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	var res []error
 
+	if err := m.contextValidateAPIVips(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
 	if err := m.contextValidateClusterNetworks(ctx, formats); err != nil {
 		res = append(res, err)
 	}
@@ -1152,6 +1236,10 @@ func (m *Cluster) ContextValidate(ctx context.Context, formats strfmt.Registry) 
 	}
 
 	if err := m.contextValidateImageInfo(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.contextValidateIngressVips(ctx, formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -1182,6 +1270,26 @@ func (m *Cluster) ContextValidate(ctx context.Context, formats strfmt.Registry) 
 	if len(res) > 0 {
 		return errors.CompositeValidationError(res...)
 	}
+	return nil
+}
+
+func (m *Cluster) contextValidateAPIVips(ctx context.Context, formats strfmt.Registry) error {
+
+	for i := 0; i < len(m.APIVips); i++ {
+
+		if m.APIVips[i] != nil {
+			if err := m.APIVips[i].ContextValidate(ctx, formats); err != nil {
+				if ve, ok := err.(*errors.Validation); ok {
+					return ve.ValidateName("api_vips" + "." + strconv.Itoa(i))
+				} else if ce, ok := err.(*errors.CompositeError); ok {
+					return ce.ValidateName("api_vips" + "." + strconv.Itoa(i))
+				}
+				return err
+			}
+		}
+
+	}
+
 	return nil
 }
 
@@ -1288,6 +1396,26 @@ func (m *Cluster) contextValidateImageInfo(ctx context.Context, formats strfmt.R
 			}
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (m *Cluster) contextValidateIngressVips(ctx context.Context, formats strfmt.Registry) error {
+
+	for i := 0; i < len(m.IngressVips); i++ {
+
+		if m.IngressVips[i] != nil {
+			if err := m.IngressVips[i].ContextValidate(ctx, formats); err != nil {
+				if ve, ok := err.(*errors.Validation); ok {
+					return ve.ValidateName("ingress_vips" + "." + strconv.Itoa(i))
+				} else if ce, ok := err.(*errors.CompositeError); ok {
+					return ce.ValidateName("ingress_vips" + "." + strconv.Itoa(i))
+				}
+				return err
+			}
+		}
+
 	}
 
 	return nil

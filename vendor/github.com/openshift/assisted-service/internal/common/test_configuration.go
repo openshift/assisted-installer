@@ -3,7 +3,7 @@ package common
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 
 	"github.com/go-openapi/strfmt"
@@ -20,7 +20,9 @@ type TestNetworking struct {
 	ServiceNetworks []*models.ServiceNetwork
 	MachineNetworks []*models.MachineNetwork
 	APIVip          string
+	APIVips         []*models.APIVip
 	IngressVip      string
+	IngressVips     []*models.IngressVip
 }
 
 type TestConfiguration struct {
@@ -56,7 +58,6 @@ var (
 	ReleaseImage            = "quay.io/openshift-release-dev/ocp-release:4.6.16-x86_64"
 	RhcosImage              = "rhcos_4.6.0"
 	RhcosVersion            = "version-46.123-0"
-	RhcosRootfs             = "rhcos_4.6.0_rootfs"
 	SupportLevel            = "beta"
 	CPUArchitecture         = DefaultCPUArchitecture
 )
@@ -72,11 +73,11 @@ var TestDefaultConfig = &TestConfiguration{
 		OpenshiftVersion: &OpenShiftVersion,
 		URL:              &ReleaseImage,
 		Version:          &ReleaseVersion,
+		CPUArchitectures: []string{CPUArchitecture},
 	},
 	OsImage: &models.OsImage{
 		CPUArchitecture:  &CPUArchitecture,
 		OpenshiftVersion: &OpenShiftVersion,
-		RootfsURL:        &RhcosRootfs,
 		URL:              &RhcosImage,
 		Version:          &RhcosVersion,
 	},
@@ -125,30 +126,77 @@ var DomainAPIInternal = "api-int.test-cluster.example.com"
 var DomainApps = fmt.Sprintf("%s.apps.test-cluster.example.com", constants.AppsSubDomainNameHostDNSValidation)
 var WildcardDomain = fmt.Sprintf("%s.test-cluster.example.com", constants.DNSWildcardFalseDomainName)
 
-var DomainResolution = []*models.DomainResolutionResponseDomain{
+var DomainResolutions = []*models.DomainResolutionResponseDomain{
 	{
 		DomainName:    &DomainAPI,
-		IPV4Addresses: []strfmt.IPv4{"1.2.3.4/24"},
-		IPV6Addresses: []strfmt.IPv6{"1001:db8::10/120"},
+		IPV4Addresses: []strfmt.IPv4{"1.2.3.40/24"},
+		IPV6Addresses: []strfmt.IPv6{"1001:db8::20/120"},
 	},
 	{
 		DomainName:    &DomainAPIInternal,
 		IPV4Addresses: []strfmt.IPv4{"4.5.6.7/24"},
-		IPV6Addresses: []strfmt.IPv6{"1002:db8::10/120"},
+		IPV6Addresses: []strfmt.IPv6{"1002:db8::30/120"},
 	},
 	{
 		DomainName:    &DomainApps,
 		IPV4Addresses: []strfmt.IPv4{"7.8.9.10/24"},
-		IPV6Addresses: []strfmt.IPv6{"1003:db8::10/120"},
+		IPV6Addresses: []strfmt.IPv6{"1003:db8::40/120"},
 	},
 	{
 		DomainName:    &WildcardDomain,
 		IPV4Addresses: []strfmt.IPv4{},
 		IPV6Addresses: []strfmt.IPv6{},
-	}}
+	},
+}
 
-var TestDomainNameResolutionSuccess = &models.DomainResolutionResponse{
-	Resolutions: DomainResolution}
+var WildcardResolved = []*models.DomainResolutionResponseDomain{
+	{
+		DomainName:    &WildcardDomain,
+		IPV4Addresses: []strfmt.IPv4{"7.8.9.10/24"},
+		IPV6Addresses: []strfmt.IPv6{"1003:db8::40/120"},
+	},
+}
+
+var DomainResolutionNoAPI = []*models.DomainResolutionResponseDomain{
+	{
+		DomainName:    &DomainApps,
+		IPV4Addresses: []strfmt.IPv4{"7.8.9.10/24"},
+		IPV6Addresses: []strfmt.IPv6{"1003:db8::40/120"},
+	},
+	{
+		DomainName:    &WildcardDomain,
+		IPV4Addresses: []strfmt.IPv4{},
+		IPV6Addresses: []strfmt.IPv6{},
+	},
+}
+
+var DomainResolutionAllEmpty = []*models.DomainResolutionResponseDomain{
+	{
+		DomainName:    &DomainAPI,
+		IPV4Addresses: []strfmt.IPv4{},
+		IPV6Addresses: []strfmt.IPv6{},
+	},
+	{
+		DomainName:    &DomainAPIInternal,
+		IPV4Addresses: []strfmt.IPv4{},
+		IPV6Addresses: []strfmt.IPv6{},
+	},
+	{
+		DomainName:    &DomainApps,
+		IPV4Addresses: []strfmt.IPv4{},
+		IPV6Addresses: []strfmt.IPv6{},
+	},
+	{
+		DomainName:    &WildcardDomain,
+		IPV4Addresses: []strfmt.IPv4{},
+		IPV6Addresses: []strfmt.IPv6{},
+	},
+}
+
+var TestDomainNameResolutionsSuccess = &models.DomainResolutionResponse{Resolutions: DomainResolutions}
+var TestDomainResolutionsNoAPI = &models.DomainResolutionResponse{Resolutions: DomainResolutionNoAPI}
+var TestDomainResolutionsAllEmpty = &models.DomainResolutionResponse{Resolutions: DomainResolutionAllEmpty}
+var TestDomainNameResolutionsWildcardResolved = &models.DomainResolutionResponse{Resolutions: WildcardResolved}
 
 var TestDefaultRouteConfiguration = []*models.Route{{Family: FamilyIPv4, Interface: "eth0", Gateway: "192.168.1.1", Destination: "0.0.0.0"}}
 
@@ -157,15 +205,32 @@ var TestIPv4Networking = TestNetworking{
 	ServiceNetworks: []*models.ServiceNetwork{{Cidr: "1.2.5.0/24"}},
 	MachineNetworks: []*models.MachineNetwork{{Cidr: "1.2.3.0/24"}},
 	APIVip:          "1.2.3.5",
+	APIVips:         []*models.APIVip{{IP: "1.2.3.5"}},
 	IngressVip:      "1.2.3.6",
+	IngressVips:     []*models.IngressVip{{IP: "1.2.3.6"}},
 }
 
+// TestIPv6Networking The values of TestIPv6Networking and TestEquivalentIPv6Networking are not equal, but are equivalent
+// in terms of their values. If any of the values in TestIPv6Networking change, please change also the corresponding
+// values in TestEquivalentIPv6Networking
 var TestIPv6Networking = TestNetworking{
 	ClusterNetworks: []*models.ClusterNetwork{{Cidr: "1003:db8::/53", HostPrefix: 64}},
 	ServiceNetworks: []*models.ServiceNetwork{{Cidr: "1002:db8::/119"}},
 	MachineNetworks: []*models.MachineNetwork{{Cidr: "1001:db8::/120"}},
 	APIVip:          "1001:db8::64",
+	APIVips:         []*models.APIVip{{IP: "1001:db8::64"}},
 	IngressVip:      "1001:db8::65",
+	IngressVips:     []*models.IngressVip{{IP: "1001:db8::65"}},
+}
+
+var TestEquivalentIPv6Networking = TestNetworking{
+	ClusterNetworks: []*models.ClusterNetwork{{Cidr: "1003:0db8:0::/53", HostPrefix: 64}},
+	ServiceNetworks: []*models.ServiceNetwork{{Cidr: "1002:0db8:0::/119"}},
+	MachineNetworks: []*models.MachineNetwork{{Cidr: "1001:0db8:0::/120"}},
+	APIVip:          "1001:0db8:0::64",
+	APIVips:         []*models.APIVip{{IP: "1001:db8::64"}},
+	IngressVip:      "1001:0db8:0::65",
+	IngressVips:     []*models.IngressVip{{IP: "1001:db8::65"}},
 }
 
 var TestDualStackNetworking = TestNetworking{
@@ -173,7 +238,9 @@ var TestDualStackNetworking = TestNetworking{
 	ServiceNetworks: append(TestIPv4Networking.ServiceNetworks, TestIPv6Networking.ServiceNetworks...),
 	MachineNetworks: append(TestIPv4Networking.MachineNetworks, TestIPv6Networking.MachineNetworks...),
 	APIVip:          TestIPv4Networking.APIVip,
+	APIVips:         TestIPv4Networking.APIVips,
 	IngressVip:      TestIPv4Networking.IngressVip,
+	IngressVips:     TestIPv4Networking.IngressVips,
 }
 
 func IncrementCidrIP(subnet string) string {
@@ -217,6 +284,40 @@ func GenerateTestDefaultInventory() string {
 				},
 			},
 		},
+		Disks: []*models.Disk{
+			TestDefaultConfig.Disks,
+		},
+		Routes: TestDefaultRouteConfiguration,
+	}
+
+	b, err := json.Marshal(inventory)
+	Expect(err).To(Not(HaveOccurred()))
+	return string(b)
+}
+
+func generateInterfaces(amount int, intfType string) []*models.Interface {
+	interfaces := make([]*models.Interface, amount)
+	for i := 0; i < amount; i++ {
+		intf := models.Interface{
+			Name: fmt.Sprintf("eth%d", i),
+			IPV4Addresses: []string{
+				fmt.Sprintf("192.%d.2.0/24", i),
+			},
+			IPV6Addresses: []string{
+				fmt.Sprintf("2001:db%d::/32", i),
+			},
+			Type: intfType,
+		}
+		interfaces[i] = &intf
+	}
+	return interfaces
+}
+
+func GenerateTestInventoryWithVirtualInterface(physicalInterfaces, virtualInterfaces int) string {
+	interfaces := generateInterfaces(physicalInterfaces, "physical")
+	interfaces = append(interfaces, generateInterfaces(virtualInterfaces, "device")...)
+	inventory := &models.Inventory{
+		Interfaces: interfaces,
 		Disks: []*models.Disk{
 			TestDefaultConfig.Disks,
 		},
@@ -333,7 +434,7 @@ func GenerateTestInventoryWithNetwork(netAddress NetAddress) string {
 				IPV6Addresses: netAddress.IPv6Address,
 			},
 		},
-		Disks:        []*models.Disk{{SizeBytes: conversions.GibToBytes(120), DriveType: "HDD"}},
+		Disks:        []*models.Disk{{SizeBytes: conversions.GibToBytes(120), DriveType: models.DriveTypeHDD}},
 		CPU:          &models.CPU{Count: 16},
 		Memory:       &models.Memory{PhysicalBytes: conversions.GibToBytes(16), UsableBytes: conversions.GibToBytes(16)},
 		SystemVendor: &models.SystemVendor{Manufacturer: "Red Hat", ProductName: "RHEL", SerialNumber: "3534"},
@@ -345,7 +446,7 @@ func GenerateTestInventoryWithNetwork(netAddress NetAddress) string {
 	return string(b)
 }
 
-func GenerateTestInventoryWithSetNetwork() string {
+func GenerateTestInventoryWithMutate(mutateFn func(*models.Inventory)) string {
 	inventory := &models.Inventory{
 		Interfaces: []*models.Interface{
 			{
@@ -358,20 +459,25 @@ func GenerateTestInventoryWithSetNetwork() string {
 				},
 			},
 		},
-		Disks:        []*models.Disk{{SizeBytes: conversions.GibToBytes(120), DriveType: "HDD"}},
+		Disks:        []*models.Disk{{SizeBytes: conversions.GibToBytes(120), DriveType: models.DriveTypeHDD}},
 		CPU:          &models.CPU{Count: 16},
 		Memory:       &models.Memory{PhysicalBytes: conversions.GibToBytes(16), UsableBytes: conversions.GibToBytes(16)},
 		SystemVendor: &models.SystemVendor{Manufacturer: "Red Hat", ProductName: "RHEL", SerialNumber: "3534"},
 		Routes:       TestDefaultRouteConfiguration,
 	}
+	mutateFn(inventory)
 	b, err := json.Marshal(inventory)
 	Expect(err).To(Not(HaveOccurred()))
 	return string(b)
 }
 
+func GenerateTestInventory() string {
+	return GenerateTestInventoryWithMutate(func(inventory *models.Inventory) {})
+}
+
 func GenerateTestInventoryWithTpmVersion(tpmVersion string) string {
 	inventory := &models.Inventory{
-		Disks:        []*models.Disk{{SizeBytes: conversions.GibToBytes(120), DriveType: "HDD"}},
+		Disks:        []*models.Disk{{SizeBytes: conversions.GibToBytes(120), DriveType: models.DriveTypeHDD}},
 		CPU:          &models.CPU{Count: 16},
 		Memory:       &models.Memory{PhysicalBytes: conversions.GibToBytes(16), UsableBytes: conversions.GibToBytes(16)},
 		SystemVendor: &models.SystemVendor{Manufacturer: "Red Hat", ProductName: "RHEL", SerialNumber: "3534"},
@@ -384,7 +490,7 @@ func GenerateTestInventoryWithTpmVersion(tpmVersion string) string {
 
 func GetTestLog() logrus.FieldLogger {
 	l := logrus.New()
-	l.SetOutput(ioutil.Discard)
+	l.SetOutput(io.Discard)
 	return l
 }
 

@@ -23,13 +23,10 @@ type OsImage struct {
 	// Required: true
 	CPUArchitecture *string `json:"cpu_architecture" gorm:"default:'x86_64'"`
 
-	// Version of the OpenShift cluster.
+	// Version of the operating system image
+	// Example: 4.12
 	// Required: true
 	OpenshiftVersion *string `json:"openshift_version"`
-
-	// The OS rootfs url.
-	// Required: true
-	RootfsURL *string `json:"rootfs_url"`
 
 	// The base OS image used for the discovery iso.
 	// Required: true
@@ -49,10 +46,6 @@ func (m *OsImage) Validate(formats strfmt.Registry) error {
 	}
 
 	if err := m.validateOpenshiftVersion(formats); err != nil {
-		res = append(res, err)
-	}
-
-	if err := m.validateRootfsURL(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -82,15 +75,6 @@ func (m *OsImage) validateCPUArchitecture(formats strfmt.Registry) error {
 func (m *OsImage) validateOpenshiftVersion(formats strfmt.Registry) error {
 
 	if err := validate.Required("openshift_version", "body", m.OpenshiftVersion); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (m *OsImage) validateRootfsURL(formats strfmt.Registry) error {
-
-	if err := validate.Required("rootfs_url", "body", m.RootfsURL); err != nil {
 		return err
 	}
 

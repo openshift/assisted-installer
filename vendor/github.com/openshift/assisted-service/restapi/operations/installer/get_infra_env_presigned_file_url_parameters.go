@@ -42,6 +42,10 @@ type GetInfraEnvPresignedFileURLParams struct {
 	  In: path
 	*/
 	InfraEnvID strfmt.UUID
+	/*Specify the script type to be served for iPXE.
+	  In: query
+	*/
+	IpxeScriptType *string
 }
 
 // BindRequest both binds and validates a request, it assumes that complex things implement a Validatable(strfmt.Registry) error interface
@@ -62,6 +66,11 @@ func (o *GetInfraEnvPresignedFileURLParams) BindRequest(r *http.Request, route *
 
 	rInfraEnvID, rhkInfraEnvID, _ := route.Params.GetOK("infra_env_id")
 	if err := o.bindInfraEnvID(rInfraEnvID, rhkInfraEnvID, route.Formats); err != nil {
+		res = append(res, err)
+	}
+
+	qIpxeScriptType, qhkIpxeScriptType, _ := qs.GetOK("ipxe_script_type")
+	if err := o.bindIpxeScriptType(qIpxeScriptType, qhkIpxeScriptType, route.Formats); err != nil {
 		res = append(res, err)
 	}
 	if len(res) > 0 {
@@ -135,5 +144,37 @@ func (o *GetInfraEnvPresignedFileURLParams) validateInfraEnvID(formats strfmt.Re
 	if err := validate.FormatOf("infra_env_id", "path", "uuid", o.InfraEnvID.String(), formats); err != nil {
 		return err
 	}
+	return nil
+}
+
+// bindIpxeScriptType binds and validates parameter IpxeScriptType from query.
+func (o *GetInfraEnvPresignedFileURLParams) bindIpxeScriptType(rawData []string, hasKey bool, formats strfmt.Registry) error {
+	var raw string
+	if len(rawData) > 0 {
+		raw = rawData[len(rawData)-1]
+	}
+
+	// Required: false
+	// AllowEmptyValue: false
+
+	if raw == "" { // empty values pass all other validations
+		return nil
+	}
+	o.IpxeScriptType = &raw
+
+	if err := o.validateIpxeScriptType(formats); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateIpxeScriptType carries on validations for parameter IpxeScriptType
+func (o *GetInfraEnvPresignedFileURLParams) validateIpxeScriptType(formats strfmt.Registry) error {
+
+	if err := validate.EnumCase("ipxe_script_type", "query", *o.IpxeScriptType, []interface{}{"discovery-image-always", "boot-order-control"}, true); err != nil {
+		return err
+	}
+
 	return nil
 }
