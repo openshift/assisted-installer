@@ -2339,7 +2339,7 @@ func init() {
           {
             "type": "string",
             "format": "uuid",
-            "description": "The cluster to return preflight requrements for.",
+            "description": "The cluster to return preflight requirements for.",
             "name": "cluster_id",
             "in": "path",
             "required": true
@@ -2982,6 +2982,15 @@ func init() {
           },
           {
             "agentAuth": []
+          },
+          {
+            "urlAuth": []
+          },
+          {
+            "imageAuth": []
+          },
+          {
+            "imageURLAuth": []
           }
         ],
         "description": "Retrieves the details of the infra-env.",
@@ -3240,13 +3249,41 @@ func init() {
           {
             "enum": [
               "discovery.ign",
-              "ipxe-script"
+              "ipxe-script",
+              "static-network-config"
             ],
             "type": "string",
             "description": "The file to be downloaded.",
             "name": "file_name",
             "in": "query",
             "required": true
+          },
+          {
+            "type": "string",
+            "format": "mac",
+            "description": "Mac address of the host running ipxe script.",
+            "name": "mac",
+            "in": "query"
+          },
+          {
+            "enum": [
+              "discovery-image-always",
+              "boot-order-control"
+            ],
+            "type": "string",
+            "description": "Specify the script type to be served for iPXE.",
+            "name": "ipxe_script_type",
+            "in": "query"
+          },
+          {
+            "enum": [
+              "full-iso",
+              "minimal-iso"
+            ],
+            "type": "string",
+            "description": "Overrides the ISO type for the disovery ignition, either 'full-iso' or 'minimal-iso'.",
+            "name": "discovery_iso_type",
+            "in": "query"
           }
         ],
         "responses": {
@@ -3339,6 +3376,16 @@ func init() {
             "name": "file_name",
             "in": "query",
             "required": true
+          },
+          {
+            "enum": [
+              "discovery-image-always",
+              "boot-order-control"
+            ],
+            "type": "string",
+            "description": "Specify the script type to be served for iPXE.",
+            "name": "ipxe_script_type",
+            "in": "query"
           }
         ],
         "responses": {
@@ -4627,6 +4674,12 @@ func init() {
             "required": true
           },
           {
+            "type": "integer",
+            "description": "The time on the host as seconds since the Unix epoch.",
+            "name": "timestamp",
+            "in": "query"
+          },
+          {
             "type": "string",
             "description": "The software version of the discovery agent that is retrieving instructions.",
             "name": "discovery_agent_version",
@@ -5041,6 +5094,18 @@ func init() {
               "$ref": "#/definitions/openshift-versions"
             }
           },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "500": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
           "503": {
             "description": "Unavailable.",
             "schema": {
@@ -5149,6 +5214,22 @@ func init() {
     }
   },
   "definitions": {
+    "api_vip": {
+      "description": "The virtual IP used to reach the OpenShift cluster's API.",
+      "type": "object",
+      "properties": {
+        "cluster_id": {
+          "description": "The cluster that this VIP is associated with.",
+          "type": "string",
+          "format": "uuid",
+          "x-go-custom-tag": "gorm:\"primaryKey\""
+        },
+        "ip": {
+          "description": "The IP address.",
+          "$ref": "#/definitions/ip"
+        }
+      }
+    },
     "api_vip_connectivity_request": {
       "type": "object",
       "required": [
@@ -5176,15 +5257,24 @@ func init() {
       }
     },
     "api_vip_connectivity_response": {
+      "description": "The response from the day-2 agent's attempt to download the worker ignition file from the API machine config server of the target cluster.\nNote - the name \"API VIP connectivity\" is old and misleading and is preserved for backwards compatibility.",
       "type": "object",
       "properties": {
+        "download_error": {
+          "description": "The error that occurred while downloading the worker ignition file, ignored when is_success is true",
+          "type": "string"
+        },
         "ignition": {
-          "description": "Ignition fetched from the specified API VIP",
+          "description": "Ignition file fetched from the target cluster's API machine config server.\nThis ignition file may be incomplete as almost all files / systemd units are removed from it by the agent in order to save space.",
           "type": "string"
         },
         "is_success": {
-          "description": "Ignition downloadability check result.",
+          "description": "Whether the agent was able to download the ignition or not",
           "type": "boolean"
+        },
+        "url": {
+          "description": "This parameter mirrors the url parameter of the corresponding api_vip_connectivity_request",
+          "type": "string"
         }
       }
     },
@@ -5231,13 +5321,22 @@ func init() {
           "format": "uuid"
         },
         "api_vip": {
-          "description": "The virtual IP used to reach the OpenShift cluster's API.",
+          "description": "(DEPRECATED) The virtual IP used to reach the OpenShift cluster's API.",
           "type": "string",
           "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))$"
         },
         "api_vip_dns_name": {
           "description": "The domain name used to reach the OpenShift cluster API.",
           "type": "string",
+          "x-nullable": true
+        },
+        "api_vips": {
+          "description": "The virtual IPs used to reach the OpenShift cluster's API. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/api_vip"
+          },
+          "x-go-custom-tag": "gorm:\"foreignkey:ClusterID;references:ID\"",
           "x-nullable": true
         },
         "base_dns_domain": {
@@ -5259,10 +5358,10 @@ func init() {
           "description": "Cluster networks that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/cluster_network"
           },
-          "x-go-custom-tag": "gorm:\"foreignkey:ClusterID;references:ID\""
+          "x-go-custom-tag": "gorm:\"foreignkey:ClusterID;references:ID\"",
+          "x-nullable": true
         },
         "connectivity_majority_groups": {
           "description": "Json formatted string containing the majority groups for connectivity checks.",
@@ -5316,7 +5415,6 @@ func init() {
         },
         "disk_encryption": {
           "description": "Information regarding hosts' installation disks encryption.",
-          "type": "object",
           "$ref": "#/definitions/disk-encryption"
         },
         "email_domain": {
@@ -5348,13 +5446,13 @@ func init() {
           "items": {
             "$ref": "#/definitions/host_network"
           },
-          "x-go-custom-tag": "gorm:\"-\""
+          "x-go-custom-tag": "gorm:\"-\"",
+          "x-nullable": true
         },
         "hosts": {
           "description": "Hosts that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/host"
           },
           "x-go-custom-tag": "gorm:\"foreignkey:ClusterID;references:ID\""
@@ -5388,24 +5486,31 @@ func init() {
           "format": "uuid",
           "x-go-custom-tag": "gorm:\"primaryKey\""
         },
-        "ignition_config_overrides": {
-          "description": "Json formatted string containing the user overrides for the initial ignition config",
-          "type": "string",
-          "x-go-custom-tag": "gorm:\"type:text\"",
-          "example": "{\"ignition\": {\"version\": \"3.1.0\"}, \"storage\": {\"files\": [{\"path\": \"/tmp/example\", \"contents\": {\"source\": \"data:text/plain;base64,aGVscGltdHJhcHBlZGluYXN3YWdnZXJzcGVj\"}}]}}"
-        },
         "ignition_endpoint": {
           "description": "Explicit ignition endpoint overrides the default ignition endpoint.",
-          "type": "object",
           "$ref": "#/definitions/ignition-endpoint"
         },
         "image_info": {
           "$ref": "#/definitions/image_info"
         },
+        "imported": {
+          "description": "Indicates whether this cluster is an imported day-2 cluster or a\nregular cluster. Clusters are considered imported when they are\ncreated via the ../clusters/import endpoint. Day-2 clusters converted\nfrom day-1 clusters by kube-api controllers or the\n../clusters/\u003ccluster_id\u003e/actions/allow-add-workers endpoint are not\nconsidered imported. Imported clusters usually lack a lot of\ninformation and are filled with default values that don't necessarily\nreflect the actual cluster they represent",
+          "type": "boolean",
+          "default": false
+        },
         "ingress_vip": {
-          "description": "The virtual IP used for cluster ingress traffic.",
+          "description": "(DEPRECATED) The virtual IP used for cluster ingress traffic.",
           "type": "string",
           "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))$"
+        },
+        "ingress_vips": {
+          "description": "The virtual IPs used for cluster ingress traffic. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingress_vip"
+          },
+          "x-go-custom-tag": "gorm:\"foreignkey:ClusterID;references:ID\"",
+          "x-nullable": true
         },
         "install_completed_at": {
           "description": "The time that this cluster completed installation.",
@@ -5446,16 +5551,15 @@ func init() {
           "description": "Machine networks that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/machine_network"
           },
-          "x-go-custom-tag": "gorm:\"foreignkey:ClusterID;references:ID\""
+          "x-go-custom-tag": "gorm:\"foreignkey:ClusterID;references:ID\"",
+          "x-nullable": true
         },
         "monitored_operators": {
           "description": "Operators that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/monitored-operator"
           },
           "x-go-custom-tag": "gorm:\"foreignkey:ClusterID;references:ID\""
@@ -5515,6 +5619,11 @@ func init() {
           "type": "boolean",
           "default": false
         },
+        "schedulable_masters_forced_true": {
+          "description": "Indicates if schedule workloads on masters will be enabled regardless the value of 'schedulable_masters' property.\nSet to 'true' when not enough hosts are associated with this cluster to disable the scheduling on masters.\n",
+          "type": "boolean",
+          "default": true
+        },
         "service_network_cidr": {
           "description": "The IP address pool to use for service IP addresses. You can enter only one IP address pool. If you need to access the services from an external network, configure load balancers and routers to manage the traffic.",
           "type": "string",
@@ -5524,10 +5633,10 @@ func init() {
           "description": "Service networks that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/service_network"
           },
-          "x-go-custom-tag": "gorm:\"foreignkey:ClusterID;references:ID\""
+          "x-go-custom-tag": "gorm:\"foreignkey:ClusterID;references:ID\"",
+          "x-nullable": true
         },
         "ssh_public_key": {
           "description": "SSH public key for debugging OpenShift nodes.",
@@ -5560,6 +5669,10 @@ func init() {
           "type": "string",
           "format": "date-time",
           "x-go-custom-tag": "gorm:\"type:timestamp with time zone\""
+        },
+        "tags": {
+          "description": "A comma-separated list of tags that are associated to the cluster.",
+          "type": "string"
         },
         "total_host_count": {
           "description": "All hosts associated to this cluster.",
@@ -5616,9 +5729,16 @@ func init() {
           "x-nullable": true
         },
         "api_vip": {
-          "description": "The virtual IP used to reach the OpenShift cluster's API.",
+          "description": "(DEPRECATED) The virtual IP used to reach the OpenShift cluster's API.",
           "type": "string",
           "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))?$"
+        },
+        "api_vips": {
+          "description": "The virtual IPs used to reach the OpenShift cluster's API. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/api_vip"
+          }
         },
         "base_dns_domain": {
           "description": "Base domain of the cluster. All DNS records must be sub-domains of this base and include the cluster name.",
@@ -5641,7 +5761,6 @@ func init() {
           "description": "Cluster networks that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/cluster_network"
           },
           "x-nullable": true
@@ -5654,7 +5773,6 @@ func init() {
         },
         "disk_encryption": {
           "description": "Installation disks encryption mode and host roles to be applied.",
-          "type": "object",
           "$ref": "#/definitions/disk-encryption"
         },
         "high_availability_mode": {
@@ -5689,19 +5807,24 @@ func init() {
         },
         "ignition_endpoint": {
           "description": "Explicit ignition endpoint overrides the default ignition endpoint.",
-          "type": "object",
           "$ref": "#/definitions/ignition-endpoint"
         },
         "ingress_vip": {
-          "description": "The virtual IP used for cluster ingress traffic.",
+          "description": "(DEPRECATED) The virtual IP used for cluster ingress traffic.",
           "type": "string",
           "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))$"
+        },
+        "ingress_vips": {
+          "description": "The virtual IPs used for cluster ingress traffic. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingress_vip"
+          }
         },
         "machine_networks": {
           "description": "Machine networks that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/machine_network"
           },
           "x-nullable": true
@@ -5715,11 +5838,11 @@ func init() {
         "network_type": {
           "description": "The desired network type used.",
           "type": "string",
-          "default": "OpenShiftSDN",
           "enum": [
             "OpenShiftSDN",
             "OVNKubernetes"
-          ]
+          ],
+          "x-nullable": true
         },
         "no_proxy": {
           "description": "An \"*\" or a comma-separated list of destination domain names, domains, IP addresses, or other network CIDRs to exclude from proxying.",
@@ -5742,7 +5865,6 @@ func init() {
           "type": "string"
         },
         "platform": {
-          "type": "object",
           "x-nullable": true,
           "$ref": "#/definitions/platform"
         },
@@ -5765,7 +5887,6 @@ func init() {
           "description": "Service networks that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/service_network"
           },
           "x-nullable": true
@@ -5773,6 +5894,11 @@ func init() {
         "ssh_public_key": {
           "description": "SSH public key for debugging OpenShift nodes.",
           "type": "string"
+        },
+        "tags": {
+          "description": "A comma-separated list of tags that are associated to the cluster.",
+          "type": "string",
+          "x-nullable": true
         },
         "user_managed_networking": {
           "description": "Indicate if the networking is managed by the user.",
@@ -5783,7 +5909,7 @@ func init() {
         "vip_dhcp_allocation": {
           "description": "Indicate if virtual IP DHCP allocation mode is enabled.",
           "type": "boolean",
-          "default": true,
+          "default": false,
           "x-nullable": true
         }
       }
@@ -5890,10 +6016,10 @@ func init() {
         "networks-same-address-families",
         "network-prefix-valid",
         "machine-cidr-equals-to-calculated-cidr",
-        "api-vip-defined",
-        "api-vip-valid",
-        "ingress-vip-defined",
-        "ingress-vip-valid",
+        "api-vips-defined",
+        "api-vips-valid",
+        "ingress-vips-defined",
+        "ingress-vips-valid",
         "all-hosts-are-ready-to-install",
         "sufficient-masters-count",
         "dns-domain-defined",
@@ -5903,6 +6029,7 @@ func init() {
         "ocs-requirements-satisfied",
         "odf-requirements-satisfied",
         "cnv-requirements-satisfied",
+        "lvm-requirements-satisfied",
         "network-type-valid"
       ]
     },
@@ -5918,6 +6045,25 @@ func init() {
           "maximum": 32,
           "minimum": 1
         },
+        "cluster_networks_dualstack": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/cluster_network"
+          }
+        },
+        "cluster_networks_ipv4": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/cluster_network"
+          }
+        },
+        "forbidden_hostnames": {
+          "description": "This provides a list of forbidden hostnames. If this list is empty or not present, this implies that the UI should fall back to a hard coded list.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "inactive_deletion_hours": {
           "type": "integer"
         },
@@ -5928,6 +6074,18 @@ func init() {
         "service_network_cidr": {
           "type": "string",
           "pattern": "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[\\/]([1-9]|[1-2][0-9]|3[0-2]?)$"
+        },
+        "service_networks_dualstack": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/service_network"
+          }
+        },
+        "service_networks_ipv4": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/service_network"
+          }
         }
       }
     },
@@ -6245,9 +6403,16 @@ func init() {
           "type": "string"
         },
         "drive_type": {
-          "type": "string"
+          "$ref": "#/definitions/drive_type"
+        },
+        "has_uuid": {
+          "type": "boolean"
         },
         "hctl": {
+          "type": "string"
+        },
+        "holders": {
+          "description": "A comma-separated list of disk names that this disk belongs to",
           "type": "string"
         },
         "id": {
@@ -6359,6 +6524,24 @@ func init() {
         "none",
         "install"
       ]
+    },
+    "disk-skip-formatting-params": {
+      "description": "Allows an addition or removal of a host disk from the host's skip_formatting_disks list",
+      "type": "object",
+      "required": [
+        "disk_id",
+        "skip_formatting"
+      ],
+      "properties": {
+        "disk_id": {
+          "description": "The ID of the disk that is being added to or removed from the host's skip_formatting_disks list",
+          "type": "string"
+        },
+        "skip_formatting": {
+          "description": "True if you wish to add the disk to the skip_formatting_disks list, false if you wish to remove it",
+          "type": "boolean"
+        }
+      }
     },
     "disk_info": {
       "type": "object",
@@ -6478,6 +6661,49 @@ func init() {
           }
         }
       }
+    },
+    "download_boot_artifacts_request": {
+      "description": "Information sent to the agent for downloading artifacts to boot a host into discovery.",
+      "type": "object",
+      "required": [
+        "kernel_url",
+        "rootfs_url",
+        "initrd_url",
+        "host_fs_mount_dir"
+      ],
+      "properties": {
+        "host_fs_mount_dir": {
+          "description": "The base directory on the host that contains the /boot folder. The host will download boot\nartifacts into a folder in this directory.",
+          "type": "string"
+        },
+        "initrd_url": {
+          "description": "URL address to download the initrd.",
+          "type": "string"
+        },
+        "kernel_url": {
+          "description": "URL address to download the kernel.",
+          "type": "string"
+        },
+        "rootfs_url": {
+          "description": "URL address to download the rootfs.",
+          "type": "string"
+        }
+      }
+    },
+    "drive_type": {
+      "type": "string",
+      "enum": [
+        "Unknown",
+        "HDD",
+        "FDD",
+        "ODD",
+        "SSD",
+        "virtual",
+        "Multipath",
+        "iSCSI",
+        "FC",
+        "LVM"
+      ]
     },
     "error": {
       "type": "object",
@@ -6599,12 +6825,12 @@ func init() {
       "properties": {
         "features": {
           "type": "array",
-          "required": [
-            "feature_id",
-            "support_level"
-          ],
           "items": {
             "type": "object",
+            "required": [
+              "feature_id",
+              "support_level"
+            ],
             "properties": {
               "feature_id": {
                 "description": "The ID of the feature",
@@ -6625,7 +6851,15 @@ func init() {
                   "CUSTOM_MANIFEST",
                   "DISK_ENCRYPTION",
                   "CLUSTER_MANAGED_NETWORKING_WITH_VMS",
-                  "ARM64_ARCHITECTURE"
+                  "ARM64_ARCHITECTURE",
+                  "ARM64_ARCHITECTURE_WITH_CLUSTER_MANAGED_NETWORKING",
+                  "SINGLE_NODE_EXPANSION",
+                  "LVM",
+                  "DUAL_STACK_NETWORKING",
+                  "MULTIARCH_RELEASE_IMAGE",
+                  "NUTANIX_INTEGRATION",
+                  "DUAL_STACK_VIPS",
+                  "USER_MANAGED_NETWORKING_WITH_MULTI_NODE"
                 ]
               },
               "support_level": {
@@ -6724,6 +6958,7 @@ func init() {
       ],
       "properties": {
         "api_vip_connectivity": {
+          "description": "Contains a serialized api_vip_connectivity_response",
           "type": "string",
           "x-go-custom-tag": "gorm:\"type:text\""
         },
@@ -6780,6 +7015,11 @@ func init() {
         },
         "disks_info": {
           "description": "Additional information about disks, formatted as JSON.",
+          "type": "string",
+          "x-go-custom-tag": "gorm:\"type:text\""
+        },
+        "disks_to_be_formatted": {
+          "description": "A comma-separated list of disks that will be formatted once\ninstallation begins, unless otherwise set to be skipped by\nskip_formatting_disks. This means that this list also includes disks\nthat appear in skip_formatting_disks. This property is managed by the\nservice and cannot be modified by the user.",
           "type": "string",
           "x-go-custom-tag": "gorm:\"type:text\""
         },
@@ -6853,7 +7093,7 @@ func init() {
         },
         "logs_collected_at": {
           "type": "string",
-          "format": "datetime",
+          "format": "date-time",
           "x-go-custom-tag": "gorm:\"type:timestamp with time zone\""
         },
         "logs_info": {
@@ -6862,11 +7102,20 @@ func init() {
         },
         "logs_started_at": {
           "type": "string",
-          "format": "datetime",
+          "format": "date-time",
           "x-go-custom-tag": "gorm:\"type:timestamp with time zone\""
         },
         "machine_config_pool_name": {
           "type": "string"
+        },
+        "media_status": {
+          "type": "string",
+          "default": "connected",
+          "enum": [
+            "connected",
+            "disconnected"
+          ],
+          "x-nullable": true
         },
         "node_labels": {
           "description": "Json containing node's labels.",
@@ -6886,13 +7135,25 @@ func init() {
           "items": {
             "$ref": "#/definitions/host-stage"
           },
-          "x-go-custom-tag": "gorm:\"-\""
+          "x-go-custom-tag": "gorm:\"-\"",
+          "x-nullable": true
+        },
+        "registered_at": {
+          "description": "The last time the host's agent tried to register in the service.",
+          "type": "string",
+          "format": "date-time",
+          "x-go-custom-tag": "gorm:\"type:timestamp with time zone\""
         },
         "requested_hostname": {
           "type": "string"
         },
         "role": {
           "$ref": "#/definitions/host-role"
+        },
+        "skip_formatting_disks": {
+          "description": "A comma-seperated list of host disks that the service will avoid\nformatting.",
+          "type": "string",
+          "x-go-custom-tag": "gorm:\"type:text\""
         },
         "stage_started_at": {
           "description": "Time at which the current progress stage started.",
@@ -6934,7 +7195,9 @@ func init() {
             "disconnected-unbound",
             "insufficient-unbound",
             "disabled-unbound",
-            "discovering-unbound"
+            "discovering-unbound",
+            "reclaiming",
+            "reclaiming-rebooting"
           ]
         },
         "status_info": {
@@ -6949,6 +7212,14 @@ func init() {
         },
         "suggested_role": {
           "$ref": "#/definitions/host-role"
+        },
+        "tang_connectivity": {
+          "type": "string",
+          "x-go-custom-tag": "gorm:\"type:text\""
+        },
+        "timestamp": {
+          "description": "The time on the host as seconds since the Unix epoch.",
+          "type": "integer"
         },
         "updated_at": {
           "type": "string",
@@ -7115,6 +7386,14 @@ func init() {
           },
           "x-nullable": true
         },
+        "disks_skip_formatting": {
+          "description": "Allows changing the host's skip_formatting_disks parameter",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/disk-skip-formatting-params"
+          },
+          "x-nullable": true
+        },
         "host_name": {
           "type": "string",
           "x-nullable": true
@@ -7151,6 +7430,7 @@ func init() {
       "type": "string",
       "enum": [
         "connected",
+        "media-connected",
         "has-inventory",
         "has-min-cpu-cores",
         "has-min-valid-disks",
@@ -7165,10 +7445,12 @@ func init() {
         "belongs-to-majority-group",
         "valid-platform-network-settings",
         "ntp-synced",
+        "time-synced-between-host-and-service",
         "container-images-available",
         "lso-requirements-satisfied",
         "ocs-requirements-satisfied",
         "odf-requirements-satisfied",
+        "lvm-requirements-satisfied",
         "sufficient-installation-disk-speed",
         "cnv-requirements-satisfied",
         "sufficient-network-latency-requirement-for-role",
@@ -7179,7 +7461,12 @@ func init() {
         "apps-domain-name-resolved-correctly",
         "compatible-with-cluster-platform",
         "dns-wildcard-not-configured",
-        "disk-encryption-requirements-satisfied"
+        "disk-encryption-requirements-satisfied",
+        "non-overlapping-subnets",
+        "vsphere-disk-uuid-enabled",
+        "compatible-agent",
+        "no-skip-installation-disk",
+        "no-skip-missing-disk"
       ]
     },
     "host_network": {
@@ -7372,6 +7659,11 @@ func init() {
           "description": "A comma-separated list of NTP sources (name or IP) going to be added to all the hosts.",
           "type": "string"
         },
+        "additional_trust_bundle": {
+          "description": "PEM-encoded X.509 certificate bundle. Hosts discovered by this\ninfra-env will trust the certificates in this bundle. Clusters formed\nfrom the hosts discovered by this infra-env will also trust the\ncertificates in this bundle.",
+          "type": "string",
+          "x-nullable": false
+        },
         "cluster_id": {
           "description": "If set, all hosts that register will be associated with the specified cluster.",
           "type": "string",
@@ -7426,6 +7718,12 @@ func init() {
         "ignition_config_override": {
           "description": "Json formatted string containing the user overrides for the initial ignition config.",
           "type": "string"
+        },
+        "kernel_arguments": {
+          "description": "JSON formatted string array representing the discovery image kernel arguments.",
+          "type": "string",
+          "x-go-custom-tag": "gorm:\"type:text\"",
+          "x-nullable": true
         },
         "kind": {
           "description": "Indicates the type of this object.",
@@ -7498,6 +7796,11 @@ func init() {
           "type": "string",
           "x-nullable": true
         },
+        "additional_trust_bundle": {
+          "description": "PEM-encoded X.509 certificate bundle. Hosts discovered by this\ninfra-env will trust the certificates in this bundle. Clusters formed\nfrom the hosts discovered by this infra-env will also trust the\ncertificates in this bundle.",
+          "type": "string",
+          "x-nullable": false
+        },
         "cluster_id": {
           "description": "If set, all hosts that register will be associated with the specified cluster.",
           "type": "string",
@@ -7516,6 +7819,9 @@ func init() {
         },
         "image_type": {
           "$ref": "#/definitions/image_type"
+        },
+        "kernel_arguments": {
+          "$ref": "#/definitions/kernel_arguments"
         },
         "name": {
           "description": "Name of the infra-env.",
@@ -7559,12 +7865,20 @@ func init() {
           "type": "string",
           "x-nullable": true
         },
+        "additional_trust_bundle": {
+          "description": "Allows users to change the additional_trust_bundle infra-env field",
+          "type": "string",
+          "x-nullable": true
+        },
         "ignition_config_override": {
           "description": "JSON formatted string containing the user overrides for the initial ignition config.",
           "type": "string"
         },
         "image_type": {
           "$ref": "#/definitions/image_type"
+        },
+        "kernel_arguments": {
+          "$ref": "#/definitions/kernel_arguments"
         },
         "proxy": {
           "$ref": "#/definitions/proxy"
@@ -7609,6 +7923,22 @@ func init() {
     "ingress-cert-params": {
       "type": "string"
     },
+    "ingress_vip": {
+      "description": "The virtual IP used for cluster ingress traffic.",
+      "type": "object",
+      "properties": {
+        "cluster_id": {
+          "description": "The cluster that this VIP is associated with.",
+          "type": "string",
+          "format": "uuid",
+          "x-go-custom-tag": "gorm:\"primaryKey\""
+        },
+        "ip": {
+          "description": "The IP address.",
+          "$ref": "#/definitions/ip"
+        }
+      }
+    },
     "install_cmd_request": {
       "type": "object",
       "required": [
@@ -7618,8 +7948,7 @@ func init() {
         "role",
         "boot_device",
         "controller_image",
-        "installer_image",
-        "high_availability_mode"
+        "installer_image"
       ],
       "properties": {
         "boot_device": {
@@ -7704,6 +8033,10 @@ func init() {
             "type": "string",
             "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))$"
           }
+        },
+        "skip_installation_disk_cleanup": {
+          "description": "Skip formatting installation disk",
+          "type": "boolean"
         }
       }
     },
@@ -7771,6 +8104,9 @@ func init() {
         "speed_mbps": {
           "type": "integer"
         },
+        "type": {
+          "type": "string"
+        },
         "vendor": {
           "type": "string"
         }
@@ -7824,9 +8160,6 @@ func init() {
         "system_vendor": {
           "$ref": "#/definitions/system_vendor"
         },
-        "timestamp": {
-          "type": "integer"
-        },
         "tpm_version": {
           "type": "string",
           "enum": [
@@ -7845,6 +8178,39 @@ func init() {
           "type": "integer"
         }
       }
+    },
+    "ip": {
+      "type": "string",
+      "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))?$",
+      "x-go-custom-tag": "gorm:\"primaryKey\""
+    },
+    "kernel_argument": {
+      "description": "pair of [operation, argument] specifying the argument and what operation should be applied on it.",
+      "type": "object",
+      "properties": {
+        "operation": {
+          "description": "The operation to apply on the kernel argument.",
+          "type": "string",
+          "enum": [
+            "append",
+            "replace",
+            "delete"
+          ]
+        },
+        "value": {
+          "description": "Kernel argument can have the form \u003cparameter\u003e or \u003cparameter\u003e=\u003cvalue\u003e. The following examples should\nbe supported:\nrd.net.timeout.carrier=60\nisolcpus=1,2,10-20,100-2000:2/25\nquiet\nThe parsing by the command line parser in linux kernel is much looser and this pattern follows it.\n",
+          "type": "string",
+          "pattern": "^(?:(?:[^ \\t\\n\\r\"]+)|(?:\"[^\"]*\"))+$"
+        }
+      }
+    },
+    "kernel_arguments": {
+      "description": "List of kernel arugment objects that define the operations and values to be applied.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/kernel_argument"
+      },
+      "x-omitempty": false
     },
     "l2-connectivity": {
       "type": "object",
@@ -8378,7 +8744,6 @@ func init() {
         "openshift_version",
         "cpu_architecture",
         "url",
-        "rootfs_url",
         "version"
       ],
       "properties": {
@@ -8389,12 +8754,9 @@ func init() {
           "x-go-custom-tag": "gorm:\"default:'x86_64'\""
         },
         "openshift_version": {
-          "description": "Version of the OpenShift cluster.",
-          "type": "string"
-        },
-        "rootfs_url": {
-          "description": "The OS rootfs url.",
-          "type": "string"
+          "description": "Version of the operating system image",
+          "type": "string",
+          "example": "4.12"
         },
         "url": {
           "description": "The base OS image used for the discovery iso.",
@@ -8412,64 +8774,6 @@ func init() {
         "$ref": "#/definitions/os-image"
       }
     },
-    "ovirt-platform": {
-      "description": "oVirt platform-specific configuration upon which to perform the installation.",
-      "type": "object",
-      "properties": {
-        "ca_bundle": {
-          "description": "The CA Bundle of the oVirt's engine certificate.",
-          "type": "string",
-          "x-nullable": true
-        },
-        "cluster_id": {
-          "description": "The oVirt cluster ID.",
-          "type": "string",
-          "format": "uuid",
-          "x-nullable": true
-        },
-        "fqdn": {
-          "description": "The oVirt's engine fully qualified domain name.",
-          "type": "string",
-          "x-nullable": true
-        },
-        "insecure": {
-          "description": "Verify oVirt engine certificate.",
-          "type": "boolean",
-          "default": true,
-          "x-nullable": true
-        },
-        "network_name": {
-          "description": "The oVirt network the VMs will be attached to.",
-          "type": "string",
-          "default": "ovirtmgmt",
-          "x-nullable": true
-        },
-        "password": {
-          "description": "The password for the oVirt user name.",
-          "type": "string",
-          "format": "password",
-          "x-nullable": true
-        },
-        "storage_domain_id": {
-          "description": "The oVirt storage domain ID.",
-          "type": "string",
-          "format": "uuid",
-          "x-nullable": true
-        },
-        "username": {
-          "description": "The user name to use to connect to the oVirt instance.",
-          "type": "string",
-          "x-nullable": true
-        },
-        "vnic_profile_id": {
-          "description": "The oVirt VNIC profile ID.",
-          "type": "string",
-          "format": "uuid",
-          "x-nullable": true
-        }
-      },
-      "x-go-custom-tag": "gorm:\"embedded;embeddedPrefix:ovirt_\""
-    },
     "platform": {
       "description": "The configuration for the specific platform upon which to perform the installation.",
       "type": "object",
@@ -8477,11 +8781,6 @@ func init() {
         "type"
       ],
       "properties": {
-        "ovirt": {
-          "type": "object",
-          "x-nullable": true,
-          "$ref": "#/definitions/ovirt-platform"
-        },
         "type": {
           "$ref": "#/definitions/platform_type"
         }
@@ -8492,8 +8791,8 @@ func init() {
       "type": "string",
       "enum": [
         "baremetal",
+        "nutanix",
         "vsphere",
-        "ovirt",
         "none"
       ]
     },
@@ -8552,6 +8851,19 @@ func init() {
       },
       "x-go-custom-tag": "gorm:\"embedded;embeddedPrefix:proxy_\""
     },
+    "reboot_for_reclaim_request": {
+      "description": "Information sent to the agent for rebooting a host into discovery.",
+      "type": "object",
+      "required": [
+        "host_fs_mount_dir"
+      ],
+      "properties": {
+        "host_fs_mount_dir": {
+          "description": "The base directory on the host that contains the /boot folder. The host needs to\nchroot into this directory in order to properly reboot.",
+          "type": "string"
+        }
+      }
+    },
     "release-image": {
       "type": "object",
       "required": [
@@ -8562,10 +8874,17 @@ func init() {
       ],
       "properties": {
         "cpu_architecture": {
-          "description": "The CPU architecture of the image (x86_64/arm64/etc).",
+          "description": "(DEPRECATED) The CPU architecture of the image (x86_64/arm64/etc).",
           "type": "string",
           "default": "x86_64",
           "x-go-custom-tag": "gorm:\"default:'x86_64'\""
+        },
+        "cpu_architectures": {
+          "description": "List of CPU architectures provided by the image.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "default": {
           "description": "Indication that the version is the recommended one.",
@@ -8619,6 +8938,11 @@ func init() {
         "interface": {
           "description": "Interface to which packets for this route will be sent",
           "type": "string"
+        },
+        "metric": {
+          "description": "Route priority metric",
+          "type": "integer",
+          "format": "int32"
         }
       }
     },
@@ -8658,9 +8982,6 @@ func init() {
             "type": "string"
           }
         },
-        "command": {
-          "type": "string"
-        },
         "step_id": {
           "type": "string"
         },
@@ -8699,13 +9020,17 @@ func init() {
         "free-network-addresses",
         "dhcp-lease-allocate",
         "api-vip-connectivity-check",
+        "tang-connectivity-check",
         "ntp-synchronizer",
         "installation-disk-speed-check",
         "container-image-availability",
         "domain-resolution",
         "stop-installation",
         "logs-gather",
-        "next-step-runner"
+        "next-step-runner",
+        "upgrade-agent",
+        "download-boot-artifacts",
+        "reboot-for-reclaim"
       ]
     },
     "steps": {
@@ -8760,6 +9085,88 @@ func init() {
         }
       }
     },
+    "tang_connectivity_request": {
+      "type": "object",
+      "required": [
+        "tang_servers"
+      ],
+      "properties": {
+        "tang_servers": {
+          "description": "JSON-formatted string containing additional information regarding tang's configuration",
+          "type": "string"
+        }
+      }
+    },
+    "tang_connectivity_response": {
+      "type": "object",
+      "properties": {
+        "is_success": {
+          "description": "Tang check result.",
+          "type": "boolean"
+        },
+        "tang_server_response": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "payload": {
+                "description": "Tang response payload.",
+                "type": "string"
+              },
+              "signatures": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "protected": {
+                      "type": "string"
+                    },
+                    "signature": {
+                      "type": "string"
+                    }
+                  },
+                  "x-go-name": "TangServerSignatures"
+                }
+              },
+              "tang_url": {
+                "description": "Tang URL.",
+                "type": "string"
+              }
+            },
+            "x-go-name": "TangServerResponse"
+          }
+        }
+      }
+    },
+    "upgrade_agent_request": {
+      "type": "object",
+      "properties": {
+        "agent_image": {
+          "description": "Full image reference of the image that the agent should upgrade to, for example\n` + "`" + `quay.io/registry-proxy.engineering.redhat.com/rh-osbs/openshift4-assisted-installer-agent-rhel8:v1.0.0-142` + "`" + `.\n",
+          "type": "string"
+        }
+      }
+    },
+    "upgrade_agent_response": {
+      "type": "object",
+      "properties": {
+        "agent_image": {
+          "description": "Full image reference of the image that the agent has upgraded to, for example\n` + "`" + `quay.io/registry-proxy.engineering.redhat.com/rh-osbs/openshift4-assisted-installer-agent-rhel8:v1.0.0-142` + "`" + `.\n",
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/definitions/upgrade_agent_result"
+        }
+      }
+    },
+    "upgrade_agent_result": {
+      "description": "Agent upgrade result.",
+      "type": "string",
+      "enum": [
+        "success",
+        "failure"
+      ]
+    },
     "usage": {
       "type": "object",
       "properties": {
@@ -8789,7 +9196,7 @@ func init() {
           "x-nullable": true
         },
         "api_vip": {
-          "description": "The virtual IP used to reach the OpenShift cluster's API.",
+          "description": "(DEPRECATED) The virtual IP used to reach the OpenShift cluster's API.",
           "type": "string",
           "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))?$",
           "x-nullable": true
@@ -8797,6 +9204,14 @@ func init() {
         "api_vip_dns_name": {
           "description": "The domain name used to reach the OpenShift cluster API.",
           "type": "string",
+          "x-nullable": true
+        },
+        "api_vips": {
+          "description": "The virtual IPs used to reach the OpenShift cluster's API. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/api_vip"
+          },
           "x-nullable": true
         },
         "base_dns_domain": {
@@ -8821,14 +9236,12 @@ func init() {
           "description": "Cluster networks that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/cluster_network"
           },
           "x-nullable": true
         },
         "disk_encryption": {
           "description": "Installation disks encryption mode and host roles to be applied.",
-          "type": "object",
           "$ref": "#/definitions/disk-encryption"
         },
         "http_proxy": {
@@ -8854,13 +9267,20 @@ func init() {
         },
         "ignition_endpoint": {
           "description": "Explicit ignition endpoint overrides the default ignition endpoint.",
-          "type": "object",
           "$ref": "#/definitions/ignition-endpoint"
         },
         "ingress_vip": {
-          "description": "The virtual IP used for cluster ingress traffic.",
+          "description": "(DEPRECATED) The virtual IP used for cluster ingress traffic.",
           "type": "string",
           "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))?$",
+          "x-nullable": true
+        },
+        "ingress_vips": {
+          "description": "The virtual IPs used for cluster ingress traffic. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingress_vip"
+          },
           "x-nullable": true
         },
         "machine_network_cidr": {
@@ -8873,7 +9293,6 @@ func init() {
           "description": "Machine networks that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/machine_network"
           },
           "x-nullable": true
@@ -8907,7 +9326,6 @@ func init() {
           }
         },
         "platform": {
-          "type": "object",
           "$ref": "#/definitions/platform"
         },
         "pull_secret": {
@@ -8930,13 +9348,17 @@ func init() {
           "description": "Service networks that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/service_network"
           },
           "x-nullable": true
         },
         "ssh_public_key": {
           "description": "SSH public key for debugging OpenShift nodes.",
+          "type": "string",
+          "x-nullable": true
+        },
+        "tags": {
+          "description": "A comma-separated list of tags that are associated to the cluster.",
           "type": "string",
           "x-nullable": true
         },
@@ -8955,6 +9377,11 @@ func init() {
     "versioned-host-requirements": {
       "type": "object",
       "properties": {
+        "edge-worker": {
+          "description": "Edge Worker OpenShift node requirements",
+          "x-go-name": "EdgeWorkerRequirements",
+          "$ref": "#/definitions/cluster-host-requirements-details"
+        },
         "master": {
           "description": "Master node requirements",
           "x-go-name": "MasterRequirements",
@@ -11371,7 +11798,7 @@ func init() {
           {
             "type": "string",
             "format": "uuid",
-            "description": "The cluster to return preflight requrements for.",
+            "description": "The cluster to return preflight requirements for.",
             "name": "cluster_id",
             "in": "path",
             "required": true
@@ -12014,6 +12441,15 @@ func init() {
           },
           {
             "agentAuth": []
+          },
+          {
+            "urlAuth": []
+          },
+          {
+            "imageAuth": []
+          },
+          {
+            "imageURLAuth": []
           }
         ],
         "description": "Retrieves the details of the infra-env.",
@@ -12272,13 +12708,41 @@ func init() {
           {
             "enum": [
               "discovery.ign",
-              "ipxe-script"
+              "ipxe-script",
+              "static-network-config"
             ],
             "type": "string",
             "description": "The file to be downloaded.",
             "name": "file_name",
             "in": "query",
             "required": true
+          },
+          {
+            "type": "string",
+            "format": "mac",
+            "description": "Mac address of the host running ipxe script.",
+            "name": "mac",
+            "in": "query"
+          },
+          {
+            "enum": [
+              "discovery-image-always",
+              "boot-order-control"
+            ],
+            "type": "string",
+            "description": "Specify the script type to be served for iPXE.",
+            "name": "ipxe_script_type",
+            "in": "query"
+          },
+          {
+            "enum": [
+              "full-iso",
+              "minimal-iso"
+            ],
+            "type": "string",
+            "description": "Overrides the ISO type for the disovery ignition, either 'full-iso' or 'minimal-iso'.",
+            "name": "discovery_iso_type",
+            "in": "query"
           }
         ],
         "responses": {
@@ -12371,6 +12835,16 @@ func init() {
             "name": "file_name",
             "in": "query",
             "required": true
+          },
+          {
+            "enum": [
+              "discovery-image-always",
+              "boot-order-control"
+            ],
+            "type": "string",
+            "description": "Specify the script type to be served for iPXE.",
+            "name": "ipxe_script_type",
+            "in": "query"
           }
         ],
         "responses": {
@@ -13659,6 +14133,12 @@ func init() {
             "required": true
           },
           {
+            "type": "integer",
+            "description": "The time on the host as seconds since the Unix epoch.",
+            "name": "timestamp",
+            "in": "query"
+          },
+          {
             "type": "string",
             "description": "The software version of the discovery agent that is retrieving instructions.",
             "name": "discovery_agent_version",
@@ -14073,6 +14553,18 @@ func init() {
               "$ref": "#/definitions/openshift-versions"
             }
           },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "500": {
+            "description": "Error.",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
           "503": {
             "description": "Unavailable.",
             "schema": {
@@ -14243,6 +14735,10 @@ func init() {
     },
     "FeatureSupportLevelFeaturesItems0": {
       "type": "object",
+      "required": [
+        "feature_id",
+        "support_level"
+      ],
       "properties": {
         "feature_id": {
           "description": "The ID of the feature",
@@ -14263,7 +14759,15 @@ func init() {
             "CUSTOM_MANIFEST",
             "DISK_ENCRYPTION",
             "CLUSTER_MANAGED_NETWORKING_WITH_VMS",
-            "ARM64_ARCHITECTURE"
+            "ARM64_ARCHITECTURE",
+            "ARM64_ARCHITECTURE_WITH_CLUSTER_MANAGED_NETWORKING",
+            "SINGLE_NODE_EXPANSION",
+            "LVM",
+            "DUAL_STACK_NETWORKING",
+            "MULTIARCH_RELEASE_IMAGE",
+            "NUTANIX_INTEGRATION",
+            "DUAL_STACK_VIPS",
+            "USER_MANAGED_NETWORKING_WITH_MULTI_NODE"
           ]
         },
         "support_level": {
@@ -14310,6 +14814,54 @@ func init() {
         }
       }
     },
+    "TangConnectivityResponseTangServerResponseItems0": {
+      "type": "object",
+      "properties": {
+        "payload": {
+          "description": "Tang response payload.",
+          "type": "string"
+        },
+        "signatures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TangConnectivityResponseTangServerResponseItems0SignaturesItems0"
+          }
+        },
+        "tang_url": {
+          "description": "Tang URL.",
+          "type": "string"
+        }
+      },
+      "x-go-name": "TangServerResponse"
+    },
+    "TangConnectivityResponseTangServerResponseItems0SignaturesItems0": {
+      "type": "object",
+      "properties": {
+        "protected": {
+          "type": "string"
+        },
+        "signature": {
+          "type": "string"
+        }
+      },
+      "x-go-name": "TangServerSignatures"
+    },
+    "api_vip": {
+      "description": "The virtual IP used to reach the OpenShift cluster's API.",
+      "type": "object",
+      "properties": {
+        "cluster_id": {
+          "description": "The cluster that this VIP is associated with.",
+          "type": "string",
+          "format": "uuid",
+          "x-go-custom-tag": "gorm:\"primaryKey\""
+        },
+        "ip": {
+          "description": "The IP address.",
+          "$ref": "#/definitions/ip"
+        }
+      }
+    },
     "api_vip_connectivity_request": {
       "type": "object",
       "required": [
@@ -14337,15 +14889,24 @@ func init() {
       }
     },
     "api_vip_connectivity_response": {
+      "description": "The response from the day-2 agent's attempt to download the worker ignition file from the API machine config server of the target cluster.\nNote - the name \"API VIP connectivity\" is old and misleading and is preserved for backwards compatibility.",
       "type": "object",
       "properties": {
+        "download_error": {
+          "description": "The error that occurred while downloading the worker ignition file, ignored when is_success is true",
+          "type": "string"
+        },
         "ignition": {
-          "description": "Ignition fetched from the specified API VIP",
+          "description": "Ignition file fetched from the target cluster's API machine config server.\nThis ignition file may be incomplete as almost all files / systemd units are removed from it by the agent in order to save space.",
           "type": "string"
         },
         "is_success": {
-          "description": "Ignition downloadability check result.",
+          "description": "Whether the agent was able to download the ignition or not",
           "type": "boolean"
+        },
+        "url": {
+          "description": "This parameter mirrors the url parameter of the corresponding api_vip_connectivity_request",
+          "type": "string"
         }
       }
     },
@@ -14392,13 +14953,22 @@ func init() {
           "format": "uuid"
         },
         "api_vip": {
-          "description": "The virtual IP used to reach the OpenShift cluster's API.",
+          "description": "(DEPRECATED) The virtual IP used to reach the OpenShift cluster's API.",
           "type": "string",
           "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))$"
         },
         "api_vip_dns_name": {
           "description": "The domain name used to reach the OpenShift cluster API.",
           "type": "string",
+          "x-nullable": true
+        },
+        "api_vips": {
+          "description": "The virtual IPs used to reach the OpenShift cluster's API. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/api_vip"
+          },
+          "x-go-custom-tag": "gorm:\"foreignkey:ClusterID;references:ID\"",
           "x-nullable": true
         },
         "base_dns_domain": {
@@ -14420,10 +14990,10 @@ func init() {
           "description": "Cluster networks that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/cluster_network"
           },
-          "x-go-custom-tag": "gorm:\"foreignkey:ClusterID;references:ID\""
+          "x-go-custom-tag": "gorm:\"foreignkey:ClusterID;references:ID\"",
+          "x-nullable": true
         },
         "connectivity_majority_groups": {
           "description": "Json formatted string containing the majority groups for connectivity checks.",
@@ -14477,7 +15047,6 @@ func init() {
         },
         "disk_encryption": {
           "description": "Information regarding hosts' installation disks encryption.",
-          "type": "object",
           "$ref": "#/definitions/disk-encryption"
         },
         "email_domain": {
@@ -14509,13 +15078,13 @@ func init() {
           "items": {
             "$ref": "#/definitions/host_network"
           },
-          "x-go-custom-tag": "gorm:\"-\""
+          "x-go-custom-tag": "gorm:\"-\"",
+          "x-nullable": true
         },
         "hosts": {
           "description": "Hosts that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/host"
           },
           "x-go-custom-tag": "gorm:\"foreignkey:ClusterID;references:ID\""
@@ -14549,24 +15118,31 @@ func init() {
           "format": "uuid",
           "x-go-custom-tag": "gorm:\"primaryKey\""
         },
-        "ignition_config_overrides": {
-          "description": "Json formatted string containing the user overrides for the initial ignition config",
-          "type": "string",
-          "x-go-custom-tag": "gorm:\"type:text\"",
-          "example": "{\"ignition\": {\"version\": \"3.1.0\"}, \"storage\": {\"files\": [{\"path\": \"/tmp/example\", \"contents\": {\"source\": \"data:text/plain;base64,aGVscGltdHJhcHBlZGluYXN3YWdnZXJzcGVj\"}}]}}"
-        },
         "ignition_endpoint": {
           "description": "Explicit ignition endpoint overrides the default ignition endpoint.",
-          "type": "object",
           "$ref": "#/definitions/ignition-endpoint"
         },
         "image_info": {
           "$ref": "#/definitions/image_info"
         },
+        "imported": {
+          "description": "Indicates whether this cluster is an imported day-2 cluster or a\nregular cluster. Clusters are considered imported when they are\ncreated via the ../clusters/import endpoint. Day-2 clusters converted\nfrom day-1 clusters by kube-api controllers or the\n../clusters/\u003ccluster_id\u003e/actions/allow-add-workers endpoint are not\nconsidered imported. Imported clusters usually lack a lot of\ninformation and are filled with default values that don't necessarily\nreflect the actual cluster they represent",
+          "type": "boolean",
+          "default": false
+        },
         "ingress_vip": {
-          "description": "The virtual IP used for cluster ingress traffic.",
+          "description": "(DEPRECATED) The virtual IP used for cluster ingress traffic.",
           "type": "string",
           "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))$"
+        },
+        "ingress_vips": {
+          "description": "The virtual IPs used for cluster ingress traffic. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingress_vip"
+          },
+          "x-go-custom-tag": "gorm:\"foreignkey:ClusterID;references:ID\"",
+          "x-nullable": true
         },
         "install_completed_at": {
           "description": "The time that this cluster completed installation.",
@@ -14607,16 +15183,15 @@ func init() {
           "description": "Machine networks that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/machine_network"
           },
-          "x-go-custom-tag": "gorm:\"foreignkey:ClusterID;references:ID\""
+          "x-go-custom-tag": "gorm:\"foreignkey:ClusterID;references:ID\"",
+          "x-nullable": true
         },
         "monitored_operators": {
           "description": "Operators that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/monitored-operator"
           },
           "x-go-custom-tag": "gorm:\"foreignkey:ClusterID;references:ID\""
@@ -14676,6 +15251,11 @@ func init() {
           "type": "boolean",
           "default": false
         },
+        "schedulable_masters_forced_true": {
+          "description": "Indicates if schedule workloads on masters will be enabled regardless the value of 'schedulable_masters' property.\nSet to 'true' when not enough hosts are associated with this cluster to disable the scheduling on masters.\n",
+          "type": "boolean",
+          "default": true
+        },
         "service_network_cidr": {
           "description": "The IP address pool to use for service IP addresses. You can enter only one IP address pool. If you need to access the services from an external network, configure load balancers and routers to manage the traffic.",
           "type": "string",
@@ -14685,10 +15265,10 @@ func init() {
           "description": "Service networks that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/service_network"
           },
-          "x-go-custom-tag": "gorm:\"foreignkey:ClusterID;references:ID\""
+          "x-go-custom-tag": "gorm:\"foreignkey:ClusterID;references:ID\"",
+          "x-nullable": true
         },
         "ssh_public_key": {
           "description": "SSH public key for debugging OpenShift nodes.",
@@ -14721,6 +15301,10 @@ func init() {
           "type": "string",
           "format": "date-time",
           "x-go-custom-tag": "gorm:\"type:timestamp with time zone\""
+        },
+        "tags": {
+          "description": "A comma-separated list of tags that are associated to the cluster.",
+          "type": "string"
         },
         "total_host_count": {
           "description": "All hosts associated to this cluster.",
@@ -14777,9 +15361,16 @@ func init() {
           "x-nullable": true
         },
         "api_vip": {
-          "description": "The virtual IP used to reach the OpenShift cluster's API.",
+          "description": "(DEPRECATED) The virtual IP used to reach the OpenShift cluster's API.",
           "type": "string",
           "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))?$"
+        },
+        "api_vips": {
+          "description": "The virtual IPs used to reach the OpenShift cluster's API. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/api_vip"
+          }
         },
         "base_dns_domain": {
           "description": "Base domain of the cluster. All DNS records must be sub-domains of this base and include the cluster name.",
@@ -14802,7 +15393,6 @@ func init() {
           "description": "Cluster networks that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/cluster_network"
           },
           "x-nullable": true
@@ -14815,7 +15405,6 @@ func init() {
         },
         "disk_encryption": {
           "description": "Installation disks encryption mode and host roles to be applied.",
-          "type": "object",
           "$ref": "#/definitions/disk-encryption"
         },
         "high_availability_mode": {
@@ -14850,19 +15439,24 @@ func init() {
         },
         "ignition_endpoint": {
           "description": "Explicit ignition endpoint overrides the default ignition endpoint.",
-          "type": "object",
           "$ref": "#/definitions/ignition-endpoint"
         },
         "ingress_vip": {
-          "description": "The virtual IP used for cluster ingress traffic.",
+          "description": "(DEPRECATED) The virtual IP used for cluster ingress traffic.",
           "type": "string",
           "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))$"
+        },
+        "ingress_vips": {
+          "description": "The virtual IPs used for cluster ingress traffic. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingress_vip"
+          }
         },
         "machine_networks": {
           "description": "Machine networks that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/machine_network"
           },
           "x-nullable": true
@@ -14876,11 +15470,11 @@ func init() {
         "network_type": {
           "description": "The desired network type used.",
           "type": "string",
-          "default": "OpenShiftSDN",
           "enum": [
             "OpenShiftSDN",
             "OVNKubernetes"
-          ]
+          ],
+          "x-nullable": true
         },
         "no_proxy": {
           "description": "An \"*\" or a comma-separated list of destination domain names, domains, IP addresses, or other network CIDRs to exclude from proxying.",
@@ -14903,7 +15497,6 @@ func init() {
           "type": "string"
         },
         "platform": {
-          "type": "object",
           "x-nullable": true,
           "$ref": "#/definitions/platform"
         },
@@ -14926,7 +15519,6 @@ func init() {
           "description": "Service networks that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/service_network"
           },
           "x-nullable": true
@@ -14934,6 +15526,11 @@ func init() {
         "ssh_public_key": {
           "description": "SSH public key for debugging OpenShift nodes.",
           "type": "string"
+        },
+        "tags": {
+          "description": "A comma-separated list of tags that are associated to the cluster.",
+          "type": "string",
+          "x-nullable": true
         },
         "user_managed_networking": {
           "description": "Indicate if the networking is managed by the user.",
@@ -14944,7 +15541,7 @@ func init() {
         "vip_dhcp_allocation": {
           "description": "Indicate if virtual IP DHCP allocation mode is enabled.",
           "type": "boolean",
-          "default": true,
+          "default": false,
           "x-nullable": true
         }
       }
@@ -15051,10 +15648,10 @@ func init() {
         "networks-same-address-families",
         "network-prefix-valid",
         "machine-cidr-equals-to-calculated-cidr",
-        "api-vip-defined",
-        "api-vip-valid",
-        "ingress-vip-defined",
-        "ingress-vip-valid",
+        "api-vips-defined",
+        "api-vips-valid",
+        "ingress-vips-defined",
+        "ingress-vips-valid",
         "all-hosts-are-ready-to-install",
         "sufficient-masters-count",
         "dns-domain-defined",
@@ -15064,6 +15661,7 @@ func init() {
         "ocs-requirements-satisfied",
         "odf-requirements-satisfied",
         "cnv-requirements-satisfied",
+        "lvm-requirements-satisfied",
         "network-type-valid"
       ]
     },
@@ -15079,6 +15677,25 @@ func init() {
           "maximum": 32,
           "minimum": 1
         },
+        "cluster_networks_dualstack": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/cluster_network"
+          }
+        },
+        "cluster_networks_ipv4": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/cluster_network"
+          }
+        },
+        "forbidden_hostnames": {
+          "description": "This provides a list of forbidden hostnames. If this list is empty or not present, this implies that the UI should fall back to a hard coded list.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "inactive_deletion_hours": {
           "type": "integer"
         },
@@ -15089,6 +15706,18 @@ func init() {
         "service_network_cidr": {
           "type": "string",
           "pattern": "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[\\/]([1-9]|[1-2][0-9]|3[0-2]?)$"
+        },
+        "service_networks_dualstack": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/service_network"
+          }
+        },
+        "service_networks_ipv4": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/service_network"
+          }
         }
       }
     },
@@ -15406,9 +16035,16 @@ func init() {
           "type": "string"
         },
         "drive_type": {
-          "type": "string"
+          "$ref": "#/definitions/drive_type"
+        },
+        "has_uuid": {
+          "type": "boolean"
         },
         "hctl": {
+          "type": "string"
+        },
+        "holders": {
+          "description": "A comma-separated list of disk names that this disk belongs to",
           "type": "string"
         },
         "id": {
@@ -15521,6 +16157,24 @@ func init() {
         "install"
       ]
     },
+    "disk-skip-formatting-params": {
+      "description": "Allows an addition or removal of a host disk from the host's skip_formatting_disks list",
+      "type": "object",
+      "required": [
+        "disk_id",
+        "skip_formatting"
+      ],
+      "properties": {
+        "disk_id": {
+          "description": "The ID of the disk that is being added to or removed from the host's skip_formatting_disks list",
+          "type": "string"
+        },
+        "skip_formatting": {
+          "description": "True if you wish to add the disk to the skip_formatting_disks list, false if you wish to remove it",
+          "type": "boolean"
+        }
+      }
+    },
     "disk_info": {
       "type": "object",
       "properties": {
@@ -15602,6 +16256,49 @@ func init() {
           }
         }
       }
+    },
+    "download_boot_artifacts_request": {
+      "description": "Information sent to the agent for downloading artifacts to boot a host into discovery.",
+      "type": "object",
+      "required": [
+        "kernel_url",
+        "rootfs_url",
+        "initrd_url",
+        "host_fs_mount_dir"
+      ],
+      "properties": {
+        "host_fs_mount_dir": {
+          "description": "The base directory on the host that contains the /boot folder. The host will download boot\nartifacts into a folder in this directory.",
+          "type": "string"
+        },
+        "initrd_url": {
+          "description": "URL address to download the initrd.",
+          "type": "string"
+        },
+        "kernel_url": {
+          "description": "URL address to download the kernel.",
+          "type": "string"
+        },
+        "rootfs_url": {
+          "description": "URL address to download the rootfs.",
+          "type": "string"
+        }
+      }
+    },
+    "drive_type": {
+      "type": "string",
+      "enum": [
+        "Unknown",
+        "HDD",
+        "FDD",
+        "ODD",
+        "SSD",
+        "virtual",
+        "Multipath",
+        "iSCSI",
+        "FC",
+        "LVM"
+      ]
     },
     "error": {
       "type": "object",
@@ -15723,10 +16420,6 @@ func init() {
       "properties": {
         "features": {
           "type": "array",
-          "required": [
-            "feature_id",
-            "support_level"
-          ],
           "items": {
             "$ref": "#/definitions/FeatureSupportLevelFeaturesItems0"
           }
@@ -15815,6 +16508,7 @@ func init() {
       ],
       "properties": {
         "api_vip_connectivity": {
+          "description": "Contains a serialized api_vip_connectivity_response",
           "type": "string",
           "x-go-custom-tag": "gorm:\"type:text\""
         },
@@ -15871,6 +16565,11 @@ func init() {
         },
         "disks_info": {
           "description": "Additional information about disks, formatted as JSON.",
+          "type": "string",
+          "x-go-custom-tag": "gorm:\"type:text\""
+        },
+        "disks_to_be_formatted": {
+          "description": "A comma-separated list of disks that will be formatted once\ninstallation begins, unless otherwise set to be skipped by\nskip_formatting_disks. This means that this list also includes disks\nthat appear in skip_formatting_disks. This property is managed by the\nservice and cannot be modified by the user.",
           "type": "string",
           "x-go-custom-tag": "gorm:\"type:text\""
         },
@@ -15944,7 +16643,7 @@ func init() {
         },
         "logs_collected_at": {
           "type": "string",
-          "format": "datetime",
+          "format": "date-time",
           "x-go-custom-tag": "gorm:\"type:timestamp with time zone\""
         },
         "logs_info": {
@@ -15953,11 +16652,20 @@ func init() {
         },
         "logs_started_at": {
           "type": "string",
-          "format": "datetime",
+          "format": "date-time",
           "x-go-custom-tag": "gorm:\"type:timestamp with time zone\""
         },
         "machine_config_pool_name": {
           "type": "string"
+        },
+        "media_status": {
+          "type": "string",
+          "default": "connected",
+          "enum": [
+            "connected",
+            "disconnected"
+          ],
+          "x-nullable": true
         },
         "node_labels": {
           "description": "Json containing node's labels.",
@@ -15977,13 +16685,25 @@ func init() {
           "items": {
             "$ref": "#/definitions/host-stage"
           },
-          "x-go-custom-tag": "gorm:\"-\""
+          "x-go-custom-tag": "gorm:\"-\"",
+          "x-nullable": true
+        },
+        "registered_at": {
+          "description": "The last time the host's agent tried to register in the service.",
+          "type": "string",
+          "format": "date-time",
+          "x-go-custom-tag": "gorm:\"type:timestamp with time zone\""
         },
         "requested_hostname": {
           "type": "string"
         },
         "role": {
           "$ref": "#/definitions/host-role"
+        },
+        "skip_formatting_disks": {
+          "description": "A comma-seperated list of host disks that the service will avoid\nformatting.",
+          "type": "string",
+          "x-go-custom-tag": "gorm:\"type:text\""
         },
         "stage_started_at": {
           "description": "Time at which the current progress stage started.",
@@ -16025,7 +16745,9 @@ func init() {
             "disconnected-unbound",
             "insufficient-unbound",
             "disabled-unbound",
-            "discovering-unbound"
+            "discovering-unbound",
+            "reclaiming",
+            "reclaiming-rebooting"
           ]
         },
         "status_info": {
@@ -16040,6 +16762,14 @@ func init() {
         },
         "suggested_role": {
           "$ref": "#/definitions/host-role"
+        },
+        "tang_connectivity": {
+          "type": "string",
+          "x-go-custom-tag": "gorm:\"type:text\""
+        },
+        "timestamp": {
+          "description": "The time on the host as seconds since the Unix epoch.",
+          "type": "integer"
         },
         "updated_at": {
           "type": "string",
@@ -16206,6 +16936,14 @@ func init() {
           },
           "x-nullable": true
         },
+        "disks_skip_formatting": {
+          "description": "Allows changing the host's skip_formatting_disks parameter",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/disk-skip-formatting-params"
+          },
+          "x-nullable": true
+        },
         "host_name": {
           "type": "string",
           "x-nullable": true
@@ -16242,6 +16980,7 @@ func init() {
       "type": "string",
       "enum": [
         "connected",
+        "media-connected",
         "has-inventory",
         "has-min-cpu-cores",
         "has-min-valid-disks",
@@ -16256,10 +16995,12 @@ func init() {
         "belongs-to-majority-group",
         "valid-platform-network-settings",
         "ntp-synced",
+        "time-synced-between-host-and-service",
         "container-images-available",
         "lso-requirements-satisfied",
         "ocs-requirements-satisfied",
         "odf-requirements-satisfied",
+        "lvm-requirements-satisfied",
         "sufficient-installation-disk-speed",
         "cnv-requirements-satisfied",
         "sufficient-network-latency-requirement-for-role",
@@ -16270,7 +17011,12 @@ func init() {
         "apps-domain-name-resolved-correctly",
         "compatible-with-cluster-platform",
         "dns-wildcard-not-configured",
-        "disk-encryption-requirements-satisfied"
+        "disk-encryption-requirements-satisfied",
+        "non-overlapping-subnets",
+        "vsphere-disk-uuid-enabled",
+        "compatible-agent",
+        "no-skip-installation-disk",
+        "no-skip-missing-disk"
       ]
     },
     "host_network": {
@@ -16464,6 +17210,11 @@ func init() {
           "description": "A comma-separated list of NTP sources (name or IP) going to be added to all the hosts.",
           "type": "string"
         },
+        "additional_trust_bundle": {
+          "description": "PEM-encoded X.509 certificate bundle. Hosts discovered by this\ninfra-env will trust the certificates in this bundle. Clusters formed\nfrom the hosts discovered by this infra-env will also trust the\ncertificates in this bundle.",
+          "type": "string",
+          "x-nullable": false
+        },
         "cluster_id": {
           "description": "If set, all hosts that register will be associated with the specified cluster.",
           "type": "string",
@@ -16518,6 +17269,12 @@ func init() {
         "ignition_config_override": {
           "description": "Json formatted string containing the user overrides for the initial ignition config.",
           "type": "string"
+        },
+        "kernel_arguments": {
+          "description": "JSON formatted string array representing the discovery image kernel arguments.",
+          "type": "string",
+          "x-go-custom-tag": "gorm:\"type:text\"",
+          "x-nullable": true
         },
         "kind": {
           "description": "Indicates the type of this object.",
@@ -16591,6 +17348,11 @@ func init() {
           "type": "string",
           "x-nullable": true
         },
+        "additional_trust_bundle": {
+          "description": "PEM-encoded X.509 certificate bundle. Hosts discovered by this\ninfra-env will trust the certificates in this bundle. Clusters formed\nfrom the hosts discovered by this infra-env will also trust the\ncertificates in this bundle.",
+          "type": "string",
+          "x-nullable": false
+        },
         "cluster_id": {
           "description": "If set, all hosts that register will be associated with the specified cluster.",
           "type": "string",
@@ -16609,6 +17371,9 @@ func init() {
         },
         "image_type": {
           "$ref": "#/definitions/image_type"
+        },
+        "kernel_arguments": {
+          "$ref": "#/definitions/kernel_arguments"
         },
         "name": {
           "description": "Name of the infra-env.",
@@ -16652,12 +17417,20 @@ func init() {
           "type": "string",
           "x-nullable": true
         },
+        "additional_trust_bundle": {
+          "description": "Allows users to change the additional_trust_bundle infra-env field",
+          "type": "string",
+          "x-nullable": true
+        },
         "ignition_config_override": {
           "description": "JSON formatted string containing the user overrides for the initial ignition config.",
           "type": "string"
         },
         "image_type": {
           "$ref": "#/definitions/image_type"
+        },
+        "kernel_arguments": {
+          "$ref": "#/definitions/kernel_arguments"
         },
         "proxy": {
           "$ref": "#/definitions/proxy"
@@ -16702,6 +17475,22 @@ func init() {
     "ingress-cert-params": {
       "type": "string"
     },
+    "ingress_vip": {
+      "description": "The virtual IP used for cluster ingress traffic.",
+      "type": "object",
+      "properties": {
+        "cluster_id": {
+          "description": "The cluster that this VIP is associated with.",
+          "type": "string",
+          "format": "uuid",
+          "x-go-custom-tag": "gorm:\"primaryKey\""
+        },
+        "ip": {
+          "description": "The IP address.",
+          "$ref": "#/definitions/ip"
+        }
+      }
+    },
     "install_cmd_request": {
       "type": "object",
       "required": [
@@ -16711,8 +17500,7 @@ func init() {
         "role",
         "boot_device",
         "controller_image",
-        "installer_image",
-        "high_availability_mode"
+        "installer_image"
       ],
       "properties": {
         "boot_device": {
@@ -16797,6 +17585,10 @@ func init() {
             "type": "string",
             "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))$"
           }
+        },
+        "skip_installation_disk_cleanup": {
+          "description": "Skip formatting installation disk",
+          "type": "boolean"
         }
       }
     },
@@ -16864,6 +17656,9 @@ func init() {
         "speed_mbps": {
           "type": "integer"
         },
+        "type": {
+          "type": "string"
+        },
         "vendor": {
           "type": "string"
         }
@@ -16917,9 +17712,6 @@ func init() {
         "system_vendor": {
           "$ref": "#/definitions/system_vendor"
         },
-        "timestamp": {
-          "type": "integer"
-        },
         "tpm_version": {
           "type": "string",
           "enum": [
@@ -16938,6 +17730,39 @@ func init() {
           "type": "integer"
         }
       }
+    },
+    "ip": {
+      "type": "string",
+      "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))?$",
+      "x-go-custom-tag": "gorm:\"primaryKey\""
+    },
+    "kernel_argument": {
+      "description": "pair of [operation, argument] specifying the argument and what operation should be applied on it.",
+      "type": "object",
+      "properties": {
+        "operation": {
+          "description": "The operation to apply on the kernel argument.",
+          "type": "string",
+          "enum": [
+            "append",
+            "replace",
+            "delete"
+          ]
+        },
+        "value": {
+          "description": "Kernel argument can have the form \u003cparameter\u003e or \u003cparameter\u003e=\u003cvalue\u003e. The following examples should\nbe supported:\nrd.net.timeout.carrier=60\nisolcpus=1,2,10-20,100-2000:2/25\nquiet\nThe parsing by the command line parser in linux kernel is much looser and this pattern follows it.\n",
+          "type": "string",
+          "pattern": "^(?:(?:[^ \\t\\n\\r\"]+)|(?:\"[^\"]*\"))+$"
+        }
+      }
+    },
+    "kernel_arguments": {
+      "description": "List of kernel arugment objects that define the operations and values to be applied.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/kernel_argument"
+      },
+      "x-omitempty": false
     },
     "l2-connectivity": {
       "type": "object",
@@ -17460,7 +18285,6 @@ func init() {
         "openshift_version",
         "cpu_architecture",
         "url",
-        "rootfs_url",
         "version"
       ],
       "properties": {
@@ -17471,12 +18295,9 @@ func init() {
           "x-go-custom-tag": "gorm:\"default:'x86_64'\""
         },
         "openshift_version": {
-          "description": "Version of the OpenShift cluster.",
-          "type": "string"
-        },
-        "rootfs_url": {
-          "description": "The OS rootfs url.",
-          "type": "string"
+          "description": "Version of the operating system image",
+          "type": "string",
+          "example": "4.12"
         },
         "url": {
           "description": "The base OS image used for the discovery iso.",
@@ -17494,64 +18315,6 @@ func init() {
         "$ref": "#/definitions/os-image"
       }
     },
-    "ovirt-platform": {
-      "description": "oVirt platform-specific configuration upon which to perform the installation.",
-      "type": "object",
-      "properties": {
-        "ca_bundle": {
-          "description": "The CA Bundle of the oVirt's engine certificate.",
-          "type": "string",
-          "x-nullable": true
-        },
-        "cluster_id": {
-          "description": "The oVirt cluster ID.",
-          "type": "string",
-          "format": "uuid",
-          "x-nullable": true
-        },
-        "fqdn": {
-          "description": "The oVirt's engine fully qualified domain name.",
-          "type": "string",
-          "x-nullable": true
-        },
-        "insecure": {
-          "description": "Verify oVirt engine certificate.",
-          "type": "boolean",
-          "default": true,
-          "x-nullable": true
-        },
-        "network_name": {
-          "description": "The oVirt network the VMs will be attached to.",
-          "type": "string",
-          "default": "ovirtmgmt",
-          "x-nullable": true
-        },
-        "password": {
-          "description": "The password for the oVirt user name.",
-          "type": "string",
-          "format": "password",
-          "x-nullable": true
-        },
-        "storage_domain_id": {
-          "description": "The oVirt storage domain ID.",
-          "type": "string",
-          "format": "uuid",
-          "x-nullable": true
-        },
-        "username": {
-          "description": "The user name to use to connect to the oVirt instance.",
-          "type": "string",
-          "x-nullable": true
-        },
-        "vnic_profile_id": {
-          "description": "The oVirt VNIC profile ID.",
-          "type": "string",
-          "format": "uuid",
-          "x-nullable": true
-        }
-      },
-      "x-go-custom-tag": "gorm:\"embedded;embeddedPrefix:ovirt_\""
-    },
     "platform": {
       "description": "The configuration for the specific platform upon which to perform the installation.",
       "type": "object",
@@ -17559,11 +18322,6 @@ func init() {
         "type"
       ],
       "properties": {
-        "ovirt": {
-          "type": "object",
-          "x-nullable": true,
-          "$ref": "#/definitions/ovirt-platform"
-        },
         "type": {
           "$ref": "#/definitions/platform_type"
         }
@@ -17574,8 +18332,8 @@ func init() {
       "type": "string",
       "enum": [
         "baremetal",
+        "nutanix",
         "vsphere",
-        "ovirt",
         "none"
       ]
     },
@@ -17634,6 +18392,19 @@ func init() {
       },
       "x-go-custom-tag": "gorm:\"embedded;embeddedPrefix:proxy_\""
     },
+    "reboot_for_reclaim_request": {
+      "description": "Information sent to the agent for rebooting a host into discovery.",
+      "type": "object",
+      "required": [
+        "host_fs_mount_dir"
+      ],
+      "properties": {
+        "host_fs_mount_dir": {
+          "description": "The base directory on the host that contains the /boot folder. The host needs to\nchroot into this directory in order to properly reboot.",
+          "type": "string"
+        }
+      }
+    },
     "release-image": {
       "type": "object",
       "required": [
@@ -17644,10 +18415,17 @@ func init() {
       ],
       "properties": {
         "cpu_architecture": {
-          "description": "The CPU architecture of the image (x86_64/arm64/etc).",
+          "description": "(DEPRECATED) The CPU architecture of the image (x86_64/arm64/etc).",
           "type": "string",
           "default": "x86_64",
           "x-go-custom-tag": "gorm:\"default:'x86_64'\""
+        },
+        "cpu_architectures": {
+          "description": "List of CPU architectures provided by the image.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "default": {
           "description": "Indication that the version is the recommended one.",
@@ -17701,6 +18479,11 @@ func init() {
         "interface": {
           "description": "Interface to which packets for this route will be sent",
           "type": "string"
+        },
+        "metric": {
+          "description": "Route priority metric",
+          "type": "integer",
+          "format": "int32"
         }
       }
     },
@@ -17740,9 +18523,6 @@ func init() {
             "type": "string"
           }
         },
-        "command": {
-          "type": "string"
-        },
         "step_id": {
           "type": "string"
         },
@@ -17781,13 +18561,17 @@ func init() {
         "free-network-addresses",
         "dhcp-lease-allocate",
         "api-vip-connectivity-check",
+        "tang-connectivity-check",
         "ntp-synchronizer",
         "installation-disk-speed-check",
         "container-image-availability",
         "domain-resolution",
         "stop-installation",
         "logs-gather",
-        "next-step-runner"
+        "next-step-runner",
+        "upgrade-agent",
+        "download-boot-artifacts",
+        "reboot-for-reclaim"
       ]
     },
     "steps": {
@@ -17842,6 +18626,62 @@ func init() {
         }
       }
     },
+    "tang_connectivity_request": {
+      "type": "object",
+      "required": [
+        "tang_servers"
+      ],
+      "properties": {
+        "tang_servers": {
+          "description": "JSON-formatted string containing additional information regarding tang's configuration",
+          "type": "string"
+        }
+      }
+    },
+    "tang_connectivity_response": {
+      "type": "object",
+      "properties": {
+        "is_success": {
+          "description": "Tang check result.",
+          "type": "boolean"
+        },
+        "tang_server_response": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TangConnectivityResponseTangServerResponseItems0"
+          }
+        }
+      }
+    },
+    "upgrade_agent_request": {
+      "type": "object",
+      "properties": {
+        "agent_image": {
+          "description": "Full image reference of the image that the agent should upgrade to, for example\n` + "`" + `quay.io/registry-proxy.engineering.redhat.com/rh-osbs/openshift4-assisted-installer-agent-rhel8:v1.0.0-142` + "`" + `.\n",
+          "type": "string"
+        }
+      }
+    },
+    "upgrade_agent_response": {
+      "type": "object",
+      "properties": {
+        "agent_image": {
+          "description": "Full image reference of the image that the agent has upgraded to, for example\n` + "`" + `quay.io/registry-proxy.engineering.redhat.com/rh-osbs/openshift4-assisted-installer-agent-rhel8:v1.0.0-142` + "`" + `.\n",
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/definitions/upgrade_agent_result"
+        }
+      }
+    },
+    "upgrade_agent_result": {
+      "description": "Agent upgrade result.",
+      "type": "string",
+      "enum": [
+        "success",
+        "failure"
+      ]
+    },
     "usage": {
       "type": "object",
       "properties": {
@@ -17871,7 +18711,7 @@ func init() {
           "x-nullable": true
         },
         "api_vip": {
-          "description": "The virtual IP used to reach the OpenShift cluster's API.",
+          "description": "(DEPRECATED) The virtual IP used to reach the OpenShift cluster's API.",
           "type": "string",
           "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))?$",
           "x-nullable": true
@@ -17879,6 +18719,14 @@ func init() {
         "api_vip_dns_name": {
           "description": "The domain name used to reach the OpenShift cluster API.",
           "type": "string",
+          "x-nullable": true
+        },
+        "api_vips": {
+          "description": "The virtual IPs used to reach the OpenShift cluster's API. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/api_vip"
+          },
           "x-nullable": true
         },
         "base_dns_domain": {
@@ -17903,14 +18751,12 @@ func init() {
           "description": "Cluster networks that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/cluster_network"
           },
           "x-nullable": true
         },
         "disk_encryption": {
           "description": "Installation disks encryption mode and host roles to be applied.",
-          "type": "object",
           "$ref": "#/definitions/disk-encryption"
         },
         "http_proxy": {
@@ -17936,13 +18782,20 @@ func init() {
         },
         "ignition_endpoint": {
           "description": "Explicit ignition endpoint overrides the default ignition endpoint.",
-          "type": "object",
           "$ref": "#/definitions/ignition-endpoint"
         },
         "ingress_vip": {
-          "description": "The virtual IP used for cluster ingress traffic.",
+          "description": "(DEPRECATED) The virtual IP used for cluster ingress traffic.",
           "type": "string",
           "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))?$",
+          "x-nullable": true
+        },
+        "ingress_vips": {
+          "description": "The virtual IPs used for cluster ingress traffic. Enter one IP address for single-stack clusters, or up to two for dual-stack clusters (at most one IP address per IP stack used). The order of stacks should be the same as order of subnets in Cluster Networks, Service Networks, and Machine Networks.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingress_vip"
+          },
           "x-nullable": true
         },
         "machine_network_cidr": {
@@ -17955,7 +18808,6 @@ func init() {
           "description": "Machine networks that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/machine_network"
           },
           "x-nullable": true
@@ -17989,7 +18841,6 @@ func init() {
           }
         },
         "platform": {
-          "type": "object",
           "$ref": "#/definitions/platform"
         },
         "pull_secret": {
@@ -18012,13 +18863,17 @@ func init() {
           "description": "Service networks that are associated with this cluster.",
           "type": "array",
           "items": {
-            "type": "object",
             "$ref": "#/definitions/service_network"
           },
           "x-nullable": true
         },
         "ssh_public_key": {
           "description": "SSH public key for debugging OpenShift nodes.",
+          "type": "string",
+          "x-nullable": true
+        },
+        "tags": {
+          "description": "A comma-separated list of tags that are associated to the cluster.",
           "type": "string",
           "x-nullable": true
         },
@@ -18037,6 +18892,11 @@ func init() {
     "versioned-host-requirements": {
       "type": "object",
       "properties": {
+        "edge-worker": {
+          "description": "Edge Worker OpenShift node requirements",
+          "x-go-name": "EdgeWorkerRequirements",
+          "$ref": "#/definitions/cluster-host-requirements-details"
+        },
         "master": {
           "description": "Master node requirements",
           "x-go-name": "MasterRequirements",

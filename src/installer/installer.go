@@ -203,7 +203,7 @@ func (i *installer) finalize() error {
 	return nil
 }
 
-//updateSingleNodeIgnition will download the host ignition config and add the files under storage
+// updateSingleNodeIgnition will download the host ignition config and add the files under storage
 func (i *installer) updateSingleNodeIgnition(singleNodeIgnitionPath string) error {
 	if i.DryRunEnabled {
 		return nil

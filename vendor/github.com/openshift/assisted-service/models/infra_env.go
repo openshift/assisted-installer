@@ -24,6 +24,12 @@ type InfraEnv struct {
 	// A comma-separated list of NTP sources (name or IP) going to be added to all the hosts.
 	AdditionalNtpSources string `json:"additional_ntp_sources,omitempty"`
 
+	// PEM-encoded X.509 certificate bundle. Hosts discovered by this
+	// infra-env will trust the certificates in this bundle. Clusters formed
+	// from the hosts discovered by this infra-env will also trust the
+	// certificates in this bundle.
+	AdditionalTrustBundle string `json:"additional_trust_bundle,omitempty"`
+
 	// If set, all hosts that register will be associated with the specified cluster.
 	// Format: uuid
 	ClusterID strfmt.UUID `json:"cluster_id,omitempty" gorm:"index"`
@@ -60,6 +66,9 @@ type InfraEnv struct {
 
 	// Json formatted string containing the user overrides for the initial ignition config.
 	IgnitionConfigOverride string `json:"ignition_config_override,omitempty"`
+
+	// JSON formatted string array representing the discovery image kernel arguments.
+	KernelArguments *string `json:"kernel_arguments,omitempty" gorm:"type:text"`
 
 	// Indicates the type of this object.
 	// Required: true

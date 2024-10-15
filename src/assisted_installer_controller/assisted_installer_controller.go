@@ -1091,7 +1091,7 @@ func (c controller) logHostResolvConf() {
 }
 
 // This is temporary function, till https://bugzilla.redhat.com/show_bug.cgi?id=2097041 will not be resolved,
-//that should validate router state only in case of failure
+// that should validate router state only in case of failure
 // It will patch router to add access logs
 // It will run http router health check to see if router is healthy on host network
 func (c controller) logRouterStatus() {

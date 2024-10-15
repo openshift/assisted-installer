@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/go-openapi/runtime/middleware"
+	"github.com/go-openapi/strfmt"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/openshift/assisted-service/internal/common"
-	"github.com/openshift/assisted-service/internal/identity"
+	"github.com/openshift/assisted-service/models"
 	params "github.com/openshift/assisted-service/pkg/context"
 	"github.com/openshift/assisted-service/pkg/ocm"
 	"github.com/openshift/assisted-service/restapi"
@@ -39,6 +39,22 @@ func (a *AuthzHandler) isTenancyEnabled() bool {
 	return a.cfg.EnableOrgTenancy
 }
 
+func (a *AuthzHandler) isOrgBasedFunctionalityEnabled() bool {
+	return a.cfg.EnableOrgBasedFeatureGates
+}
+
+func (a *AuthzHandler) IsAdmin(ctx context.Context) bool {
+	authPayload := ocm.PayloadFromContext(ctx)
+	allowedRoles := []ocm.RoleType{ocm.AdminRole, ocm.ReadOnlyAdminRole}
+	return funk.Contains(allowedRoles, authPayload.Role)
+}
+
+func (a *AuthzHandler) isReadOnlyAdmin(ctx context.Context) bool {
+	authPayload := ocm.PayloadFromContext(ctx)
+	allowedRoles := []ocm.RoleType{ocm.ReadOnlyAdminRole}
+	return funk.Contains(allowedRoles, authPayload.Role)
+}
+
 func handleOwnershipQueryError(err error) (bool, error) {
 	if err != nil {
 		//if user is not the owner of the object return false
@@ -52,7 +68,7 @@ func handleOwnershipQueryError(err error) (bool, error) {
 }
 
 func (a *AuthzHandler) OwnedBy(ctx context.Context, db *gorm.DB) *gorm.DB {
-	if identity.IsAdmin(ctx) {
+	if a.IsAdmin(ctx) {
 		return db
 	}
 	if a.isTenancyEnabled() {
@@ -120,22 +136,7 @@ func (a *AuthzHandler) hasSubscriptionAccess(clusterId string, action string, pa
 		if err != nil {
 			return handleOwnershipQueryError(err)
 		}
-
-		cacheKey := fmt.Sprintf("%s_%s_%s_%s", payload.Username, payload.Organization, cluster.AmsSubscriptionID, action)
-		if cacheData, existInCache := a.client.Cache.Get(cacheKey); existInCache {
-			var ok bool
-			isAllowed, ok = cacheData.(bool)
-			if !ok {
-				return false, fmt.Errorf(
-					"error while retrieving cluster edit role from cache for %s",
-					cluster.AmsSubscriptionID.String())
-			}
-			return isAllowed, nil
-		}
 		isAllowed, err = a.hasClusterEditRole(payload, action, cluster.AmsSubscriptionID.String())
-		if shouldStorePayloadInCache(err) {
-			a.client.Cache.Set(cacheKey, isAllowed, 10*time.Minute)
-		}
 		return isAllowed, err
 	}
 
@@ -143,7 +144,11 @@ func (a *AuthzHandler) hasSubscriptionAccess(clusterId string, action string, pa
 }
 
 func (a *AuthzHandler) HasAccessTo(ctx context.Context, obj interface{}, action Action) (bool, error) {
-	if identity.IsAdmin(ctx) {
+	if a.isReadOnlyAdmin(ctx) {
+		if action == ReadAction {
+			return true, nil
+		}
+	} else if a.IsAdmin(ctx) {
 		return true, nil
 	}
 	if cluster, ok := obj.(*common.Cluster); ok && cluster != nil {
@@ -161,6 +166,18 @@ func (a *AuthzHandler) HasAccessTo(ctx context.Context, obj interface{}, action 
 	return false, errors.New("can not perform access check on this object")
 }
 
+func (a *AuthzHandler) HasOrgBasedCapability(ctx context.Context, capability string) (bool, error) {
+	if !a.isOrgBasedFunctionalityEnabled() {
+		return true, nil
+	}
+
+	username := ocm.UserNameFromContext(ctx)
+	isAllowed, err := a.client.Authorization.CapabilityReview(context.Background(), fmt.Sprint(username), capability, ocm.OrganizationCapabilityType)
+	a.log.Debugf("queried AMS API with CapabilityReview for username: %s about capability: %s, capability type: %s. Result: %t",
+		fmt.Sprint(username), capability, ocm.OrganizationCapabilityType, isAllowed)
+	return isAllowed, err
+}
+
 func (a *AuthzHandler) checkClusterBasedAccess(id string, action Action, payload *ocm.AuthPayload) (bool, error) {
 	if a.db == nil {
 		return true, nil
@@ -170,7 +187,7 @@ func (a *AuthzHandler) checkClusterBasedAccess(id string, action Action, payload
 	case UpdateAction:
 		return a.hasSubscriptionAccess(id, ocm.AMSActionUpdate, payload)
 	case DeleteAction:
-		return a.hasSubscriptionAccess(id, ocm.AMSActionDelete, payload)
+		return a.hasSubscriptionAccess(id, ocm.AMSActionUpdate, payload)
 	default:
 		return a.hasOwnerAccess(id, &common.Cluster{}, payload)
 	}
@@ -195,6 +212,10 @@ func (a *AuthzHandler) checkInfraEnvBasedAccess(id string, action Action, payloa
 	err = a.db.Select("cluster_id").First(&infraEnv, "id = ?", id).Error
 	if err != nil {
 		a.log.WithError(err).Errorf("failed to retrieve infra-env record %s", id)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// not returning err as the response should be StatusNotFound
+			return false, nil
+		}
 		return false, err
 	}
 
@@ -309,10 +330,31 @@ func (a *AuthzHandler) ocmAuthorizer(request *http.Request) error {
 			return common.NewApiError(http.StatusInternalServerError, err)
 		}
 		if !isAllowed {
+			obj := a.getObjFromRequest(request)
+			if obj != nil && toAction(request) != http.MethodGet {
+				// Check if user has read access (needed for returning an appropriate http status)
+				// Returns status forbidden if only read is allowed on object
+				if canRead, _ := a.HasAccessTo(request.Context(), obj, ReadAction); canRead {
+					return common.NewInfraError(http.StatusForbidden, fmt.Errorf("Unauthorized to manipulate object"))
+				}
+			}
 			return common.NewApiError(http.StatusNotFound, fmt.Errorf("Object Not Found"))
 		}
 	}
 
+	return nil
+}
+
+func (a *AuthzHandler) getObjFromRequest(request *http.Request) interface{} {
+	if clusterID := params.GetParam(request.Context(), params.ClusterId); clusterID != "" {
+		id := strfmt.UUID(clusterID)
+		cluster := &common.Cluster{Cluster: models.Cluster{ID: &id}}
+		return cluster
+	} else if infraEnvID := params.GetParam(request.Context(), params.InfraEnvId); infraEnvID != "" {
+		id := strfmt.UUID(infraEnvID)
+		infraEnv := &common.InfraEnv{InfraEnv: models.InfraEnv{ID: &id}}
+		return infraEnv
+	}
 	return nil
 }
 

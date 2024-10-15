@@ -44,9 +44,8 @@ type InstallCmdRequest struct {
 	// Guaranteed availability of the installed cluster. 'Full' installs a Highly-Available cluster
 	// over multiple master nodes whereas 'None' installs a full cluster over one node.
 	//
-	// Required: true
 	// Enum: [Full None]
-	HighAvailabilityMode *string `json:"high_availability_mode"`
+	HighAvailabilityMode *string `json:"high_availability_mode,omitempty"`
 
 	// Host id
 	// Required: true
@@ -85,6 +84,9 @@ type InstallCmdRequest struct {
 
 	// List of service ips
 	ServiceIps []string `json:"service_ips"`
+
+	// Skip formatting installation disk
+	SkipInstallationDiskCleanup bool `json:"skip_installation_disk_cleanup,omitempty"`
 }
 
 // Validate validates this install cmd request
@@ -206,9 +208,8 @@ func (m *InstallCmdRequest) validateHighAvailabilityModeEnum(path, location stri
 }
 
 func (m *InstallCmdRequest) validateHighAvailabilityMode(formats strfmt.Registry) error {
-
-	if err := validate.Required("high_availability_mode", "body", m.HighAvailabilityMode); err != nil {
-		return err
+	if swag.IsZero(m.HighAvailabilityMode) { // not required
+		return nil
 	}
 
 	// value enum
