@@ -5,6 +5,7 @@
 //
 //	mockgen -source=reboots_notifier.go -package=assisted_installer_controller -destination=mock_reboots_notifier.go
 //
+
 // Package assisted_installer_controller is a generated GoMock package.
 package assisted_installer_controller
 
