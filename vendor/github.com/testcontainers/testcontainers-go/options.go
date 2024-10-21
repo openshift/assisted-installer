@@ -17,46 +17,51 @@ import (
 // ContainerCustomizer is an interface that can be used to configure the Testcontainers container
 // request. The passed request will be merged with the default one.
 type ContainerCustomizer interface {
-	Customize(req *GenericContainerRequest)
+	Customize(req *GenericContainerRequest) error
 }
 
 // CustomizeRequestOption is a type that can be used to configure the Testcontainers container request.
 // The passed request will be merged with the default one.
-type CustomizeRequestOption func(req *GenericContainerRequest)
+type CustomizeRequestOption func(req *GenericContainerRequest) error
 
-func (opt CustomizeRequestOption) Customize(req *GenericContainerRequest) {
-	opt(req)
+func (opt CustomizeRequestOption) Customize(req *GenericContainerRequest) error {
+	return opt(req)
 }
 
 // CustomizeRequest returns a function that can be used to merge the passed container request with the one that is used by the container.
 // Slices and Maps will be appended.
 func CustomizeRequest(src GenericContainerRequest) CustomizeRequestOption {
-	return func(req *GenericContainerRequest) {
+	return func(req *GenericContainerRequest) error {
 		if err := mergo.Merge(req, &src, mergo.WithOverride, mergo.WithAppendSlice); err != nil {
-			Logger.Printf("error merging container request, keeping the original one. Error: %v", err)
-			return
+			return fmt.Errorf("error merging container request, keeping the original one: %w", err)
 		}
+
+		return nil
 	}
 }
 
 // WithConfigModifier allows to override the default container config
 func WithConfigModifier(modifier func(config *container.Config)) CustomizeRequestOption {
-	return func(req *GenericContainerRequest) {
+	return func(req *GenericContainerRequest) error {
 		req.ConfigModifier = modifier
+
+		return nil
 	}
 }
 
 // WithEndpointSettingsModifier allows to override the default endpoint settings
 func WithEndpointSettingsModifier(modifier func(settings map[string]*network.EndpointSettings)) CustomizeRequestOption {
-	return func(req *GenericContainerRequest) {
+	return func(req *GenericContainerRequest) error {
 		req.EnpointSettingsModifier = modifier
+
+		return nil
 	}
 }
 
 // WithEnv sets the environment variables for a container.
 // If the environment variable already exists, it will be overridden.
 func WithEnv(envs map[string]string) CustomizeRequestOption {
-	return func(req *GenericContainerRequest) {
+	return func(req *GenericContainerRequest) error {
 		if req.Env == nil {
 			req.Env = map[string]string{}
 		}
@@ -64,20 +69,39 @@ func WithEnv(envs map[string]string) CustomizeRequestOption {
 		for key, val := range envs {
 			req.Env[key] = val
 		}
+
+		return nil
 	}
 }
 
 // WithHostConfigModifier allows to override the default host config
 func WithHostConfigModifier(modifier func(hostConfig *container.HostConfig)) CustomizeRequestOption {
-	return func(req *GenericContainerRequest) {
+	return func(req *GenericContainerRequest) error {
 		req.HostConfigModifier = modifier
+
+		return nil
 	}
 }
 
+// WithHostPortAccess allows to expose the host ports to the container
+func WithHostPortAccess(ports ...int) CustomizeRequestOption {
+	return func(req *GenericContainerRequest) error {
+		if req.HostAccessPorts == nil {
+			req.HostAccessPorts = []int{}
+		}
+
+		req.HostAccessPorts = append(req.HostAccessPorts, ports...)
+		return nil
+	}
+}
+
+// Deprecated: the modules API forces passing the image as part of the signature of the Run function.
 // WithImage sets the image for a container
 func WithImage(image string) CustomizeRequestOption {
-	return func(req *GenericContainerRequest) {
+	return func(req *GenericContainerRequest) error {
 		req.Image = image
+
+		return nil
 	}
 }
 
@@ -92,6 +116,47 @@ type ImageSubstitutor interface {
 }
 
 // }
+
+// CustomHubSubstitutor represents a way to substitute the hub of an image with a custom one,
+// using provided value with respect to the HubImageNamePrefix configuration value.
+type CustomHubSubstitutor struct {
+	hub string
+}
+
+// NewCustomHubSubstitutor creates a new CustomHubSubstitutor
+func NewCustomHubSubstitutor(hub string) CustomHubSubstitutor {
+	return CustomHubSubstitutor{
+		hub: hub,
+	}
+}
+
+// Description returns the name of the type and a short description of how it modifies the image.
+func (c CustomHubSubstitutor) Description() string {
+	return fmt.Sprintf("CustomHubSubstitutor (replaces hub with %s)", c.hub)
+}
+
+// Substitute replaces the hub of the image with the provided one, with certain conditions:
+//   - if the hub is empty, the image is returned as is.
+//   - if the image already contains a registry, the image is returned as is.
+//   - if the HubImageNamePrefix configuration value is set, the image is returned as is.
+func (c CustomHubSubstitutor) Substitute(image string) (string, error) {
+	registry := core.ExtractRegistry(image, "")
+	cfg := ReadConfig()
+
+	exclusions := []func() bool{
+		func() bool { return c.hub == "" },
+		func() bool { return registry != "" },
+		func() bool { return cfg.Config.HubImageNamePrefix != "" },
+	}
+
+	for _, exclusion := range exclusions {
+		if exclusion() {
+			return image, nil
+		}
+	}
+
+	return fmt.Sprintf("%s/%s", c.hub, image), nil
+}
 
 // prependHubRegistry represents a way to prepend a custom Hub registry to the image name,
 // using the HubImageNamePrefix configuration value
@@ -138,19 +203,22 @@ func (p prependHubRegistry) Substitute(image string) (string, error) {
 
 // WithImageSubstitutors sets the image substitutors for a container
 func WithImageSubstitutors(fn ...ImageSubstitutor) CustomizeRequestOption {
-	return func(req *GenericContainerRequest) {
+	return func(req *GenericContainerRequest) error {
 		req.ImageSubstitutors = fn
+
+		return nil
 	}
 }
 
 // WithLogConsumers sets the log consumers for a container
 func WithLogConsumers(consumer ...LogConsumer) CustomizeRequestOption {
-	return func(req *GenericContainerRequest) {
+	return func(req *GenericContainerRequest) error {
 		if req.LogConsumerCfg == nil {
 			req.LogConsumerCfg = &LogConsumerConfig{}
 		}
 
 		req.LogConsumerCfg.Consumers = consumer
+		return nil
 	}
 }
 
@@ -198,7 +266,7 @@ func (r RawCommand) AsCommand() []string {
 // It will leverage the container lifecycle hooks to call the command right after the container
 // is started.
 func WithStartupCommand(execs ...Executable) CustomizeRequestOption {
-	return func(req *GenericContainerRequest) {
+	return func(req *GenericContainerRequest) error {
 		startupCommandsHook := ContainerLifecycleHooks{
 			PostStarts: []ContainerHook{},
 		}
@@ -213,6 +281,8 @@ func WithStartupCommand(execs ...Executable) CustomizeRequestOption {
 		}
 
 		req.LifecycleHooks = append(req.LifecycleHooks, startupCommandsHook)
+
+		return nil
 	}
 }
 
@@ -220,7 +290,7 @@ func WithStartupCommand(execs ...Executable) CustomizeRequestOption {
 // It will leverage the container lifecycle hooks to call the command right after the container
 // is ready.
 func WithAfterReadyCommand(execs ...Executable) CustomizeRequestOption {
-	return func(req *GenericContainerRequest) {
+	return func(req *GenericContainerRequest) error {
 		postReadiesHook := []ContainerHook{}
 
 		for _, exec := range execs {
@@ -235,6 +305,8 @@ func WithAfterReadyCommand(execs ...Executable) CustomizeRequestOption {
 		req.LifecycleHooks = append(req.LifecycleHooks, ContainerLifecycleHooks{
 			PostReadies: postReadiesHook,
 		})
+
+		return nil
 	}
 }
 
@@ -245,7 +317,9 @@ func WithWaitStrategy(strategies ...wait.Strategy) CustomizeRequestOption {
 
 // WithWaitStrategyAndDeadline sets the wait strategy for a container, including deadline
 func WithWaitStrategyAndDeadline(deadline time.Duration, strategies ...wait.Strategy) CustomizeRequestOption {
-	return func(req *GenericContainerRequest) {
+	return func(req *GenericContainerRequest) error {
 		req.WaitingFor = wait.ForAll(strategies...).WithDeadline(deadline)
+
+		return nil
 	}
 }
