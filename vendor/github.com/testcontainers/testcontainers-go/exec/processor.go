@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/stdcopy"
 )
 
 // ProcessOptions defines options applicable to the reader processor
 type ProcessOptions struct {
-	ExecConfig types.ExecConfig
+	ExecConfig container.ExecOptions
 	Reader     io.Reader
 }
 
@@ -21,7 +21,7 @@ type ProcessOptions struct {
 // - attach stderr: true
 func NewProcessOptions(cmd []string) *ProcessOptions {
 	return &ProcessOptions{
-		ExecConfig: types.ExecConfig{
+		ExecConfig: container.ExecOptions{
 			Cmd:          cmd,
 			Detach:       false,
 			AttachStdout: true,
@@ -60,6 +60,8 @@ func WithEnv(env []string) ProcessOption {
 	})
 }
 
+// Multiplexed returns a [ProcessOption] that configures the command execution
+// to combine stdout and stderr into a single stream without Docker's multiplexing headers.
 func Multiplexed() ProcessOption {
 	return ProcessOptionFunc(func(opts *ProcessOptions) {
 		// returning fast to bypass those options with a nil reader,
@@ -82,10 +84,6 @@ func Multiplexed() ProcessOption {
 
 		<-done
 
-		if errBuff.Bytes() != nil {
-			opts.Reader = &errBuff
-		} else {
-			opts.Reader = &outBuff
-		}
+		opts.Reader = io.MultiReader(&outBuff, &errBuff)
 	})
 }

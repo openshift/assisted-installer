@@ -47,6 +47,19 @@ const (
 	// annotation is present and status is empty, BMO will reconstruct BMH Status
 	// from the status annotation.
 	StatusAnnotation = "baremetalhost.metal3.io/status"
+
+	// RebootAnnotationPrefix is the annotation which tells the host which mode to use
+	// when rebooting - hard/soft
+	RebootAnnotationPrefix = "reboot.metal3.io"
+
+	// InspectAnnotationPrefix is used to specify if automatic introspection carried out
+	// during registration of BMH is enabled or disabled
+	InspectAnnotationPrefix = "inspect.metal3.io"
+
+	// HardwareDetailsAnnotation provides the hardware details for the host
+	// in case its not already part of the host status and when introspection
+	// is disabed
+	HardwareDetailsAnnotation = InspectAnnotationPrefix + "/hardwaredetails"
 )
 
 // RootDeviceHints holds the hints for specifying the storage location
@@ -131,6 +144,9 @@ const (
 	OperationalStatusDetached OperationalStatus = "detached"
 )
 
+// OperationalStatusAllowed represents the allowed values of OperationalStatus
+var OperationalStatusAllowed = []string{"", string(OperationalStatusOK), string(OperationalStatusDiscovered), string(OperationalStatusError), string(OperationalStatusDelayed), string(OperationalStatusDetached)}
+
 // ErrorType indicates the class of problem that has caused the Host resource
 // to enter an error state.
 type ErrorType string
@@ -159,6 +175,9 @@ const (
 	// controller is unable to detatch the host from the provisioner
 	DetachError ErrorType = "detach error"
 )
+
+// ErrorTypeAllowed represents the allowed values of ErrorType
+var ErrorTypeAllowed = []string{"", string(ProvisionedRegistrationError), string(RegistrationError), string(InspectionError), string(PreparationError), string(ProvisioningError), string(PowerManagementError)}
 
 // ProvisioningState defines the states the provisioner will report
 // the host has having.
@@ -207,6 +226,10 @@ const (
 	// StateInspecting means we are running the agent on the host to
 	// learn about the hardware components available there
 	StateInspecting ProvisioningState = "inspecting"
+
+	// StatePoweringOffBeforeDelete means we are in the process of
+	// powering off the node before it's deleted.
+	StatePoweringOffBeforeDelete ProvisioningState = "powering off before delete"
 
 	// StateDeleting means we are in the process of cleaning up the host
 	// ready for deletion
@@ -408,6 +431,10 @@ type BareMetalHostSpec struct {
 	// A custom deploy procedure.
 	// +optional
 	CustomDeploy *CustomDeploy `json:"customDeploy,omitempty"`
+
+	// CPU architecture of the host, e.g. "x86_64" or "aarch64". If unset, eventually populated by inspection.
+	// +optional
+	Architecture string `json:"architecture,omitempty"`
 }
 
 // AutomatedCleaningMode is the interface to enable/disable automated cleaning

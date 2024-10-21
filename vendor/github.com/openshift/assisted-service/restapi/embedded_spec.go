@@ -7748,6 +7748,7 @@ func init() {
         "Applying olm manifests",
         "Waiting for olm operators csv initialization",
         "Waiting for olm operators csv",
+        "Waiting for OLM operator setup jobs",
         "Done"
       ]
     },
@@ -8811,6 +8812,11 @@ func init() {
         },
         "kernel_arguments": {
           "$ref": "#/definitions/kernel_arguments"
+        },
+        "openshift_version": {
+          "description": "Version of the OS image",
+          "type": "string",
+          "x-nullable": true
         },
         "proxy": {
           "$ref": "#/definitions/proxy"
@@ -18534,6 +18540,7 @@ func init() {
         "Applying olm manifests",
         "Waiting for olm operators csv initialization",
         "Waiting for olm operators csv",
+        "Waiting for OLM operator setup jobs",
         "Done"
       ]
     },
@@ -19599,6 +19606,11 @@ func init() {
         },
         "kernel_arguments": {
           "$ref": "#/definitions/kernel_arguments"
+        },
+        "openshift_version": {
+          "description": "Version of the OS image",
+          "type": "string",
+          "x-nullable": true
         },
         "proxy": {
           "$ref": "#/definitions/proxy"
