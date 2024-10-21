@@ -2,13 +2,17 @@ package ignition
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
+
+	"encoding/base64"
 
 	ignitionConfigPrevVersion "github.com/coreos/ignition/v2/config/v3_1"
 	ignitionConfig "github.com/coreos/ignition/v2/config/v3_2"
 	"github.com/coreos/ignition/v2/config/v3_2/translate"
 	"github.com/coreos/ignition/v2/config/v3_2/types"
 	"github.com/coreos/ignition/v2/config/validate"
+	"github.com/openshift/assisted-installer/src/convert"
 	"github.com/pkg/errors"
 )
 
@@ -21,6 +25,7 @@ type Ignition interface {
 	ParseIgnitionFile(path string) (*types.Config, error)
 	WriteIgnitionFile(path string, config *types.Config) error
 	MergeIgnitionConfig(base *types.Config, overrides *types.Config) (*types.Config, error)
+	InjectKubeletTempPrivateKey(pathToSourceIgnition string, privateKeyBytes []byte, certPathToInject string) error
 }
 
 type ignition struct{}
@@ -77,4 +82,33 @@ func (i *ignition) MergeIgnitionConfig(base *types.Config, overrides *types.Conf
 		return &config, errors.Errorf("merged ignition config is invalid: %s", report.String())
 	}
 	return &config, nil
+}
+
+func (i *ignition) InjectKubeletTempPrivateKey(pathToSourceIgnition string, privateKeyBytes []byte, certPathToInject string) error {
+	sourceIgnition, err := i.ParseIgnitionFile(pathToSourceIgnition)
+	if err != nil {
+		return errors.Wrapf(err, "unable to parse ignition file %s", pathToSourceIgnition)
+	}
+	privateKeyFile := types.File{
+		Node: types.Node{
+			Overwrite: convert.Bool(true),
+			Path: certPathToInject,
+			User: types.NodeUser{
+				Name: convert.String("root"),
+			},
+		},
+		FileEmbedded1: types.FileEmbedded1{
+			Contents: types.Resource{
+				Source: convert.String(
+					fmt.Sprintf(
+						"data:text/plain;charset=utf-8;base64,%s",
+						base64.StdEncoding.EncodeToString([]byte(privateKeyBytes)),
+					),
+				),
+			},
+			Mode: convert.Int(0600),
+		},
+	}
+	sourceIgnition.Storage.Files = append(sourceIgnition.Storage.Files, privateKeyFile)
+	return nil
 }

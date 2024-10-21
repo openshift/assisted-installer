@@ -22,7 +22,6 @@ import (
 	"time"
 
 	config_latest "github.com/coreos/ignition/v2/config/v3_2"
-	"github.com/go-openapi/swag"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/thoas/go-funk"
 	"github.com/vincent-petithory/dataurl"
@@ -33,6 +32,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/openshift/assisted-installer/src/config"
+	"github.com/openshift/assisted-installer/src/convert"
 	"github.com/openshift/assisted-installer/src/ops/execute"
 	"github.com/openshift/assisted-installer/src/utils"
 )
@@ -593,7 +593,7 @@ func (o *ops) GetMustGatherLogs(workDir, kubeconfigPath string, images ...string
 	}
 
 	if len(files) == 0 {
-		lerr := fmt.Errorf("Failed to find must-gather output")
+		lerr := fmt.Errorf("failed to find must-gather output")
 		o.log.Errorf(lerr.Error())
 		return "", lerr
 	}
@@ -707,7 +707,7 @@ func (o *ops) getPointedIgnitionAndCA(ignitionPath string) (string, string, erro
 	for i := range conf.Ignition.Config.Merge {
 		r := &conf.Ignition.Config.Merge[i]
 		if r.Source != nil {
-			source = swag.StringValue(r.Source)
+			source = convert.StringValue(r.Source)
 			if source != "" {
 				break
 			}
@@ -720,7 +720,7 @@ func (o *ops) getPointedIgnitionAndCA(ignitionPath string) (string, string, erro
 	for i := range conf.Ignition.Security.TLS.CertificateAuthorities {
 		r := &conf.Ignition.Security.TLS.CertificateAuthorities[i]
 		if r.Source != nil {
-			d, err := dataurl.DecodeString(swag.StringValue(r.Source))
+			d, err := dataurl.DecodeString(convert.StringValue(r.Source))
 			if err != nil {
 				return "", "", err
 			}

@@ -38,6 +38,20 @@ func (m *MockIgnition) EXPECT() *MockIgnitionMockRecorder {
 	return m.recorder
 }
 
+// InjectKubeletTempPrivateKey mocks base method.
+func (m *MockIgnition) InjectKubeletTempPrivateKey(pathToSourceIgnition string, privateKeyBytes []byte, certPathToInject string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "InjectKubeletTempPrivateKey", pathToSourceIgnition, privateKeyBytes, certPathToInject)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// InjectKubeletTempPrivateKey indicates an expected call of InjectKubeletTempPrivateKey.
+func (mr *MockIgnitionMockRecorder) InjectKubeletTempPrivateKey(pathToSourceIgnition, privateKeyBytes, certPathToInject interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InjectKubeletTempPrivateKey", reflect.TypeOf((*MockIgnition)(nil).InjectKubeletTempPrivateKey), pathToSourceIgnition, privateKeyBytes, certPathToInject)
+}
+
 // MergeIgnitionConfig mocks base method.
 func (m *MockIgnition) MergeIgnitionConfig(base, overrides *types.Config) (*types.Config, error) {
 	m.ctrl.T.Helper()
