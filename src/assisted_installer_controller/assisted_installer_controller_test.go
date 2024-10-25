@@ -746,7 +746,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				},
 			}
 
-			mockk8sclient.EXPECT().ListJobs(gomock.Any()).Return(&batchV1.JobList{}, nil).Times(1)
+			mockk8sclient.EXPECT().ListJobs(olmNamespace, metav1.ListOptions{}).Return(&batchV1.JobList{}, nil).Times(1)
 			mockk8sclient.EXPECT().GetAllInstallPlansOfSubscription(gomock.Any()).Return([]olmv1alpha1.InstallPlan{}, nil).Times(1)
 			mockk8sclient.EXPECT().GetCSVFromSubscription(operators[0].Namespace, operators[0].SubscriptionName).Return("", fmt.Errorf("dummy")).Times(1)
 			Expect(assistedController.waitForCSVBeCreated(operators)).Should(Equal(false))
@@ -758,7 +758,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					Name: operatorName, Status: models.OperatorStatusProgressing, OperatorType: models.OperatorTypeOlm,
 				},
 			}
-			mockk8sclient.EXPECT().ListJobs(gomock.Any()).Return(&batchV1.JobList{}, nil).AnyTimes()
+			mockk8sclient.EXPECT().ListJobs(olmNamespace, metav1.ListOptions{}).Return(&batchV1.JobList{}, nil).AnyTimes()
 			mockk8sclient.EXPECT().GetAllInstallPlansOfSubscription(gomock.Any()).Return([]olmv1alpha1.InstallPlan{}, nil).AnyTimes()
 			mockk8sclient.EXPECT().GetCSVFromSubscription(operators[0].Namespace, operators[0].SubscriptionName).Return("", nil).Times(1)
 			mockk8sclient.EXPECT().GetCSV(operators[0].Namespace, gomock.Any()).Return(nil, fmt.Errorf("dummy")).Times(1)
@@ -777,7 +777,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			succeededJob := batchV1.Job{ObjectMeta: metav1.ObjectMeta{Name: "succeed", Namespace: olmNamespace}, Status: batchV1.JobStatus{Failed: 0}}
 			mockk8sclient.EXPECT().GetCSVFromSubscription(operators[0].Namespace, operators[0].SubscriptionName).Return("", nil).Times(1)
 			mockk8sclient.EXPECT().GetCSV(operators[0].Namespace, gomock.Any()).Return(nil, apierrors.NewNotFound(apischema.GroupResource{}, failedJob.Name)).Times(1)
-			mockk8sclient.EXPECT().ListJobs(olmNamespace).Return(&batchV1.JobList{Items: []batchV1.Job{failedJob, succeededJob, failedJob1}}, nil).Times(1)
+			mockk8sclient.EXPECT().ListJobs(olmNamespace, metav1.ListOptions{}).Return(&batchV1.JobList{Items: []batchV1.Job{failedJob, succeededJob, failedJob1}}, nil).Times(1)
 			mockk8sclient.EXPECT().DeleteJob(types.NamespacedName{Name: failedJob.Name, Namespace: failedJob.Namespace}).Return(nil).Times(1)
 			mockk8sclient.EXPECT().DeleteJob(types.NamespacedName{Name: failedJob1.Name, Namespace: failedJob1.Namespace}).Return(nil).Times(1)
 
@@ -798,7 +798,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					Name: operatorName, Status: models.OperatorStatusProgressing, OperatorType: models.OperatorTypeOlm,
 				},
 			}
-			mockk8sclient.EXPECT().ListJobs(gomock.Any()).Return(&batchV1.JobList{}, nil).Times(1)
+			mockk8sclient.EXPECT().ListJobs(olmNamespace, metav1.ListOptions{}).Return(&batchV1.JobList{}, nil).Times(1)
 			mockk8sclient.EXPECT().GetAllInstallPlansOfSubscription(gomock.Any()).Return([]olmv1alpha1.InstallPlan{}, nil).Times(1)
 			mockk8sclient.EXPECT().GetCSVFromSubscription(operators[0].Namespace, operators[0].SubscriptionName).Return("randomCSV", nil).Times(1)
 			mockk8sclient.EXPECT().GetCSV(operators[0].Namespace, gomock.Any()).Return(nil, nil).Times(1)
@@ -1129,7 +1129,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				)
 
 				wg.Add(1)
-				mockk8sclient.EXPECT().ListJobs(gomock.Any()).Return(&batchV1.JobList{}, nil).AnyTimes()
+				mockk8sclient.EXPECT().ListJobs(olmNamespace, metav1.ListOptions{}).Return(&batchV1.JobList{}, nil).AnyTimes()
 				mockk8sclient.EXPECT().GetAllInstallPlansOfSubscription(gomock.Any()).Return([]olmv1alpha1.InstallPlan{}, nil).AnyTimes()
 				assistedController.PostInstallConfigs(context.TODO(), &wg)
 				wg.Wait()
@@ -1150,7 +1150,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 				By("endless empty status", func() {
 					mockbmclient.EXPECT().GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), "lso", gomock.Any()).Return(&models.MonitoredOperator{Name: "lso", Status: ""}, nil).AnyTimes()
-					mockk8sclient.EXPECT().ListJobs(gomock.Any()).Return(&batchV1.JobList{}, nil).AnyTimes()
+					mockk8sclient.EXPECT().ListJobs(olmNamespace, metav1.ListOptions{}).Return(&batchV1.JobList{}, nil).AnyTimes()
 					mockk8sclient.EXPECT().GetAllInstallPlansOfSubscription(gomock.Any()).Return([]olmv1alpha1.InstallPlan{}, nil).AnyTimes()
 					mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-local-storage", "local-storage-operator").Return("lso-1.1", nil).AnyTimes()
 					mockk8sclient.EXPECT().GetCSV("openshift-local-storage", "lso-1.1").Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseInstalling}}, nil).AnyTimes()
@@ -1188,7 +1188,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 				By("endless empty status", func() {
 					mockbmclient.EXPECT().GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), "lso", gomock.Any()).Return(&models.MonitoredOperator{Name: "lso", Status: ""}, nil).AnyTimes()
-					mockk8sclient.EXPECT().ListJobs(gomock.Any()).Return(&batchV1.JobList{}, nil).AnyTimes()
+					mockk8sclient.EXPECT().ListJobs(olmNamespace, metav1.ListOptions{}).Return(&batchV1.JobList{}, nil).AnyTimes()
 					mockk8sclient.EXPECT().GetAllInstallPlansOfSubscription(gomock.Any()).Return([]olmv1alpha1.InstallPlan{}, nil).AnyTimes()
 					mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-local-storage", "local-storage-operator").Return("lso-1.1", nil).AnyTimes()
 					mockk8sclient.EXPECT().GetCSV("openshift-local-storage", "lso-1.1").Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseInstalling}}, nil).AnyTimes()
