@@ -83,7 +83,7 @@ type K8SClient interface {
 	PatchNamespace(namespace string, data []byte) error
 	GetNode(name string) (*v1.Node, error)
 	PatchNodeLabels(nodeName string, nodeLabels string) error
-	ListJobs(namespace string) (*batchV1.JobList, error)
+	ListJobs(namespace string, options metav1.ListOptions) (*batchV1.JobList, error)
 	DeleteJob(job types.NamespacedName) error
 	IsClusterCapabilityEnabled(configv1.ClusterVersionCapability) (bool, error)
 	UntaintNode(name string) error
@@ -192,8 +192,8 @@ func (c *k8sClient) DeleteService(name, namespace string) error {
 	return c.client.CoreV1().Services(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 }
 
-func (c *k8sClient) ListJobs(namespace string) (*batchV1.JobList, error) {
-	jobs, err := c.client.BatchV1().Jobs(namespace).List(context.TODO(), metav1.ListOptions{})
+func (c *k8sClient) ListJobs(namespace string, options metav1.ListOptions) (*batchV1.JobList, error) {
+	jobs, err := c.client.BatchV1().Jobs(namespace).List(context.TODO(), options)
 	if err != nil {
 		return &batchV1.JobList{}, err
 	}

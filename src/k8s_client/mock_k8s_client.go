@@ -22,6 +22,7 @@ import (
 	v10 "k8s.io/api/batch/v1"
 	v11 "k8s.io/api/certificates/v1"
 	v12 "k8s.io/api/core/v1"
+	v13 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 )
 
@@ -448,18 +449,18 @@ func (mr *MockK8SClientMockRecorder) ListEvents(namespace any) *gomock.Call {
 }
 
 // ListJobs mocks base method.
-func (m *MockK8SClient) ListJobs(namespace string) (*v10.JobList, error) {
+func (m *MockK8SClient) ListJobs(namespace string, options v13.ListOptions) (*v10.JobList, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListJobs", namespace)
+	ret := m.ctrl.Call(m, "ListJobs", namespace, options)
 	ret0, _ := ret[0].(*v10.JobList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListJobs indicates an expected call of ListJobs.
-func (mr *MockK8SClientMockRecorder) ListJobs(namespace any) *gomock.Call {
+func (mr *MockK8SClientMockRecorder) ListJobs(namespace, options any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListJobs", reflect.TypeOf((*MockK8SClient)(nil).ListJobs), namespace)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListJobs", reflect.TypeOf((*MockK8SClient)(nil).ListJobs), namespace, options)
 }
 
 // ListMachines mocks base method.
