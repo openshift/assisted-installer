@@ -949,6 +949,7 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 				"rhcos"), extraArgs...)...,
 		),
 		makecmd("fsfreeze", "--freeze", "/mnt/boot"),
+		makecmd("if ", "command -v zipl -v > /dev/null; then zipl -V -t /mnt/boot -b /mnt/boot/loader/entries; ", "fi"),
 		makecmd("umount", "/mnt/boot"),
 		makecmd("fsfreeze", "--freeze", "/mnt"),
 		makecmd("umount", "/mnt"),
