@@ -222,6 +222,9 @@ func HostMatchByNameOrIPAddress(node v1.Node, namesMap, IPAddressMap map[string]
 func RemoveUninitializedTaint(ctx context.Context, ic inventory_client.InventoryClient, kc k8s_client.K8SClient,
 	log logrus.FieldLogger, platformType models.PlatformType, openshiftVersion, invoker string) bool {
 	removeUninitializedTaintForPlatforms := [...]models.PlatformType{models.PlatformTypeNutanix, models.PlatformTypeVsphere}
+	if invoker == InvokerAgent && platformType == models.PlatformTypeExternal {
+		return true
+	}
 	if invoker == InvokerAgent && platformType == models.PlatformTypeVsphere {
 		hasValidvSphereCredentials := HasValidvSphereCredentials(ctx, ic, kc, log)
 		if hasValidvSphereCredentials {
