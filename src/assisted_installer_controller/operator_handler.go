@@ -49,7 +49,22 @@ func (c *controller) isOperatorAvailable(handler OperatorHandler) bool {
 			return false
 		}
 
-		err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operatorName, operatorVersion, operatorStatus, operatorMessage)
+		// If the operator is available but has setup jobs then we don't want to mark it as available here
+		// because if we do that for all operators then the service will consider that the cluster is ready
+		// and that will in turn stop the controller without first checking if the setup jobs have finished.
+		// So instead we mark the operator as progressing, and will mark it as available later, when we check
+		// the setup jobs.
+		var reportedStatus models.OperatorStatus
+		if operatorStatus == models.OperatorStatusAvailable && c.getSetupJobCount(operatorName) > 0 {
+			c.log.WithFields(logrus.Fields{
+				"name": operatorName,
+			}).Info("Operator is available but has setup jobs", operatorName)
+			reportedStatus = models.OperatorStatusProgressing
+		} else {
+			reportedStatus = operatorStatus
+		}
+
+		err = c.ic.UpdateClusterOperator(context.TODO(), c.ClusterID, operatorName, operatorVersion, reportedStatus, operatorMessage)
 		if err != nil {
 			c.log.WithError(err).Warnf("Failed to update %s operator status %s with message %s", operatorName, operatorStatus, operatorMessage)
 			return false

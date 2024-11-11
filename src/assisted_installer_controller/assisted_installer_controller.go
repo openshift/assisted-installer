@@ -8,11 +8,13 @@ import (
 	stderrors "errors"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"net"
 	"net/http"
 	"os"
 	"path"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -25,6 +27,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	batchV1 "k8s.io/api/batch/v1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -63,6 +66,11 @@ const (
 	clusterOperatorReportKey string = "CLUSTER_OPERATORS_REPORT"
 	workerMCPName                   = "worker"
 	roleLabel                       = "node-role.kubernetes.io"
+
+	// This is the label that should be added to jobs that are used to complete the setup of OLM operators. The
+	// isntaller will wait till those jobs are completed before declaring the operator available. The value should
+	// be the identifier of the operator.
+	agentInstallSetupJobLabel = "agent-install.openshift.io/setup-job"
 )
 
 var (
@@ -121,12 +129,14 @@ type Controller interface {
 
 type controller struct {
 	ControllerConfig
-	status          *ControllerStatus
-	log             *logrus.Logger
-	ops             ops.Ops
-	ic              inventory_client.InventoryClient
-	kc              k8s_client.K8SClient
-	rebootsNotifier RebootsNotifier
+	status             *ControllerStatus
+	log                *logrus.Logger
+	ops                ops.Ops
+	ic                 inventory_client.InventoryClient
+	kc                 k8s_client.K8SClient
+	rebootsNotifier    RebootsNotifier
+	setupJobCountsLock *sync.Mutex
+	setupJobCounts     map[string]int
 }
 
 // manifest store the operator manifest used by assisted-installer to create CRs of the OLM:
@@ -139,13 +149,15 @@ type manifest struct {
 
 func newController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inventory_client.InventoryClient, kc k8s_client.K8SClient, rebootsNotifier RebootsNotifier) *controller {
 	return &controller{
-		log:              log,
-		ControllerConfig: cfg,
-		ops:              ops,
-		ic:               ic,
-		kc:               kc,
-		status:           NewControllerStatus(),
-		rebootsNotifier:  rebootsNotifier,
+		log:                log,
+		ControllerConfig:   cfg,
+		ops:                ops,
+		ic:                 ic,
+		kc:                 kc,
+		status:             NewControllerStatus(),
+		rebootsNotifier:    rebootsNotifier,
+		setupJobCountsLock: &sync.Mutex{},
+		setupJobCounts:     map[string]int{},
 	}
 }
 
@@ -587,6 +599,15 @@ func (c *controller) waitForOLMOperators(ctx context.Context) error {
 		errs = append(errs, err)
 	}
 
+	// Some of the post install manifests may be jobs to complete the setup of the operators. For example, a storage
+	// operator may include a job that waits for the default storage class and then marks it as the default. We need
+	// to check and remember that.
+	err = c.refreshSetupJobCounts()
+	if err != nil {
+		c.log.WithError(err).Warning("Failed to check setup jobs")
+		errs = append(errs, err)
+	}
+
 	c.updateFinalizingProgress(ctx, models.FinalizingStageWaitingForOlmOperatorsCsv)
 	err = c.waitForCSV(ctx)
 	if err != nil {
@@ -595,6 +616,22 @@ func (c *controller) waitForOLMOperators(ctx context.Context) error {
 
 		errs = append(errs, err)
 	}
+
+	// If there are any setup jobs then wait for them to finish and then mark the corresponding operator as
+	// available:
+	totalSetupJobCount := 0
+	for _, setupJobCount := range c.getSetupJobCounts() {
+		totalSetupJobCount += setupJobCount
+	}
+	if totalSetupJobCount > 0 {
+		c.updateFinalizingProgress(ctx, models.FinalizingStageWaitingForOLMOperatorSetupJobs)
+		err = c.waitForSetupJobs(ctx)
+		if err != nil {
+			c.log.WithError(err).Warning("Failed to wait for setup jobs")
+			errs = append(errs, err)
+		}
+	}
+
 	return stderrors.Join(errs...)
 }
 
@@ -1505,4 +1542,111 @@ func (c controller) SetReadyState(waitTimeout time.Duration) *models.Cluster {
 
 func (c *controller) GetStatus() *ControllerStatus {
 	return c.status
+}
+
+// waitForSetupJobs waits till the jobs are completed successfully.
+func (c *controller) waitForSetupJobs(ctx context.Context) error {
+	c.log.Info("Waiting for setup jobs")
+	operators, err := c.getProgressingOLMOperators()
+	if err != nil {
+		return err
+	}
+	areAllSetupJobsComplete := func() bool {
+		err := c.refreshSetupJobCounts()
+		if err != nil {
+			c.log.WithError(err).Error("Failed to refresh setup job counts")
+			return false
+		}
+		totalSetupJobCount := 0
+		for _, operator := range operators {
+			setupJobCount := c.getSetupJobCount(operator.Name)
+			totalSetupJobCount += setupJobCount
+			if setupJobCount == 0 {
+				err = c.ic.UpdateClusterOperator(
+					ctx,
+					c.ClusterID,
+					operator.Name,
+					operator.Version,
+					models.OperatorStatusAvailable,
+					"Setup jobs completed",
+				)
+				if err != nil {
+					c.log.WithError(err).Error("Failed to update operator")
+					return false
+				}
+				c.log.WithFields(logrus.Fields{
+					"name": operator.Name,
+				}).Info("Operator is available because setup jobs are completed")
+			}
+		}
+		return totalSetupJobCount == 0
+	}
+	return utils.WaitForeverForPredicateWithCancel(
+		ctx,
+		GeneralProgressUpdateInt,
+		areAllSetupJobsComplete,
+		c.isStageTimedOut(models.FinalizingStageWaitingForOLMOperatorSetupJobs),
+	)
+}
+
+// refreshSetupJobsCounts updatest the internal data structure that contains the counts of setup jobs.
+func (c *controller) refreshSetupJobCounts() error {
+	c.setupJobCountsLock.Lock()
+	defer c.setupJobCountsLock.Unlock()
+	for k := range c.setupJobCounts {
+		delete(c.setupJobCounts, k)
+	}
+	list, err := c.kc.ListJobs("", metav1.ListOptions{
+		LabelSelector: agentInstallSetupJobLabel,
+	})
+	if err != nil {
+		return err
+	}
+	for i := range list.Items {
+		item := &list.Items[i]
+		name := item.Labels[agentInstallSetupJobLabel]
+		count := c.setupJobCounts[name]
+		var completed bool
+		completed, err = c.checkSetupJob(item)
+		if err != nil {
+			return err
+		}
+		if !completed {
+			count++
+		}
+		c.setupJobCounts[name] = count
+	}
+	names := make([]string, len(c.setupJobCounts))
+	i := 0
+	for name := range c.setupJobCounts {
+		names[i] = name
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		c.log.WithFields(logrus.Fields{
+			"name":  name,
+			"count": c.setupJobCounts[name],
+		}).Info("Setup jobs")
+	}
+	return nil
+}
+
+// getSetupJobCounts returns the job counts for all the operators.
+func (c *controller) getSetupJobCounts() map[string]int {
+	c.setupJobCountsLock.Lock()
+	defer c.setupJobCountsLock.Unlock()
+	return maps.Clone(c.setupJobCounts)
+}
+
+// getSetupJobCount returns the number of setup jobs for the given operator.
+func (c *controller) getSetupJobCount(name string) int {
+	c.setupJobCountsLock.Lock()
+	defer c.setupJobCountsLock.Unlock()
+	return c.setupJobCounts[name]
+}
+
+// checkSetupJob checks if the given setup job has been completed.
+func (c *controller) checkSetupJob(job *batchV1.Job) (result bool, err error) {
+	result = job.Status.Succeeded > 0
+	return
 }

@@ -1075,9 +1075,16 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				logClusterOperatorsSuccess()
 			})
 
+			mockNoSetupJobs := func() {
+				mockk8sclient.EXPECT().ListJobs("", metav1.ListOptions{
+					LabelSelector: agentInstallSetupJobLabel,
+				}).Return(&batchV1.JobList{}, nil).AnyTimes()
+			}
+
 			It("waiting for single OLM operator", func() {
 				mockAllCapabilitiesEnabled()
 				mockGetClusterForCancel()
+				mockNoSetupJobs()
 
 				By("setup", func() {
 					setControllerWaitForOLMOperators(assistedController.ClusterID)
@@ -1140,6 +1147,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			It("waiting for single OLM operator which timeouts", func() {
 				mockAllCapabilitiesEnabled()
 				mockGetClusterForCancel()
+				mockNoSetupJobs()
 
 				By("setup", func() {
 					setControllerWaitForOLMOperators(assistedController.ClusterID)
@@ -1178,6 +1186,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 			It("waiting for single OLM operator which continues installation after timeout occurs", func() {
 				mockAllCapabilitiesEnabled()
+				mockNoSetupJobs()
 
 				By("setup", func() {
 					setControllerWaitForOLMOperators(assistedController.ClusterID)
@@ -1231,6 +1240,175 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				wg.Wait()
 				Expect(assistedController.status.HasError()).Should(Equal(false))
 				Expect(assistedController.status.GetOperatorsInError()).To(ContainElement("lso"))
+			})
+
+			It("Waiting for setup job", func() {
+				mockAllCapabilitiesEnabled()
+				mockGetClusterForCancel()
+
+				operator := models.MonitoredOperator{
+					SubscriptionName: "local-storage-operator",
+					Namespace:        "openshift-local-storage",
+					OperatorType:     models.OperatorTypeOlm,
+					Name:             "lso",
+					TimeoutSeconds:   120 * 60,
+				}
+
+				By("Setup", func() {
+					setControllerWaitForOLMOperators(assistedController.ClusterID)
+					mockGetOLMOperators([]models.MonitoredOperator{operator})
+					mockApplyPostInstallManifests([]models.MonitoredOperator{operator})
+					mockk8sclient.EXPECT().GetCSVFromSubscription(
+						operator.Namespace,
+						operator.SubscriptionName,
+					).Return("local-storage-operator", nil).Times(2)
+					mockk8sclient.EXPECT().GetCSV(
+						operator.Namespace,
+						operator.SubscriptionName,
+					).Return(
+						&olmv1alpha1.ClusterServiceVersion{
+							Status: olmv1alpha1.ClusterServiceVersionStatus{
+								Phase: olmv1alpha1.CSVPhaseNone,
+							},
+						},
+						nil,
+					).Times(2)
+
+					mockk8sclient.EXPECT().ListJobs(
+						"",
+						metav1.ListOptions{
+							LabelSelector: agentInstallSetupJobLabel,
+						},
+					).Return(
+						&batchV1.JobList{
+							Items: []batchV1.Job{{
+								ObjectMeta: metav1.ObjectMeta{
+									Labels: map[string]string{
+										agentInstallSetupJobLabel: operator.Name,
+									},
+								},
+								Status: batchV1.JobStatus{
+									Succeeded: 0,
+								},
+							}},
+						},
+						nil,
+					).Times(1)
+				})
+
+				By("Empty status", func() {
+					operator.Status = ""
+					mockGetServiceOperators([]models.MonitoredOperator{operator})
+					mockGetCSV(
+						operator,
+						&olmv1alpha1.ClusterServiceVersion{
+							Status: olmv1alpha1.ClusterServiceVersionStatus{
+								Phase: olmv1alpha1.CSVPhaseInstalling,
+							},
+						},
+					)
+				})
+
+				By("In progress", func() {
+					operator.Status = models.OperatorStatusProgressing
+					mockGetServiceOperators([]models.MonitoredOperator{operator})
+					mockGetCSV(
+						operator,
+						&olmv1alpha1.ClusterServiceVersion{
+							Status: olmv1alpha1.ClusterServiceVersionStatus{
+								Phase: olmv1alpha1.CSVPhaseInstalling,
+							},
+						},
+					)
+					mockbmclient.EXPECT().UpdateClusterOperator(
+						gomock.Any(),
+						"cluster-id",
+						"lso",
+						gomock.Any(),
+						models.OperatorStatusProgressing,
+						gomock.Any(),
+					).Return(nil).Times(1)
+				})
+
+				By("Available but with setup jobs", func() {
+					operator.Status = models.OperatorStatusProgressing
+					mockGetServiceOperators([]models.MonitoredOperator{operator})
+					mockGetCSV(
+						operator,
+						&olmv1alpha1.ClusterServiceVersion{
+							Status: olmv1alpha1.ClusterServiceVersionStatus{
+								Phase: olmv1alpha1.CSVPhaseSucceeded,
+							},
+						},
+					)
+					mockbmclient.EXPECT().UpdateClusterOperator(
+						gomock.Any(),
+						"cluster-id",
+						"lso",
+						gomock.Any(),
+						models.OperatorStatusProgressing,
+						gomock.Any(),
+					).Return(nil).Times(1)
+				})
+
+				By("Available and no setup jobs", func() {
+					operator.Status = models.OperatorStatusProgressing
+					mockGetOLMOperators([]models.MonitoredOperator{operator})
+					mockk8sclient.EXPECT().ListJobs(
+						"",
+						metav1.ListOptions{
+							LabelSelector: agentInstallSetupJobLabel,
+						},
+					).Return(
+						&batchV1.JobList{
+							Items: []batchV1.Job{{
+								ObjectMeta: metav1.ObjectMeta{
+									Labels: map[string]string{
+										agentInstallSetupJobLabel: "lso",
+									},
+								},
+								Status: batchV1.JobStatus{
+									Succeeded: 1,
+								},
+							}},
+						},
+						nil,
+					).Times(1)
+					mockbmclient.EXPECT().UpdateClusterOperator(
+						gomock.Any(),
+						"cluster-id",
+						"lso",
+						gomock.Any(),
+						models.OperatorStatusAvailable,
+						gomock.Any(),
+					).Return(nil).Times(1)
+				})
+
+				mockbmclient.EXPECT().CompleteInstallation(
+					gomock.Any(),
+					"cluster-id",
+					true,
+					"",
+					nil,
+				).Return(fmt.Errorf("dummy")).Times(1)
+				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "", nil).Return(nil).Times(1)
+				mockSuccessUpdateFinalizingStages(
+					models.FinalizingStageWaitingForClusterOperators,
+					models.FinalizingStageAddingRouterCa,
+					models.FinalizingStageWaitingForOlmOperatorsCsvInitialization,
+					models.FinalizingStageApplyingOlmManifests,
+					models.FinalizingStageWaitingForOlmOperatorsCsv,
+					models.FinalizingStageWaitingForOLMOperatorSetupJobs,
+					models.FinalizingStageDone,
+				)
+
+				wg.Add(1)
+				mockk8sclient.EXPECT().ListJobs(olmNamespace, metav1.ListOptions{}).Return(&batchV1.JobList{}, nil).AnyTimes()
+				mockk8sclient.EXPECT().GetAllInstallPlansOfSubscription(gomock.Any()).Return([]olmv1alpha1.InstallPlan{}, nil).AnyTimes()
+				assistedController.PostInstallConfigs(context.TODO(), &wg)
+				wg.Wait()
+				Expect(assistedController.status.HasError()).Should(Equal(false))
+				Expect(assistedController.status.HasOperatorError()).Should(Equal(false))
 			})
 		})
 
