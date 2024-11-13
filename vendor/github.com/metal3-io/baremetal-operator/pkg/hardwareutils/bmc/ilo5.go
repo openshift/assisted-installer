@@ -52,7 +52,6 @@ func (a *iLO5AccessDetails) DisableCertificateVerification() bool {
 // expected to add any other information that might be needed (such as
 // the kernel and ramdisk locations).
 func (a *iLO5AccessDetails) DriverInfo(bmcCreds Credentials) map[string]interface{} {
-
 	result := map[string]interface{}{
 		"ilo_username": bmcCreds.Username,
 		"ilo_password": bmcCreds.Password,
@@ -78,6 +77,10 @@ func (a *iLO5AccessDetails) BootInterface() string {
 	return "ilo-ipxe"
 }
 
+func (a *iLO5AccessDetails) FirmwareInterface() string {
+	return ""
+}
+
 func (a *iLO5AccessDetails) ManagementInterface() string {
 	return ""
 }
@@ -87,9 +90,7 @@ func (a *iLO5AccessDetails) PowerInterface() string {
 }
 
 func (a *iLO5AccessDetails) RAIDInterface() string {
-	// Disabled RAID in OpenShift because we are not ready to support it
-	//return "ilo5"
-	return "no-raid"
+	return "ilo5"
 }
 
 func (a *iLO5AccessDetails) VendorInterface() string {
@@ -116,9 +117,9 @@ func (a *iLO5AccessDetails) BuildBIOSSettings(firmwareConfig *FirmwareConfig) (s
 	var value string
 
 	if firmwareConfig.VirtualizationEnabled != nil {
-		value = "Disabled"
+		value = disabled
 		if *firmwareConfig.VirtualizationEnabled {
-			value = "Enabled"
+			value = enabled
 		}
 		settings = append(settings,
 			map[string]string{
@@ -129,9 +130,9 @@ func (a *iLO5AccessDetails) BuildBIOSSettings(firmwareConfig *FirmwareConfig) (s
 	}
 
 	if firmwareConfig.SimultaneousMultithreadingEnabled != nil {
-		value = "Disabled"
+		value = disabled
 		if *firmwareConfig.SimultaneousMultithreadingEnabled {
-			value = "Enabled"
+			value = enabled
 		}
 		settings = append(settings,
 			map[string]string{
@@ -142,9 +143,9 @@ func (a *iLO5AccessDetails) BuildBIOSSettings(firmwareConfig *FirmwareConfig) (s
 	}
 
 	if firmwareConfig.SriovEnabled != nil {
-		value = "Disabled"
+		value = disabled
 		if *firmwareConfig.SriovEnabled {
-			value = "Enabled"
+			value = enabled
 		}
 		settings = append(settings,
 			map[string]string{
