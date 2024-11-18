@@ -923,7 +923,7 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 		growpartcmd = makecmd("growpart", device, "4")
 	}
 	ret, err := o.ExecPrivilegeCommand(nil, "uname", "-m")
-	if err == nil && ret != nil && ret == "s390x" {
+	if err == nil && ret == "s390x" {
 		o.log.Infof("Running on s390x archtiecture - skip overwrite image.")
 		return nil
 	}
