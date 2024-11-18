@@ -434,6 +434,7 @@ var _ = Describe("overwrite OS image", func() {
 			"abc",
 		}
 		mockPrivileged("cat", "/proc/cmdline")
+		mockPrivileged("uname", "-m")
 		mockPrivileged("mount", part4, "/mnt")
 		mockPrivileged("mount", part3, "/mnt/boot")
 		mockPrivileged("growpart", "--free-percent=92", device, "4")
