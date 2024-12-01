@@ -260,7 +260,10 @@ func (o *ops) findEfiDirectory(device string) (string, error) {
 		out string
 		err error
 	)
-	if _, err = o.ExecPrivilegeCommand(nil, "mount", partitionForDevice(device, "2"), "/mnt"); err != nil {
+	if err = utils.Retry(3, 5*time.Second, o.log, func() (err error) {
+		_, err = o.ExecPrivilegeCommand(nil, "mount", partitionForDevice(device, "2"), "/mnt")
+		return
+	}); err != nil {
 		return "", errors.Wrap(err, "failed to mount efi device")
 	}
 	defer func() {
