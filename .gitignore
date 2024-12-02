@@ -8,3 +8,5 @@ kubevirtci/
 .*.swp
 
 reports
+
+**/junit_unit_test.xml
