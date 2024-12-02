@@ -8,6 +8,7 @@ import (
 	batchV1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/openshift/assisted-installer/src/k8s_client"
@@ -198,7 +199,7 @@ func (handler ClusterServiceVersionHandler) handleOLMEarlySetupBug() error {
 }
 
 func (handler ClusterServiceVersionHandler) deleteFailedOlmJobs() error {
-	jobs, err := handler.kc.ListJobs(olmNamespace)
+	jobs, err := handler.kc.ListJobs(olmNamespace, metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

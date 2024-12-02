@@ -24,7 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/thoas/go-funk"
 	"github.com/vincent-petithory/dataurl"
-	gomock "go.uber.org/mock/gomock"
+	"go.uber.org/mock/gomock"
 )
 
 var _ = Describe("installerArgs", func() {

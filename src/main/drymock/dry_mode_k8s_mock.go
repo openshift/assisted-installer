@@ -13,7 +13,7 @@ import (
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/sirupsen/logrus"
-	gomock "go.uber.org/mock/gomock"
+	"go.uber.org/mock/gomock"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
