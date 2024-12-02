@@ -83,18 +83,18 @@ func (mr *MockOpsMockRecorder) CreateRandomHostname(hostname any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRandomHostname", reflect.TypeOf((*MockOps)(nil).CreateRandomHostname), hostname)
 }
 
-// DryRebootHappened mocks base method.
-func (m *MockOps) DryRebootHappened(markerPath string) bool {
+// FileExists mocks base method.
+func (m *MockOps) FileExists(markerPath string) bool {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DryRebootHappened", markerPath)
+	ret := m.ctrl.Call(m, "FileExists", markerPath)
 	ret0, _ := ret[0].(bool)
 	return ret0
 }
 
-// DryRebootHappened indicates an expected call of DryRebootHappened.
-func (mr *MockOpsMockRecorder) DryRebootHappened(markerPath any) *gomock.Call {
+// FileExists indicates an expected call of FileExists.
+func (mr *MockOpsMockRecorder) FileExists(markerPath any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DryRebootHappened", reflect.TypeOf((*MockOps)(nil).DryRebootHappened), markerPath)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FileExists", reflect.TypeOf((*MockOps)(nil).FileExists), markerPath)
 }
 
 // EvaluateDiskSymlink mocks base method.
