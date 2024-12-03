@@ -922,6 +922,11 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 	} else {
 		growpartcmd = makecmd("growpart", device, "4")
 	}
+	ret, err := o.ExecPrivilegeCommand(nil, "uname", "-m")
+	if err == nil && ret == "s390x" {
+		o.log.Infof("Running on s390x archtiecture - skip overwrite image.")
+		return nil
+	}
 	cmds := []*cmd{
 		makecmd("mount", partitionForDevice(device, "4"), "/mnt"),
 		makecmd("mount", partitionForDevice(device, "3"), "/mnt/boot"),
