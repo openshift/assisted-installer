@@ -26,26 +26,16 @@ spec:
     value: quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-mce-downstream-2-13/assisted-installer-mce-downstream-2-13:on-pr-{{revision}}
   - name: image-expires-after
     value: 5d
-  - name: build-platforms
-    value:
-    - linux/x86_64
-    - linux/arm64
-    - linux/ppc64le
-    - linux/s390x
   - name: dockerfile
     value: Dockerfile.assisted-installer-mce
   - name: path-context
     value: .
-  - name: build-args
-    value:
-    - release={{target_branch}}
-    - version={{revision}}
   pipelineSpec:
     description: |
-      This pipeline is ideal for building multi-arch container images from a Containerfile while maintaining trust after pipeline customization.
+      This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
 
-      _Uses `buildah` to create a multi-platform container image leveraging [trusted artifacts](https://konflux-ci.dev/architecture/ADR/0036-trusted-artifacts.html). It also optionally creates a source image and runs some build-time tests. This pipeline requires that the [multi platform controller](https://github.com/konflux-ci/multi-platform-controller) is deployed and configured on your Konflux instance. Information is shared between tasks using OCI artifacts instead of PVCs. EC will pass the [`trusted_task.trusted`](https://enterprisecontract.dev/docs/ec-policies/release_policy.html#trusted_task__trusted) policy as long as all data used to build the artifact is generated from trusted tasks.
-      This pipeline is pushed as a Tekton bundle to [quay.io](https://quay.io/repository/konflux-ci/tekton-catalog/pipeline-docker-build-multi-platform-oci-ta?tab=tags)_
+      _Uses `buildah` to create a container image leveraging [trusted artifacts](https://konflux-ci.dev/architecture/ADR/0036-trusted-artifacts.html). It also optionally creates a source image and runs some build-time tests. Information is shared between tasks using OCI artifacts instead of PVCs. EC will pass the [`trusted_task.trusted`](https://enterprisecontract.dev/docs/ec-policies/release_policy.html#trusted_task__trusted) policy as long as all data used to build the artifact is generated from trusted tasks.
+      This pipeline is pushed as a Tekton bundle to [quay.io](https://quay.io/repository/konflux-ci/tekton-catalog/pipeline-docker-build-oci-ta?tab=tags)_
     finally:
     - name: show-sbom
       params:
@@ -105,7 +95,7 @@ spec:
       description: Build a source image.
       name: build-source-image
       type: string
-    - default: "true"
+    - default: "false"
       description: Add built image into an OCI image index
       name: build-image-index
       type: string
@@ -117,12 +107,6 @@ spec:
       description: Path to a file with build arguments for buildah, see https://www.mankier.com/1/buildah-build#--build-arg-file
       name: build-args-file
       type: string
-    - default:
-      - linux/x86_64
-      description: List of platforms to build the container images on. The available
-        set of values is determined by the configuration of the multi-platform-controller.
-      name: build-platforms
-      type: array
     results:
     - description: ""
       name: IMAGE_URL
@@ -200,7 +184,7 @@ spec:
         - name: name
           value: prefetch-dependencies-oci-ta
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-prefetch-dependencies-oci-ta:0.1@sha256:b1ac9124ad909a8d7dbac01b1a02ef9a973d448d4c94efcf3d1b29e2a5c9e76f
+          value: quay.io/konflux-ci/tekton-catalog/task-prefetch-dependencies-oci-ta:0.1@sha256:4072f732119864d12ec8e2ff075f01487aaee9df4440166dbe85fdd447865161
         - name: kind
           value: task
         resolver: bundles
@@ -209,12 +193,7 @@ spec:
         workspace: git-auth
       - name: netrc
         workspace: netrc
-    - matrix:
-        params:
-        - name: PLATFORM
-          value:
-          - $(params.build-platforms)
-      name: build-images
+    - name: build-container
       params:
       - name: IMAGE
         value: $(params.output-image)
@@ -239,16 +218,14 @@ spec:
         value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
       - name: CACHI2_ARTIFACT
         value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
-      - name: IMAGE_APPEND_PLATFORM
-        value: "true"
       runAfter:
       - prefetch-dependencies
       taskRef:
         params:
         - name: name
-          value: buildah-remote-oci-ta
+          value: buildah-oci-ta
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-buildah-remote-oci-ta:0.2@sha256:52a1a93cf99ab1f1092e983ac41b3684b7af004772d325e89b42e82e046bc7d1
+          value: quay.io/konflux-ci/tekton-catalog/task-buildah-oci-ta:0.2@sha256:937f465189482f3279b9491161fff7720d4c443f27e6d9febbf2344268383011
         - name: kind
           value: task
         resolver: bundles
@@ -269,15 +246,15 @@ spec:
         value: $(params.build-image-index)
       - name: IMAGES
         value:
-        - $(tasks.build-images.results.IMAGE_REF[*])
+        - $(tasks.build-container.results.IMAGE_URL)@$(tasks.build-container.results.IMAGE_DIGEST)
       runAfter:
-      - build-images
+      - build-container
       taskRef:
         params:
         - name: name
           value: build-image-index
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-build-image-index:0.1@sha256:ebc17bb22481160eec6eb7277df1e48b90f599bebe563cd4f046807f4e32ced3
+          value: quay.io/konflux-ci/tekton-catalog/task-build-image-index:0.1@sha256:a89c141c8d35b2e9d9904c92c9b128f7ccf36681adac7f7422b4537b8bb077e7
         - name: kind
           value: task
         resolver: bundles
@@ -301,7 +278,7 @@ spec:
         - name: name
           value: source-build-oci-ta
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-source-build-oci-ta:0.1@sha256:bd786bc1d33391bb169f98a1070d1a39e410b835f05fd0db0263754c65bd9bea
+          value: quay.io/konflux-ci/tekton-catalog/task-source-build-oci-ta:0.1@sha256:6686b885af277e7b912143a080d6af7a0372a12c33d66924bbd9bb1aa4d8d0dc
         - name: kind
           value: task
         resolver: bundles
@@ -477,7 +454,7 @@ spec:
         - name: name
           value: rpms-signature-scan
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-rpms-signature-scan:0.2@sha256:28aaf87d61078a0aeeeabcae455eda7d05c4f9b81d8995bdcf3dde95c1a7a77b
+          value: quay.io/konflux-ci/tekton-catalog/task-rpms-signature-scan:0.2@sha256:8f3b23bf1b0ef55cc79d28604d2397a0101ac9c0c42ae26e26532eb2778c801b
         - name: kind
           value: task
         resolver: bundles
