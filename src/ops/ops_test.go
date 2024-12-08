@@ -12,10 +12,10 @@ import (
 	"os"
 	"reflect"
 
+	"github.com/openshift/assisted-installer/src/convert"
 	"github.com/openshift/assisted-installer/src/ops/execute"
 
 	"github.com/coreos/ignition/v2/config/v3_2/types"
-	"github.com/go-openapi/swag"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
@@ -192,11 +192,11 @@ WkBKOclmOV2xlTVuPw==
 		ret.Ignition.Version = "3.2.0"
 		ret.Ignition.Config.Merge = append(ret.Ignition.Config.Merge,
 			types.Resource{
-				Source: swag.String(source),
+				Source: convert.String(source),
 			})
 		ret.Ignition.Security.TLS.CertificateAuthorities = append(ret.Ignition.Security.TLS.CertificateAuthorities,
 			types.Resource{
-				Source: swag.String(dataurl.EncodeBytes(localhostCert)),
+				Source: convert.String(dataurl.EncodeBytes(localhostCert)),
 			})
 		return ret
 	}
