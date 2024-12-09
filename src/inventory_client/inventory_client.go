@@ -20,8 +20,8 @@ import (
 	ttlCache "github.com/ReneKroon/ttlcache/v2"
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/strfmt"
-	"github.com/go-openapi/swag"
 	"github.com/hashicorp/go-version"
+	"github.com/openshift/assisted-installer/src/convert"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/client"
 	"github.com/openshift/assisted-service/client/events"
@@ -254,7 +254,7 @@ func (c *inventoryClient) UploadIngressCa(ctx context.Context, ingressCA string,
 }
 
 func (c *inventoryClient) GetCluster(ctx context.Context, withHosts bool) (*models.Cluster, error) {
-	cluster, err := c.ai.Installer.V2GetCluster(ctx, &installer.V2GetClusterParams{ClusterID: c.clusterId, ExcludeHosts: swag.Bool(!withHosts)})
+	cluster, err := c.ai.Installer.V2GetCluster(ctx, &installer.V2GetClusterParams{ClusterID: c.clusterId, ExcludeHosts: convert.Bool(!withHosts)})
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +263,7 @@ func (c *inventoryClient) GetCluster(ctx context.Context, withHosts bool) (*mode
 }
 
 func (c *inventoryClient) ListsHostsForRole(ctx context.Context, role string) (models.HostList, error) {
-	ret, err := c.ai.Installer.ListClusterHosts(ctx, &installer.ListClusterHostsParams{ClusterID: c.clusterId, Role: swag.String(role)})
+	ret, err := c.ai.Installer.ListClusterHosts(ctx, &installer.ListClusterHostsParams{ClusterID: c.clusterId, Role: convert.String(role)})
 	if err != nil {
 		return nil, err
 	}
