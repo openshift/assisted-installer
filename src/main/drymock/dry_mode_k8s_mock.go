@@ -22,7 +22,7 @@ import (
 func mockNodeList(mockk8sclient *k8s_client.MockK8SClient, clusterHosts config.DryClusterHosts, o ops.Ops) v1.NodeList {
 	nodeListPopulated := v1.NodeList{}
 	for _, clusterHost := range clusterHosts {
-		if !o.DryRebootHappened(clusterHost.RebootMarkerPath) {
+		if !o.FileExists(clusterHost.RebootMarkerPath) {
 			// Host didn't even reboot yet, don't pretend it's a node
 			continue
 		}
@@ -103,7 +103,7 @@ func PrepareControllerDryMock(mockk8sclient *k8s_client.MockK8SClient, logger *l
 		mcsLogs := ""
 		for _, clusterHost := range clusterHosts {
 			// Add IP access log for each IP, this is how the controller determines which node has downloaded the ignition
-			if !o.DryRebootHappened(clusterHost.RebootMarkerPath) {
+			if !o.FileExists(clusterHost.RebootMarkerPath) {
 				// Host didn't even reboot yet, don't pretend it fetched the ignition
 				continue
 			}
