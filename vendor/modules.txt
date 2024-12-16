@@ -481,8 +481,8 @@ github.com/openshift/api/operator/v1alpha1
 # github.com/openshift/assisted-installer-agent v1.0.9
 ## explicit; go 1.13
 github.com/openshift/assisted-installer-agent/pkg/journalLogger
-# github.com/openshift/assisted-service v1.0.10-0.20241010075207-fb3ac617eaf7
-## explicit; go 1.21
+# github.com/openshift/assisted-service v1.0.10-0.20241215073835-af8bf11a3fcd
+## explicit; go 1.20
 github.com/openshift/assisted-service/internal/common
 github.com/openshift/assisted-service/internal/constants
 github.com/openshift/assisted-service/internal/events/api
@@ -508,12 +508,12 @@ github.com/openshift/assisted-service/restapi/operations/managed_domains
 github.com/openshift/assisted-service/restapi/operations/manifests
 github.com/openshift/assisted-service/restapi/operations/operators
 github.com/openshift/assisted-service/restapi/operations/versions
-# github.com/openshift/assisted-service/api v0.0.0 => github.com/openshift/assisted-service/api v0.0.0-20241010075207-fb3ac617eaf7
-## explicit; go 1.21
+# github.com/openshift/assisted-service/api v0.0.0 => github.com/openshift/assisted-service/api v0.0.0-20241215073835-af8bf11a3fcd
+## explicit; go 1.20
 github.com/openshift/assisted-service/api/common
 github.com/openshift/assisted-service/api/hiveextension/v1beta1
-# github.com/openshift/assisted-service/client v0.0.0 => github.com/openshift/assisted-service/client v0.0.0-20241010075207-fb3ac617eaf7
-## explicit; go 1.21
+# github.com/openshift/assisted-service/client v0.0.0 => github.com/openshift/assisted-service/client v0.0.0-20241215073835-af8bf11a3fcd
+## explicit; go 1.20
 github.com/openshift/assisted-service/client
 github.com/openshift/assisted-service/client/events
 github.com/openshift/assisted-service/client/installer
@@ -521,8 +521,8 @@ github.com/openshift/assisted-service/client/managed_domains
 github.com/openshift/assisted-service/client/manifests
 github.com/openshift/assisted-service/client/operators
 github.com/openshift/assisted-service/client/versions
-# github.com/openshift/assisted-service/models v0.0.0 => github.com/openshift/assisted-service/models v0.0.0-20241010075207-fb3ac617eaf7
-## explicit; go 1.21
+# github.com/openshift/assisted-service/models v0.0.0 => github.com/openshift/assisted-service/models v0.0.0-20241215073835-af8bf11a3fcd
+## explicit; go 1.20
 github.com/openshift/assisted-service/models
 # github.com/openshift/client-go v0.0.0-20230926161409-848405da69e1
 ## explicit; go 1.20
@@ -711,7 +711,7 @@ go.opentelemetry.io/otel/trace/embedded
 # go.uber.org/mock v0.4.0
 ## explicit; go 1.20
 go.uber.org/mock/gomock
-# golang.org/x/crypto v0.25.0
+# golang.org/x/crypto v0.31.0
 ## explicit; go 1.20
 golang.org/x/crypto/ed25519
 golang.org/x/crypto/pbkdf2
@@ -736,19 +736,19 @@ golang.org/x/net/idna
 ## explicit; go 1.18
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sync v0.7.0
+# golang.org/x/sync v0.10.0
 ## explicit; go 1.18
 golang.org/x/sync/errgroup
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.22.0
+# golang.org/x/sys v0.28.0
 ## explicit; go 1.18
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/term v0.22.0
+# golang.org/x/term v0.27.0
 ## explicit; go 1.18
 golang.org/x/term
-# golang.org/x/text v0.16.0
+# golang.org/x/text v0.21.0
 ## explicit; go 1.18
 golang.org/x/text/cases
 golang.org/x/text/encoding
@@ -1177,9 +1177,9 @@ sigs.k8s.io/yaml/goyaml.v2
 # github.com/metal3-io/baremetal-operator/apis => github.com/openshift/baremetal-operator/apis v0.0.0-20230531194024-8dde0991ffdd
 # github.com/metal3-io/baremetal-operator/pkg/hardwareutils => github.com/openshift/baremetal-operator/pkg/hardwareutils v0.0.0-20230531194024-8dde0991ffdd
 # github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.12
-# github.com/openshift/assisted-service/api => github.com/openshift/assisted-service/api v0.0.0-20241010075207-fb3ac617eaf7
-# github.com/openshift/assisted-service/client => github.com/openshift/assisted-service/client v0.0.0-20241010075207-fb3ac617eaf7
-# github.com/openshift/assisted-service/models => github.com/openshift/assisted-service/models v0.0.0-20241010075207-fb3ac617eaf7
+# github.com/openshift/assisted-service/api => github.com/openshift/assisted-service/api v0.0.0-20241215073835-af8bf11a3fcd
+# github.com/openshift/assisted-service/client => github.com/openshift/assisted-service/client v0.0.0-20241215073835-af8bf11a3fcd
+# github.com/openshift/assisted-service/models => github.com/openshift/assisted-service/models v0.0.0-20241215073835-af8bf11a3fcd
 # golang.org/x/net => golang.org/x/net v0.24.0
 # k8s.io/apimachinery => k8s.io/apimachinery v0.28.0
 # sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v0.4.5
