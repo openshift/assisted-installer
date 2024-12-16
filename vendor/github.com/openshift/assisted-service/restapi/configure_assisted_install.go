@@ -33,9 +33,6 @@ const AuthKey contextKey = "Auth"
 type EventsAPI interface {
 	/* V2ListEvents Lists events for a cluster. */
 	V2ListEvents(ctx context.Context, params events.V2ListEventsParams) middleware.Responder
-
-	/* V2TriggerEvent Add new assisted installer event. */
-	V2TriggerEvent(ctx context.Context, params events.V2TriggerEventParams) middleware.Responder
 }
 
 //go:generate mockery -name InstallerAPI -inpkg
@@ -202,9 +199,6 @@ type InstallerAPI interface {
 	/* V2SetIgnoredValidations Register the validations which are to be ignored for this cluster. */
 	V2SetIgnoredValidations(ctx context.Context, params installer.V2SetIgnoredValidationsParams) middleware.Responder
 
-	/* V2UpdateClusterFinalizingProgress Update installation finalizing progress. */
-	V2UpdateClusterFinalizingProgress(ctx context.Context, params installer.V2UpdateClusterFinalizingProgressParams) middleware.Responder
-
 	/* V2UpdateClusterInstallConfig Override values in the install config. */
 	V2UpdateClusterInstallConfig(ctx context.Context, params installer.V2UpdateClusterInstallConfigParams) middleware.Responder
 
@@ -281,9 +275,6 @@ type OperatorsAPI interface {
 type VersionsAPI interface {
 	/* V2ListComponentVersions List of component versions. */
 	V2ListComponentVersions(ctx context.Context, params versions.V2ListComponentVersionsParams) middleware.Responder
-
-	/* V2ListReleaseSources Retrieves openshift release sources configuration. */
-	V2ListReleaseSources(ctx context.Context, params versions.V2ListReleaseSourcesParams) middleware.Responder
 
 	/* V2ListSupportedOpenshiftVersions Retrieves the list of OpenShift supported versions. */
 	V2ListSupportedOpenshiftVersions(ctx context.Context, params versions.V2ListSupportedOpenshiftVersionsParams) middleware.Responder
@@ -696,11 +687,6 @@ func HandlerAPI(c Config) (http.Handler, *operations.AssistedInstallAPI, error) 
 		ctx = storeAuth(ctx, principal)
 		return c.InstallerAPI.V2ListHosts(ctx, params)
 	})
-	api.VersionsV2ListReleaseSourcesHandler = versions.V2ListReleaseSourcesHandlerFunc(func(params versions.V2ListReleaseSourcesParams, principal interface{}) middleware.Responder {
-		ctx := params.HTTPRequest.Context()
-		ctx = storeAuth(ctx, principal)
-		return c.VersionsAPI.V2ListReleaseSources(ctx, params)
-	})
 	api.VersionsV2ListSupportedOpenshiftVersionsHandler = versions.V2ListSupportedOpenshiftVersionsHandlerFunc(func(params versions.V2ListSupportedOpenshiftVersionsParams, principal interface{}) middleware.Responder {
 		ctx := params.HTTPRequest.Context()
 		ctx = storeAuth(ctx, principal)
@@ -745,16 +731,6 @@ func HandlerAPI(c Config) (http.Handler, *operations.AssistedInstallAPI, error) 
 		ctx := params.HTTPRequest.Context()
 		ctx = storeAuth(ctx, principal)
 		return c.InstallerAPI.V2SetIgnoredValidations(ctx, params)
-	})
-	api.EventsV2TriggerEventHandler = events.V2TriggerEventHandlerFunc(func(params events.V2TriggerEventParams, principal interface{}) middleware.Responder {
-		ctx := params.HTTPRequest.Context()
-		ctx = storeAuth(ctx, principal)
-		return c.EventsAPI.V2TriggerEvent(ctx, params)
-	})
-	api.InstallerV2UpdateClusterFinalizingProgressHandler = installer.V2UpdateClusterFinalizingProgressHandlerFunc(func(params installer.V2UpdateClusterFinalizingProgressParams, principal interface{}) middleware.Responder {
-		ctx := params.HTTPRequest.Context()
-		ctx = storeAuth(ctx, principal)
-		return c.InstallerAPI.V2UpdateClusterFinalizingProgress(ctx, params)
 	})
 	api.InstallerV2UpdateClusterInstallConfigHandler = installer.V2UpdateClusterInstallConfigHandlerFunc(func(params installer.V2UpdateClusterInstallConfigParams, principal interface{}) middleware.Responder {
 		ctx := params.HTTPRequest.Context()

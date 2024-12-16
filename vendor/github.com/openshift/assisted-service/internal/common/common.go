@@ -15,7 +15,6 @@ import (
 	yamlpatch "github.com/krishicks/yaml-patch"
 	"github.com/openshift/assisted-service/models"
 	"github.com/thoas/go-funk"
-	"golang.org/x/sys/unix"
 	"gorm.io/gorm"
 )
 
@@ -41,6 +40,9 @@ const (
 
 	IgnitionTokenKeyInSecret = "ignition-token"
 
+	FamilyIPv4 int32 = 4
+	FamilyIPv6 int32 = 6
+
 	AMD64CPUArchitecture   = "amd64"
 	X86CPUArchitecture     = "x86_64"
 	DefaultCPUArchitecture = X86CPUArchitecture
@@ -50,27 +52,7 @@ const (
 	PowerCPUArchitecture   = "ppc64le"
 	S390xCPUArchitecture   = "s390x"
 	MultiCPUArchitecture   = "multi"
-
-	ExternalPlatformNameOci = "oci"
 )
-
-type AddressFamily int
-
-const (
-	IPv4 AddressFamily = unix.AF_INET
-	IPv6 AddressFamily = unix.AF_INET6
-)
-
-func (a AddressFamily) String() string {
-	switch a {
-	case IPv4:
-		return "IPv4"
-	case IPv6:
-		return "IPv6"
-	default:
-		return fmt.Sprintf("Unexpected family value %d", a)
-	}
-}
 
 var (
 	UnlimitedEvents *int64 = swag.Int64(-1)
@@ -469,14 +451,8 @@ func GetTagFromImageRef(ref string) string {
 func GetConvertedClusterAPIVipDNSName(c *Cluster) string {
 	// In case cluster that isn't configured with user-managed-networking
 	// and api vip is set we should set api vip as APIVipDNSName
-
-	apiVip := ""
-	if len(c.APIVips) > 0 {
-		apiVip = string(c.APIVips[0].IP)
-	}
-
-	if !swag.BoolValue(c.Cluster.UserManagedNetworking) && apiVip != "" {
-		return apiVip
+	if !swag.BoolValue(c.Cluster.UserManagedNetworking) && c.Cluster.APIVip != "" {
+		return c.Cluster.APIVip
 	}
 	return fmt.Sprintf("api.%s.%s", c.Cluster.Name, c.Cluster.BaseDNSDomain)
 }
@@ -594,38 +570,4 @@ func GetDefaultV2GetEventsParams(clusterID *strfmt.UUID, hostIds []strfmt.UUID, 
 		Offset:     NoOffsetEvents,
 		Categories: selectedCategories,
 	}
-}
-
-func IsPlatformExternal(platform *models.Platform) bool {
-	if platform == nil || platform.Type == nil {
-		return false
-	}
-	return IsPlatformTypeExternal(*platform.Type)
-}
-
-func IsPlatformTypeExternal(platformType models.PlatformType) bool {
-	return platformType == models.PlatformTypeExternal
-}
-
-func IsExternalIntegrationEnabled(platform *models.Platform, platformName string) bool {
-	if platform == nil ||
-		platform.Type == nil {
-		return false
-	}
-
-	if *platform.Type == models.PlatformTypeExternal &&
-		platform.External != nil &&
-		swag.StringValue(platform.External.PlatformName) == platformName {
-		return true
-	}
-
-	return false
-}
-
-func IsOciExternalIntegrationEnabled(platform *models.Platform) bool {
-	return IsExternalIntegrationEnabled(platform, ExternalPlatformNameOci)
-}
-
-func IsMultiNodeNonePlatformCluster(cluster *Cluster) bool {
-	return !IsSingleNodeCluster(cluster) && swag.BoolValue(cluster.UserManagedNetworking)
 }
