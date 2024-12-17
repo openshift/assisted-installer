@@ -62,6 +62,9 @@ type Cluster struct {
 	// Indication if we updated console_url in AMS subscription
 	IsAmsSubscriptionConsoleUrlSet bool `json:"is_ams_subscription_console_url_set"`
 
+	// Indication if installation preparation succeeded or failed
+	InstallationPreparationCompletionStatus string
+
 	// ImageGenerated indicates if the discovery image was generated successfully. It will be used internally
 	// when an image needs to be generated. In case the user request to generate an image with custom parameters,
 	// and the generation failed, the value of ImageGenerated will be set to 'false'. In that case, providing the
@@ -136,9 +139,6 @@ type Host struct {
 
 	// A string which will be used as Authorization Bearer token to fetch the ignition from ignition_endpoint_url.
 	IgnitionEndpointToken string `json:"ignition_endpoint_token" gorm:"type:TEXT"`
-
-	// Json formatted string of the additional HTTP headers when fetching the ignition.
-	IgnitionEndpointHTTPHeaders string `json:"ignition_endpoint_http_headers,omitempty" gorm:"type:TEXT"`
 }
 
 func (h *Host) GetClusterID() *strfmt.UUID {
@@ -251,7 +251,6 @@ func AutoMigrate(db *gorm.DB) error {
 		&Cluster{},
 		&Event{},
 		&InfraEnv{},
-		&models.ReleaseImage{},
 		&models.ClusterNetwork{},
 		&models.ServiceNetwork{},
 		&models.MachineNetwork{},

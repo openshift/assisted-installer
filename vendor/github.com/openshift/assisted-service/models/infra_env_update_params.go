@@ -36,9 +36,6 @@ type InfraEnvUpdateParams struct {
 	// kernel arguments
 	KernelArguments KernelArguments `json:"kernel_arguments"`
 
-	// Version of the OS image
-	OpenshiftVersion *string `json:"openshift_version,omitempty"`
-
 	// proxy
 	Proxy *Proxy `json:"proxy,omitempty" gorm:"embedded;embeddedPrefix:proxy_"`
 
