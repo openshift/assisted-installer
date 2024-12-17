@@ -50,6 +50,9 @@ func init() {
               "read-only-admin",
               "user"
             ]
+          },
+          {
+            "watcherAuth": []
           }
         ],
         "description": "Retrieves the list of OpenShift clusters.",
@@ -300,6 +303,9 @@ func init() {
           },
           {
             "agentAuth": []
+          },
+          {
+            "watcherAuth": []
           }
         ],
         "description": "Retrieves the details of the OpenShift cluster.",
@@ -3054,6 +3060,9 @@ func init() {
           },
           {
             "urlAuth": []
+          },
+          {
+            "watcherAuth": []
           }
         ],
         "description": "Lists events for a cluster.",
@@ -3404,6 +3413,9 @@ func init() {
               "read-only-admin",
               "user"
             ]
+          },
+          {
+            "watcherAuth": []
           }
         ],
         "description": "Retrieves the list of infra-envs.",
@@ -6128,6 +6140,9 @@ func init() {
         },
         "pxe_interface": {
           "type": "string"
+        },
+        "secure_boot_state": {
+          "$ref": "#/definitions/secure-boot-state"
         }
       }
     },
@@ -6193,6 +6208,10 @@ func init() {
           "description": "Json formatted string containing the majority groups for connectivity checks.",
           "type": "string",
           "x-go-custom-tag": "gorm:\"type:text\""
+        },
+        "control_plane_count": {
+          "description": "Specifies the required number of control plane nodes that should be part of the cluster.",
+          "type": "integer"
         },
         "controller_logs_collected_at": {
           "type": "string",
@@ -6611,6 +6630,11 @@ func init() {
           },
           "x-nullable": true
         },
+        "control_plane_count": {
+          "description": "Specifies the required number of control plane nodes that should be part of the cluster.",
+          "type": "integer",
+          "x-nullable": true
+        },
         "cpu_architecture": {
           "description": "The CPU architecture of the image (x86_64/arm64/etc).",
           "type": "string",
@@ -6630,7 +6654,7 @@ func init() {
           "$ref": "#/definitions/disk-encryption"
         },
         "high_availability_mode": {
-          "description": "Guaranteed availability of the installed cluster. 'Full' installs a Highly-Available cluster\nover multiple master nodes whereas 'None' installs a full cluster over one node.\n",
+          "description": "(DEPRECATED) Please use 'control_plane_count' instead. Guaranteed availability of the installed cluster. 'Full' installs a Highly-Available cluster\nover multiple master nodes whereas 'None' installs a full cluster over one node.\n",
           "type": "string",
           "default": "Full",
           "enum": [
@@ -6899,8 +6923,16 @@ func init() {
         "cnv-requirements-satisfied",
         "lvm-requirements-satisfied",
         "mce-requirements-satisfied",
+        "mtv-requirements-satisfied",
         "network-type-valid",
-        "platform-requirements-satisfied"
+        "platform-requirements-satisfied",
+        "node-feature-discovery-requirements-satisfied",
+        "nvidia-gpu-requirements-satisfied",
+        "pipelines-requirements-satisfied",
+        "servicemesh-requirements-satisfied",
+        "serverless-requirements-satisfied",
+        "openshift-ai-requirements-satisfied",
+        "authorino-requirements-satisfied"
       ]
     },
     "cluster_default_config": {
@@ -7059,6 +7091,12 @@ func init() {
           "type": "array",
           "items": {
             "$ref": "#/definitions/l3-connectivity"
+          }
+        },
+        "mtu_report": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/mtu-report"
           }
         }
       }
@@ -7721,6 +7759,7 @@ func init() {
         "LSO",
         "CNV",
         "MCE",
+        "MTV",
         "NUTANIX_INTEGRATION",
         "BAREMETAL_PLATFORM",
         "NONE_PLATFORM",
@@ -7736,7 +7775,15 @@ func init() {
         "SKIP_MCO_REBOOT",
         "EXTERNAL_PLATFORM",
         "OVN_NETWORK_TYPE",
-        "SDN_NETWORK_TYPE"
+        "SDN_NETWORK_TYPE",
+        "NODE_FEATURE_DISCOVERY",
+        "NVIDIA_GPU",
+        "PIPELINES",
+        "SERVICEMESH",
+        "SERVERLESS",
+        "OPENSHIFT_AI",
+        "NON_STANDARD_HA_CONTROL_PLANE",
+        "AUTHORINO"
       ]
     },
     "finalizing-stage": {
@@ -8334,6 +8381,7 @@ func init() {
         "odf-requirements-satisfied",
         "lvm-requirements-satisfied",
         "mce-requirements-satisfied",
+        "mtv-requirements-satisfied",
         "sufficient-installation-disk-speed",
         "cnv-requirements-satisfied",
         "sufficient-network-latency-requirement-for-role",
@@ -8351,7 +8399,16 @@ func init() {
         "compatible-agent",
         "no-skip-installation-disk",
         "no-skip-missing-disk",
-        "no-ip-collisions-in-network"
+        "no-ip-collisions-in-network",
+        "no-iscsi-nic-belongs-to-machine-cidr",
+        "node-feature-discovery-requirements-satisfied",
+        "nvidia-gpu-requirements-satisfied",
+        "pipelines-requirements-satisfied",
+        "servicemesh-requirements-satisfied",
+        "serverless-requirements-satisfied",
+        "openshift-ai-requirements-satisfied",
+        "authorino-requirements-satisfied",
+        "mtu-valid"
       ]
     },
     "host_network": {
@@ -9493,6 +9550,20 @@ func init() {
         "$ref": "#/definitions/monitored-operator"
       }
     },
+    "mtu-report": {
+      "type": "object",
+      "properties": {
+        "mtu_successful": {
+          "type": "boolean"
+        },
+        "outgoing_nic": {
+          "type": "string"
+        },
+        "remote_ip_address": {
+          "type": "string"
+        }
+      }
+    },
     "next_step_cmd_request": {
       "type": "object",
       "required": [
@@ -10051,6 +10122,15 @@ func init() {
         }
       }
     },
+    "secure-boot-state": {
+      "type": "string",
+      "enum": [
+        "Unknown",
+        "NotSupported",
+        "Enabled",
+        "Disabled"
+      ]
+    },
     "service_network": {
       "description": "IP address block for service IP blocks.",
       "type": "object",
@@ -10430,6 +10510,11 @@ func init() {
           },
           "x-nullable": true
         },
+        "control_plane_count": {
+          "description": "Specifies the required number of control plane nodes that should be part of the cluster.",
+          "type": "integer",
+          "x-nullable": true
+        },
         "disk_encryption": {
           "description": "Installation disks encryption mode and host roles to be applied.",
           "$ref": "#/definitions/disk-encryption"
@@ -10678,6 +10763,11 @@ func init() {
       "type": "apiKey",
       "name": "Authorization",
       "in": "header"
+    },
+    "watcherAuth": {
+      "type": "apiKey",
+      "name": "Watcher-Authorization",
+      "in": "header"
     }
   },
   "security": [
@@ -10752,6 +10842,9 @@ func init() {
               "read-only-admin",
               "user"
             ]
+          },
+          {
+            "watcherAuth": []
           }
         ],
         "description": "Retrieves the list of OpenShift clusters.",
@@ -11002,6 +11095,9 @@ func init() {
           },
           {
             "agentAuth": []
+          },
+          {
+            "watcherAuth": []
           }
         ],
         "description": "Retrieves the details of the OpenShift cluster.",
@@ -13756,6 +13852,9 @@ func init() {
           },
           {
             "urlAuth": []
+          },
+          {
+            "watcherAuth": []
           }
         ],
         "description": "Lists events for a cluster.",
@@ -14111,6 +14210,9 @@ func init() {
               "read-only-admin",
               "user"
             ]
+          },
+          {
+            "watcherAuth": []
           }
         ],
         "description": "Retrieves the list of infra-envs.",
@@ -16953,6 +17055,9 @@ func init() {
         },
         "pxe_interface": {
           "type": "string"
+        },
+        "secure_boot_state": {
+          "$ref": "#/definitions/secure-boot-state"
         }
       }
     },
@@ -17018,6 +17123,10 @@ func init() {
           "description": "Json formatted string containing the majority groups for connectivity checks.",
           "type": "string",
           "x-go-custom-tag": "gorm:\"type:text\""
+        },
+        "control_plane_count": {
+          "description": "Specifies the required number of control plane nodes that should be part of the cluster.",
+          "type": "integer"
         },
         "controller_logs_collected_at": {
           "type": "string",
@@ -17436,6 +17545,11 @@ func init() {
           },
           "x-nullable": true
         },
+        "control_plane_count": {
+          "description": "Specifies the required number of control plane nodes that should be part of the cluster.",
+          "type": "integer",
+          "x-nullable": true
+        },
         "cpu_architecture": {
           "description": "The CPU architecture of the image (x86_64/arm64/etc).",
           "type": "string",
@@ -17455,7 +17569,7 @@ func init() {
           "$ref": "#/definitions/disk-encryption"
         },
         "high_availability_mode": {
-          "description": "Guaranteed availability of the installed cluster. 'Full' installs a Highly-Available cluster\nover multiple master nodes whereas 'None' installs a full cluster over one node.\n",
+          "description": "(DEPRECATED) Please use 'control_plane_count' instead. Guaranteed availability of the installed cluster. 'Full' installs a Highly-Available cluster\nover multiple master nodes whereas 'None' installs a full cluster over one node.\n",
           "type": "string",
           "default": "Full",
           "enum": [
@@ -17724,8 +17838,16 @@ func init() {
         "cnv-requirements-satisfied",
         "lvm-requirements-satisfied",
         "mce-requirements-satisfied",
+        "mtv-requirements-satisfied",
         "network-type-valid",
-        "platform-requirements-satisfied"
+        "platform-requirements-satisfied",
+        "node-feature-discovery-requirements-satisfied",
+        "nvidia-gpu-requirements-satisfied",
+        "pipelines-requirements-satisfied",
+        "servicemesh-requirements-satisfied",
+        "serverless-requirements-satisfied",
+        "openshift-ai-requirements-satisfied",
+        "authorino-requirements-satisfied"
       ]
     },
     "cluster_default_config": {
@@ -17884,6 +18006,12 @@ func init() {
           "type": "array",
           "items": {
             "$ref": "#/definitions/l3-connectivity"
+          }
+        },
+        "mtu_report": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/mtu-report"
           }
         }
       }
@@ -18513,6 +18641,7 @@ func init() {
         "LSO",
         "CNV",
         "MCE",
+        "MTV",
         "NUTANIX_INTEGRATION",
         "BAREMETAL_PLATFORM",
         "NONE_PLATFORM",
@@ -18528,7 +18657,15 @@ func init() {
         "SKIP_MCO_REBOOT",
         "EXTERNAL_PLATFORM",
         "OVN_NETWORK_TYPE",
-        "SDN_NETWORK_TYPE"
+        "SDN_NETWORK_TYPE",
+        "NODE_FEATURE_DISCOVERY",
+        "NVIDIA_GPU",
+        "PIPELINES",
+        "SERVICEMESH",
+        "SERVERLESS",
+        "OPENSHIFT_AI",
+        "NON_STANDARD_HA_CONTROL_PLANE",
+        "AUTHORINO"
       ]
     },
     "finalizing-stage": {
@@ -19126,6 +19263,7 @@ func init() {
         "odf-requirements-satisfied",
         "lvm-requirements-satisfied",
         "mce-requirements-satisfied",
+        "mtv-requirements-satisfied",
         "sufficient-installation-disk-speed",
         "cnv-requirements-satisfied",
         "sufficient-network-latency-requirement-for-role",
@@ -19143,7 +19281,16 @@ func init() {
         "compatible-agent",
         "no-skip-installation-disk",
         "no-skip-missing-disk",
-        "no-ip-collisions-in-network"
+        "no-ip-collisions-in-network",
+        "no-iscsi-nic-belongs-to-machine-cidr",
+        "node-feature-discovery-requirements-satisfied",
+        "nvidia-gpu-requirements-satisfied",
+        "pipelines-requirements-satisfied",
+        "servicemesh-requirements-satisfied",
+        "serverless-requirements-satisfied",
+        "openshift-ai-requirements-satisfied",
+        "authorino-requirements-satisfied",
+        "mtu-valid"
       ]
     },
     "host_network": {
@@ -20276,6 +20423,20 @@ func init() {
         "$ref": "#/definitions/monitored-operator"
       }
     },
+    "mtu-report": {
+      "type": "object",
+      "properties": {
+        "mtu_successful": {
+          "type": "boolean"
+        },
+        "outgoing_nic": {
+          "type": "string"
+        },
+        "remote_ip_address": {
+          "type": "string"
+        }
+      }
+    },
     "next_step_cmd_request": {
       "type": "object",
       "required": [
@@ -20834,6 +20995,15 @@ func init() {
         }
       }
     },
+    "secure-boot-state": {
+      "type": "string",
+      "enum": [
+        "Unknown",
+        "NotSupported",
+        "Enabled",
+        "Disabled"
+      ]
+    },
     "service_network": {
       "description": "IP address block for service IP blocks.",
       "type": "object",
@@ -21187,6 +21357,11 @@ func init() {
           },
           "x-nullable": true
         },
+        "control_plane_count": {
+          "description": "Specifies the required number of control plane nodes that should be part of the cluster.",
+          "type": "integer",
+          "x-nullable": true
+        },
         "disk_encryption": {
           "description": "Installation disks encryption mode and host roles to be applied.",
           "$ref": "#/definitions/disk-encryption"
@@ -21434,6 +21609,11 @@ func init() {
     "userAuth": {
       "type": "apiKey",
       "name": "Authorization",
+      "in": "header"
+    },
+    "watcherAuth": {
+      "type": "apiKey",
+      "name": "Watcher-Authorization",
       "in": "header"
     }
   },

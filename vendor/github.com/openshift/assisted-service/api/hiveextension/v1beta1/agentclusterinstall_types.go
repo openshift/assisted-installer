@@ -22,13 +22,11 @@ const (
 	ClusterInstallationStoppedReason string = "ClusterInstallationStopped"
 	ClusterInstallationStoppedMsg    string = "The cluster installation stopped"
 	ClusterInsufficientAgentsReason  string = "InsufficientAgents"
-	ClusterInsufficientAgentsMsg     string = "The cluster currently requires %d agents but only %d have registered"
+	ClusterInsufficientAgentsMsg     string = "The cluster currently requires exactly %d master agents and %d worker agents, but currently registered %d master agents and %d worker agents"
 	ClusterUnapprovedAgentsReason    string = "UnapprovedAgents"
 	ClusterUnapprovedAgentsMsg       string = "The installation is pending on the approval of %d agents"
 	ClusterUnsyncedAgentsReason      string = "UnsyncedAgents"
 	ClusterUnsyncedAgentsMsg         string = "The cluster currently has %d agents with spec error"
-	ClusterAdditionalAgentsReason    string = "AdditionalAgents"
-	ClusterAdditionalAgentsMsg       string = "The cluster currently requires exactly %d agents but have %d registered"
 
 	ClusterValidatedCondition        hivev1.ClusterInstallConditionType = "Validated"
 	ClusterValidationsOKMsg          string                             = "The cluster's validations are passing"
@@ -205,6 +203,12 @@ type AgentClusterInstallSpec struct {
 	// Set to true to allow control plane nodes to be schedulable
 	// +optional
 	MastersSchedulable bool `json:"mastersSchedulable,omitempty"`
+
+	// MirrorRegistryRef is a reference to ClusterMirrorRegistry ConfigMap that holds the registries toml
+	// data
+	// Set per cluster mirror registry
+	// +optional
+	MirrorRegistryRef *MirrorRegistryConfigMapReference `json:"mirrorRegistryRef,omitempty"`
 }
 
 // IgnitionEndpoint stores the data to of the custom ignition endpoint.
@@ -355,7 +359,7 @@ type ClusterNetworkEntry struct {
 type ProvisionRequirements struct {
 
 	// ControlPlaneAgents is the number of matching approved and ready Agents with the control plane role
-	// required to launch the install. Must be either 1 or 3.
+	// required to launch the install. Must be either 1 or 3-5.
 	ControlPlaneAgents int `json:"controlPlaneAgents"`
 
 	// WorkerAgents is the minimum number of matching approved and ready Agents with the worker role
@@ -504,4 +508,12 @@ type ManifestsConfigMapReference struct {
 
 func init() {
 	SchemeBuilder.Register(&AgentClusterInstall{}, &AgentClusterInstallList{})
+}
+
+// MirrorRegistryConfigMapReference contains reference to a ConfigMap for mirror registry
+type MirrorRegistryConfigMapReference struct {
+	// Name is the name of the ConfigMap that this refers to
+	Name string `json:"name"`
+	// Namespace of the ConfigMap
+	Namespace string `json:"namespace"`
 }

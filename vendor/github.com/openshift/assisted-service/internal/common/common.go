@@ -22,10 +22,6 @@ import (
 const (
 	EnvConfigPrefix = "myapp"
 
-	MinMasterHostsNeededForInstallation    = 3
-	AllowedNumberOfMasterHostsInNoneHaMode = 1
-	AllowedNumberOfWorkersInNoneHaMode     = 0
-
 	HostCACertPath = "/etc/assisted-service/service-ca-cert.crt"
 
 	AdditionalTrustBundlePath = "/etc/pki/ca-trust/source/anchors/assisted-infraenv-additional-trust-bundle.pem"
@@ -52,6 +48,14 @@ const (
 	MultiCPUArchitecture   = "multi"
 
 	ExternalPlatformNameOci = "oci"
+
+	MaxMasterHostsNeededForInstallationInHaModeOfOCP418OrNewer       = 5
+	MinMasterHostsNeededForInstallationInHaMode                      = 3
+	AllowedNumberOfMasterHostsForInstallationInHaModeOfOCP417OrOlder = 3
+	AllowedNumberOfMasterHostsInNoneHaMode                           = 1
+	AllowedNumberOfWorkersInNoneHaMode                               = 0
+	MinimumVersionForNonStandardHAOCPControlPlane                    = "4.18"
+	MinimumNumberOfWorkersForNonSchedulableMastersClusterInHaMode    = 2
 )
 
 type AddressFamily int
@@ -190,15 +194,10 @@ func IsImportedCluster(cluster *Cluster) bool {
 	return swag.BoolValue(cluster.Imported)
 }
 
+// AreMastersSchedulable returns whether a given cluster masters will be schedulable
+// It will get correct result only when all hosts roles are assigned.
 func AreMastersSchedulable(cluster *Cluster) bool {
 	return swag.BoolValue(cluster.SchedulableMastersForcedTrue) || swag.BoolValue(cluster.SchedulableMasters)
-}
-
-func GetEffectiveRole(host *models.Host) models.HostRole {
-	if host.Role == models.HostRoleAutoAssign && host.SuggestedRole != "" {
-		return host.SuggestedRole
-	}
-	return host.Role
 }
 
 func GetConsoleUrl(clusterName, baseDomain string) string {
@@ -628,4 +627,75 @@ func IsOciExternalIntegrationEnabled(platform *models.Platform) bool {
 
 func IsMultiNodeNonePlatformCluster(cluster *Cluster) bool {
 	return !IsSingleNodeCluster(cluster) && swag.BoolValue(cluster.UserManagedNetworking)
+}
+
+func NumberOfWorkers(c *Cluster) int {
+	num := 0
+	for _, host := range c.Hosts {
+		if GetEffectiveRole(host) != models.HostRoleWorker {
+			continue
+		}
+		num += 1
+	}
+	return num
+}
+
+func GetEffectiveRole(host *models.Host) models.HostRole {
+	if host.Role == models.HostRoleAutoAssign && host.SuggestedRole != "" {
+		return host.SuggestedRole
+	}
+	return host.Role
+}
+
+// GetHostsByEachRole returns the 3 slices of hosts by their effective role for a given cluster:
+// 1. bootstrap/master hosts
+// 2. worker hosts
+// 3. auto-assign hosts
+// Note - The hosts should be preloaded in the cluster
+func GetHostsByEachRole(cluster *models.Cluster, effectiveRoles bool) ([]*models.Host, []*models.Host, []*models.Host) {
+	masterHosts := make([]*models.Host, 0)
+	workerHosts := make([]*models.Host, 0)
+	autoAssignHosts := make([]*models.Host, 0)
+
+	roleFunction := func(host *models.Host) models.HostRole {
+		if effectiveRoles {
+			return GetEffectiveRole(host)
+		}
+
+		return host.Role
+	}
+
+	for _, host := range cluster.Hosts {
+		switch role := roleFunction(host); role {
+		case models.HostRoleMaster, models.HostRoleBootstrap:
+			masterHosts = append(masterHosts, host)
+		case models.HostRoleWorker:
+			workerHosts = append(workerHosts, host)
+		case models.HostRoleAutoAssign:
+			autoAssignHosts = append(autoAssignHosts, host)
+		}
+	}
+
+	return masterHosts, workerHosts, autoAssignHosts
+}
+
+func ShouldMastersBeSchedulable(cluster *models.Cluster) bool {
+	if swag.StringValue(cluster.HighAvailabilityMode) == models.ClusterCreateParamsHighAvailabilityModeNone {
+		return true
+	}
+
+	_, workers, _ := GetHostsByEachRole(cluster, true)
+	return len(workers) < MinimumNumberOfWorkersForNonSchedulableMastersClusterInHaMode
+}
+
+func IsMirrorConfigurationSet(conf *MirrorRegistryConfiguration) bool {
+	if conf == nil {
+		return false
+	}
+
+	if conf.RegistriesConf != "" {
+		return true
+	}
+
+	return false
 }
