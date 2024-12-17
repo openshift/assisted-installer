@@ -5663,20 +5663,6 @@ func init() {
           "versions"
         ],
         "operationId": "v2ListSupportedOpenshiftVersions",
-        "parameters": [
-          {
-            "type": "string",
-            "description": "Retrieves only the versions that contain the specified substring in their display name.",
-            "name": "version",
-            "in": "query"
-          },
-          {
-            "type": "boolean",
-            "description": "If true, returns only the latest version for each minor.",
-            "name": "only_latest",
-            "in": "query"
-          }
-        ],
         "responses": {
           "200": {
             "description": "Success.",
@@ -5700,32 +5686,6 @@ func init() {
             "description": "Unavailable.",
             "schema": {
               "$ref": "#/definitions/error"
-            }
-          }
-        }
-      }
-    },
-    "/v2/release-sources": {
-      "get": {
-        "security": [
-          {
-            "userAuth": [
-              "admin",
-              "read-only-admin",
-              "user"
-            ]
-          }
-        ],
-        "description": "Retrieves openshift release sources configuration.",
-        "tags": [
-          "versions"
-        ],
-        "operationId": "v2ListReleaseSources",
-        "responses": {
-          "200": {
-            "description": "Success.",
-            "schema": {
-              "$ref": "#/definitions/release-sources"
             }
           }
         }
@@ -7179,7 +7139,7 @@ func init() {
         "file_name": {
           "description": "The name of the manifest to customize the installed OCP cluster.",
           "type": "string",
-          "pattern": "^[^\\/]*\\.(json|ya?ml(\\.patch_?[a-zA-Z0-9_]*)?)$"
+          "pattern": "^[^/]*\\.(yaml|yml|json)$"
         },
         "folder": {
           "description": "The folder that contains the files. Manifests can be placed in 'manifests' or 'openshift' directories.",
@@ -7320,16 +7280,10 @@ func init() {
           "description": "Whether the disk appears to be an installation media or not",
           "type": "boolean"
         },
-        "iscsi": {
-          "$ref": "#/definitions/iscsi"
-        },
         "model": {
           "type": "string"
         },
         "name": {
-          "type": "string"
-        },
-        "partitionTypes": {
           "type": "string"
         },
         "path": {
@@ -7514,13 +7468,6 @@ func init() {
               "domain_name"
             ],
             "properties": {
-              "cnames": {
-                "description": "The cnames that were resolved for the domain, empty if none",
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
               "domain_name": {
                 "description": "The domain that was resolved",
                 "type": "string"
@@ -9133,15 +9080,6 @@ func init() {
       "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))?$",
       "x-go-custom-tag": "gorm:\"primaryKey\""
     },
-    "iscsi": {
-      "type": "object",
-      "properties": {
-        "host_ip_address": {
-          "description": "Host IP address used to reach iSCSI target",
-          "type": "string"
-        }
-      }
-    },
     "kernel_argument": {
       "description": "pair of [operation, argument] specifying the argument and what operation should be applied on it.",
       "type": "object",
@@ -9399,14 +9337,6 @@ func init() {
             "manifests",
             "openshift"
           ]
-        },
-        "manifest_source": {
-          "description": "Describes whether manifest is sourced from a user or created by the system.",
-          "type": "string",
-          "enum": [
-            "user",
-            "system"
-          ]
         }
       }
     },
@@ -9598,8 +9528,7 @@ func init() {
           "enum": [
             "beta",
             "production",
-            "maintenance",
-            "end-of-life"
+            "maintenance"
           ]
         }
       }
@@ -9897,16 +9826,6 @@ func init() {
         }
       }
     },
-    "release-channel": {
-      "description": "Release channel.",
-      "type": "string",
-      "enum": [
-        "candidate",
-        "fast",
-        "stable",
-        "eus"
-      ]
-    },
     "release-image": {
       "type": "object",
       "required": [
@@ -9935,16 +9854,6 @@ func init() {
           "type": "array",
           "items": {
             "type": "string"
-          },
-          "x-go-custom-tag": "gorm:\"type:text[]\"",
-          "x-go-type": {
-            "hints": {
-              "noValidation": true
-            },
-            "import": {
-              "package": "github.com/lib/pq"
-            },
-            "type": "StringArray"
           }
         },
         "default": {
@@ -9961,14 +9870,12 @@ func init() {
           "enum": [
             "beta",
             "production",
-            "maintenance",
-            "end-of-life"
+            "maintenance"
           ]
         },
         "url": {
           "description": "The installation image of the OpenShift cluster.",
-          "type": "string",
-          "x-go-custom-tag": "gorm:\"primarykey\""
+          "type": "string"
         },
         "version": {
           "description": "OCP version from the release metadata.",
@@ -9980,47 +9887,6 @@ func init() {
       "type": "array",
       "items": {
         "$ref": "#/definitions/release-image"
-      }
-    },
-    "release-source": {
-      "type": "object",
-      "required": [
-        "openshift_version",
-        "multi_cpu_architectures",
-        "upgrade_channels"
-      ],
-      "properties": {
-        "multi_cpu_architectures": {
-          "type": "array",
-          "items": {
-            "description": "Supported CPU architecture for multi-architecture releases in this OpenShift version..",
-            "type": "string",
-            "enum": [
-              "x86_64",
-              "aarch64",
-              "arm64",
-              "ppc64le",
-              "s390x"
-            ]
-          }
-        },
-        "openshift_version": {
-          "description": "Version of the OpenShift cluster.",
-          "type": "string",
-          "example": "4.14"
-        },
-        "upgrade_channels": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/upgrade-channel"
-          }
-        }
-      }
-    },
-    "release-sources": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/release-source"
       }
     },
     "route": {
@@ -10270,7 +10136,7 @@ func init() {
         "file_name": {
           "description": "The file name for the manifest to modify.",
           "type": "string",
-          "pattern": "^[^\\/]*\\.(json|ya?ml(\\.patch_?[a-zA-Z0-9_]*)?)$",
+          "pattern": "^[^/]*\\.(yaml|yml|json)$",
           "x-nullable": false
         },
         "folder": {
@@ -10291,7 +10157,7 @@ func init() {
         "updated_file_name": {
           "description": "The new file name for the manifest.",
           "type": "string",
-          "pattern": "^[^\\/]*\\.(json|ya?ml(\\.patch_?[a-zA-Z0-9_]*)?)$",
+          "pattern": "^[^/]*\\.(yaml|yml|json)$",
           "x-nullable": true
         },
         "updated_folder": {
@@ -10303,33 +10169,6 @@ func init() {
             "openshift"
           ],
           "x-nullable": true
-        }
-      }
-    },
-    "upgrade-channel": {
-      "type": "object",
-      "required": [
-        "cpu_architecture",
-        "channels"
-      ],
-      "properties": {
-        "channels": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/release-channel"
-          }
-        },
-        "cpu_architecture": {
-          "description": "The CPU architecture of the image.",
-          "type": "string",
-          "enum": [
-            "x86_64",
-            "aarch64",
-            "arm64",
-            "ppc64le",
-            "s390x",
-            "multi"
-          ]
         }
       }
     },
@@ -16369,20 +16208,6 @@ func init() {
           "versions"
         ],
         "operationId": "v2ListSupportedOpenshiftVersions",
-        "parameters": [
-          {
-            "type": "string",
-            "description": "Retrieves only the versions that contain the specified substring in their display name.",
-            "name": "version",
-            "in": "query"
-          },
-          {
-            "type": "boolean",
-            "description": "If true, returns only the latest version for each minor.",
-            "name": "only_latest",
-            "in": "query"
-          }
-        ],
         "responses": {
           "200": {
             "description": "Success.",
@@ -16406,32 +16231,6 @@ func init() {
             "description": "Unavailable.",
             "schema": {
               "$ref": "#/definitions/error"
-            }
-          }
-        }
-      }
-    },
-    "/v2/release-sources": {
-      "get": {
-        "security": [
-          {
-            "userAuth": [
-              "admin",
-              "read-only-admin",
-              "user"
-            ]
-          }
-        ],
-        "description": "Retrieves openshift release sources configuration.",
-        "tags": [
-          "versions"
-        ],
-        "operationId": "v2ListReleaseSources",
-        "responses": {
-          "200": {
-            "description": "Success.",
-            "schema": {
-              "$ref": "#/definitions/release-sources"
             }
           }
         }
@@ -16735,13 +16534,6 @@ func init() {
         "domain_name"
       ],
       "properties": {
-        "cnames": {
-          "description": "The cnames that were resolved for the domain, empty if none",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
         "domain_name": {
           "description": "The domain that was resolved",
           "type": "string"
@@ -18003,7 +17795,7 @@ func init() {
         "file_name": {
           "description": "The name of the manifest to customize the installed OCP cluster.",
           "type": "string",
-          "pattern": "^[^\\/]*\\.(json|ya?ml(\\.patch_?[a-zA-Z0-9_]*)?)$"
+          "pattern": "^[^/]*\\.(yaml|yml|json)$"
         },
         "folder": {
           "description": "The folder that contains the files. Manifests can be placed in 'manifests' or 'openshift' directories.",
@@ -18144,16 +17936,10 @@ func init() {
           "description": "Whether the disk appears to be an installation media or not",
           "type": "boolean"
         },
-        "iscsi": {
-          "$ref": "#/definitions/iscsi"
-        },
         "model": {
           "type": "string"
         },
         "name": {
-          "type": "string"
-        },
-        "partitionTypes": {
           "type": "string"
         },
         "path": {
@@ -19926,15 +19712,6 @@ func init() {
       "pattern": "^(?:(?:(?:[0-9]{1,3}\\.){3}[0-9]{1,3})|(?:(?:[0-9a-fA-F]*:[0-9a-fA-F]*){2,}))?$",
       "x-go-custom-tag": "gorm:\"primaryKey\""
     },
-    "iscsi": {
-      "type": "object",
-      "properties": {
-        "host_ip_address": {
-          "description": "Host IP address used to reach iSCSI target",
-          "type": "string"
-        }
-      }
-    },
     "kernel_argument": {
       "description": "pair of [operation, argument] specifying the argument and what operation should be applied on it.",
       "type": "object",
@@ -20181,14 +19958,6 @@ func init() {
             "manifests",
             "openshift"
           ]
-        },
-        "manifest_source": {
-          "description": "Describes whether manifest is sourced from a user or created by the system.",
-          "type": "string",
-          "enum": [
-            "user",
-            "system"
-          ]
         }
       }
     },
@@ -20380,8 +20149,7 @@ func init() {
           "enum": [
             "beta",
             "production",
-            "maintenance",
-            "end-of-life"
+            "maintenance"
           ]
         }
       }
@@ -20679,16 +20447,6 @@ func init() {
         }
       }
     },
-    "release-channel": {
-      "description": "Release channel.",
-      "type": "string",
-      "enum": [
-        "candidate",
-        "fast",
-        "stable",
-        "eus"
-      ]
-    },
     "release-image": {
       "type": "object",
       "required": [
@@ -20717,16 +20475,6 @@ func init() {
           "type": "array",
           "items": {
             "type": "string"
-          },
-          "x-go-custom-tag": "gorm:\"type:text[]\"",
-          "x-go-type": {
-            "hints": {
-              "noValidation": true
-            },
-            "import": {
-              "package": "github.com/lib/pq"
-            },
-            "type": "StringArray"
           }
         },
         "default": {
@@ -20743,14 +20491,12 @@ func init() {
           "enum": [
             "beta",
             "production",
-            "maintenance",
-            "end-of-life"
+            "maintenance"
           ]
         },
         "url": {
           "description": "The installation image of the OpenShift cluster.",
-          "type": "string",
-          "x-go-custom-tag": "gorm:\"primarykey\""
+          "type": "string"
         },
         "version": {
           "description": "OCP version from the release metadata.",
@@ -20762,47 +20508,6 @@ func init() {
       "type": "array",
       "items": {
         "$ref": "#/definitions/release-image"
-      }
-    },
-    "release-source": {
-      "type": "object",
-      "required": [
-        "openshift_version",
-        "multi_cpu_architectures",
-        "upgrade_channels"
-      ],
-      "properties": {
-        "multi_cpu_architectures": {
-          "type": "array",
-          "items": {
-            "description": "Supported CPU architecture for multi-architecture releases in this OpenShift version..",
-            "type": "string",
-            "enum": [
-              "x86_64",
-              "aarch64",
-              "arm64",
-              "ppc64le",
-              "s390x"
-            ]
-          }
-        },
-        "openshift_version": {
-          "description": "Version of the OpenShift cluster.",
-          "type": "string",
-          "example": "4.14"
-        },
-        "upgrade_channels": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/upgrade-channel"
-          }
-        }
-      }
-    },
-    "release-sources": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/release-source"
       }
     },
     "route": {
@@ -21026,7 +20731,7 @@ func init() {
         "file_name": {
           "description": "The file name for the manifest to modify.",
           "type": "string",
-          "pattern": "^[^\\/]*\\.(json|ya?ml(\\.patch_?[a-zA-Z0-9_]*)?)$",
+          "pattern": "^[^/]*\\.(yaml|yml|json)$",
           "x-nullable": false
         },
         "folder": {
@@ -21047,7 +20752,7 @@ func init() {
         "updated_file_name": {
           "description": "The new file name for the manifest.",
           "type": "string",
-          "pattern": "^[^\\/]*\\.(json|ya?ml(\\.patch_?[a-zA-Z0-9_]*)?)$",
+          "pattern": "^[^/]*\\.(yaml|yml|json)$",
           "x-nullable": true
         },
         "updated_folder": {
@@ -21059,33 +20764,6 @@ func init() {
             "openshift"
           ],
           "x-nullable": true
-        }
-      }
-    },
-    "upgrade-channel": {
-      "type": "object",
-      "required": [
-        "cpu_architecture",
-        "channels"
-      ],
-      "properties": {
-        "channels": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/release-channel"
-          }
-        },
-        "cpu_architecture": {
-          "description": "The CPU architecture of the image.",
-          "type": "string",
-          "enum": [
-            "x86_64",
-            "aarch64",
-            "arm64",
-            "ppc64le",
-            "s390x",
-            "multi"
-          ]
         }
       }
     },

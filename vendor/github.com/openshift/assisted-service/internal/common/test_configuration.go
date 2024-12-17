@@ -49,12 +49,11 @@ type TestConfiguration struct {
 
 const TestDiskId = "/dev/disk/by-id/test-disk-id"
 const TestDiskPath = "/dev/test-disk"
-const MinimalVersionForNmstatectl = "4.19"
 
 var (
 	OpenShiftVersion string = "4.6"
 	ReleaseVersion          = "4.6.0"
-	ReleaseImageURL         = "quay.io/openshift-release-dev/ocp-release:4.6.16-x86_64"
+	ReleaseImage            = "quay.io/openshift-release-dev/ocp-release:4.6.16-x86_64"
 	RhcosImage              = "rhcos_4.6.0"
 	RhcosVersion            = "version-46.123-0"
 	SupportLevel            = "beta"
@@ -65,12 +64,12 @@ var (
 var TestDefaultConfig = &TestConfiguration{
 	OpenShiftVersion: OpenShiftVersion,
 	ReleaseVersion:   ReleaseVersion,
-	ReleaseImageUrl:  ReleaseImageURL,
+	ReleaseImageUrl:  ReleaseImage,
 	CPUArchitecture:  CPUArchitecture,
 	ReleaseImage: &models.ReleaseImage{
 		CPUArchitecture:  &CPUArchitecture,
 		OpenshiftVersion: &OpenShiftVersion,
-		URL:              &ReleaseImageURL,
+		URL:              &ReleaseImage,
 		Version:          &ReleaseVersion,
 		CPUArchitectures: []string{CPUArchitecture},
 	},
@@ -160,31 +159,6 @@ var DomainResolutions = []*models.DomainResolutionResponseDomain{
 	},
 }
 
-var DomainResolutionsWithCname = []*models.DomainResolutionResponseDomain{
-	{
-		DomainName: &DomainAPI,
-		Cnames:     []string{"api.cname.com"},
-	},
-	{
-		DomainName: &DomainAPIInternal,
-		Cnames:     []string{"api-int.cname.com"},
-	},
-	{
-		DomainName: &DomainApps,
-		Cnames:     []string{"console.apps.cname.com"},
-	},
-	{
-		DomainName: &ReleaseDomain,
-		Cnames:     []string{"release.cname.com"},
-	},
-	{
-		DomainName: &WildcardDomain,
-	},
-	{
-		DomainName: &UndottedWildcardDomain,
-	},
-}
-
 var WildcardResolved = []*models.DomainResolutionResponseDomain{
 	{
 		DomainName:    &WildcardDomain,
@@ -195,17 +169,6 @@ var WildcardResolved = []*models.DomainResolutionResponseDomain{
 		DomainName:    &UndottedWildcardDomain,
 		IPV4Addresses: []strfmt.IPv4{"7.8.9.10/24"},
 		IPV6Addresses: []strfmt.IPv6{"1003:db8::40/120"},
-	},
-}
-
-var WildcardResolvedWithCname = []*models.DomainResolutionResponseDomain{
-	{
-		DomainName: &WildcardDomain,
-		Cnames:     []string{"a.test.com"},
-	},
-	{
-		DomainName: &UndottedWildcardDomain,
-		Cnames:     []string{"a.test.com"},
 	},
 }
 
@@ -274,14 +237,12 @@ var DomainResolutionAllEmpty = []*models.DomainResolutionResponseDomain{
 }
 
 var TestDomainNameResolutionsSuccess = &models.DomainResolutionResponse{Resolutions: DomainResolutions}
-var TestDomainNameResolutionsSuccessWithCname = &models.DomainResolutionResponse{Resolutions: DomainResolutionsWithCname}
 var TestDomainResolutionsNoAPI = &models.DomainResolutionResponse{Resolutions: DomainResolutionNoAPI}
 var TestDomainResolutionsAllEmpty = &models.DomainResolutionResponse{Resolutions: DomainResolutionAllEmpty}
 var TestDomainNameResolutionsWildcardResolved = &models.DomainResolutionResponse{Resolutions: WildcardResolved}
-var TestDomainNameResolutionsWildcardResolvedWithCname = &models.DomainResolutionResponse{Resolutions: WildcardResolvedWithCname}
 var TestSubDomainNameResolutionsWildcardResolved = &models.DomainResolutionResponse{Resolutions: SubDomainWildcardResolved}
 
-var TestDefaultRouteConfiguration = []*models.Route{{Family: int32(IPv4), Interface: "eth0", Gateway: "1.2.3.10", Destination: "0.0.0.0", Metric: 600}}
+var TestDefaultRouteConfiguration = []*models.Route{{Family: FamilyIPv4, Interface: "eth0", Gateway: "1.2.3.10", Destination: "0.0.0.0", Metric: 600}}
 
 var TestIPv4Networking = TestNetworking{
 	ClusterNetworks: []*models.ClusterNetwork{{Cidr: "1.3.0.0/16", HostPrefix: 24}},
