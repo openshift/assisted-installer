@@ -58,10 +58,10 @@ require (
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/coreos/vcontext v0.0.0-20230201181013-d72178a18687 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/docker/cli v23.0.3+incompatible // indirect
+	github.com/docker/cli v20.10.14+incompatible // indirect
 	github.com/docker/distribution v2.8.2+incompatible // indirect
-	github.com/docker/docker v25.0.3+incompatible // indirect
-	github.com/docker/go-connections v0.5.0 // indirect
+	github.com/docker/docker v20.10.24+incompatible // indirect
+	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch/v5 v5.7.0 // indirect
@@ -120,8 +120,7 @@ require (
 	github.com/opencontainers/runc v1.1.5 // indirect
 	github.com/openshift-online/ocm-sdk-go v0.1.205 // indirect
 	github.com/openshift/assisted-service/api v0.0.0 // indirect
-	github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87 // indirect
-	github.com/openshift/hive/apis v0.0.0-20231220215202-ad99b9e52d27 // indirect
+	github.com/openshift/hive/apis v0.0.0-20220222213051-def9088fdb5a // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/ory/dockertest/v3 v3.9.1 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
