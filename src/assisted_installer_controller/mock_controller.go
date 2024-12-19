@@ -5,6 +5,7 @@
 //
 //	mockgen -source=assisted_installer_controller.go -package=assisted_installer_controller -destination=mock_controller.go
 //
+
 // Package assisted_installer_controller is a generated GoMock package.
 package assisted_installer_controller
 
