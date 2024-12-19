@@ -32,7 +32,7 @@ require (
 	github.com/tidwall/gjson v1.17.1
 	github.com/vincent-petithory/dataurl v1.0.0
 	go.uber.org/mock v0.4.0
-	golang.org/x/net v0.26.0
+	golang.org/x/net v0.33.0
 	golang.org/x/sync v0.10.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.29.9
@@ -192,7 +192,7 @@ replace (
 	github.com/openshift/assisted-service/api => github.com/openshift/assisted-service/api v0.0.0-20241215073835-af8bf11a3fcd
 	github.com/openshift/assisted-service/client => github.com/openshift/assisted-service/client v0.0.0-20241215073835-af8bf11a3fcd
 	github.com/openshift/assisted-service/models => github.com/openshift/assisted-service/models v0.0.0-20241215073835-af8bf11a3fcd
-	golang.org/x/net => golang.org/x/net v0.24.0
+	golang.org/x/net => golang.org/x/net v0.33.0
 	k8s.io/apimachinery => k8s.io/apimachinery v0.28.0
 	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v0.4.5
 	sigs.k8s.io/cluster-api-provider-aws => github.com/openshift/cluster-api-provider-aws v0.2.1-0.20201022175424-d30c7a274820

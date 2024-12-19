@@ -5,6 +5,7 @@
 //
 //	mockgen -source=ops.go -package=ops -destination=mock_ops.go
 //
+
 // Package ops is a generated GoMock package.
 package ops
 
