@@ -651,7 +651,7 @@ golang.org/x/crypto/pbkdf2
 # golang.org/x/mod v0.17.0
 ## explicit; go 1.18
 golang.org/x/mod/semver
-# golang.org/x/net v0.26.0 => golang.org/x/net v0.24.0
+# golang.org/x/net v0.33.0
 ## explicit; go 1.18
 golang.org/x/net/context
 golang.org/x/net/html
@@ -1093,7 +1093,6 @@ sigs.k8s.io/yaml/goyaml.v2
 # github.com/openshift/assisted-service/api => github.com/openshift/assisted-service/api v0.0.0-20241215111549-58068322e0f1
 # github.com/openshift/assisted-service/client => github.com/openshift/assisted-service/client v0.0.0-20241215111549-58068322e0f1
 # github.com/openshift/assisted-service/models => github.com/openshift/assisted-service/models v0.0.0-20241215111549-58068322e0f1
-# golang.org/x/net => golang.org/x/net v0.24.0
 # k8s.io/apimachinery => k8s.io/apimachinery v0.28.0
 # sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v0.4.5
 # sigs.k8s.io/cluster-api-provider-aws => github.com/openshift/cluster-api-provider-aws v0.2.1-0.20201022175424-d30c7a274820
