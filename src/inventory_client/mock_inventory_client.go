@@ -5,6 +5,7 @@
 //
 //	mockgen -source=inventory_client.go -package=inventory_client -destination=mock_inventory_client.go
 //
+
 // Package inventory_client is a generated GoMock package.
 package inventory_client
 
