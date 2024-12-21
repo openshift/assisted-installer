@@ -453,6 +453,22 @@ func (i *installer) startBootstrap() error {
 		return err
 	}
 
+	// If we're in a pure RHEL/CentOS environment, we need to overlay the node image
+	// first to have access to e.g. oc, kubelet, cri-o, etc...
+	// https://github.com/openshift/enhancements/pull/1637
+	if !i.ops.FileExists("/usr/bin/oc") {
+		err = i.ops.SystemctlAction("start", "node-image-overlay.service")
+		if err != nil {
+			return err
+		}
+
+		i.waitForNodeImageOverlay(context.Background())
+
+		if !i.ops.FileExists("/usr/bin/oc") {
+			return stderrors.New("/usr/bin/oc still doesn't exist after node image overlay")
+		}
+	}
+
 	servicesToStart := []string{"bootkube.service", "approve-csr.service", "progress.service"}
 	for _, service := range servicesToStart {
 		err = i.ops.SystemctlAction("start", service)
@@ -658,13 +674,32 @@ func (i *installer) waitForBootkube(ctx context.Context) {
 			return
 		case <-time.After(generalWaitInterval):
 			// check if bootkube is done every 5 seconds
-			if _, err := i.ops.ExecPrivilegeCommand(nil, "stat", "/opt/openshift/.bootkube.done"); err == nil {
+			if i.ops.FileExists("/opt/openshift/.bootkube.done") {
 				// in case bootkube is done log the status and return
 				i.log.Info("bootkube service completed")
 				out, _ := i.ops.ExecPrivilegeCommand(nil, "systemctl", "status", "bootkube.service")
 				i.log.Info(out)
 				return
 			}
+		}
+	}
+}
+
+func (i *installer) waitForNodeImageOverlay(ctx context.Context) {
+	i.log.Infof("Waiting for node image overlay to complete")
+
+	for {
+		select {
+		case <-ctx.Done():
+			i.log.Info("Context cancelled, terminating wait for node image overlay\n")
+			return
+		case <-time.After(generalWaitInterval):
+			out, err := i.ops.ExecPrivilegeCommand(nil, "systemctl", "is-active", "node-image-overlay.service")
+			if err == nil {
+				i.log.Info("node image overlay service completed")
+				return
+			}
+			i.log.Debugf("node image overlay service not yet active: %s", out)
 		}
 	}
 }
