@@ -10,5 +10,6 @@ RUN go install golang.org/x/tools/cmd/goimports@v0.1.0 && \
     go install github.com/onsi/ginkgo/ginkgo@v1.16.1 && \
     go install github.com/golang/mock/mockgen@v1.6.0 && \
     go install gotest.tools/gotestsum@v1.6.3 && \
-    go install github.com/axw/gocov/gocov@latest && \
-    go install github.com/AlekSi/gocov-xml@latest
+    go install github.com/axw/gocov/gocov@v1.1.0 && \
+    go install github.com/AlekSi/gocov-xml@v1.1.0
+
