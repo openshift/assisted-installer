@@ -18,7 +18,7 @@ RUN go install github.com/google/go-licenses@v1.6.0
 RUN ${HOME}/go/bin/go-licenses save --save_path /tmp/licenses ./...
 
 
-FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi9/ubi:9.4
+FROM --platform=$BUILDPLATFORM registry.redhat.io/rhel9-4-els/rhel:9.4
 ARG release=main
 ARG version=latest
 
