@@ -21,7 +21,7 @@ RUN ${HOME}/go/bin/go-licenses save --save_path /tmp/licenses ./...
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags strictfipsruntime -o assisted-installer-controller src/main/assisted-installer-controller/assisted_installer_main.go
 
 
-FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi9/ubi:9.4
+FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi9/ubi:9.5-1734495538
 ARG release=main
 ARG version=latest
 
