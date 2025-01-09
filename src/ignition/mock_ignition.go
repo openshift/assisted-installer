@@ -5,6 +5,7 @@
 //
 //	mockgen -source=ignition.go -package=ignition -destination=mock_ignition.go
 //
+
 // Package ignition is a generated GoMock package.
 package ignition
 
