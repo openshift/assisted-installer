@@ -1,0 +1,216 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: aarch64
+  packages:
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/aarch64/rhocp/4.17/os/Packages/o/openshift-clients-4.17.0-202412120604.p0.gf4525b8.assembly.stream.el9.aarch64.rpm
+    repoid: rhocp-4.17-for-rhel-9-aarch64-rpms
+    size: 55684607
+    checksum: sha256:9e6b2c17085d98b21aa5bd74cecd2af3d0251d7b97d7eb513b4f7e3c0197ff73
+    name: openshift-clients
+    evr: 4.17.0-202412120604.p0.gf4525b8.assembly.stream.el9
+    sourcerpm: openshift-clients-4.17.0-202412120604.p0.gf4525b8.assembly.stream.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/b/bash-completion-2.11-5.el9.noarch.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 469639
+    checksum: sha256:3b4ae87f0e9a13cda47f1c009eb2c63135dc22b2b4dd89a6310f8e8fbb59e30a
+    name: bash-completion
+    evr: 1:2.11-5.el9
+    sourcerpm: bash-completion-2.11-5.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libpkgconf-1.7.3-10.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 38310
+    checksum: sha256:9bdfccf6b092e0683aa6984f7c6caa737b30c0b1495e16abb03b5d1a5f8e787a
+    name: libpkgconf
+    evr: 1.7.3-10.el9
+    sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/pkgconf-1.7.3-10.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 45196
+    checksum: sha256:aa38a3951a690d721a815ea8f9b01995a85f35a8540d8075205821011d0385e6
+    name: pkgconf
+    evr: 1.7.3-10.el9
+    sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/pkgconf-m4-1.7.3-10.el9.noarch.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 16054
+    checksum: sha256:91bafd6e06099451f60288327b275cfcc651822f6145176a157c6b0fa5131e02
+    name: pkgconf-m4
+    evr: 1.7.3-10.el9
+    sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/p/pkgconf-pkg-config-1.7.3-10.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 12398
+    checksum: sha256:47f1f744f96a2f3d360bc129837738dcebb1ee5032effc4472a891eea1d6a907
+    name: pkgconf-pkg-config
+    evr: 1.7.3-10.el9
+    sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/r/rsync-3.2.3-20.el9.aarch64.rpm
+    repoid: rhel-9-for-aarch64-baseos-rpms
+    size: 405766
+    checksum: sha256:83e5198193ecd11eaa4472138697c08726bd8c9b8fed8670e5c883b6a5b76d57
+    name: rsync
+    evr: 3.2.3-20.el9
+    sourcerpm: rsync-3.2.3-20.el9.src.rpm
+  source: []
+  module_metadata: []
+- arch: ppc64le
+  packages:
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/ppc64le/rhocp/4.17/os/Packages/o/openshift-clients-4.17.0-202412120604.p0.gf4525b8.assembly.stream.el9.ppc64le.rpm
+    repoid: rhocp-4.17-for-rhel-9-ppc64le-rpms
+    size: 52724856
+    checksum: sha256:67e24aedd85a899634468dd1c4a1bac1e8f370f203e5371528f0f512a5761a84
+    name: openshift-clients
+    evr: 4.17.0-202412120604.p0.gf4525b8.assembly.stream.el9
+    sourcerpm: openshift-clients-4.17.0-202412120604.p0.gf4525b8.assembly.stream.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/b/bash-completion-2.11-5.el9.noarch.rpm
+    repoid: rhel-9-for-ppc64le-baseos-rpms
+    size: 469639
+    checksum: sha256:3b4ae87f0e9a13cda47f1c009eb2c63135dc22b2b4dd89a6310f8e8fbb59e30a
+    name: bash-completion
+    evr: 1:2.11-5.el9
+    sourcerpm: bash-completion-2.11-5.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libpkgconf-1.7.3-10.el9.ppc64le.rpm
+    repoid: rhel-9-for-ppc64le-baseos-rpms
+    size: 42712
+    checksum: sha256:a96600fec79e7d94523816dc620203e812c4a08c82c07fb3bb62d7e9e6e1f661
+    name: libpkgconf
+    evr: 1.7.3-10.el9
+    sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/p/pkgconf-1.7.3-10.el9.ppc64le.rpm
+    repoid: rhel-9-for-ppc64le-baseos-rpms
+    size: 46315
+    checksum: sha256:a70516a3a8f016a80613bc071586cd653db12a650c4c9f057743125cb7ad7433
+    name: pkgconf
+    evr: 1.7.3-10.el9
+    sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/p/pkgconf-m4-1.7.3-10.el9.noarch.rpm
+    repoid: rhel-9-for-ppc64le-baseos-rpms
+    size: 16054
+    checksum: sha256:91bafd6e06099451f60288327b275cfcc651822f6145176a157c6b0fa5131e02
+    name: pkgconf-m4
+    evr: 1.7.3-10.el9
+    sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/p/pkgconf-pkg-config-1.7.3-10.el9.ppc64le.rpm
+    repoid: rhel-9-for-ppc64le-baseos-rpms
+    size: 12416
+    checksum: sha256:1d641be62db76b074f4ca2d6b470d85dcf806d96e2c834337482a73984db1979
+    name: pkgconf-pkg-config
+    evr: 1.7.3-10.el9
+    sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/r/rsync-3.2.3-20.el9.ppc64le.rpm
+    repoid: rhel-9-for-ppc64le-baseos-rpms
+    size: 438760
+    checksum: sha256:812d772d00253f15f5dd87c7e53509136cfeb48e9eb028e869cd427820daa99c
+    name: rsync
+    evr: 3.2.3-20.el9
+    sourcerpm: rsync-3.2.3-20.el9.src.rpm
+  source: []
+  module_metadata: []
+- arch: s390x
+  packages:
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/s390x/rhocp/4.17/os/Packages/o/openshift-clients-4.17.0-202412120604.p0.gf4525b8.assembly.stream.el9.s390x.rpm
+    repoid: rhocp-4.17-for-rhel-9-s390x-rpms
+    size: 54541323
+    checksum: sha256:305e4856758e6964f87a717790fab7ebefbd773bf8376fb4fbd5222ac818e187
+    name: openshift-clients
+    evr: 4.17.0-202412120604.p0.gf4525b8.assembly.stream.el9
+    sourcerpm: openshift-clients-4.17.0-202412120604.p0.gf4525b8.assembly.stream.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/b/bash-completion-2.11-5.el9.noarch.rpm
+    repoid: rhel-9-for-s390x-baseos-rpms
+    size: 469639
+    checksum: sha256:3b4ae87f0e9a13cda47f1c009eb2c63135dc22b2b4dd89a6310f8e8fbb59e30a
+    name: bash-completion
+    evr: 1:2.11-5.el9
+    sourcerpm: bash-completion-2.11-5.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libpkgconf-1.7.3-10.el9.s390x.rpm
+    repoid: rhel-9-for-s390x-baseos-rpms
+    size: 37876
+    checksum: sha256:fa1da3b44d85663cceaa0faf8eb5f2f7325cc83c381d6018f303edd06cab5938
+    name: libpkgconf
+    evr: 1.7.3-10.el9
+    sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/p/pkgconf-1.7.3-10.el9.s390x.rpm
+    repoid: rhel-9-for-s390x-baseos-rpms
+    size: 45258
+    checksum: sha256:a5f966f792cacc4696e4187593a915fb56452dd272cf4c81d930968adb3ee00c
+    name: pkgconf
+    evr: 1.7.3-10.el9
+    sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/p/pkgconf-m4-1.7.3-10.el9.noarch.rpm
+    repoid: rhel-9-for-s390x-baseos-rpms
+    size: 16054
+    checksum: sha256:91bafd6e06099451f60288327b275cfcc651822f6145176a157c6b0fa5131e02
+    name: pkgconf-m4
+    evr: 1.7.3-10.el9
+    sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/p/pkgconf-pkg-config-1.7.3-10.el9.s390x.rpm
+    repoid: rhel-9-for-s390x-baseos-rpms
+    size: 12411
+    checksum: sha256:ef854bfe75102d994afb58510121164c4b9b8359b7d983cd8904c425a175b750
+    name: pkgconf-pkg-config
+    evr: 1.7.3-10.el9
+    sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/r/rsync-3.2.3-20.el9.s390x.rpm
+    repoid: rhel-9-for-s390x-baseos-rpms
+    size: 407920
+    checksum: sha256:64bf419470d88adb1dd6f75c8067f9b2ca1d4c7ca90dc48f09535aeed99c794d
+    name: rsync
+    evr: 3.2.3-20.el9
+    sourcerpm: rsync-3.2.3-20.el9.src.rpm
+  source: []
+  module_metadata: []
+- arch: x86_64
+  packages:
+  - url: https://cdn.redhat.com/content/dist/layered/rhel9/x86_64/rhocp/4.17/os/Packages/o/openshift-clients-4.17.0-202412120604.p0.gf4525b8.assembly.stream.el9.x86_64.rpm
+    repoid: rhocp-4.17-for-rhel-9-x86_64-rpms
+    size: 56578564
+    checksum: sha256:0e54afd463622715eae60777363319b215f7aedbd605b83ad6770047e4424778
+    name: openshift-clients
+    evr: 4.17.0-202412120604.p0.gf4525b8.assembly.stream.el9
+    sourcerpm: openshift-clients-4.17.0-202412120604.p0.gf4525b8.assembly.stream.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/b/bash-completion-2.11-5.el9.noarch.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 469639
+    checksum: sha256:3b4ae87f0e9a13cda47f1c009eb2c63135dc22b2b4dd89a6310f8e8fbb59e30a
+    name: bash-completion
+    evr: 1:2.11-5.el9
+    sourcerpm: bash-completion-2.11-5.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libpkgconf-1.7.3-10.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 38387
+    checksum: sha256:4feae5941b73640bd86b8d506a657cac5b770043db1464fbcd207721b2159dda
+    name: libpkgconf
+    evr: 1.7.3-10.el9
+    sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/pkgconf-1.7.3-10.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 45675
+    checksum: sha256:bb47b4ecc499c308f41031a99e723827d152d5d750f59849d0c265d820944a26
+    name: pkgconf
+    evr: 1.7.3-10.el9
+    sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/pkgconf-m4-1.7.3-10.el9.noarch.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 16054
+    checksum: sha256:91bafd6e06099451f60288327b275cfcc651822f6145176a157c6b0fa5131e02
+    name: pkgconf-m4
+    evr: 1.7.3-10.el9
+    sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/p/pkgconf-pkg-config-1.7.3-10.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 12438
+    checksum: sha256:9a502d81d73d3303ceb53a06ad7ce525c97117ea64352174a33708bf3429283d
+    name: pkgconf-pkg-config
+    evr: 1.7.3-10.el9
+    sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/r/rsync-3.2.3-20.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 411143
+    checksum: sha256:093a322b87dd5f287d4f46189f6eeb72168572f79bbeaf01a56a457838388886
+    name: rsync
+    evr: 3.2.3-20.el9
+    sourcerpm: rsync-3.2.3-20.el9.src.rpm
+  source: []
+  module_metadata: []

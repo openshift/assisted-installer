@@ -15,9 +15,6 @@ ENV USER_UID=1001 \
 COPY --chown=${USER_UID} . /app
 WORKDIR /app
 
-RUN go install github.com/google/go-licenses@v1.6.0
-RUN ${HOME}/go/bin/go-licenses save --save_path /tmp/licenses ./...
-
 RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags strictfipsruntime -o installer src/main/main.go
 
 
@@ -25,9 +22,10 @@ FROM --platform=$BUILDPLATFORM registry.redhat.io/rhel9-4-els/rhel:9.4
 ARG release=main
 ARG version=latest
 
-RUN subscription-manager refresh && dnf install -y util-linux && dnf clean all
+# base image already includes util-linux
+# RUN dnf install -y util-linux && dnf clean all
 
-COPY --from=builder /tmp/licenses /licenses
+COPY LICENSE /licenses/
 COPY --from=builder /app/installer /installer
 COPY --from=builder /app/deploy/assisted-installer-controller /assisted-installer-controller/deploy
 
@@ -46,6 +44,7 @@ LABEL com.redhat.component="multicluster-engine-assisted-installer-container" \
       distribution-scope="public" \
       release="${release}" \
       vendor="Red Hat, Inc." \
+      io.openshift.tags="OpenShift 4" \
       upstream_commit="${version}" \
       org.label-schema.vcs-ref="${version}" \
       org.label-schema.vcs-url="https://github.com/openshift/assisted-installer"
