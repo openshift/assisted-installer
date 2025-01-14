@@ -1,0 +1,9 @@
+contentOrigin:
+  repofiles: ["./redhat.repo"]
+packages:
+  - util-linux
+arches:
+  - aarch64
+  - x86_64
+  - ppc64le
+  - s390x
