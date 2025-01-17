@@ -5,6 +5,7 @@
 //
 //	mockgen -source=k8s_client.go -package=k8s_client -destination=mock_k8s_client.go
 //
+
 // Package k8s_client is a generated GoMock package.
 package k8s_client
 
