@@ -38,6 +38,7 @@ import (
 )
 
 const (
+	dockerConfigFile                = "/root/.docker/config.json"
 	coreosInstallerExecutable       = "coreos-installer"
 	dryRunCoreosInstallerExecutable = "dry-installer"
 	encapsulatedMachineConfigFile   = "/etc/ignition-machine-config-encapsulated.json"
@@ -130,7 +131,7 @@ var ostreeOutputRegex = regexp.MustCompile(`Imported: (\w+)`)
 
 func (o *ops) importOSTreeCommit(liveLogger io.Writer) (string, error) {
 	ostreeReleasePullSpec := fmt.Sprintf("ostree-unverified-registry:%s", o.installerConfig.CoreosImage)
-	out, err := o.ExecPrivilegeCommand(liveLogger, "ostree", "container", "unencapsulate", "--authfile", "/root/.docker/config.json", "--quiet", "--repo", "/ostree/repo", ostreeReleasePullSpec)
+	out, err := o.ExecPrivilegeCommand(liveLogger, "ostree", "container", "unencapsulate", "--authfile", dockerConfigFile, "--quiet", "--repo", "/ostree/repo", ostreeReleasePullSpec)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to unencapsulate rhcos payload image: %s", out)
 	}
@@ -1018,7 +1019,7 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 				"--sysroot",
 				"/mnt",
 				"--authfile",
-				"/root/.docker/config.json",
+				dockerConfigFile,
 				"--imgref",
 				"ostree-unverified-registry:"+osImage,
 				"--karg",
