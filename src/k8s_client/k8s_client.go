@@ -88,6 +88,8 @@ type K8SClient interface {
 	IsClusterCapabilityEnabled(configv1.ClusterVersionCapability) (bool, error)
 	UntaintNode(name string) error
 	PatchMachineConfigPoolPaused(pause bool, mcpName string) error
+	CreateNamespace(name string) error
+	CreateConfigMap(name string, namespace string, data map[string]string) error
 }
 
 type K8SClientBuilder func(configPath string, logger logrus.FieldLogger) (K8SClient, error)
@@ -690,4 +692,28 @@ func (c *k8sClient) PatchMachineConfigPoolPaused(pause bool, mcpName string) err
 	pausePatch := []byte(fmt.Sprintf("{\"spec\":{\"paused\":%t}}", pause))
 	c.log.Infof("Setting pause MCP %s to %t", mcpName, pause)
 	return c.runtimeClient.Patch(context.TODO(), mcp, runtimeclient.RawPatch(types.MergePatchType, pausePatch))
+}
+
+func (c *k8sClient) CreateNamespace(name string) error {
+	if _, err := c.client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}, metav1.CreateOptions{}); err != nil {
+		return errors.Wrap(err, "unable to create namespace for known hosts")
+	}
+	return nil
+}
+
+func (c *k8sClient) CreateConfigMap(name string, namespace string, data map[string]string) error {
+	if _, err := c.client.CoreV1().ConfigMaps(namespace).Create(context.TODO(), &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: data,
+	}, metav1.CreateOptions{}); err != nil {
+		return errors.Wrap(err, "unable to create config map for known hosts")
+	}
+	return nil
 }
