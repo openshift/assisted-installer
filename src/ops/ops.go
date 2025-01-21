@@ -66,6 +66,7 @@ type Ops interface {
 	FormatDisk(string) error
 	CreateManifests(string, []byte) error
 	DryRebootHappened(markerPath string) bool
+	FileExists(path string) bool
 	ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error)
 	ReadFile(filePath string) ([]byte, error)
 	GetEncapsulatedMC(ignitionPath string) (*mcfgv1.MachineConfig, error)
@@ -652,7 +653,12 @@ func (o *ops) CreateManifests(kubeconfig string, content []byte) error {
 // The dry run installer creates this file on "Reboot" (instead of actually rebooting)
 // We use this function to check whether the given node in the cluster have already rebooted
 func (o *ops) DryRebootHappened(markerPath string) bool {
-	_, err := o.ExecPrivilegeCommand(nil, "stat", markerPath)
+	return o.FileExists(markerPath)
+}
+
+// FileExists checks if a file exists
+func (o *ops) FileExists(path string) bool {
+	_, err := o.ExecPrivilegeCommand(nil, "stat", path)
 
 	return err == nil
 }

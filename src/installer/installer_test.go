@@ -271,6 +271,28 @@ var _ = Describe("installer HostRoleMaster role", func() {
 						mockops.EXPECT().CreateRandomHostname(gomock.Any()).Return(nil).Times(1)
 					}
 				}
+				checkOcBinary := func(exists bool) {
+					mockops.EXPECT().FileExists(openshiftClientBin).Return(exists).Times(1)
+				}
+				checkOverlayService := func(name string, injectError bool) {
+					// verify that we retry if `systemctl show` fails for some reason
+					mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "systemctl", "show", "-P", "ActiveState", name).Return("", errors.New("bad")).Times(1)
+					// verify that we retry if service is still inactive (hasn't started yet)
+					mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "systemctl", "show", "-P", "ActiveState", name).Return("inactive", nil).Times(1)
+					if !injectError {
+						// ok, succeed this time
+						mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "systemctl", "show", "-P", "ActiveState", name).Return("active", nil).Times(1)
+					} else {
+						// oh no! the service failed!
+						mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "systemctl", "show", "-P", "ActiveState", name).Return("failed", nil).Times(1)
+						mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "systemctl", "status", name).Return("status", nil).Times(1)
+					}
+				}
+				overlayNodeImage := func(injectError bool) {
+					mockops.EXPECT().SystemctlAction("start", "--no-block", nodeImagePullService, nodeImageOverlayService).Return(nil).Times(1)
+					checkOverlayService(nodeImagePullService, false)
+					checkOverlayService(nodeImageOverlayService, injectError)
+				}
 				startServicesSuccess := func() {
 					services := []string{"bootkube.service", "progress.service", "approve-csr.service"}
 					for i := range services {
@@ -297,7 +319,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				}
 				waitForBootkubeSuccess := func() {
 					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), infraEnvId, hostId, models.HostStageWaitingForBootkube, "").Return(nil).Times(1)
-					mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "stat", "/opt/openshift/.bootkube.done").Return("OK", nil).Times(1)
+					mockops.EXPECT().FileExists("/opt/openshift/.bootkube.done").Return(true).Times(1)
 				}
 				bootkubeStatusSuccess := func() {
 					mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "systemctl", "status", "bootkube.service").Return("1", nil).Times(1)
@@ -354,6 +376,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							checkLocalHostname("notlocalhost", nil)
 							restartNetworkManager(nil)
 							prepareControllerSuccess()
+							checkOcBinary(true)
 							startServicesSuccess()
 							WaitMasterNodesSucccess()
 							waitForBootkubeSuccess()
@@ -375,6 +398,63 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							ret := installerObj.InstallNode()
 							Expect(ret).Should(BeNil())
 						})
+						It("bootstrap role happy flow on RHEL-only bootimage", func() {
+							updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+								{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
+								{string(models.HostStageWaitingForControlPlane), waitingForMastersStatusInfo},
+								{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+								{string(models.HostStageWritingImageToDisk)},
+								{string(models.HostStageRebooting)},
+							})
+							bootstrapSetup()
+							checkLocalHostname("notlocalhost", nil)
+							restartNetworkManager(nil)
+							prepareControllerSuccess()
+							checkOcBinary(false)
+							overlayNodeImage(false)
+							checkOcBinary(true)
+							startServicesSuccess()
+							WaitMasterNodesSucccess()
+							waitForBootkubeSuccess()
+							bootkubeStatusSuccess()
+							waitForETCDBootstrapSuccess()
+							bootstrapETCDStatusSuccess()
+							resolvConfSuccess()
+							waitForControllerSuccessfully(conf.ClusterID)
+							//HostRoleMaster flow:
+							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
+							writeToDiskSuccess(gomock.Any())
+							reportLogProgressSuccess()
+							setBootOrderSuccess(gomock.Any())
+							uploadLogsSuccess(true)
+							ironicAgentDoesntExist()
+							rebootSuccess()
+							getEncapsulatedMcSuccess(nil)
+							overwriteImageSuccess()
+							ret := installerObj.InstallNode()
+							Expect(ret).Should(BeNil())
+						})
+						It("bootstrap role fails on RHEL-only bootimage if can't overlay node image", func() {
+							updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+								{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
+								{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+								{string(models.HostStageWritingImageToDisk)},
+							})
+							bootstrapSetup()
+							checkLocalHostname("notlocalhost", nil)
+							restartNetworkManager(nil)
+							prepareControllerSuccess()
+							checkOcBinary(false)
+							overlayNodeImage(true)
+							//HostRoleMaster flow:
+							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
+							writeToDiskSuccess(gomock.Any())
+							setBootOrderSuccess(gomock.Any())
+							getEncapsulatedMcSuccess(nil)
+							overwriteImageSuccess()
+							ret := installerObj.InstallNode()
+							Expect(ret).To(HaveOccurred())
+						})
 						It("bootstrap role happy flow with invalid hostname", func() {
 							updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 								{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
@@ -387,6 +467,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							checkLocalHostname("InvalidHostname", nil)
 							restartNetworkManager(nil)
 							prepareControllerSuccess()
+							checkOcBinary(true)
 							startServicesSuccess()
 							WaitMasterNodesSucccess()
 							waitForBootkubeSuccess()
@@ -420,6 +501,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							checkLocalHostname("localhost", nil)
 							restartNetworkManager(nil)
 							prepareControllerSuccess()
+							checkOcBinary(true)
 							startServicesSuccess()
 							WaitMasterNodesSucccess()
 							waitForBootkubeSuccess()
@@ -454,6 +536,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							checkLocalHostname("notlocalhost", nil)
 							restartNetworkManager(nil)
 							prepareControllerSuccess()
+							checkOcBinary(true)
 							startServicesSuccess()
 							WaitMasterNodesSucccessWithCluster(&models.Cluster{
 								Platform: &models.Platform{
@@ -520,6 +603,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					checkLocalHostname("notlocalhost", nil)
 					restartNetworkManager(nil)
 					prepareControllerSuccess()
+					checkOcBinary(true)
 					startServicesSuccess()
 					WaitMasterNodesSucccess()
 					waitForBootkubeSuccess()
@@ -633,6 +717,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							checkLocalHostname("notlocalhost", nil)
 							restartNetworkManager(nil)
 							prepareControllerSuccess()
+							checkOcBinary(true)
 							startServicesSuccess()
 
 							mockbmclient.EXPECT().GetEnabledHostsNamesHosts(gomock.Any(), gomock.Any()).Return(inventoryNamesHost, nil).AnyTimes()
@@ -1037,6 +1122,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 						mockops.EXPECT().CreateRandomHostname(gomock.Any()).Return(nil).Times(1)
 					}
 				}
+				checkOcBinary := func(exists bool) {
+					mockops.EXPECT().FileExists(openshiftClientBin).Return(exists).Times(1)
+				}
 				startServicesSuccess := func() {
 					services := []string{"bootkube.service", "progress.service", "approve-csr.service"}
 					for i := range services {
@@ -1048,7 +1136,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				}
 				waitForBootkubeSuccess := func() {
 					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), infraEnvId, hostId, models.HostStageWaitingForBootkube, "").Return(nil).Times(1)
-					mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "stat", "/opt/openshift/.bootkube.done").Return("OK", nil).Times(1)
+					mockops.EXPECT().FileExists("/opt/openshift/.bootkube.done").Return(true).Times(1)
 				}
 				bootkubeStatusSuccess := func() {
 					mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "systemctl", "status", "bootkube.service").Return("1", nil).Times(1)
@@ -1079,6 +1167,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					singleNodeBootstrapSetup()
 					checkLocalHostname("localhost", nil)
 					prepareControllerSuccess()
+					checkOcBinary(true)
 					startServicesSuccess()
 					waitForBootkubeSuccess()
 					bootkubeStatusSuccess()
@@ -1116,6 +1205,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					singleNodeBootstrapSetup()
 					checkLocalHostname("localhost", nil)
 					prepareControllerSuccess()
+					checkOcBinary(true)
 					startServicesSuccess()
 					waitForBootkubeSuccess()
 					bootkubeStatusSuccess()
