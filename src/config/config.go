@@ -40,6 +40,7 @@ type Config struct {
 	SkipInstallationDiskCleanup bool
 	EnableSkipMcoReboot         bool
 	NotifyNumReboots            bool
+	CoreosImage                 string
 }
 
 func printHelpAndExit(err error) {
@@ -79,6 +80,7 @@ func (c *Config) ProcessArgs(args []string) {
 	flagSet.BoolVar(&c.SkipInstallationDiskCleanup, "skip-installation-disk-cleanup", false, "Skip installation disk cleanup gives disk management to coreos-installer in case needed")
 	flagSet.BoolVar(&c.EnableSkipMcoReboot, "enable-skip-mco-reboot", false, "indicate assisted installer to generate settings to match MCO requirements for skipping reboot after firstboot")
 	flagSet.BoolVar(&c.NotifyNumReboots, "notify-num-reboots", false, "indicate number of reboots should be notified as event")
+	flagSet.StringVar(&c.CoreosImage, "coreos-image", "", "CoreOS image to install to the existing root")
 
 	var installerArgs string
 	flagSet.StringVar(&installerArgs, "installer-args", "", "JSON array of additional coreos-installer arguments")

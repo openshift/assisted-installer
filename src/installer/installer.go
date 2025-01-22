@@ -155,14 +155,17 @@ func (i *installer) InstallNode() error {
 		}
 	}
 
-	if i.EnableSkipMcoReboot {
-		i.skipMcoReboot(ignitionPath)
-	}
+	// we can't do any of this if we're installing to the existing root
+	if i.Config.CoreosImage == "" {
+		if i.EnableSkipMcoReboot {
+			i.skipMcoReboot(ignitionPath)
+		}
 
-	if err = i.ops.SetBootOrder(i.Device); err != nil {
-		i.log.WithError(err).Warnf("Failed to set boot order")
-		// Ignore the error for now so it doesn't fail the installation in case it fails
-		//return err
+		if err = i.ops.SetBootOrder(i.Device); err != nil {
+			i.log.WithError(err).Warnf("Failed to set boot order")
+			// Ignore the error for now so it doesn't fail the installation in case it fails
+			//return err
+		}
 	}
 
 	if isBootstrap {
@@ -321,7 +324,7 @@ func convertToOverwriteKargs(args []string) []string {
 }
 
 func (i *installer) cleanupInstallDevice() {
-	if i.DryRunEnabled || i.Config.SkipInstallationDiskCleanup {
+	if i.DryRunEnabled || i.Config.SkipInstallationDiskCleanup || i.Config.CoreosImage != "" {
 		i.log.Infof("skipping installation disk cleanup")
 	} else {
 		err := i.cleanupDevice.CleanupInstallDevice(i.Config.Device)
@@ -365,7 +368,11 @@ func (i *installer) writeImageToDisk(ignitionPath string) error {
 	interval := time.Second
 	liveLogger := coreos_logger.NewCoreosInstallerLogWriter(i.log, i.inventoryClient, i.Config.InfraEnvID, i.Config.HostID)
 	err := utils.Retry(3, interval, i.log, func() error {
-		return i.ops.WriteImageToDisk(liveLogger, ignitionPath, i.Device, i.Config.InstallerArgs)
+		if i.Config.CoreosImage == "" {
+			return i.ops.WriteImageToDisk(liveLogger, ignitionPath, i.Device, i.Config.InstallerArgs)
+		} else {
+			return i.ops.WriteImageToExistingRoot(liveLogger, ignitionPath)
+		}
 	})
 	if err != nil {
 		i.log.WithError(err).Error("Failed to write image to disk")
@@ -1044,7 +1051,11 @@ func RunInstaller(installerConfig *config.Config, logger *logrus.Logger) error {
 	)
 
 	// Try to format requested disks. May fail formatting some disks, this is not an error.
-	ai.FormatDisks()
+	if installerConfig.CoreosImage == "" {
+		ai.FormatDisks()
+	} else {
+		logger.Info("not attempting disk format when installing to boot device")
+	}
 
 	if err = ai.InstallNode(); err != nil {
 		ai.UpdateHostInstallProgress(models.HostStageFailed, err.Error())

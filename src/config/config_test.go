@@ -66,6 +66,12 @@ var _ = Describe("ProcessArgs", func() {
 		Expect(config.InfraEnvID).To(Equal("9f2a26d7-10a6-4be0-b1c2-e895ad3b04b8"))
 	})
 
+	It("should set coreos image when provided", func() {
+		config := &Config{}
+		arguments := []string{"--role", string(models.HostRoleBootstrap), "--infra-env-id", "9f2a26d7-10a6-4be0-b1c2-e895ad3b04b8", "--cluster-id", "0ae63135-5f7c-431e-9c72-0efaf2cb83b8", "--coreos-image", "example.com/coreos/os:latest"}
+		config.ProcessArgs(arguments)
+		Expect(config.CoreosImage).To(Equal("example.com/coreos/os:latest"))
+	})
 })
 
 var _ = Describe("SetInstallerArgs", func() {
