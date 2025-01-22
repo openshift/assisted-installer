@@ -27,10 +27,15 @@ type OperatorHandler interface {
 	IsInitialized() bool
 }
 
-func (c *controller) isOperatorAvailable(handler OperatorHandler) bool {
+// checkAndUpdateOperatorAvailability checks performs the following actions:
+//  1. Checks the current availability status of the operator object in assisted-service.
+//     If it is available, it returns true, otherwise continue to check the operator status in the cluster.
+//  2. If the status or message differs from the current values, it updates the operator's object status in assisted-service.
+//  3. Returns true if the status changed to 'available', or false otherwise.
+func (c *controller) checkAndUpdateOperatorAvailability(handler OperatorHandler, useCache bool) bool {
 	operatorName := handler.GetName()
 	c.log.Infof("Checking <%s> operator availability status", operatorName)
-	operatorStatusInService, isAvailable := c.isOperatorAvailableInService(operatorName, c.OpenshiftVersion)
+	operatorStatusInService, isAvailable := c.isOperatorAvailableInService(operatorName, c.OpenshiftVersion, useCache)
 	if isAvailable {
 		return true
 	}
@@ -41,8 +46,17 @@ func (c *controller) isOperatorAvailable(handler OperatorHandler) bool {
 		return false
 	}
 
-	if operatorStatusInService != nil && (operatorStatusInService.Status != operatorStatus || (operatorStatusInService.StatusInfo != operatorMessage && operatorMessage != "")) {
-		c.log.Infof("Operator <%s> updated, status: %s -> %s, message: %s -> %s.", operatorName, operatorStatusInService.Status, operatorStatus, operatorStatusInService.StatusInfo, operatorMessage)
+	if operatorStatusInService != nil &&
+		(operatorStatusInService.Status != operatorStatus ||
+			(operatorStatusInService.StatusInfo != operatorMessage && operatorMessage != "")) {
+		c.log.Infof(
+			"Operator <%s> updated, status: %s -> %s, message: %s -> %s.",
+			operatorName,
+			operatorStatusInService.Status,
+			operatorStatus,
+			operatorStatusInService.StatusInfo,
+			operatorMessage,
+		)
 		if !handler.OnChange(operatorStatus) {
 			c.log.WithError(err).Warnf("<%s> operator's OnChange() returned false. Will skip an update.", operatorName)
 			return false
@@ -61,8 +75,8 @@ func (c *controller) isOperatorAvailable(handler OperatorHandler) bool {
 	return isAvailable
 }
 
-func (c *controller) isOperatorAvailableInService(operatorName string, openshiftVersion string) (*models.MonitoredOperator, bool) {
-	operatorStatusInService, err := c.ic.GetClusterMonitoredOperator(utils.GenerateRequestContext(), c.ClusterID, operatorName, openshiftVersion)
+func (c *controller) isOperatorAvailableInService(operatorName string, openshiftVersion string, useCache bool) (*models.MonitoredOperator, bool) {
+	operatorStatusInService, err := c.ic.GetClusterMonitoredOperator(utils.GenerateRequestContext(), c.ClusterID, operatorName, openshiftVersion, useCache)
 	if err != nil {
 		c.log.WithError(err).Errorf("Failed to get cluster %s %s operator status", c.ClusterID, operatorName)
 		return nil, false

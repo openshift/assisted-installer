@@ -52,8 +52,8 @@ type InventoryClient interface {
 	UploadIngressCa(ctx context.Context, ingressCA string, clusterId string) error
 	GetCluster(ctx context.Context, withHosts bool) (*models.Cluster, error)
 	ListsHostsForRole(ctx context.Context, role string) (models.HostList, error)
-	GetClusterMonitoredOperator(ctx context.Context, clusterId, operatorName string, openshiftVersion string) (*models.MonitoredOperator, error)
-	GetClusterMonitoredOLMOperators(ctx context.Context, clusterId string, openshiftVersion string) ([]models.MonitoredOperator, error)
+	GetClusterMonitoredOperator(ctx context.Context, clusterId, operatorName string, openshiftVersion string, useCache bool) (*models.MonitoredOperator, error)
+	GetClusterMonitoredOLMOperators(ctx context.Context, clusterId string, openshiftVersion string, useCache bool) ([]models.MonitoredOperator, error)
 	CompleteInstallation(ctx context.Context, clusterId string, isSuccess bool, errorInfo string, data map[string]interface{}) error
 	GetHosts(ctx context.Context, log logrus.FieldLogger, skippedStatuses []string) (map[string]HostData, error)
 	UploadLogs(ctx context.Context, clusterId string, logsType models.LogsType, upfile io.Reader) error
@@ -270,10 +270,12 @@ func (c *inventoryClient) ListsHostsForRole(ctx context.Context, role string) (m
 	return ret.Payload, nil
 }
 
-func (c *inventoryClient) getMonitoredOperators(ctx context.Context, clusterId string) (models.MonitoredOperatorsList, error) {
+func (c *inventoryClient) getMonitoredOperators(ctx context.Context, clusterId string, useCache bool) (models.MonitoredOperatorsList, error) {
 	cacheKey := fmt.Sprintf("getMonitoredOperators-%s", clusterId)
-	if val, err := c.cache.Get(cacheKey); err == nil {
-		return val.(models.MonitoredOperatorsList), nil
+	if useCache {
+		if val, err := c.cache.Get(cacheKey); err == nil {
+			return val.(models.MonitoredOperatorsList), nil
+		}
 	}
 
 	monitoredOperators, err := c.ai.Operators.V2ListOfClusterOperators(ctx, &operators.V2ListOfClusterOperatorsParams{
@@ -282,12 +284,20 @@ func (c *inventoryClient) getMonitoredOperators(ctx context.Context, clusterId s
 	if err != nil {
 		return nil, aserror.GetAssistedError(err)
 	}
+
 	c.cache.Set(cacheKey, monitoredOperators.Payload)
+
 	return monitoredOperators.Payload, nil
 }
 
-func (c *inventoryClient) GetClusterMonitoredOperator(ctx context.Context, clusterId, operatorName string, openshiftVersion string) (*models.MonitoredOperator, error) {
-	monitoredOperators, err := c.getMonitoredOperators(ctx, clusterId)
+func (c *inventoryClient) GetClusterMonitoredOperator(
+	ctx context.Context,
+	clusterId,
+	operatorName string,
+	openshiftVersion string,
+	useCache bool,
+) (*models.MonitoredOperator, error) {
+	monitoredOperators, err := c.getMonitoredOperators(ctx, clusterId, useCache)
 	if err != nil {
 		return nil, err
 	}
@@ -319,8 +329,13 @@ func (c *inventoryClient) GetClusterMonitoredOperator(ctx context.Context, clust
 	return nil, fmt.Errorf("operator %s not found", operatorName)
 }
 
-func (c *inventoryClient) GetClusterMonitoredOLMOperators(ctx context.Context, clusterId string, openshiftVersion string) ([]models.MonitoredOperator, error) {
-	monitoredOperators, err := c.getMonitoredOperators(ctx, clusterId)
+func (c *inventoryClient) GetClusterMonitoredOLMOperators(
+	ctx context.Context,
+	clusterId string,
+	openshiftVersion string,
+	useCache bool,
+) ([]models.MonitoredOperator, error) {
+	monitoredOperators, err := c.getMonitoredOperators(ctx, clusterId, useCache)
 	if err != nil {
 		return nil, err
 	}

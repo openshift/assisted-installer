@@ -312,6 +312,7 @@ func waitForInstallationAgentBasedInstaller(kubeClient k8s_client.K8SClient, log
 }
 
 func didInstallationFinish(clusterStatus string, log logrus.FieldLogger, status *assistedinstallercontroller.ControllerStatus) bool {
+	log.Info("Checking if the cluster installation finished...")
 	switch clusterStatus {
 	case models.ClusterStatusError:
 		log.Infof("Cluster installation failed.")
