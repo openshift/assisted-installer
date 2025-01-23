@@ -546,11 +546,14 @@ func (c *controller) waitForOLMOperators(ctx context.Context) error {
 			c.log.WithError(err).Error("Timeout while waiting for some of the operators and not able to update its state")
 		}
 	}()
+
 	// Get the monitored operators:
 	c.updateFinalizingProgress(ctx, models.FinalizingStageWaitingForOlmOperatorsCsvInitialization)
 	retryErr = utils.WaitForeverForPredicateWithCancel(ctx, FetchRetryInterval, func() bool {
 		var err2 error
-		operators, err2 = c.ic.GetClusterMonitoredOLMOperators(context.TODO(), c.ClusterID, c.OpenshiftVersion)
+		// We use the cache here to retrieve results from the assisted-service, as this function is executed repeatedly.
+		// Over time, this approach ensures that we ultimately get the correct result.
+		operators, err2 = c.ic.GetClusterMonitoredOLMOperators(context.TODO(), c.ClusterID, c.OpenshiftVersion, true)
 		if err2 != nil {
 			c.log.WithError(err2).Errorf("Error fetching the monitored operators from assisted-service")
 			return false
@@ -560,6 +563,7 @@ func (c *controller) waitForOLMOperators(ctx context.Context) error {
 	if retryErr != nil {
 		return errors.Wrapf(retryErr, "Failed to fetch monitored operators")
 	}
+
 	if len(operators) == 0 {
 		c.log.Info("No OLM operators found.")
 		return nil
@@ -951,9 +955,9 @@ func (c *controller) addRouterCAToClusterCA() bool {
 
 }
 
-func (c *controller) getProgressingOLMOperators() ([]*models.MonitoredOperator, error) {
+func (c *controller) getProgressingOLMOperators(useCache bool) ([]*models.MonitoredOperator, error) {
 	ret := make([]*models.MonitoredOperator, 0)
-	operators, err := c.ic.GetClusterMonitoredOLMOperators(context.TODO(), c.ClusterID, c.OpenshiftVersion)
+	operators, err := c.ic.GetClusterMonitoredOLMOperators(context.TODO(), c.ClusterID, c.OpenshiftVersion, useCache)
 	if err != nil {
 		c.log.WithError(err).Warningf("Failed to connect to assisted service")
 		return ret, err
@@ -968,11 +972,17 @@ func (c *controller) getProgressingOLMOperators() ([]*models.MonitoredOperator, 
 
 func (c *controller) updatePendingOLMOperators(ctx context.Context) error {
 	c.log.Infof("Updating pending OLM operators")
-	operators, err := c.getProgressingOLMOperators()
+
+	// This call is executed only once during the application's graceful shutdown.
+	// Therefore, it is essential to retrieve up-to-date results on which operators are
+	// still progressing from the assisted-service. To ensure accuracy, we avoid using the cache in this case.
+	operators, err := c.getProgressingOLMOperators(false)
 	if err != nil {
 		return err
 	}
+
 	for _, operator := range operators {
+		c.log.Infof("Updating operator %s status to 'failed'", operator.Name)
 		c.status.OperatorError(operator.Name)
 		err := c.ic.UpdateClusterOperator(ctx, c.ClusterID, operator.Name, operator.Version, models.OperatorStatusFailed, "Waiting for operator timed out")
 		if err != nil {
@@ -980,12 +990,16 @@ func (c *controller) updatePendingOLMOperators(ctx context.Context) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
 // waitForCSV wait until all OLM monitored operators are available or failed.
 func (c *controller) waitForCSV(ctx context.Context) error {
-	operators, err := c.getProgressingOLMOperators()
+	// This function is executed only once during the wait for OLM operators to become ready.
+	// As such, we need up-to-date information on which operators are still progressing.
+	// While no operators should yet be in a 'failing' or 'available' status at this point, avoiding the cache helps mitigate potential edge cases.
+	operators, err := c.getProgressingOLMOperators(false)
 	if err != nil {
 		return err
 	}
@@ -998,18 +1012,19 @@ func (c *controller) waitForCSV(ctx context.Context) error {
 	for index := range operators {
 		handlers[operators[index].Name] = NewClusterServiceVersionHandler(c.log, c.kc, operators[index], c.status)
 	}
-	areOLMOperatorsAvailable := func() bool {
-		if len(handlers) == 0 {
-			return true
-		}
 
+	areOLMOperatorsAvailable := func() bool {
 		for index := range handlers {
-			if c.isOperatorAvailable(handlers[index]) {
+			// We use the cache here to retrieve results from the assisted-service, as this function is executed repeatedly.
+			// Over time, this approach ensures that we ultimately get the correct result.
+			if c.checkAndUpdateOperatorAvailability(handlers[index], true) {
 				delete(handlers, index)
 			}
 		}
-		return false
+
+		return len(handlers) == 0
 	}
+
 	return utils.WaitForeverForPredicateWithCancel(ctx, GeneralWaitInterval, areOLMOperatorsAvailable,
 		c.isStageTimedOut(models.FinalizingStageWaitingForOlmOperatorsCsv))
 }
@@ -1036,13 +1051,17 @@ func (c *controller) waitingForClusterOperators(ctx context.Context) error {
 		var result bool
 		if isConsoleEnabled {
 			c.log.Info("Console is enabled, will wait for the console operator to be available")
-			result = c.isOperatorAvailable(clusterOperatorHandler)
+			// We use the cache here to retrieve results from the assisted-service, as this function is executed repeatedly.
+			// Over time, this approach ensures that we ultimately get the correct result.
+			result = c.checkAndUpdateOperatorAvailability(clusterOperatorHandler, true)
 		} else {
 			c.log.Info("Console is disabled, will not wait for the console operator to be available")
 			result = true
 		}
 		if c.WaitForClusterVersion {
-			result = c.isOperatorAvailable(clusterVersionHandler) && result
+			// We use the cache here to retrieve results from the assisted-service, as this function is executed repeatedly.
+			// Over time, this approach ensures that we ultimately get the correct result.
+			result = c.checkAndUpdateOperatorAvailability(clusterVersionHandler, true) && result
 		}
 		return result
 	}

@@ -126,33 +126,33 @@ func (mr *MockInventoryClientMockRecorder) GetCluster(ctx, withHosts any) *gomoc
 }
 
 // GetClusterMonitoredOLMOperators mocks base method.
-func (m *MockInventoryClient) GetClusterMonitoredOLMOperators(ctx context.Context, clusterId, openshiftVersion string) ([]models.MonitoredOperator, error) {
+func (m *MockInventoryClient) GetClusterMonitoredOLMOperators(ctx context.Context, clusterId, openshiftVersion string, useCache bool) ([]models.MonitoredOperator, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetClusterMonitoredOLMOperators", ctx, clusterId, openshiftVersion)
+	ret := m.ctrl.Call(m, "GetClusterMonitoredOLMOperators", ctx, clusterId, openshiftVersion, useCache)
 	ret0, _ := ret[0].([]models.MonitoredOperator)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetClusterMonitoredOLMOperators indicates an expected call of GetClusterMonitoredOLMOperators.
-func (mr *MockInventoryClientMockRecorder) GetClusterMonitoredOLMOperators(ctx, clusterId, openshiftVersion any) *gomock.Call {
+func (mr *MockInventoryClientMockRecorder) GetClusterMonitoredOLMOperators(ctx, clusterId, openshiftVersion, useCache any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClusterMonitoredOLMOperators", reflect.TypeOf((*MockInventoryClient)(nil).GetClusterMonitoredOLMOperators), ctx, clusterId, openshiftVersion)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClusterMonitoredOLMOperators", reflect.TypeOf((*MockInventoryClient)(nil).GetClusterMonitoredOLMOperators), ctx, clusterId, openshiftVersion, useCache)
 }
 
 // GetClusterMonitoredOperator mocks base method.
-func (m *MockInventoryClient) GetClusterMonitoredOperator(ctx context.Context, clusterId, operatorName, openshiftVersion string) (*models.MonitoredOperator, error) {
+func (m *MockInventoryClient) GetClusterMonitoredOperator(ctx context.Context, clusterId, operatorName, openshiftVersion string, useCache bool) (*models.MonitoredOperator, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetClusterMonitoredOperator", ctx, clusterId, operatorName, openshiftVersion)
+	ret := m.ctrl.Call(m, "GetClusterMonitoredOperator", ctx, clusterId, operatorName, openshiftVersion, useCache)
 	ret0, _ := ret[0].(*models.MonitoredOperator)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetClusterMonitoredOperator indicates an expected call of GetClusterMonitoredOperator.
-func (mr *MockInventoryClientMockRecorder) GetClusterMonitoredOperator(ctx, clusterId, operatorName, openshiftVersion any) *gomock.Call {
+func (mr *MockInventoryClientMockRecorder) GetClusterMonitoredOperator(ctx, clusterId, operatorName, openshiftVersion, useCache any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClusterMonitoredOperator", reflect.TypeOf((*MockInventoryClient)(nil).GetClusterMonitoredOperator), ctx, clusterId, operatorName, openshiftVersion)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetClusterMonitoredOperator", reflect.TypeOf((*MockInventoryClient)(nil).GetClusterMonitoredOperator), ctx, clusterId, operatorName, openshiftVersion, useCache)
 }
 
 // GetEnabledHostsNamesHosts mocks base method.
