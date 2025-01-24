@@ -606,3 +606,70 @@ var _ = Describe("importOSTreeCommit", func() {
 		Expect(err).To(HaveOccurred())
 	})
 })
+
+var _ = Describe("ostreeArgs", func() {
+	It("returns the basic args when no additional installer args are provided", func() {
+		args := ostreeArgs("commit", nil)
+		expectedArgs := []string{
+			"admin", "deploy",
+			"--stateroot", "install",
+			"--karg", "$ignition_firstboot",
+			"--karg", defaultIgnitionPlatformId,
+			"commit",
+		}
+		Expect(args).To(Equal(expectedArgs))
+	})
+
+	It("ignores non append-karg or delete-karg args", func() {
+		args := ostreeArgs("commit", []string{"--copy-network", "--network-dir", "/some/dir/"})
+		expectedArgs := []string{
+			"admin", "deploy",
+			"--stateroot", "install",
+			"--karg", "$ignition_firstboot",
+			"--karg", defaultIgnitionPlatformId,
+			"commit",
+		}
+		Expect(args).To(Equal(expectedArgs))
+	})
+
+	It("adds append args", func() {
+		args := ostreeArgs("commit", []string{"--append-karg", "nameserver=8.8.8.8"})
+		expectedArgs := []string{
+			"admin", "deploy",
+			"--stateroot", "install",
+			"--karg", "$ignition_firstboot",
+			"--karg", defaultIgnitionPlatformId,
+			"--karg-append", "nameserver=8.8.8.8",
+			"commit",
+		}
+		Expect(args).To(Equal(expectedArgs))
+	})
+
+	It("adds remove args", func() {
+		args := ostreeArgs("commit", []string{"--delete-karg", "console"})
+		expectedArgs := []string{
+			"admin", "deploy",
+			"--stateroot", "install",
+			"--karg", "$ignition_firstboot",
+			"--karg", defaultIgnitionPlatformId,
+			"--karg-delete", "console",
+			"commit",
+		}
+		Expect(args).To(Equal(expectedArgs))
+	})
+
+	It("works with multiple instances of append and remove", func() {
+		args := ostreeArgs("commit", []string{"--append-karg", "nameserver=8.8.8.8", "--delete-karg", "console", "--append-karg", "ip=192.0.2.100"})
+		expectedArgs := []string{
+			"admin", "deploy",
+			"--stateroot", "install",
+			"--karg", "$ignition_firstboot",
+			"--karg", defaultIgnitionPlatformId,
+			"--karg-append", "nameserver=8.8.8.8",
+			"--karg-delete", "console",
+			"--karg-append", "ip=192.0.2.100",
+			"commit",
+		}
+		Expect(args).To(Equal(expectedArgs))
+	})
+})

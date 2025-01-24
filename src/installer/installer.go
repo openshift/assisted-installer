@@ -371,7 +371,7 @@ func (i *installer) writeImageToDisk(ignitionPath string) error {
 		if i.Config.CoreosImage == "" {
 			return i.ops.WriteImageToDisk(liveLogger, ignitionPath, i.Device, i.Config.InstallerArgs)
 		} else {
-			return i.ops.WriteImageToExistingRoot(liveLogger, ignitionPath)
+			return i.ops.WriteImageToExistingRoot(liveLogger, ignitionPath, i.Config.InstallerArgs)
 		}
 	})
 	if err != nil {
