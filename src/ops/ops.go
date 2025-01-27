@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"text/template"
@@ -189,6 +190,19 @@ func (o *ops) WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string
 	out, err = o.ExecPrivilegeCommand(liveLogger, "ostree", ostreeArgs(commit, installerArgs)...)
 	if err != nil {
 		return errors.Wrapf(err, "failed to deploy commit to stateroot: %s", out)
+	}
+
+	if slices.Contains(installerArgs, "--copy-network") || slices.Contains(installerArgs, "-n") {
+		o.log.Info("copying network files from /etc/NetworkManager/system-connections to /boot/coreos-firstboot-network")
+		out, err = o.ExecPrivilegeCommand(liveLogger, "mkdir", "/boot/coreos-firstboot-network")
+		if err != nil {
+			return errors.Wrapf(err, "failed to create firstboot network directory: %s", out)
+		}
+
+		out, err = o.ExecPrivilegeCommand(liveLogger, "sh", "-c", "cp /etc/NetworkManager/system-connections/* /boot/coreos-firstboot-network")
+		if err != nil {
+			return errors.Wrapf(err, "failed to copy network files to firstboot network directory: %s", out)
+		}
 	}
 
 	out, err = o.ExecPrivilegeCommand(liveLogger, "mkdir", "/boot/ignition")
