@@ -114,7 +114,7 @@ func (i *installer) InstallNode() error {
 	//cancel the context in case this method ends
 	defer cancel()
 	isBootstrap := false
-	if i.Config.Role == string(models.HostRoleBootstrap) && i.HighAvailabilityMode != models.ClusterHighAvailabilityModeNone {
+	if i.Config.Role == string(models.HostRoleBootstrap) && (i.HighAvailabilityMode != models.ClusterHighAvailabilityModeNone || i.ControlPlaneCount > 1) {
 		isBootstrap = true
 		bootstrapErrGroup.Go(func() error {
 			return i.startBootstrap()
@@ -130,7 +130,7 @@ func (i *installer) InstallNode() error {
 	// i.HighAvailabilityMode is set as an empty string for workers
 	// regardless of the availability mode of the cluster they are joining
 	// as it is of no consequence to them.
-	if i.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone {
+	if i.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone || i.ControlPlaneCount == 1 {
 		i.log.Info("Installing single node openshift")
 		ignitionPath, err = i.createSingleNodeMasterIgnition()
 		if err != nil {
@@ -190,7 +190,7 @@ func (i *installer) InstallNode() error {
 	//upload host logs and report log status before reboot
 	i.log.Infof("Uploading logs and reporting status before rebooting the node %s for cluster %s", i.Config.HostID, i.Config.ClusterID)
 	i.inventoryClient.HostLogProgressReport(ctx, i.Config.InfraEnvID, i.Config.HostID, models.LogsStateRequested)
-	_, err = i.ops.UploadInstallationLogs(isBootstrap || i.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone)
+	_, err = i.ops.UploadInstallationLogs(isBootstrap || i.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone || i.ControlPlaneCount == 1)
 	if err != nil {
 		i.log.Errorf("upload installation logs %s", err)
 	}
@@ -258,7 +258,7 @@ func (i *installer) finalize() error {
 		// Deu to a race condition in etcd bootstrap strategy we need to bring back this delay.
 		// See: https://issues.redhat.com/browse/OCPBUGS-5988
 		whenToReboot := "+1"
-		if i.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone {
+		if i.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone || i.ControlPlaneCount == 1 {
 			whenToReboot = "now"
 		}
 		if err = i.ops.Reboot(whenToReboot); err != nil {
@@ -419,7 +419,7 @@ func (i *installer) startBootstrap() error {
 		return err
 	}
 
-	if i.HighAvailabilityMode != models.ClusterHighAvailabilityModeNone {
+	if i.HighAvailabilityMode != models.ClusterHighAvailabilityModeNone || i.ControlPlaneCount > 1 {
 		err = i.generateSshKeyPair()
 		if err != nil {
 			return err
@@ -450,7 +450,7 @@ func (i *installer) startBootstrap() error {
 	// restart NetworkManager to trigger NetworkManager/dispatcher.d/30-local-dns-prepender
 	// we don't do it on SNO because the "local-dns-prepender" is not even
 	// available on none-platform
-	if i.HighAvailabilityMode != models.ClusterHighAvailabilityModeNone {
+	if i.HighAvailabilityMode != models.ClusterHighAvailabilityModeNone || i.ControlPlaneCount > 1 {
 		err = i.ops.SystemctlAction("restart", "NetworkManager.service")
 		if err != nil {
 			i.log.Error(err)

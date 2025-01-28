@@ -491,7 +491,7 @@ func (o *ops) renderControllerPod() error {
 		params["ServiceIPs"] = strings.Split(o.installerConfig.ServiceIPs, ",")
 	}
 
-	if o.installerConfig.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone {
+	if o.installerConfig.HighAvailabilityMode == models.ClusterHighAvailabilityModeNone || o.installerConfig.ControlPlaneCount == 1 {
 		params["SNO"] = true
 	}
 
