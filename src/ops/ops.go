@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"text/template"
@@ -50,7 +51,7 @@ const (
 type Ops interface {
 	Mkdir(dirName string) error
 	WriteImageToDisk(liveLogger io.Writer, ignitionPath string, device string, extraArgs []string) error
-	WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string) error
+	WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string, installerArgs []string) error
 	Reboot(delay string) error
 	SetBootOrder(device string) error
 	ExtractFromIgnition(ignitionPath string, fileToExtract string) error
@@ -144,7 +145,28 @@ func (o *ops) importOSTreeCommit(liveLogger io.Writer) (string, error) {
 	return matches[1], nil
 }
 
-func (o *ops) WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string) error {
+func ostreeArgs(commit string, installerArgs []string) []string {
+	ostreeArgs := []string{"admin", "deploy",
+		"--stateroot", "install",
+		"--karg", "$ignition_firstboot",
+		"--karg", defaultIgnitionPlatformId,
+	}
+
+	lastArgIndex := len(installerArgs) - 1
+	for i, arg := range installerArgs {
+		if arg == "--append-karg" && i < lastArgIndex {
+			ostreeArgs = append(ostreeArgs, "--karg-append", installerArgs[i+1])
+			continue
+		}
+		if arg == "--delete-karg" && i < lastArgIndex {
+			ostreeArgs = append(ostreeArgs, "--karg-delete", installerArgs[i+1])
+			continue
+		}
+	}
+	return append(ostreeArgs, commit)
+}
+
+func (o *ops) WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string, installerArgs []string) error {
 	out, err := o.ExecPrivilegeCommand(liveLogger, "mount", "/sysroot", "-o", "remount,rw")
 	if err != nil {
 		return errors.Wrapf(err, "failed to remount sysroot: %s", out)
@@ -165,13 +187,22 @@ func (o *ops) WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string
 	}
 	o.log.Infof("imported commit %s", commit)
 
-	out, err = o.ExecPrivilegeCommand(liveLogger, "ostree", "admin", "deploy",
-		"--stateroot", "install",
-		"--karg", "$ignition_firstboot",
-		"--karg", defaultIgnitionPlatformId,
-		commit)
+	out, err = o.ExecPrivilegeCommand(liveLogger, "ostree", ostreeArgs(commit, installerArgs)...)
 	if err != nil {
 		return errors.Wrapf(err, "failed to deploy commit to stateroot: %s", out)
+	}
+
+	if slices.Contains(installerArgs, "--copy-network") || slices.Contains(installerArgs, "-n") {
+		o.log.Info("copying network files from /etc/NetworkManager/system-connections to /boot/coreos-firstboot-network")
+		out, err = o.ExecPrivilegeCommand(liveLogger, "mkdir", "/boot/coreos-firstboot-network")
+		if err != nil {
+			return errors.Wrapf(err, "failed to create firstboot network directory: %s", out)
+		}
+
+		out, err = o.ExecPrivilegeCommand(liveLogger, "sh", "-c", "cp /etc/NetworkManager/system-connections/* /boot/coreos-firstboot-network")
+		if err != nil {
+			return errors.Wrapf(err, "failed to copy network files to firstboot network directory: %s", out)
+		}
 	}
 
 	out, err = o.ExecPrivilegeCommand(liveLogger, "mkdir", "/boot/ignition")

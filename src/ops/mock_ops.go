@@ -97,20 +97,6 @@ func (mr *MockOpsMockRecorder) DryRebootHappened(markerPath any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DryRebootHappened", reflect.TypeOf((*MockOps)(nil).DryRebootHappened), markerPath)
 }
 
-// FileExists mocks base method.
-func (m *MockOps) FileExists(path string) bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FileExists", path)
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// FileExists indicates an expected call of FileExists.
-func (mr *MockOpsMockRecorder) FileExists(path any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FileExists", reflect.TypeOf((*MockOps)(nil).FileExists), path)
-}
-
 // EvaluateDiskSymlink mocks base method.
 func (m *MockOps) EvaluateDiskSymlink(arg0 string) string {
 	m.ctrl.T.Helper()
@@ -157,6 +143,20 @@ func (m *MockOps) ExtractFromIgnition(ignitionPath, fileToExtract string) error 
 func (mr *MockOpsMockRecorder) ExtractFromIgnition(ignitionPath, fileToExtract any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExtractFromIgnition", reflect.TypeOf((*MockOps)(nil).ExtractFromIgnition), ignitionPath, fileToExtract)
+}
+
+// FileExists mocks base method.
+func (m *MockOps) FileExists(path string) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FileExists", path)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// FileExists indicates an expected call of FileExists.
+func (mr *MockOpsMockRecorder) FileExists(path any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FileExists", reflect.TypeOf((*MockOps)(nil).FileExists), path)
 }
 
 // FormatDisk mocks base method.
@@ -401,15 +401,15 @@ func (mr *MockOpsMockRecorder) WriteImageToDisk(liveLogger, ignitionPath, device
 }
 
 // WriteImageToExistingRoot mocks base method.
-func (m *MockOps) WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string) error {
+func (m *MockOps) WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string, installerArgs []string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WriteImageToExistingRoot", liveLogger, ignitionPath)
+	ret := m.ctrl.Call(m, "WriteImageToExistingRoot", liveLogger, ignitionPath, installerArgs)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // WriteImageToExistingRoot indicates an expected call of WriteImageToExistingRoot.
-func (mr *MockOpsMockRecorder) WriteImageToExistingRoot(liveLogger, ignitionPath any) *gomock.Call {
+func (mr *MockOpsMockRecorder) WriteImageToExistingRoot(liveLogger, ignitionPath, installerArgs any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteImageToExistingRoot", reflect.TypeOf((*MockOps)(nil).WriteImageToExistingRoot), liveLogger, ignitionPath)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteImageToExistingRoot", reflect.TypeOf((*MockOps)(nil).WriteImageToExistingRoot), liveLogger, ignitionPath, installerArgs)
 }

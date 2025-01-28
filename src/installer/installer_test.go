@@ -899,7 +899,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					cleanupDevice.EXPECT().CleanupInstallDevice(device).Times(0)
 					mkdirSuccess(InstallDir)
 					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
-					mockops.EXPECT().WriteImageToExistingRoot(gomock.Any(), filepath.Join(InstallDir, "master-host-id.ign")).Return(nil).Times(1)
+					mockops.EXPECT().WriteImageToExistingRoot(gomock.Any(), filepath.Join(InstallDir, "master-host-id.ign"), gomock.Any()).Return(nil).Times(1)
 					mockops.EXPECT().SetBootOrder(device).Times(0)
 					uploadLogsSuccess(false)
 					reportLogProgressSuccess()
