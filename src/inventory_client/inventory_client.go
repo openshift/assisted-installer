@@ -117,11 +117,15 @@ func CreateInventoryClientWithDelay(clusterId string, inventoryURL string, pullS
 		rehttp.RetryAny(
 			rehttp.RetryAll(
 				rehttp.RetryMaxRetries(minRetries),
-				rehttp.RetryStatusInterval(400, 404),
+				rehttp.RetryStatuses(404, 423, 425),
 			),
 			rehttp.RetryAll(
 				rehttp.RetryMaxRetries(maxRetries),
-				rehttp.RetryStatusInterval(405, 600),
+				rehttp.RetryStatuses(408, 429),
+			),
+			rehttp.RetryAll(
+				rehttp.RetryMaxRetries(maxRetries),
+				rehttp.RetryStatusInterval(500, 600),
 			),
 			rehttp.RetryAll(
 				rehttp.RetryMaxRetries(maxRetries),

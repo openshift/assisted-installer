@@ -626,6 +626,8 @@ func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, 
 		}
 		if err = i.updateReadyMasters(nodes, &readyMasters, inventoryHostsMap); err != nil {
 			i.log.WithError(err).Warnf("Failed to update ready with masters")
+			// Re-fetch inventory on next invocation
+			inventoryHostsMap = nil
 			return false
 		}
 		i.log.Infof("Found %d ready master nodes", len(readyMasters))
@@ -681,15 +683,17 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 			ctx := utils.GenerateRequestContext()
 			log := utils.RequestIDLogger(ctx, i.log)
 			log.Infof("Found a new ready master node %s with id %s", node.Name, node.Status.NodeInfo.SystemUUID)
-			*readyMasters = append(*readyMasters, node.Name)
 
 			host, ok := common.HostMatchByNameOrIPAddress(node, inventoryHostsMap, knownIpAddresses)
+			if ok && (host.Host.Status == nil || *host.Host.Status != models.HostStatusInstalled) {
+				if err := i.inventoryClient.UpdateHostInstallProgress(ctx, host.Host.InfraEnvID.String(), host.Host.ID.String(), models.HostStageJoined, ""); err != nil {
+					log.Errorf("Failed to update node installation status, %s", err)
+					return err
+				}
+			}
+			*readyMasters = append(*readyMasters, node.Name)
 			if !ok {
 				return fmt.Errorf("Node %s is not in inventory hosts", node.Name)
-			}
-			ctx = utils.GenerateRequestContext()
-			if err := i.inventoryClient.UpdateHostInstallProgress(ctx, host.Host.InfraEnvID.String(), host.Host.ID.String(), models.HostStageJoined, ""); err != nil {
-				utils.RequestIDLogger(ctx, i.log).Errorf("Failed to update node installation status, %s", err)
 			}
 		}
 	}
