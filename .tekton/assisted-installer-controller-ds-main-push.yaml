@@ -10,10 +10,10 @@ metadata:
       == "master"
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: assisted-installer-downstream-main
-    appstudio.openshift.io/component: assisted-installer-downstream-main
+    appstudio.openshift.io/application: assisted-installer-application-ds-main
+    appstudio.openshift.io/component: assisted-installer-controller-ds-main
     pipelines.appstudio.openshift.io/type: build
-  name: assisted-installer-downstream-main-on-push
+  name: assisted-installer-controller-ds-main-on-push
   namespace: assisted-installer-tenant
 spec:
   params:
@@ -22,7 +22,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-downstream-main/assisted-installer-downstream-main:{{revision}}
+    value: quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-ds-main/assisted-installer-controller-ds-main:{{revision}}
   - name: build-platforms
     value:
     - linux/x86_64
@@ -30,7 +30,7 @@ spec:
     - linux/ppc64le
     - linux/s390x
   - name: dockerfile
-    value: Dockerfile.assisted-installer-downstream
+    value: Dockerfile.assisted-installer-controller-downstream
   - name: path-context
     value: .
   - name: build-args
@@ -40,7 +40,7 @@ spec:
   - name: hermetic
     value: "true"
   - name: prefetch-input
-    value: '[{"type": "gomod", "path": "."}]'
+    value: '[{"type": "gomod", "path": "."}, {"type": "rpm", "path": "./rpm-prefetching/assisted-installer-controller/"}]'
   - name: build-source-image
     value: "true"
   pipelineSpec:

@@ -4,17 +4,16 @@ metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/openshift/assisted-installer?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
-    build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "master"
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
+      == "release-ocm-2.13"
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: assisted-installer-mce-downstream-main
-    appstudio.openshift.io/component: assisted-installer-mce-downstream-main
+    appstudio.openshift.io/application: assisted-installer-application-acm-ds-2-13
+    appstudio.openshift.io/component: assisted-installer-controller-acm-ds-2-13
     pipelines.appstudio.openshift.io/type: build
-  name: assisted-installer-mce-downstream-main-on-pull-request
+  name: assisted-installer-controller-acm-ds-2-13-on-push
   namespace: assisted-installer-tenant
 spec:
   params:
@@ -23,14 +22,12 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-mce-downstream-main/assisted-installer-mce-downstream-main:on-pr-{{revision}}
-  - name: image-expires-after
-    value: 5d
+    value: quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-acm-ds-2-13/assisted-installer-controller-acm-ds-2-13:{{revision}}
   - name: build-platforms
     value:
     - linux/x86_64
   - name: dockerfile
-    value: Dockerfile.assisted-installer-mce
+    value: Dockerfile.assisted-installer-controller-mce
   - name: path-context
     value: .
   - name: build-args
@@ -40,7 +37,7 @@ spec:
   - name: hermetic
     value: "true"
   - name: prefetch-input
-    value: '[{"type": "gomod", "path": "."}]'
+    value: '[{"type": "gomod", "path": "."}, {"type": "rpm", "path": "./rpm-prefetching/assisted-installer-controller/"}]'
   - name: build-source-image
     value: "true"
   pipelineSpec:
