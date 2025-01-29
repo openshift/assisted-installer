@@ -11,10 +11,10 @@ metadata:
       == "release-ocm-2.13"
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: assisted-installer-controller-mce-downstream-2-13
-    appstudio.openshift.io/component: assisted-installer-controller-mce-downstream-2-13
+    appstudio.openshift.io/application: assisted-installer-application-acm-ds-2-13
+    appstudio.openshift.io/component: assisted-installer-acm-ds-2-13
     pipelines.appstudio.openshift.io/type: build
-  name: assisted-installer-controller-mce-downstream-2-13-on-pull-request
+  name: assisted-installer-acm-ds-2-13-on-pull-request
   namespace: assisted-installer-tenant
 spec:
   params:
@@ -23,14 +23,14 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-controller-mce-downstream-2-13/assisted-installer-controller-mce-downstream-2-13:on-pr-{{revision}}
+    value: quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-acm-ds-2-13/assisted-installer-acm-ds-2-13:on-pr-{{revision}}
   - name: image-expires-after
     value: 5d
   - name: build-platforms
     value:
     - linux/x86_64
   - name: dockerfile
-    value: Dockerfile.assisted-installer-controller-mce
+    value: Dockerfile.assisted-installer-mce
   - name: path-context
     value: .
   - name: build-args
@@ -40,7 +40,7 @@ spec:
   - name: hermetic
     value: "true"
   - name: prefetch-input
-    value: '[{"type": "gomod", "path": "."}, {"type": "rpm", "path": "./rpm-prefetching/assisted-installer-controller/"}]'
+    value: '[{"type": "gomod", "path": "."}]'
   - name: build-source-image
     value: "true"
   pipelineSpec:
