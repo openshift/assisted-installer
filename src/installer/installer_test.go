@@ -1112,15 +1112,15 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			Context("None HA mode ", func() {
 
 				conf := config.Config{Role: string(models.HostRoleMaster),
-					ClusterID:            "cluster-id",
-					InfraEnvID:           "infra-env-id",
-					HostID:               "host-id",
-					Device:               "/dev/vda",
-					URL:                  "https://assisted-service.com:80",
-					OpenshiftVersion:     openShiftVersion,
-					MCOImage:             "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:dc1a34f55c712b2b9c5e5a14dd85e67cbdae11fd147046ac2fef9eaf179ab221",
-					HighAvailabilityMode: models.ClusterHighAvailabilityModeNone,
-					EnableSkipMcoReboot:  withEnableSkipMcoReboot,
+					ClusterID:           "cluster-id",
+					InfraEnvID:          "infra-env-id",
+					HostID:              "host-id",
+					Device:              "/dev/vda",
+					URL:                 "https://assisted-service.com:80",
+					OpenshiftVersion:    openShiftVersion,
+					MCOImage:            "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:dc1a34f55c712b2b9c5e5a14dd85e67cbdae11fd147046ac2fef9eaf179ab221",
+					ControlPlaneCount:   1,
+					EnableSkipMcoReboot: withEnableSkipMcoReboot,
 				}
 				BeforeEach(func() {
 					installerObj = NewAssistedInstaller(l, conf, mockops, mockbmclient, k8sBuilder, mockIgnition, cleanupDevice)

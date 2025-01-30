@@ -90,7 +90,6 @@ type ControllerConfig struct {
 	CACertPath              string `envconfig:"CA_CERT_PATH" required:"false" default:""`
 	Namespace               string `envconfig:"NAMESPACE" required:"false" default:"assisted-installer"`
 	OpenshiftVersion        string `envconfig:"OPENSHIFT_VERSION" required:"true"`
-	HighAvailabilityMode    string `envconfig:"HIGH_AVAILABILITY_MODE" required:"false" default:"Full"`
 	ControlPlainCount       int
 	WaitForClusterVersion   bool   `envconfig:"CHECK_CLUSTER_VERSION" required:"false" default:"false"`
 	MustGatherImage         string `envconfig:"MUST_GATHER_IMAGE" required:"false" default:""`
@@ -1256,7 +1255,7 @@ func (c *controller) logHostResolvConf() {
 // It will patch router to add access logs
 // It will run http router health check to see if router is healthy on host network
 func (c *controller) logRouterStatus() {
-	if !c.status.HasError() || c.HighAvailabilityMode != models.ClusterHighAvailabilityModeNone || c.ControlPlainCount > 1 {
+	if !c.status.HasError() || c.ControlPlainCount != 1 {
 		return
 	}
 	c.log.Infof("Start checking router status")
