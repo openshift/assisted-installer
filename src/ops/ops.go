@@ -459,7 +459,7 @@ func (o *ops) renderControllerCm() error {
 		"ClusterId":            o.installerConfig.ClusterID,
 		"SkipCertVerification": strconv.FormatBool(o.installerConfig.SkipCertVerification),
 		"CACertPath":           o.installerConfig.CACertPath,
-		"HaMode":               o.installerConfig.ControlPlaneCount,
+		"ControlPlaneCount":    strconv.Itoa(o.installerConfig.ControlPlaneCount),
 		"CheckCVO":             o.installerConfig.CheckClusterVersion,
 		"MustGatherImage":      o.installerConfig.MustGatherImage,
 	}
