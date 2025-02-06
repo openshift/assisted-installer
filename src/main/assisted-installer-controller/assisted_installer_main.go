@@ -143,7 +143,7 @@ func main() {
 	var platformType models.PlatformType
 	removeUninitializedTaint := false
 	if invoker == common.InvokerAgent {
-		if Options.ControllerConfig.ControlPlainCount == 1 {
+		if Options.ControllerConfig.ControlPlaneCount == 1 {
 			// When the agent-based installer installs a SNO cluster, assisted-service
 			// will never be reachable because it will not be running after the boostrap
 			// node reboots to become the SNO cluster. SetReadyState will never be

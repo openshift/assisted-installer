@@ -11,5 +11,5 @@ data:
   skip-cert-verification: '{{.SkipCertVerification}}'
   ca-cert-path: '{{.CACertPath}}'
   check-cluster-version: '{{.CheckCVO}}'
-  control-plane-count: {{.HaMode}}
+  control-plane-count: '{{.ControlPlaneCount}}'
   must-gather-image: '{{.MustGatherImage}}'

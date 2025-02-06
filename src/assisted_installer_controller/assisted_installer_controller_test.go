@@ -1701,7 +1701,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 
 		It("Validate router check will not run with no error", func() {
-			assistedController.ControlPlainCount = 1
+			assistedController.ControlPlaneCount = 1
 			successUpload()
 			logClusterOperatorsSuccess()
 			mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Times(0).Return(&models.Cluster{Name: "test", BaseDNSDomain: "test.com"}, nil)
@@ -1709,7 +1709,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 
 		It("Validate upload logs not blocked by router validation failure (with must-gather logs)", func() {
-			assistedController.ControlPlainCount = 1
+			assistedController.ControlPlaneCount = 1
 			successUpload()
 			logClusterOperatorsSuccess()
 			logResolvConfSuccess()
@@ -1721,7 +1721,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 
 		It("Validate upload logs (with must-gather logs) with router status on sno", func() {
-			assistedController.ControlPlainCount = 1
+			assistedController.ControlPlaneCount = 1
 			successUpload()
 			mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Times(1).Return(&models.Cluster{Name: "test", BaseDNSDomain: "test.com"}, nil)
 			logClusterOperatorsSuccess()
