@@ -33,7 +33,7 @@ type Config struct {
 	NoProxy                     string
 	ServiceIPs                  string
 	InstallerArgs               []string
-	HighAvailabilityMode        string
+	ControlPlaneCount           int
 	CheckClusterVersion         bool
 	MustGatherImage             string
 	DisksToFormat               ArrayFlags
@@ -73,7 +73,7 @@ func (c *Config) ProcessArgs(args []string) {
 	flagSet.StringVar(&c.HTTPSProxy, "https-proxy", "", "A proxy URL to use for creating HTTPS connections outside the cluster")
 	flagSet.StringVar(&c.NoProxy, "no-proxy", "", "A comma-separated list of destination domain names, domains, IP addresses, or other network CIDRs to exclude proxying")
 	flagSet.StringVar(&c.ServiceIPs, "service-ips", "", "All IPs of assisted service node")
-	flagSet.StringVar(&c.HighAvailabilityMode, "high-availability-mode", "", "high-availability expectations, \"Full\" which represents the behavior in a \"normal\" cluster. Use 'None' for single-node deployment. Leave this value as \"\" for workers as we do not care about HA mode for workers.")
+	flagSet.IntVar(&c.ControlPlaneCount, "control-plane-count", 0, "The number of controller nodes in the cluster")
 	flagSet.BoolVar(&c.CheckClusterVersion, "check-cluster-version", false, "Do not monitor CVO")
 	flagSet.StringVar(&c.MustGatherImage, "must-gather-image", "", "Custom must-gather image")
 	flagSet.Var(&c.DisksToFormat, "format-disk", "Disk to format. Can be specified multiple times")
@@ -85,6 +85,7 @@ func (c *Config) ProcessArgs(args []string) {
 	var installerArgs string
 	flagSet.StringVar(&installerArgs, "installer-args", "", "JSON array of additional coreos-installer arguments")
 	h := flagSet.Bool("help", false, "Help message")
+	highAvailability := flagSet.String("high-availability-mode", "", "valid values: full/none")
 
 	// Add dry-run specific flag bindings.
 	err := envconfig.Process("dryconfig", &DefaultDryRunConfig)
@@ -123,6 +124,15 @@ func (c *Config) ProcessArgs(args []string) {
 		utils.SetNoProxyEnv(c.NoProxy)
 	}
 
+	if highAvailability != nil && *highAvailability != "" {
+		if *highAvailability == models.ClusterHighAvailabilityModeFull {
+			c.ControlPlaneCount = 3
+		}
+		if *highAvailability == models.ClusterHighAvailabilityModeNone {
+			c.ControlPlaneCount = 1
+		}
+	}
+
 	c.SetDefaults()
 }
 
@@ -136,7 +146,7 @@ func (c *Config) SetInstallerArgs(installerArgs string) error {
 func (c *Config) SetDefaults() {
 	if c.Role == string(models.HostRoleWorker) {
 		//High availability mode is not relevant to workers, so make sure we clear this.
-		c.HighAvailabilityMode = ""
+		c.ControlPlaneCount = 0
 	}
 
 	if c.InfraEnvID == "" {
