@@ -85,6 +85,7 @@ func (c *Config) ProcessArgs(args []string) {
 	var installerArgs string
 	flagSet.StringVar(&installerArgs, "installer-args", "", "JSON array of additional coreos-installer arguments")
 	h := flagSet.Bool("help", false, "Help message")
+	highAvailability := flagSet.String("high-availability-mode", "", "valid values: full/none")
 
 	// Add dry-run specific flag bindings.
 	err := envconfig.Process("dryconfig", &DefaultDryRunConfig)
@@ -121,6 +122,15 @@ func (c *Config) ProcessArgs(args []string) {
 
 	if c.NoProxy != "" {
 		utils.SetNoProxyEnv(c.NoProxy)
+	}
+
+	if highAvailability != nil && *highAvailability != "" {
+		if *highAvailability == models.ClusterHighAvailabilityModeFull {
+			c.ControlPlaneCount = 3
+		}
+		if *highAvailability == models.ClusterHighAvailabilityModeNone {
+			c.ControlPlaneCount = 1
+		}
 	}
 
 	c.SetDefaults()
