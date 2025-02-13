@@ -52,11 +52,11 @@ spec:
               value: "{{.OpenshiftVersion}}"
             - name: NOTIFY_NUM_REBOOTS
               value: "{{.NotifyNumReboots}}"
-            - name: HIGH_AVAILABILITY_MODE
+            - name: CONTROL_PLANE_COUNT
               valueFrom:
                 configMapKeyRef:
                   name: assisted-installer-controller-config
-                  key: high-availability-mode
+                  key: control-plane-count
                   optional: true
             - name: CHECK_CLUSTER_VERSION
               valueFrom:
