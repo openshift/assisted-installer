@@ -19,7 +19,9 @@ type TestNetworking struct {
 	ClusterNetworks []*models.ClusterNetwork
 	ServiceNetworks []*models.ServiceNetwork
 	MachineNetworks []*models.MachineNetwork
+	APIVip          string
 	APIVips         []*models.APIVip
+	IngressVip      string
 	IngressVips     []*models.IngressVip
 }
 
@@ -49,12 +51,11 @@ type TestConfiguration struct {
 
 const TestDiskId = "/dev/disk/by-id/test-disk-id"
 const TestDiskPath = "/dev/test-disk"
-const MinimalVersionForNmstatectl = "4.19"
 
 var (
 	OpenShiftVersion string = "4.6"
 	ReleaseVersion          = "4.6.0"
-	ReleaseImageURL         = "quay.io/openshift-release-dev/ocp-release:4.6.16-x86_64"
+	ReleaseImage            = "quay.io/openshift-release-dev/ocp-release:4.6.16-x86_64"
 	RhcosImage              = "rhcos_4.6.0"
 	RhcosVersion            = "version-46.123-0"
 	SupportLevel            = "beta"
@@ -65,12 +66,12 @@ var (
 var TestDefaultConfig = &TestConfiguration{
 	OpenShiftVersion: OpenShiftVersion,
 	ReleaseVersion:   ReleaseVersion,
-	ReleaseImageUrl:  ReleaseImageURL,
+	ReleaseImageUrl:  ReleaseImage,
 	CPUArchitecture:  CPUArchitecture,
 	ReleaseImage: &models.ReleaseImage{
 		CPUArchitecture:  &CPUArchitecture,
 		OpenshiftVersion: &OpenShiftVersion,
-		URL:              &ReleaseImageURL,
+		URL:              &ReleaseImage,
 		Version:          &ReleaseVersion,
 		CPUArchitectures: []string{CPUArchitecture},
 	},
@@ -160,31 +161,6 @@ var DomainResolutions = []*models.DomainResolutionResponseDomain{
 	},
 }
 
-var DomainResolutionsWithCname = []*models.DomainResolutionResponseDomain{
-	{
-		DomainName: &DomainAPI,
-		Cnames:     []string{"api.cname.com"},
-	},
-	{
-		DomainName: &DomainAPIInternal,
-		Cnames:     []string{"api-int.cname.com"},
-	},
-	{
-		DomainName: &DomainApps,
-		Cnames:     []string{"console.apps.cname.com"},
-	},
-	{
-		DomainName: &ReleaseDomain,
-		Cnames:     []string{"release.cname.com"},
-	},
-	{
-		DomainName: &WildcardDomain,
-	},
-	{
-		DomainName: &UndottedWildcardDomain,
-	},
-}
-
 var WildcardResolved = []*models.DomainResolutionResponseDomain{
 	{
 		DomainName:    &WildcardDomain,
@@ -195,17 +171,6 @@ var WildcardResolved = []*models.DomainResolutionResponseDomain{
 		DomainName:    &UndottedWildcardDomain,
 		IPV4Addresses: []strfmt.IPv4{"7.8.9.10/24"},
 		IPV6Addresses: []strfmt.IPv6{"1003:db8::40/120"},
-	},
-}
-
-var WildcardResolvedWithCname = []*models.DomainResolutionResponseDomain{
-	{
-		DomainName: &WildcardDomain,
-		Cnames:     []string{"a.test.com"},
-	},
-	{
-		DomainName: &UndottedWildcardDomain,
-		Cnames:     []string{"a.test.com"},
 	},
 }
 
@@ -274,20 +239,20 @@ var DomainResolutionAllEmpty = []*models.DomainResolutionResponseDomain{
 }
 
 var TestDomainNameResolutionsSuccess = &models.DomainResolutionResponse{Resolutions: DomainResolutions}
-var TestDomainNameResolutionsSuccessWithCname = &models.DomainResolutionResponse{Resolutions: DomainResolutionsWithCname}
 var TestDomainResolutionsNoAPI = &models.DomainResolutionResponse{Resolutions: DomainResolutionNoAPI}
 var TestDomainResolutionsAllEmpty = &models.DomainResolutionResponse{Resolutions: DomainResolutionAllEmpty}
 var TestDomainNameResolutionsWildcardResolved = &models.DomainResolutionResponse{Resolutions: WildcardResolved}
-var TestDomainNameResolutionsWildcardResolvedWithCname = &models.DomainResolutionResponse{Resolutions: WildcardResolvedWithCname}
 var TestSubDomainNameResolutionsWildcardResolved = &models.DomainResolutionResponse{Resolutions: SubDomainWildcardResolved}
 
-var TestDefaultRouteConfiguration = []*models.Route{{Family: int32(IPv4), Interface: "eth0", Gateway: "1.2.3.10", Destination: "0.0.0.0", Metric: 600}}
+var TestDefaultRouteConfiguration = []*models.Route{{Family: FamilyIPv4, Interface: "eth0", Gateway: "1.2.3.10", Destination: "0.0.0.0", Metric: 600}}
 
 var TestIPv4Networking = TestNetworking{
 	ClusterNetworks: []*models.ClusterNetwork{{Cidr: "1.3.0.0/16", HostPrefix: 24}},
 	ServiceNetworks: []*models.ServiceNetwork{{Cidr: "1.2.5.0/24"}},
 	MachineNetworks: []*models.MachineNetwork{{Cidr: "1.2.3.0/24"}},
+	APIVip:          "1.2.3.5",
 	APIVips:         []*models.APIVip{{IP: "1.2.3.5", Verification: VipVerificationPtr(models.VipVerificationSucceeded)}},
+	IngressVip:      "1.2.3.6",
 	IngressVips:     []*models.IngressVip{{IP: "1.2.3.6", Verification: VipVerificationPtr(models.VipVerificationSucceeded)}},
 }
 
@@ -298,7 +263,9 @@ var TestIPv6Networking = TestNetworking{
 	ClusterNetworks: []*models.ClusterNetwork{{Cidr: "1003:db8::/53", HostPrefix: 64}},
 	ServiceNetworks: []*models.ServiceNetwork{{Cidr: "1002:db8::/119"}},
 	MachineNetworks: []*models.MachineNetwork{{Cidr: "1001:db8::/120"}},
+	APIVip:          "1001:db8::64",
 	APIVips:         []*models.APIVip{{IP: "1001:db8::64", Verification: VipVerificationPtr(models.VipVerificationSucceeded)}},
+	IngressVip:      "1001:db8::65",
 	IngressVips:     []*models.IngressVip{{IP: "1001:db8::65", Verification: VipVerificationPtr(models.VipVerificationSucceeded)}},
 }
 
@@ -306,7 +273,9 @@ var TestEquivalentIPv6Networking = TestNetworking{
 	ClusterNetworks: []*models.ClusterNetwork{{Cidr: "1003:0db8:0::/53", HostPrefix: 64}},
 	ServiceNetworks: []*models.ServiceNetwork{{Cidr: "1002:0db8:0::/119"}},
 	MachineNetworks: []*models.MachineNetwork{{Cidr: "1001:0db8:0::/120"}},
+	APIVip:          "1001:0db8:0::64",
 	APIVips:         []*models.APIVip{{IP: "1001:db8::64"}},
+	IngressVip:      "1001:0db8:0::65",
 	IngressVips:     []*models.IngressVip{{IP: "1001:db8::65"}},
 }
 
@@ -314,7 +283,9 @@ var TestDualStackNetworking = TestNetworking{
 	ClusterNetworks: append(TestIPv4Networking.ClusterNetworks, TestIPv6Networking.ClusterNetworks...),
 	ServiceNetworks: append(TestIPv4Networking.ServiceNetworks, TestIPv6Networking.ServiceNetworks...),
 	MachineNetworks: append(TestIPv4Networking.MachineNetworks, TestIPv6Networking.MachineNetworks...),
+	APIVip:          TestIPv4Networking.APIVip,
 	APIVips:         TestIPv4Networking.APIVips,
+	IngressVip:      TestIPv4Networking.IngressVip,
 	IngressVips:     TestIPv4Networking.IngressVips,
 }
 
@@ -447,6 +418,33 @@ func GenerateTestIPv6Inventory() string {
 		},
 		Disks: []*models.Disk{
 			TestDefaultConfig.Disks,
+		},
+		Routes: TestDefaultRouteConfiguration,
+	}
+
+	b, err := json.Marshal(inventory)
+	Expect(err).To(Not(HaveOccurred()))
+	return string(b)
+}
+
+func GenerateTestDefaultVmwareInventory() string {
+	inventory := &models.Inventory{
+		Interfaces: []*models.Interface{
+			{
+				Name: "eth0",
+				IPV4Addresses: []string{
+					"1.2.3.4/24",
+				},
+				IPV6Addresses: []string{
+					"1001:db8::10/120",
+				},
+			},
+		},
+		Disks: []*models.Disk{
+			TestDefaultConfig.Disks,
+		},
+		SystemVendor: &models.SystemVendor{
+			Manufacturer: "vmware",
 		},
 		Routes: TestDefaultRouteConfiguration,
 	}
