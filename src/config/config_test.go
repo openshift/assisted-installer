@@ -31,37 +31,37 @@ var _ = Describe("ProcessArgs", func() {
 		Expect(config.InstallerArgs[1]).To(Equal("arg2=bar"))
 	})
 
-	It("HighAvailabilityMode should be set to empty string if the host role is worker.", func() {
+	It("ControlPlaneCount should be set to 0 if the host role is worker.", func() {
 		config := &Config{}
-		arguments := []string{"--role", string(models.HostRoleWorker), "--cluster-id", "0ae63135-5f7c-431e-9c72-0efaf2cb83b8", "--high-availability-mode", models.ClusterHighAvailabilityModeFull}
+		arguments := []string{"--role", string(models.HostRoleWorker), "--cluster-id", "0ae63135-5f7c-431e-9c72-0efaf2cb83b8", "--control-plane-count", "3"}
 		config.ProcessArgs(arguments)
-		Expect(config.HighAvailabilityMode).To(BeEmpty())
+		Expect(config.ControlPlaneCount).To(BeZero())
 	})
 
-	It("HighAvailabilityMode should be unchanged if the host role is master.", func() {
+	It("ControlPlaneCount should be unchanged if the host role is master.", func() {
 		config := &Config{}
-		arguments := []string{"--role", string(models.HostRoleMaster), "--cluster-id", "0ae63135-5f7c-431e-9c72-0efaf2cb83b8", "--high-availability-mode", models.ClusterHighAvailabilityModeFull}
+		arguments := []string{"--role", string(models.HostRoleMaster), "--cluster-id", "0ae63135-5f7c-431e-9c72-0efaf2cb83b8", "--control-plane-count", "5"}
 		config.ProcessArgs(arguments)
-		Expect(config.HighAvailabilityMode).To(Equal(models.ClusterHighAvailabilityModeFull))
+		Expect(config.ControlPlaneCount).To(Equal(5))
 	})
 
-	It("HighAvailabilityMode should be unchanged if the host role is bootstrap.", func() {
+	It("ControlPlaneCount should be unchanged if the host role is bootstrap.", func() {
 		config := &Config{}
-		arguments := []string{"--role", string(models.HostRoleBootstrap), "--cluster-id", "0ae63135-5f7c-431e-9c72-0efaf2cb83b8", "--high-availability-mode", models.ClusterHighAvailabilityModeFull}
+		arguments := []string{"--role", string(models.HostRoleBootstrap), "--cluster-id", "0ae63135-5f7c-431e-9c72-0efaf2cb83b8", "--control-plane-count", "5"}
 		config.ProcessArgs(arguments)
-		Expect(config.HighAvailabilityMode).To(Equal(models.ClusterHighAvailabilityModeFull))
+		Expect(config.ControlPlaneCount).To(Equal(5))
 	})
 
 	It("InfraEnvId should be set to ClusterId if the InfraEnvId is not defined", func() {
 		config := &Config{}
-		arguments := []string{"--role", string(models.HostRoleBootstrap), "--cluster-id", "0ae63135-5f7c-431e-9c72-0efaf2cb83b8", "--high-availability-mode", models.ClusterHighAvailabilityModeFull}
+		arguments := []string{"--role", string(models.HostRoleBootstrap), "--cluster-id", "0ae63135-5f7c-431e-9c72-0efaf2cb83b8", "--control-plane-count", "3"}
 		config.ProcessArgs(arguments)
 		Expect(config.InfraEnvID).To(Equal(config.ClusterID))
 	})
 
 	It("InfraEnvId should not be set to ClusterId if the InfraEnvId is defined", func() {
 		config := &Config{}
-		arguments := []string{"--role", string(models.HostRoleBootstrap), "--infra-env-id", "9f2a26d7-10a6-4be0-b1c2-e895ad3b04b8", "--cluster-id", "0ae63135-5f7c-431e-9c72-0efaf2cb83b8", "--high-availability-mode", models.ClusterHighAvailabilityModeFull}
+		arguments := []string{"--role", string(models.HostRoleBootstrap), "--infra-env-id", "9f2a26d7-10a6-4be0-b1c2-e895ad3b04b8", "--cluster-id", "0ae63135-5f7c-431e-9c72-0efaf2cb83b8", "--control-plane-count", "3"}
 		config.ProcessArgs(arguments)
 		Expect(config.InfraEnvID).To(Equal("9f2a26d7-10a6-4be0-b1c2-e895ad3b04b8"))
 	})
