@@ -17,6 +17,9 @@ COPY . .
 RUN git config --global --add safe.directory '*'; \
     TARGETPLATFORM=$TARGETPLATFORM make installer
 
+# Extract the commit reference from which the image is built
+RUN git rev-parse --short HEAD > /commit-reference.txt
+
 FROM quay.io/centos/centos:stream9
 
 # for the 'nsenter' executable
@@ -24,6 +27,9 @@ RUN dnf install -y util-linux-core && dnf clean all
 
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/installer /usr/bin/installer
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/deploy/assisted-installer-controller /assisted-installer-controller/deploy
+
+# Copy the commit reference from the builder
+COPY --from=builder /commit-reference.txt /commit-reference.txt
 
 ENTRYPOINT ["/usr/bin/installer"]
 
