@@ -46,5 +46,3 @@ You can change the default target, export `INSTALLER` environment variable to yo
 export INSTALLER=<registry>/<image-name>:<tag>
 make
 ```
-
-placeholder - will be reverted soon
