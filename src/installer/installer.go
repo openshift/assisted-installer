@@ -172,6 +172,13 @@ func (i *installer) InstallNode() error {
 			return err
 		}
 		i.log.Info("Setting bootstrap node new role to master")
+
+		// In the agent-based installer the assisted-service runs on the bootstrap node, so let's
+		// wait for the workers (if any) to kick-off the joining process before rebooting the
+		// bootstrap node.
+		if err = i.waitForWorkers(ctx); err != nil {
+			return err
+		}
 	}
 
 	//upload host logs and report log status before reboot
@@ -182,6 +189,42 @@ func (i *installer) InstallNode() error {
 		i.log.Errorf("upload installation logs %s", err)
 	}
 	return i.finalize()
+}
+
+func (i *installer) waitForWorkers(ctx context.Context) error {
+	// This waiting condition is valid only for agent-based installer.
+	kc, err := i.kcBuilder(KubeconfigPath, i.log)
+	if err != nil {
+		i.log.Error(err)
+		return err
+	}
+	if invoker := common.GetInvoker(kc, i.log); invoker != common.InvokerAgent {
+		return nil
+	}
+
+	return utils.WaitForPredicate(waitForeverTimeout, 30*time.Second, func() bool {
+		workers, err := i.inventoryClient.ListsHostsForRole(ctx, string(models.HostRoleWorker))
+		if err != nil {
+			i.log.WithError(err).Error("failed to get workers")
+			return false
+		}
+		if len(workers) == 0 {
+			return true
+		}
+
+		i.log.Infof("Found %d workers, waiting for workers to reach reboot stage", len(workers))
+		for _, worker := range workers {
+			// Wait until all the workers reached (at least) their rebooting stage, since
+			// they could still require assisted-service before that.
+			if funk.Contains([]models.HostStage{models.HostStageWaitingForControlPlane, models.HostStageInstalling, models.HostStageStartingInstallation}, worker.Progress.CurrentStage) {
+				i.log.Infof("Still waiting for worker %s to start the joining process (current stage: %s)", worker.ID, worker.Progress.CurrentStage)
+				return false
+			}
+			i.log.Infof("Worker %s current stage is %s", worker.ID, worker.Progress.CurrentStage)
+		}
+
+		return true
+	})
 }
 
 func (i *installer) finalize() error {
