@@ -32,7 +32,7 @@ require (
 	github.com/tidwall/gjson v1.17.1
 	github.com/vincent-petithory/dataurl v1.0.0
 	golang.org/x/net v0.33.0
-	golang.org/x/sync v0.10.0
+	golang.org/x/sync v0.11.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.29.9
 	k8s.io/apimachinery v0.29.9
@@ -147,9 +147,9 @@ require (
 	golang.org/x/exp v0.0.0-20231226003508-02704c960a9b // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/oauth2 v0.15.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
-	golang.org/x/term v0.27.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/term v0.29.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	google.golang.org/appengine v1.6.8 // indirect
@@ -177,6 +177,7 @@ replace (
 	github.com/openshift/assisted-service/api => github.com/openshift/assisted-service/api v0.0.0-20241215111549-58068322e0f1
 	github.com/openshift/assisted-service/client => github.com/openshift/assisted-service/client v0.0.0-20241215111549-58068322e0f1
 	github.com/openshift/assisted-service/models => github.com/openshift/assisted-service/models v0.0.0-20241215111549-58068322e0f1
+	golang.org/x/crypto => github.com/openshift/golang-crypto v0.33.1-0.20250310193910-9003f682e581
 	k8s.io/apimachinery => k8s.io/apimachinery v0.28.0
 	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v0.4.5
 	sigs.k8s.io/cluster-api-provider-aws => github.com/openshift/cluster-api-provider-aws v0.2.1-0.20201022175424-d30c7a274820
