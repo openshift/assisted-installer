@@ -466,6 +466,8 @@ func (i *installer) startBootstrap() error {
 	// If we're in a pure RHEL/CentOS environment, we need to overlay the node image
 	// first to have access to e.g. oc, kubelet, cri-o, etc...
 	// https://github.com/openshift/enhancements/pull/1637
+
+	//if _, err := i.ops.ExecPrivilegeCommand(utils.NewLogWriter(i.log), "which", "oc"); err != nil {
 	if !i.ops.FileExists(openshiftClientBin) {
 		err = i.ops.SystemctlAction("start", "--no-block", nodeImagePullService, nodeImageOverlayService)
 		if err != nil {
