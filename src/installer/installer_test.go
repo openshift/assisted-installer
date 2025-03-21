@@ -435,23 +435,13 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							Expect(ret).Should(BeNil())
 						})
 						It("bootstrap role fails on RHEL-only bootimage if can't overlay node image", func() {
-							updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
-								{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
-								{string(models.HostStageInstalling), string(models.HostRoleMaster)},
-								{string(models.HostStageWritingImageToDisk)},
-							})
+							updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
 							bootstrapSetup()
 							checkLocalHostname("notlocalhost", nil)
 							restartNetworkManager(nil)
 							prepareControllerSuccess()
 							checkOcBinary(false)
 							overlayNodeImage(true)
-							//HostRoleMaster flow:
-							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
-							writeToDiskSuccess(gomock.Any())
-							setBootOrderSuccess()
-							getEncapsulatedMcSuccess(nil)
-							overwriteImageSuccess()
 							ret := installerObj.InstallNode()
 							Expect(ret).To(HaveOccurred())
 						})
@@ -567,11 +557,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					})
 				}
 				It("bootstrap role creating SSH manifest failed", func() {
-					updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
-						{string(models.HostStageInstalling), string(models.HostRoleMaster)},
-						{string(models.HostStageWritingImageToDisk)},
-						{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
-					})
+					updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
 					cleanInstallDevice()
 					mkdirSuccess(InstallDir)
 					mkdirSuccess(sshDir)
@@ -581,12 +567,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					generateSshKeyPairSuccess()
 					err := fmt.Errorf("generate SSH keys failed")
 					mockops.EXPECT().CreateOpenshiftSshManifest(assistedInstallerSshManifest, sshManifestTmpl, sshPubKeyPath).Return(err).Times(1)
-					//HostRoleMaster flow:
-					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
-					writeToDiskSuccess(gomock.Any())
-					setBootOrderSuccess()
-					getEncapsulatedMcSuccess(nil)
-					overwriteImageSuccess()
 					ret := installerObj.InstallNode()
 					Expect(ret).To(HaveOccurred())
 				})
@@ -626,21 +606,12 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					Expect(ret).Should(BeNil())
 				})
 				It("bootstrap role extract ignition retry exhausted", func() {
-					updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
-						{string(models.HostStageInstalling), string(models.HostRoleMaster)},
-						{string(models.HostStageWritingImageToDisk)},
-						{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
-					})
+					updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
 					cleanInstallDevice()
 					mkdirSuccess(InstallDir)
 					mkdirSuccess(sshDir)
 					downloadFileSuccess(bootstrapIgn)
-					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
-					writeToDiskSuccess(gomock.Any())
-					setBootOrderSuccess()
 					extractSecretFromIgnitionSuccess()
-					getEncapsulatedMcSuccess(nil)
-					overwriteImageSuccess()
 					extractIgnitionToFS("extract failure", fmt.Errorf("extract failed"))
 					extractIgnitionToFS("extract failure", fmt.Errorf("extract failed"))
 					extractIgnitionToFS("extract failure", fmt.Errorf("extract failed"))
@@ -649,21 +620,11 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				})
 
 				It("bootstrap fail to restart NetworkManager", func() {
-					updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
-						{string(models.HostStageInstalling), string(models.HostRoleMaster)},
-						{string(models.HostStageWritingImageToDisk)},
-						{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
-					})
+					updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role}})
 					bootstrapSetup()
 					checkLocalHostname("notlocalhost", nil)
 					err := fmt.Errorf("Failed to restart NetworkManager")
 					restartNetworkManager(err)
-					//HostRoleMaster flow:
-					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
-					writeToDiskSuccess(gomock.Any())
-					setBootOrderSuccess()
-					getEncapsulatedMcSuccess(nil)
-					overwriteImageSuccess()
 					ret := installerObj.InstallNode()
 					Expect(ret).Should(Equal(err))
 				})
