@@ -11,7 +11,6 @@ import (
 
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
-	"golang.org/x/sync/errgroup"
 	v1 "k8s.io/api/core/v1"
 
 	"github.com/go-openapi/swag"
@@ -110,15 +109,15 @@ func (i *installer) InstallNode() error {
 		return err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	bootstrapErrGroup, _ := errgroup.WithContext(ctx)
 	//cancel the context in case this method ends
 	defer cancel()
 	isBootstrap := false
 	if i.Config.Role == string(models.HostRoleBootstrap) && i.ControlPlaneCount != 1 {
 		isBootstrap = true
-		bootstrapErrGroup.Go(func() error {
-			return i.startBootstrap()
-		})
+		if err := i.startBootstrap(); err != nil {
+			i.log.WithError(err).Error("failed to start bootstrap services")
+			return err
+		}
 		go i.updateConfiguringStatus(ctx)
 		i.Config.Role = string(models.HostRoleMaster)
 	}
@@ -170,10 +169,6 @@ func (i *installer) InstallNode() error {
 
 	if isBootstrap {
 		i.UpdateHostInstallProgress(models.HostStageWaitingForControlPlane, waitingForBootstrapToPrepare)
-		if err = bootstrapErrGroup.Wait(); err != nil {
-			i.log.Errorf("Bootstrap failed %s", err)
-			return err
-		}
 		if err = i.waitForControlPlane(ctx); err != nil {
 			return err
 		}
