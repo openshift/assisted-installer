@@ -528,7 +528,15 @@ var _ = Describe("get number of reboots", func() {
 })
 
 var _ = Describe("importOSTreeCommit", func() {
-	const osImage = "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:d21f2ed754a66d18b0a13a59434fa4dc36abd4320e78f3be83a3e29e21e3c2f9"
+	const (
+		osImage = "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:d21f2ed754a66d18b0a13a59434fa4dc36abd4320e78f3be83a3e29e21e3c2f9"
+		refs    = `ostree/1/1/0
+ostree/container/blob/sha256_3A_fc720be5d0197fb849e42fb29169a43720e9429a6c99675de2c64365bfb01301
+ostree/container/blob/sha256_3A_fca63a0d990545ed4961bee68fa99b45356cc6272d6427b4c1ec63ebec0be718
+ostree/container/blob/sha256_3A_fef40c109cd5259d6319849502d96f9e7964f2af71bf8e8bb51f2249c66c6afd
+ostree/container/image/docker_3A__2F__2F_quay_2E_io/openshift-release-dev/ocp-v4_2E_0-art-dev_40_sha256_3A_8fac1110def727105bd11bbf49fef58072b970d40e9e55e5a645fcc54e00610a`
+		ref = "ostree/container/image/docker_3A__2F__2F_quay_2E_io/openshift-release-dev/ocp-v4_2E_0-art-dev_40_sha256_3A_8fac1110def727105bd11bbf49fef58072b970d40e9e55e5a645fcc54e00610a"
+	)
 	var (
 		l        = logrus.New()
 		ctrl     *gomock.Controller
@@ -549,61 +557,96 @@ var _ = Describe("importOSTreeCommit", func() {
 		}
 	})
 
+	expectExec := func(out string, err error, additionalArgs ...any) {
+		baseArgs := []any{"--target", "1", "--cgroup", "--mount", "--ipc", "--pid", "--"}
+		args := append(baseArgs, additionalArgs...)
+		execMock.EXPECT().ExecCommand(gomock.Any(),
+			"nsenter", args...).Return(out, err)
+	}
+
 	It("returns the commit when successful", func() {
 		pullSpec := "ostree-unverified-registry:" + osImage
-		execMock.EXPECT().ExecCommand(gomock.Any(),
-			"nsenter", "--target", "1", "--cgroup", "--mount", "--ipc", "--pid", "--",
-			"ostree", "container", "unencapsulate",
+		expectExec("", nil,
+			"ostree", "container", "image", "pull",
 			"--authfile", "/root/.docker/config.json",
-			"--quiet",
-			"--repo", "/ostree/repo",
-			pullSpec,
-		).Return("Imported: bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25\n", nil)
+			"/ostree/repo", pullSpec)
+		expectExec(refs, nil, "ostree", "refs", "--repo", "/ostree/repo")
+		expectExec("", nil, "ostree", "refs", "--repo", "/ostree/repo", ref, "--create", assistedInstallOSTreeRefName)
+		expectExec("bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25\n", nil,
+			"cat", "/ostree/repo/refs/heads/assisted-installer/install-image")
+
 		commit, err := o.importOSTreeCommit(io.Discard)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(commit).To(Equal("bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25"))
 	})
 
-	It("fails when the command fails", func() {
+	It("fails when the image pull fails", func() {
 		pullSpec := "ostree-unverified-registry:" + osImage
-		execMock.EXPECT().ExecCommand(gomock.Any(),
-			"nsenter", "--target", "1", "--cgroup", "--mount", "--ipc", "--pid", "--",
-			"ostree", "container", "unencapsulate",
+		expectExec("", fmt.Errorf("failed"),
+			"ostree", "container", "image", "pull",
 			"--authfile", "/root/.docker/config.json",
-			"--quiet",
-			"--repo", "/ostree/repo",
-			pullSpec,
-		).Return("", fmt.Errorf("failed"))
+			"/ostree/repo", pullSpec)
+
 		_, err := o.importOSTreeCommit(io.Discard)
 		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed to pull rhcos payload image"))
 	})
 
-	It("fails when the output is not as expected", func() {
+	It("fails when the refs call fails", func() {
 		pullSpec := "ostree-unverified-registry:" + osImage
-		execMock.EXPECT().ExecCommand(gomock.Any(),
-			"nsenter", "--target", "1", "--cgroup", "--mount", "--ipc", "--pid", "--",
-			"ostree", "container", "unencapsulate",
+		expectExec("", nil,
+			"ostree", "container", "image", "pull",
 			"--authfile", "/root/.docker/config.json",
-			"--quiet",
-			"--repo", "/ostree/repo",
-			pullSpec,
-		).Return("commit bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25\n", nil)
+			"/ostree/repo", pullSpec)
+		expectExec("", fmt.Errorf("failed"), "ostree", "refs", "--repo", "/ostree/repo")
+
 		_, err := o.importOSTreeCommit(io.Discard)
 		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed to list refs in repo"))
 	})
 
-	It("fails when the output cannot be parsed", func() {
+	It("fails when refs returns multiple docker-prefixed refs", func() {
 		pullSpec := "ostree-unverified-registry:" + osImage
-		execMock.EXPECT().ExecCommand(gomock.Any(),
-			"nsenter", "--target", "1", "--cgroup", "--mount", "--ipc", "--pid", "--",
-			"ostree", "container", "unencapsulate",
+		expectExec("", nil,
+			"ostree", "container", "image", "pull",
 			"--authfile", "/root/.docker/config.json",
-			"--quiet",
-			"--repo", "/ostree/repo",
-			pullSpec,
-		).Return("some nonsense here", nil)
+			"/ostree/repo", pullSpec)
+		additionalRef := "ostree/container/image/docker_3A__2F__2F_quay_2E_io/openshift-release-dev/ocp-v4_2E_0-art-dev_40_sha256_3A_95632f72f20d4ddea6f787ecf38fe7a96abd4320e78f3be83a3e29e21e3c2f9"
+		dupeDockerRefs := fmt.Sprintf("%s\n%s", refs, additionalRef)
+		expectExec(dupeDockerRefs, nil, "ostree", "refs", "--repo", "/ostree/repo")
+
 		_, err := o.importOSTreeCommit(io.Discard)
 		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("found 2 matching ostree refs, expected only 1"))
+	})
+
+	It("fails when ref create fails", func() {
+		pullSpec := "ostree-unverified-registry:" + osImage
+		expectExec("", nil,
+			"ostree", "container", "image", "pull",
+			"--authfile", "/root/.docker/config.json",
+			"/ostree/repo", pullSpec)
+		expectExec(refs, nil, "ostree", "refs", "--repo", "/ostree/repo")
+		expectExec("", fmt.Errorf("failed"), "ostree", "refs", "--repo", "/ostree/repo", ref, "--create", assistedInstallOSTreeRefName)
+
+		_, err := o.importOSTreeCommit(io.Discard)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed to create ref"))
+	})
+
+	It("fails when the ref file cannot be read", func() {
+		pullSpec := "ostree-unverified-registry:" + osImage
+		expectExec("", nil,
+			"ostree", "container", "image", "pull",
+			"--authfile", "/root/.docker/config.json",
+			"/ostree/repo", pullSpec)
+		expectExec(refs, nil, "ostree", "refs", "--repo", "/ostree/repo")
+		expectExec("", nil, "ostree", "refs", "--repo", "/ostree/repo", ref, "--create", assistedInstallOSTreeRefName)
+		expectExec("", fmt.Errorf("failed"), "cat", "/ostree/repo/refs/heads/assisted-installer/install-image")
+
+		_, err := o.importOSTreeCommit(io.Discard)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed to read commit from ref file"))
 	})
 })
 
@@ -675,7 +718,16 @@ var _ = Describe("ostreeArgs", func() {
 })
 
 var _ = Describe("WriteImageToExistingRoot", func() {
-	const osImage = "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:d21f2ed754a66d18b0a13a59434fa4dc36abd4320e78f3be83a3e29e21e3c2f9"
+	const (
+		osImage = "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:d21f2ed754a66d18b0a13a59434fa4dc36abd4320e78f3be83a3e29e21e3c2f9"
+		refs    = `ostree/1/1/0
+ostree/container/blob/sha256_3A_fc720be5d0197fb849e42fb29169a43720e9429a6c99675de2c64365bfb01301
+ostree/container/blob/sha256_3A_fca63a0d990545ed4961bee68fa99b45356cc6272d6427b4c1ec63ebec0be718
+ostree/container/blob/sha256_3A_fef40c109cd5259d6319849502d96f9e7964f2af71bf8e8bb51f2249c66c6afd
+ostree/container/image/docker_3A__2F__2F_quay_2E_io/openshift-release-dev/ocp-v4_2E_0-art-dev_40_sha256_3A_8fac1110def727105bd11bbf49fef58072b970d40e9e55e5a645fcc54e00610a`
+		ref    = "ostree/container/image/docker_3A__2F__2F_quay_2E_io/openshift-release-dev/ocp-v4_2E_0-art-dev_40_sha256_3A_8fac1110def727105bd11bbf49fef58072b970d40e9e55e5a645fcc54e00610a"
+		commit = "8fac1110def727105bd11bbf49fef58072b970d40e9e55e5a645fcc54e00610a"
+	)
 	var (
 		l        = logrus.New()
 		ctrl     *gomock.Controller
@@ -703,19 +755,45 @@ var _ = Describe("WriteImageToExistingRoot", func() {
 			"nsenter", args...).Return(out, err)
 	}
 
-	It("runs the correct commands", func() {
+	expectCommitImportSuccess := func() {
+		expectExec("", nil,
+			"ostree", "container", "image", "pull",
+			"--authfile", "/root/.docker/config.json",
+			"/ostree/repo", "ostree-unverified-registry:"+osImage)
+		expectExec(refs, nil, "ostree", "refs", "--repo", "/ostree/repo")
+		expectExec("", nil, "ostree", "refs", "--repo", "/ostree/repo", ref, "--create", assistedInstallOSTreeRefName)
+		expectExec(commit, nil, "cat", "/ostree/repo/refs/heads/assisted-installer/install-image")
+	}
+
+	It("runs the correct commands when the node image ref doesn't exist", func() {
 		ignitionPath := "/tmp/ignition.ign"
 		expectExec("", nil, "mount", "/sysroot", "-o", "remount,rw")
 		expectExec("", nil, "mount", "/boot", "-o", "remount,rw")
+		expectExec("", fmt.Errorf("does not exist"), "stat", "/ostree/repo/refs/heads/coreos/node-image")
 		expectExec("", nil, "ostree", "admin", "stateroot-init", "install")
-		expectExec("Imported: bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25\n", nil,
-			"ostree", "container", "unencapsulate",
-			"--authfile", "/root/.docker/config.json",
-			"--quiet",
-			"--repo", "/ostree/repo",
-			"ostree-unverified-registry:"+osImage,
-		)
-		expectExec("", nil, "ostree", "admin", "deploy", "--stateroot", "install", "--karg", "$ignition_firstboot", "--karg", defaultIgnitionPlatformId, "bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25")
+		expectCommitImportSuccess()
+		expectExec("", nil, "ostree", "admin", "deploy", "--stateroot", "install", "--karg", "$ignition_firstboot", "--karg", defaultIgnitionPlatformId, commit)
+		expectExec("", nil, "ostree", "refs", "--repo", "/ostree/repo", "--delete", assistedInstallOSTreeRefName)
+		expectExec("", nil, "mkdir", "/boot/ignition")
+		expectExec("", nil, "cp", ignitionPath, "/boot/ignition/config.ign")
+		expectExec("", nil, "touch", "/boot/ignition.firstboot")
+
+		Expect(o.WriteImageToExistingRoot(io.Discard, ignitionPath, nil)).To(Succeed())
+	})
+
+	It("deletes the node image ref when it exists", func() {
+		ignitionPath := "/tmp/ignition.ign"
+		expectExec("", nil, "mount", "/sysroot", "-o", "remount,rw")
+		expectExec("", nil, "mount", "/boot", "-o", "remount,rw")
+
+		expectExec("", nil, "stat", "/ostree/repo/refs/heads/coreos/node-image")
+		expectExec("", nil, "ostree", "refs", "--repo", "/ostree/repo", "--delete", nodeImageOSTreeRefName)
+		expectExec("", nil, "touch", "/ostree/repo/tmp/node-image")
+
+		expectExec("", nil, "ostree", "admin", "stateroot-init", "install")
+		expectCommitImportSuccess()
+		expectExec("", nil, "ostree", "admin", "deploy", "--stateroot", "install", "--karg", "$ignition_firstboot", "--karg", defaultIgnitionPlatformId, commit)
+		expectExec("", nil, "ostree", "refs", "--repo", "/ostree/repo", "--delete", assistedInstallOSTreeRefName)
 		expectExec("", nil, "mkdir", "/boot/ignition")
 		expectExec("", nil, "cp", ignitionPath, "/boot/ignition/config.ign")
 		expectExec("", nil, "touch", "/boot/ignition.firstboot")
@@ -727,22 +805,21 @@ var _ = Describe("WriteImageToExistingRoot", func() {
 		ignitionPath := "/tmp/ignition.ign"
 		expectExec("", nil, "mount", "/sysroot", "-o", "remount,rw")
 		expectExec("", nil, "mount", "/boot", "-o", "remount,rw")
+		expectExec("", fmt.Errorf("does not exist"), "stat", "/ostree/repo/refs/heads/coreos/node-image")
 		expectExec("", nil, "ostree", "admin", "stateroot-init", "install")
-		expectExec("Imported: bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25\n", nil,
-			"ostree", "container", "unencapsulate",
-			"--authfile", "/root/.docker/config.json",
-			"--quiet",
-			"--repo", "/ostree/repo",
-			"ostree-unverified-registry:"+osImage,
-		)
+		expectCommitImportSuccess()
+		expectExec("", nil, "ostree", "admin", "deploy", "--stateroot", "install", "--karg", "$ignition_firstboot", "--karg", defaultIgnitionPlatformId, commit)
+		expectExec("", nil, "ostree", "refs", "--repo", "/ostree/repo", "--delete", assistedInstallOSTreeRefName)
+
 		expectExec("", nil, "mkdir", "/boot/coreos-firstboot-network")
 		expectExec("", nil, "sh", "-c", "cp /etc/NetworkManager/system-connections/* /boot/coreos-firstboot-network")
+
 		expectExec("", nil, "ostree", "admin", "deploy",
 			"--stateroot", "install",
 			"--karg", "$ignition_firstboot",
 			"--karg", defaultIgnitionPlatformId,
 			"--karg-append", "nameserver=8.8.8.8",
-			"bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25")
+			commit)
 		expectExec("", nil, "mkdir", "/boot/ignition")
 		expectExec("", nil, "cp", ignitionPath, "/boot/ignition/config.ign")
 		expectExec("", nil, "touch", "/boot/ignition.firstboot")
@@ -755,22 +832,21 @@ var _ = Describe("WriteImageToExistingRoot", func() {
 		ignitionPath := "/tmp/ignition.ign"
 		expectExec("", nil, "mount", "/sysroot", "-o", "remount,rw")
 		expectExec("", nil, "mount", "/boot", "-o", "remount,rw")
+		expectExec("", fmt.Errorf("does not exist"), "stat", "/ostree/repo/refs/heads/coreos/node-image")
 		expectExec("", nil, "ostree", "admin", "stateroot-init", "install")
-		expectExec("Imported: bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25\n", nil,
-			"ostree", "container", "unencapsulate",
-			"--authfile", "/root/.docker/config.json",
-			"--quiet",
-			"--repo", "/ostree/repo",
-			"ostree-unverified-registry:"+osImage,
-		)
+		expectCommitImportSuccess()
+		expectExec("", nil, "ostree", "admin", "deploy", "--stateroot", "install", "--karg", "$ignition_firstboot", "--karg", defaultIgnitionPlatformId, commit)
+		expectExec("", nil, "ostree", "refs", "--repo", "/ostree/repo", "--delete", assistedInstallOSTreeRefName)
+
 		expectExec("", nil, "mkdir", "/boot/coreos-firstboot-network")
 		expectExec("", nil, "sh", "-c", "cp /etc/NetworkManager/system-connections/* /boot/coreos-firstboot-network")
+
 		expectExec("", nil, "ostree", "admin", "deploy",
 			"--stateroot", "install",
 			"--karg", "$ignition_firstboot",
 			"--karg", defaultIgnitionPlatformId,
 			"--karg-append", "nameserver=8.8.8.8",
-			"bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25")
+			commit)
 		expectExec("", nil, "mkdir", "/boot/ignition")
 		expectExec("", nil, "cp", ignitionPath, "/boot/ignition/config.ign")
 		expectExec("", nil, "touch", "/boot/ignition.firstboot")
