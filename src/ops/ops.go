@@ -83,6 +83,10 @@ const (
 	controllerDeployPodTemplate    = "assisted-installer-controller-pod.yaml.template"
 	renderedControllerSecret       = "assisted-installer-controller-secret.yaml"
 	controllerDeploySecretTemplate = "assisted-installer-controller-secret.yaml.template"
+	ostreeRepo                     = "/ostree/repo"
+	assistedInstallOSTreeRefName   = "assisted-installer/install-image"
+	nodeImageOSTreeRefName         = "coreos/node-image"
+	installStateRootName           = "install"
 	MustGatherFileName             = "must-gather.tar.gz"
 )
 
@@ -126,42 +130,25 @@ func (o *ops) SystemctlAction(action string, args ...string) error {
 	return errors.Wrapf(err, "Failed executing systemctl %s %s", action, args)
 }
 
-var ostreeOutputRegex = regexp.MustCompile(`Imported: (\w+)`)
+// Removes the node image reference if it still exists, but also ensure it isn't garbage collected just yet
+// Workaround until https://github.com/openshift/installer/pull/9570 is included in all 4.19 releases
+func (o *ops) removeNodeImage(liveLogger io.Writer) error {
+	if !o.FileExists(path.Join(ostreeRepo, "refs/heads", nodeImageOSTreeRefName)) {
+		return nil
+	}
 
-func (o *ops) importOSTreeCommit(liveLogger io.Writer) (string, error) {
-	ostreeReleasePullSpec := fmt.Sprintf("ostree-unverified-registry:%s", o.installerConfig.CoreosImage)
-	out, err := o.ExecPrivilegeCommand(liveLogger, "ostree", "container", "unencapsulate", "--authfile", dockerConfigFile, "--quiet", "--repo", "/ostree/repo", ostreeReleasePullSpec)
+	o.log.Info("Removing existing node-image ref")
+
+	out, err := o.ExecPrivilegeCommand(liveLogger, "ostree", "refs", "--repo", ostreeRepo, "--delete", nodeImageOSTreeRefName)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to unencapsulate rhcos payload image: %s", out)
+		return errors.Wrapf(err, "failed deleting the coreos node image ref: %s", out)
+	}
+	out, err = o.ExecPrivilegeCommand(liveLogger, "touch", "/ostree/repo/tmp/node-image")
+	if err != nil {
+		return errors.Wrapf(err, "failed to update temp node image checkout: %s", out)
 	}
 
-	matches := ostreeOutputRegex.FindStringSubmatch(out)
-	if matches == nil {
-		return "", fmt.Errorf("got unexpected output from unencapsulate: \"%s\"", out)
-	}
-
-	return matches[1], nil
-}
-
-func ostreeArgs(commit string, installerArgs []string) []string {
-	ostreeArgs := []string{"admin", "deploy",
-		"--stateroot", "install",
-		"--karg", "$ignition_firstboot",
-		"--karg", defaultIgnitionPlatformId,
-	}
-
-	lastArgIndex := len(installerArgs) - 1
-	for i, arg := range installerArgs {
-		if arg == "--append-karg" && i < lastArgIndex {
-			ostreeArgs = append(ostreeArgs, "--karg-append", installerArgs[i+1])
-			continue
-		}
-		if arg == "--delete-karg" && i < lastArgIndex {
-			ostreeArgs = append(ostreeArgs, "--karg-delete", installerArgs[i+1])
-			continue
-		}
-	}
-	return append(ostreeArgs, commit)
+	return nil
 }
 
 func (o *ops) WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string, installerArgs []string) error {
@@ -174,20 +161,24 @@ func (o *ops) WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string
 		return errors.Wrapf(err, "failed to remount boot: %s", out)
 	}
 
-	out, err = o.ExecPrivilegeCommand(liveLogger, "ostree", "admin", "stateroot-init", "install")
+	if err := o.removeNodeImage(liveLogger); err != nil {
+		return errors.Wrap(err, "failed to remove node image")
+	}
+
+	out, err = o.ExecPrivilegeCommand(liveLogger, "ostree", "admin", "stateroot-init", installStateRootName)
 	if err != nil {
 		return errors.Wrapf(err, "failed creating new stateroot: %s", out)
 	}
 
-	commit, err := o.importOSTreeCommit(liveLogger)
+	out, err = o.ExecPrivilegeCommand(liveLogger, "ostree", "container", "image", "deploy",
+		"--stateroot", installStateRootName,
+		"--sysroot", "/",
+		"--authfile", dockerConfigFile,
+		"--karg", "$ignition_firstboot",
+		"--karg", defaultIgnitionPlatformId,
+		"--image", o.installerConfig.CoreosImage)
 	if err != nil {
-		return err
-	}
-	o.log.Infof("imported commit %s", commit)
-
-	out, err = o.ExecPrivilegeCommand(liveLogger, "ostree", ostreeArgs(commit, installerArgs)...)
-	if err != nil {
-		return errors.Wrapf(err, "failed to deploy commit to stateroot: %s", out)
+		return errors.Wrapf(err, "failed to deploy container image %s to stateroot: %s", o.installerConfig.CoreosImage, out)
 	}
 
 	if slices.Contains(installerArgs, "--copy-network") || slices.Contains(installerArgs, "-n") {

@@ -527,174 +527,17 @@ var _ = Describe("get number of reboots", func() {
 	})
 })
 
-var _ = Describe("importOSTreeCommit", func() {
-	const osImage = "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:d21f2ed754a66d18b0a13a59434fa4dc36abd4320e78f3be83a3e29e21e3c2f9"
-	var (
-		l        = logrus.New()
-		ctrl     *gomock.Controller
-		execMock *execute.MockExecute
-		o        *ops
-	)
-
-	BeforeEach(func() {
-		ctrl = gomock.NewController(GinkgoT())
-		execMock = execute.NewMockExecute(ctrl)
-		o = &ops{
-			log:       l,
-			logWriter: utils.NewLogWriter(l),
-			installerConfig: &config.Config{
-				CoreosImage: osImage,
-			},
-			executor: execMock,
-		}
-	})
-
-	It("returns the commit when successful", func() {
-		pullSpec := "ostree-unverified-registry:" + osImage
-		execMock.EXPECT().ExecCommand(gomock.Any(),
-			"nsenter", "--target", "1", "--cgroup", "--mount", "--ipc", "--pid", "--",
-			"ostree", "container", "unencapsulate",
-			"--authfile", "/root/.docker/config.json",
-			"--quiet",
-			"--repo", "/ostree/repo",
-			pullSpec,
-		).Return("Imported: bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25\n", nil)
-		commit, err := o.importOSTreeCommit(io.Discard)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(commit).To(Equal("bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25"))
-	})
-
-	It("fails when the command fails", func() {
-		pullSpec := "ostree-unverified-registry:" + osImage
-		execMock.EXPECT().ExecCommand(gomock.Any(),
-			"nsenter", "--target", "1", "--cgroup", "--mount", "--ipc", "--pid", "--",
-			"ostree", "container", "unencapsulate",
-			"--authfile", "/root/.docker/config.json",
-			"--quiet",
-			"--repo", "/ostree/repo",
-			pullSpec,
-		).Return("", fmt.Errorf("failed"))
-		_, err := o.importOSTreeCommit(io.Discard)
-		Expect(err).To(HaveOccurred())
-	})
-
-	It("fails when the output is not as expected", func() {
-		pullSpec := "ostree-unverified-registry:" + osImage
-		execMock.EXPECT().ExecCommand(gomock.Any(),
-			"nsenter", "--target", "1", "--cgroup", "--mount", "--ipc", "--pid", "--",
-			"ostree", "container", "unencapsulate",
-			"--authfile", "/root/.docker/config.json",
-			"--quiet",
-			"--repo", "/ostree/repo",
-			pullSpec,
-		).Return("commit bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25\n", nil)
-		_, err := o.importOSTreeCommit(io.Discard)
-		Expect(err).To(HaveOccurred())
-	})
-
-	It("fails when the output cannot be parsed", func() {
-		pullSpec := "ostree-unverified-registry:" + osImage
-		execMock.EXPECT().ExecCommand(gomock.Any(),
-			"nsenter", "--target", "1", "--cgroup", "--mount", "--ipc", "--pid", "--",
-			"ostree", "container", "unencapsulate",
-			"--authfile", "/root/.docker/config.json",
-			"--quiet",
-			"--repo", "/ostree/repo",
-			pullSpec,
-		).Return("some nonsense here", nil)
-		_, err := o.importOSTreeCommit(io.Discard)
-		Expect(err).To(HaveOccurred())
-	})
-})
-
-var _ = Describe("ostreeArgs", func() {
-	It("returns the basic args when no additional installer args are provided", func() {
-		args := ostreeArgs("commit", nil)
-		expectedArgs := []string{
-			"admin", "deploy",
-			"--stateroot", "install",
-			"--karg", "$ignition_firstboot",
-			"--karg", defaultIgnitionPlatformId,
-			"commit",
-		}
-		Expect(args).To(Equal(expectedArgs))
-	})
-
-	It("ignores non append-karg or delete-karg args", func() {
-		args := ostreeArgs("commit", []string{"--copy-network", "--network-dir", "/some/dir/"})
-		expectedArgs := []string{
-			"admin", "deploy",
-			"--stateroot", "install",
-			"--karg", "$ignition_firstboot",
-			"--karg", defaultIgnitionPlatformId,
-			"commit",
-		}
-		Expect(args).To(Equal(expectedArgs))
-	})
-
-	It("adds append args", func() {
-		args := ostreeArgs("commit", []string{"--append-karg", "nameserver=8.8.8.8"})
-		expectedArgs := []string{
-			"admin", "deploy",
-			"--stateroot", "install",
-			"--karg", "$ignition_firstboot",
-			"--karg", defaultIgnitionPlatformId,
-			"--karg-append", "nameserver=8.8.8.8",
-			"commit",
-		}
-		Expect(args).To(Equal(expectedArgs))
-	})
-
-	It("adds remove args", func() {
-		args := ostreeArgs("commit", []string{"--delete-karg", "console"})
-		expectedArgs := []string{
-			"admin", "deploy",
-			"--stateroot", "install",
-			"--karg", "$ignition_firstboot",
-			"--karg", defaultIgnitionPlatformId,
-			"--karg-delete", "console",
-			"commit",
-		}
-		Expect(args).To(Equal(expectedArgs))
-	})
-
-	It("works with multiple instances of append and remove", func() {
-		args := ostreeArgs("commit", []string{"--append-karg", "nameserver=8.8.8.8", "--delete-karg", "console", "--append-karg", "ip=192.0.2.100"})
-		expectedArgs := []string{
-			"admin", "deploy",
-			"--stateroot", "install",
-			"--karg", "$ignition_firstboot",
-			"--karg", defaultIgnitionPlatformId,
-			"--karg-append", "nameserver=8.8.8.8",
-			"--karg-delete", "console",
-			"--karg-append", "ip=192.0.2.100",
-			"commit",
-		}
-		Expect(args).To(Equal(expectedArgs))
-	})
-})
-
 var _ = Describe("WriteImageToExistingRoot", func() {
-	const osImage = "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:d21f2ed754a66d18b0a13a59434fa4dc36abd4320e78f3be83a3e29e21e3c2f9"
+	const (
+		osImage      = "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:d21f2ed754a66d18b0a13a59434fa4dc36abd4320e78f3be83a3e29e21e3c2f9"
+		ignitionPath = "/tmp/ignition.ign"
+	)
 	var (
 		l        = logrus.New()
 		ctrl     *gomock.Controller
 		execMock *execute.MockExecute
 		o        *ops
 	)
-
-	BeforeEach(func() {
-		ctrl = gomock.NewController(GinkgoT())
-		execMock = execute.NewMockExecute(ctrl)
-		o = &ops{
-			log:       l,
-			logWriter: utils.NewLogWriter(l),
-			installerConfig: &config.Config{
-				CoreosImage: osImage,
-			},
-			executor: execMock,
-		}
-	})
 
 	expectExec := func(out string, err error, additionalArgs ...any) {
 		baseArgs := []any{"--target", "1", "--cgroup", "--mount", "--ipc", "--pid", "--"}
@@ -703,77 +546,100 @@ var _ = Describe("WriteImageToExistingRoot", func() {
 			"nsenter", args...).Return(out, err)
 	}
 
-	It("runs the correct commands", func() {
-		ignitionPath := "/tmp/ignition.ign"
+	BeforeEach(func() {
+		ctrl = gomock.NewController(GinkgoT())
+		execMock = execute.NewMockExecute(ctrl)
+		o = &ops{
+			log:       l,
+			logWriter: utils.NewLogWriter(l),
+			installerConfig: &config.Config{
+				CoreosImage: osImage,
+			},
+			executor: execMock,
+		}
+	})
+
+	expectRemount := func() {
 		expectExec("", nil, "mount", "/sysroot", "-o", "remount,rw")
 		expectExec("", nil, "mount", "/boot", "-o", "remount,rw")
-		expectExec("", nil, "ostree", "admin", "stateroot-init", "install")
-		expectExec("Imported: bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25\n", nil,
-			"ostree", "container", "unencapsulate",
-			"--authfile", "/root/.docker/config.json",
-			"--quiet",
-			"--repo", "/ostree/repo",
-			"ostree-unverified-registry:"+osImage,
-		)
-		expectExec("", nil, "ostree", "admin", "deploy", "--stateroot", "install", "--karg", "$ignition_firstboot", "--karg", defaultIgnitionPlatformId, "bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25")
+	}
+
+	expectIgnitionSetup := func() {
 		expectExec("", nil, "mkdir", "/boot/ignition")
 		expectExec("", nil, "cp", ignitionPath, "/boot/ignition/config.ign")
 		expectExec("", nil, "touch", "/boot/ignition.firstboot")
+	}
+
+	It("runs the correct commands when the node image ref doesn't exist", func() {
+		expectRemount()
+		expectExec("", fmt.Errorf("does not exist"), "stat", "/ostree/repo/refs/heads/coreos/node-image")
+		expectExec("", nil, "ostree", "admin", "stateroot-init", "install")
+		expectExec("", nil, "ostree", "container", "image", "deploy",
+			"--stateroot", "install",
+			"--sysroot", "/",
+			"--authfile", "/root/.docker/config.json",
+			"--karg", "$ignition_firstboot",
+			"--karg", defaultIgnitionPlatformId,
+			"--image", osImage)
+		expectIgnitionSetup()
+
+		Expect(o.WriteImageToExistingRoot(io.Discard, ignitionPath, nil)).To(Succeed())
+	})
+
+	It("deletes the node image ref when it exists", func() {
+		expectRemount()
+		expectExec("", nil, "stat", "/ostree/repo/refs/heads/coreos/node-image")
+		expectExec("", nil, "ostree", "refs", "--repo", "/ostree/repo", "--delete", nodeImageOSTreeRefName)
+		expectExec("", nil, "touch", "/ostree/repo/tmp/node-image")
+
+		expectExec("", nil, "ostree", "admin", "stateroot-init", "install")
+		expectExec("", nil, "ostree", "container", "image", "deploy",
+			"--stateroot", "install",
+			"--sysroot", "/",
+			"--authfile", "/root/.docker/config.json",
+			"--karg", "$ignition_firstboot",
+			"--karg", defaultIgnitionPlatformId,
+			"--image", osImage)
+		expectIgnitionSetup()
 
 		Expect(o.WriteImageToExistingRoot(io.Discard, ignitionPath, nil)).To(Succeed())
 	})
 
 	It("copies the network files when -n is provided", func() {
-		ignitionPath := "/tmp/ignition.ign"
-		expectExec("", nil, "mount", "/sysroot", "-o", "remount,rw")
-		expectExec("", nil, "mount", "/boot", "-o", "remount,rw")
+		expectRemount()
+		expectExec("", fmt.Errorf("does not exist"), "stat", "/ostree/repo/refs/heads/coreos/node-image")
 		expectExec("", nil, "ostree", "admin", "stateroot-init", "install")
-		expectExec("Imported: bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25\n", nil,
-			"ostree", "container", "unencapsulate",
-			"--authfile", "/root/.docker/config.json",
-			"--quiet",
-			"--repo", "/ostree/repo",
-			"ostree-unverified-registry:"+osImage,
-		)
-		expectExec("", nil, "mkdir", "/boot/coreos-firstboot-network")
-		expectExec("", nil, "sh", "-c", "cp /etc/NetworkManager/system-connections/* /boot/coreos-firstboot-network")
-		expectExec("", nil, "ostree", "admin", "deploy",
+		expectExec("", nil, "ostree", "container", "image", "deploy",
 			"--stateroot", "install",
+			"--sysroot", "/",
+			"--authfile", "/root/.docker/config.json",
 			"--karg", "$ignition_firstboot",
 			"--karg", defaultIgnitionPlatformId,
-			"--karg-append", "nameserver=8.8.8.8",
-			"bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25")
-		expectExec("", nil, "mkdir", "/boot/ignition")
-		expectExec("", nil, "cp", ignitionPath, "/boot/ignition/config.ign")
-		expectExec("", nil, "touch", "/boot/ignition.firstboot")
+			"--image", osImage)
+
+		expectExec("", nil, "mkdir", "/boot/coreos-firstboot-network")
+		expectExec("", nil, "sh", "-c", "cp /etc/NetworkManager/system-connections/* /boot/coreos-firstboot-network")
+		expectIgnitionSetup()
 
 		installerArgs := []string{"--append-karg", "nameserver=8.8.8.8", "-n"}
 		Expect(o.WriteImageToExistingRoot(io.Discard, ignitionPath, installerArgs)).To(Succeed())
 	})
 
 	It("copies the network files when --copy-network is provided", func() {
-		ignitionPath := "/tmp/ignition.ign"
-		expectExec("", nil, "mount", "/sysroot", "-o", "remount,rw")
-		expectExec("", nil, "mount", "/boot", "-o", "remount,rw")
+		expectRemount()
+		expectExec("", fmt.Errorf("does not exist"), "stat", "/ostree/repo/refs/heads/coreos/node-image")
 		expectExec("", nil, "ostree", "admin", "stateroot-init", "install")
-		expectExec("Imported: bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25\n", nil,
-			"ostree", "container", "unencapsulate",
-			"--authfile", "/root/.docker/config.json",
-			"--quiet",
-			"--repo", "/ostree/repo",
-			"ostree-unverified-registry:"+osImage,
-		)
-		expectExec("", nil, "mkdir", "/boot/coreos-firstboot-network")
-		expectExec("", nil, "sh", "-c", "cp /etc/NetworkManager/system-connections/* /boot/coreos-firstboot-network")
-		expectExec("", nil, "ostree", "admin", "deploy",
+		expectExec("", nil, "ostree", "container", "image", "deploy",
 			"--stateroot", "install",
+			"--sysroot", "/",
+			"--authfile", "/root/.docker/config.json",
 			"--karg", "$ignition_firstboot",
 			"--karg", defaultIgnitionPlatformId,
-			"--karg-append", "nameserver=8.8.8.8",
-			"bd58af6b04f8ed7e3e72d1af34439fb03a5640a516edd200fb26775df346ae25")
-		expectExec("", nil, "mkdir", "/boot/ignition")
-		expectExec("", nil, "cp", ignitionPath, "/boot/ignition/config.ign")
-		expectExec("", nil, "touch", "/boot/ignition.firstboot")
+			"--image", osImage)
+
+		expectExec("", nil, "mkdir", "/boot/coreos-firstboot-network")
+		expectExec("", nil, "sh", "-c", "cp /etc/NetworkManager/system-connections/* /boot/coreos-firstboot-network")
+		expectIgnitionSetup()
 
 		installerArgs := []string{"--append-karg", "nameserver=8.8.8.8", "--copy-network"}
 		Expect(o.WriteImageToExistingRoot(io.Discard, ignitionPath, installerArgs)).To(Succeed())
