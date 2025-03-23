@@ -5717,6 +5717,72 @@ func init() {
         }
       }
     },
+    "/v2/operators/bundles": {
+      "get": {
+        "description": "Retrieves a list of avaliable bundles.",
+        "tags": [
+          "operators"
+        ],
+        "summary": "Get list of avaliable bundles",
+        "operationId": "V2ListBundles",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/bundle"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          }
+        }
+      }
+    },
+    "/v2/operators/bundles/{id}": {
+      "get": {
+        "description": "Retrieves an array of operator properties for the specified bundle.",
+        "tags": [
+          "operators"
+        ],
+        "summary": "Get operator properties for a bundle",
+        "operationId": "V2GetBundle",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Identifier of the bundle, for example, ` + "`" + `virtualization` + "`" + ` or ` + "`" + `openshift-ai-nvidia` + "`" + `.",
+            "name": "id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/bundle"
+            }
+          },
+          "404": {
+            "description": "Bundle not found",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          }
+        }
+      }
+    },
     "/v2/release-sources": {
       "get": {
         "security": [
@@ -5932,7 +5998,23 @@ func init() {
             "schema": {
               "type": "array",
               "items": {
-                "type": "string"
+                "type": "string",
+                "enum": [
+                  "lso",
+                  "mtv",
+                  "openshift_ai",
+                  "osc",
+                  "servicemesh",
+                  "authorino",
+                  "cnv",
+                  "nvidia_gpu",
+                  "pipelines",
+                  "odf",
+                  "lvm",
+                  "mce",
+                  "node_feature_discovery",
+                  "serverless"
+                ]
               }
             }
           },
@@ -6138,11 +6220,42 @@ func init() {
         "current_boot_mode": {
           "type": "string"
         },
+        "device_type": {
+          "type": "string",
+          "enum": [
+            "persistent",
+            "ephemeral"
+          ]
+        },
         "pxe_interface": {
           "type": "string"
         },
         "secure_boot_state": {
           "$ref": "#/definitions/secure-boot-state"
+        }
+      }
+    },
+    "bundle": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "description": "Longer human friendly description for the bundle, usually one or more sentences.\n",
+          "type": "string"
+        },
+        "id": {
+          "description": "Unique identifier of the bundle, for example ` + "`" + `virtualization` + "`" + ` or ` + "`" + `openshift-ai-nvidia` + "`" + `.",
+          "type": "string"
+        },
+        "operators": {
+          "description": "List of operators associated with the bundle.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "title": {
+          "description": "Short human friendly description for the bundle, usually only a few words, for example ` + "`" + `Virtualization` + "`" + ` or\n` + "`" + `OpenShift AI (NVIDIA)` + "`" + `.\n",
+          "type": "string"
         }
       }
     },
@@ -6403,6 +6516,9 @@ func init() {
         },
         "last-installation-preparation": {
           "$ref": "#/definitions/last-installation-preparation"
+        },
+        "load_balancer": {
+          "$ref": "#/definitions/load_balancer"
         },
         "logs_info": {
           "description": "The progress of log collection or empty if logs are not applicable",
@@ -6694,6 +6810,9 @@ func init() {
             "$ref": "#/definitions/ingress_vip"
           }
         },
+        "load_balancer": {
+          "$ref": "#/definitions/load_balancer"
+        },
         "machine_networks": {
           "description": "Machine networks that are associated with this cluster.",
           "type": "array",
@@ -6727,7 +6846,7 @@ func init() {
           "type": "string"
         },
         "olm_operators": {
-          "description": "List of OLM operators to be installed.",
+          "description": "List of OLM operators to be installed.\nFor the full list of supported operators, check the endpoint ` + "`" + `/v2/supported-operators` + "`" + `:\n",
           "type": "array",
           "items": {
             "$ref": "#/definitions/operator-create-params"
@@ -6924,6 +7043,7 @@ func init() {
         "lvm-requirements-satisfied",
         "mce-requirements-satisfied",
         "mtv-requirements-satisfied",
+        "osc-requirements-satisfied",
         "network-type-valid",
         "platform-requirements-satisfied",
         "node-feature-discovery-requirements-satisfied",
@@ -6932,7 +7052,8 @@ func init() {
         "servicemesh-requirements-satisfied",
         "serverless-requirements-satisfied",
         "openshift-ai-requirements-satisfied",
-        "authorino-requirements-satisfied"
+        "authorino-requirements-satisfied",
+        "nmstate-requirements-satisfied"
       ]
     },
     "cluster_default_config": {
@@ -7760,6 +7881,7 @@ func init() {
         "CNV",
         "MCE",
         "MTV",
+        "OSC",
         "NUTANIX_INTEGRATION",
         "BAREMETAL_PLATFORM",
         "NONE_PLATFORM",
@@ -7783,7 +7905,9 @@ func init() {
         "SERVERLESS",
         "OPENSHIFT_AI",
         "NON_STANDARD_HA_CONTROL_PLANE",
-        "AUTHORINO"
+        "AUTHORINO",
+        "USER_MANAGED_LOAD_BALANCER",
+        "NMSTATE"
       ]
     },
     "finalizing-stage": {
@@ -8382,6 +8506,7 @@ func init() {
         "lvm-requirements-satisfied",
         "mce-requirements-satisfied",
         "mtv-requirements-satisfied",
+        "osc-requirements-satisfied",
         "sufficient-installation-disk-speed",
         "cnv-requirements-satisfied",
         "sufficient-network-latency-requirement-for-role",
@@ -8408,7 +8533,8 @@ func init() {
         "serverless-requirements-satisfied",
         "openshift-ai-requirements-satisfied",
         "authorino-requirements-satisfied",
-        "mtu-valid"
+        "mtu-valid",
+        "nmstate-requirements-satisfied"
       ]
     },
     "host_network": {
@@ -8964,10 +9090,18 @@ func init() {
           "type": "string",
           "format": "uuid"
         },
+        "control_plane_count": {
+          "description": "Specifies the required number of control plane nodes that should be part of the cluster.",
+          "type": "integer"
+        },
         "controller_image": {
           "description": "Assisted installer controller image",
           "type": "string",
           "pattern": "^(([a-zA-Z0-9\\-\\.]+)(:[0-9]+)?\\/)?[a-z0-9\\._\\-\\/@]+[?::a-zA-Z0-9_\\-.]+$"
+        },
+        "coreos_image": {
+          "description": "CoreOS container image to use if installing to the local device",
+          "type": "string"
         },
         "disks_to_format": {
           "description": "List of disks to format",
@@ -9319,6 +9453,21 @@ func init() {
         }
       }
     },
+    "load_balancer": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "description": "Indicates if the load balancer will be managed by the cluster or by the user. This is optional and The\ndefault is ` + "`" + `cluster-managed` + "`" + `.\n\n` + "`" + `cluster-managed` + "`" + ` means that the cluster will start the components that assign the API and ingress VIPs to the\nnodes of the cluster automatically.\n\n` + "`" + `user-managed` + "`" + ` means that the user is responsible for configuring an external load balancer and assign the\nAPI and ingress VIPs to it. Note that this configuration needs to be completed before starting the\ninstallation of the cluster, as it is needed during the installation process.\n",
+          "type": "string",
+          "enum": [
+            "cluster-managed",
+            "user-managed"
+          ],
+          "x-go-custom-tag": "gorm:\"not null;check:load_balancer_type in ('cluster-managed', 'user-managed');default:'cluster-managed'\""
+        }
+      },
+      "x-go-custom-tag": "gorm:\"embedded;embeddedPrefix:load_balancer_\""
+    },
     "logs-progress-params": {
       "type": "object",
       "required": [
@@ -9494,6 +9643,23 @@ func init() {
     "monitored-operator": {
       "type": "object",
       "properties": {
+        "bundles": {
+          "description": "List of identifier of the bundles associated with the operator. Can be empty.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-custom-tag": "gorm:\"type:text[]\"",
+          "x-go-type": {
+            "hints": {
+              "noValidation": true
+            },
+            "import": {
+              "package": "github.com/lib/pq"
+            },
+            "type": "StringArray"
+          }
+        },
         "cluster_id": {
           "description": "The cluster that this operator is associated with.",
           "type": "string",
@@ -10552,6 +10718,9 @@ func init() {
           },
           "x-nullable": true
         },
+        "load_balancer": {
+          "$ref": "#/definitions/load_balancer"
+        },
         "machine_network_cidr": {
           "description": "A CIDR that all hosts belonging to the cluster should have an interfaces with IP address that belongs to this CIDR. The api_vip belongs to this CIDR.",
           "type": "string",
@@ -10588,7 +10757,7 @@ func init() {
           "x-nullable": true
         },
         "olm_operators": {
-          "description": "List of OLM operators to be installed.",
+          "description": "List of OLM operators to be installed.\nFor the full list of supported operators, check the endpoint ` + "`" + `/v2/supported-operators` + "`" + `:\n",
           "type": "array",
           "items": {
             "$ref": "#/definitions/operator-create-params"
@@ -16514,6 +16683,72 @@ func init() {
         }
       }
     },
+    "/v2/operators/bundles": {
+      "get": {
+        "description": "Retrieves a list of avaliable bundles.",
+        "tags": [
+          "operators"
+        ],
+        "summary": "Get list of avaliable bundles",
+        "operationId": "V2ListBundles",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/bundle"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          }
+        }
+      }
+    },
+    "/v2/operators/bundles/{id}": {
+      "get": {
+        "description": "Retrieves an array of operator properties for the specified bundle.",
+        "tags": [
+          "operators"
+        ],
+        "summary": "Get operator properties for a bundle",
+        "operationId": "V2GetBundle",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Identifier of the bundle, for example, ` + "`" + `virtualization` + "`" + ` or ` + "`" + `openshift-ai-nvidia` + "`" + `.",
+            "name": "id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "schema": {
+              "$ref": "#/definitions/bundle"
+            }
+          },
+          "404": {
+            "description": "Bundle not found",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "$ref": "#/definitions/error"
+            }
+          }
+        }
+      }
+    },
     "/v2/release-sources": {
       "get": {
         "security": [
@@ -16729,7 +16964,23 @@ func init() {
             "schema": {
               "type": "array",
               "items": {
-                "type": "string"
+                "type": "string",
+                "enum": [
+                  "lso",
+                  "mtv",
+                  "openshift_ai",
+                  "osc",
+                  "servicemesh",
+                  "authorino",
+                  "cnv",
+                  "nvidia_gpu",
+                  "pipelines",
+                  "odf",
+                  "lvm",
+                  "mce",
+                  "node_feature_discovery",
+                  "serverless"
+                ]
               }
             }
           },
@@ -17053,11 +17304,42 @@ func init() {
         "current_boot_mode": {
           "type": "string"
         },
+        "device_type": {
+          "type": "string",
+          "enum": [
+            "persistent",
+            "ephemeral"
+          ]
+        },
         "pxe_interface": {
           "type": "string"
         },
         "secure_boot_state": {
           "$ref": "#/definitions/secure-boot-state"
+        }
+      }
+    },
+    "bundle": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "description": "Longer human friendly description for the bundle, usually one or more sentences.\n",
+          "type": "string"
+        },
+        "id": {
+          "description": "Unique identifier of the bundle, for example ` + "`" + `virtualization` + "`" + ` or ` + "`" + `openshift-ai-nvidia` + "`" + `.",
+          "type": "string"
+        },
+        "operators": {
+          "description": "List of operators associated with the bundle.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "title": {
+          "description": "Short human friendly description for the bundle, usually only a few words, for example ` + "`" + `Virtualization` + "`" + ` or\n` + "`" + `OpenShift AI (NVIDIA)` + "`" + `.\n",
+          "type": "string"
         }
       }
     },
@@ -17318,6 +17600,9 @@ func init() {
         },
         "last-installation-preparation": {
           "$ref": "#/definitions/last-installation-preparation"
+        },
+        "load_balancer": {
+          "$ref": "#/definitions/load_balancer"
         },
         "logs_info": {
           "description": "The progress of log collection or empty if logs are not applicable",
@@ -17609,6 +17894,9 @@ func init() {
             "$ref": "#/definitions/ingress_vip"
           }
         },
+        "load_balancer": {
+          "$ref": "#/definitions/load_balancer"
+        },
         "machine_networks": {
           "description": "Machine networks that are associated with this cluster.",
           "type": "array",
@@ -17642,7 +17930,7 @@ func init() {
           "type": "string"
         },
         "olm_operators": {
-          "description": "List of OLM operators to be installed.",
+          "description": "List of OLM operators to be installed.\nFor the full list of supported operators, check the endpoint ` + "`" + `/v2/supported-operators` + "`" + `:\n",
           "type": "array",
           "items": {
             "$ref": "#/definitions/operator-create-params"
@@ -17839,6 +18127,7 @@ func init() {
         "lvm-requirements-satisfied",
         "mce-requirements-satisfied",
         "mtv-requirements-satisfied",
+        "osc-requirements-satisfied",
         "network-type-valid",
         "platform-requirements-satisfied",
         "node-feature-discovery-requirements-satisfied",
@@ -17847,7 +18136,8 @@ func init() {
         "servicemesh-requirements-satisfied",
         "serverless-requirements-satisfied",
         "openshift-ai-requirements-satisfied",
-        "authorino-requirements-satisfied"
+        "authorino-requirements-satisfied",
+        "nmstate-requirements-satisfied"
       ]
     },
     "cluster_default_config": {
@@ -18642,6 +18932,7 @@ func init() {
         "CNV",
         "MCE",
         "MTV",
+        "OSC",
         "NUTANIX_INTEGRATION",
         "BAREMETAL_PLATFORM",
         "NONE_PLATFORM",
@@ -18665,7 +18956,9 @@ func init() {
         "SERVERLESS",
         "OPENSHIFT_AI",
         "NON_STANDARD_HA_CONTROL_PLANE",
-        "AUTHORINO"
+        "AUTHORINO",
+        "USER_MANAGED_LOAD_BALANCER",
+        "NMSTATE"
       ]
     },
     "finalizing-stage": {
@@ -19264,6 +19557,7 @@ func init() {
         "lvm-requirements-satisfied",
         "mce-requirements-satisfied",
         "mtv-requirements-satisfied",
+        "osc-requirements-satisfied",
         "sufficient-installation-disk-speed",
         "cnv-requirements-satisfied",
         "sufficient-network-latency-requirement-for-role",
@@ -19290,7 +19584,8 @@ func init() {
         "serverless-requirements-satisfied",
         "openshift-ai-requirements-satisfied",
         "authorino-requirements-satisfied",
-        "mtu-valid"
+        "mtu-valid",
+        "nmstate-requirements-satisfied"
       ]
     },
     "host_network": {
@@ -19848,10 +20143,18 @@ func init() {
           "type": "string",
           "format": "uuid"
         },
+        "control_plane_count": {
+          "description": "Specifies the required number of control plane nodes that should be part of the cluster.",
+          "type": "integer"
+        },
         "controller_image": {
           "description": "Assisted installer controller image",
           "type": "string",
           "pattern": "^(([a-zA-Z0-9\\-\\.]+)(:[0-9]+)?\\/)?[a-z0-9\\._\\-\\/@]+[?::a-zA-Z0-9_\\-.]+$"
+        },
+        "coreos_image": {
+          "description": "CoreOS container image to use if installing to the local device",
+          "type": "string"
         },
         "disks_to_format": {
           "description": "List of disks to format",
@@ -20203,6 +20506,21 @@ func init() {
         }
       }
     },
+    "load_balancer": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "description": "Indicates if the load balancer will be managed by the cluster or by the user. This is optional and The\ndefault is ` + "`" + `cluster-managed` + "`" + `.\n\n` + "`" + `cluster-managed` + "`" + ` means that the cluster will start the components that assign the API and ingress VIPs to the\nnodes of the cluster automatically.\n\n` + "`" + `user-managed` + "`" + ` means that the user is responsible for configuring an external load balancer and assign the\nAPI and ingress VIPs to it. Note that this configuration needs to be completed before starting the\ninstallation of the cluster, as it is needed during the installation process.\n",
+          "type": "string",
+          "enum": [
+            "cluster-managed",
+            "user-managed"
+          ],
+          "x-go-custom-tag": "gorm:\"not null;check:load_balancer_type in ('cluster-managed', 'user-managed');default:'cluster-managed'\""
+        }
+      },
+      "x-go-custom-tag": "gorm:\"embedded;embeddedPrefix:load_balancer_\""
+    },
     "logs-progress-params": {
       "type": "object",
       "required": [
@@ -20367,6 +20685,23 @@ func init() {
     "monitored-operator": {
       "type": "object",
       "properties": {
+        "bundles": {
+          "description": "List of identifier of the bundles associated with the operator. Can be empty.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-go-custom-tag": "gorm:\"type:text[]\"",
+          "x-go-type": {
+            "hints": {
+              "noValidation": true
+            },
+            "import": {
+              "package": "github.com/lib/pq"
+            },
+            "type": "StringArray"
+          }
+        },
         "cluster_id": {
           "description": "The cluster that this operator is associated with.",
           "type": "string",
@@ -21399,6 +21734,9 @@ func init() {
           },
           "x-nullable": true
         },
+        "load_balancer": {
+          "$ref": "#/definitions/load_balancer"
+        },
         "machine_network_cidr": {
           "description": "A CIDR that all hosts belonging to the cluster should have an interfaces with IP address that belongs to this CIDR. The api_vip belongs to this CIDR.",
           "type": "string",
@@ -21435,7 +21773,7 @@ func init() {
           "x-nullable": true
         },
         "olm_operators": {
-          "description": "List of OLM operators to be installed.",
+          "description": "List of OLM operators to be installed.\nFor the full list of supported operators, check the endpoint ` + "`" + `/v2/supported-operators` + "`" + `:\n",
           "type": "array",
           "items": {
             "$ref": "#/definitions/operator-create-params"
