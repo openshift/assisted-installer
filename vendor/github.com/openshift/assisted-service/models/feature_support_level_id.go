@@ -60,6 +60,9 @@ const (
 	// FeatureSupportLevelIDMTV captures enum value "MTV"
 	FeatureSupportLevelIDMTV FeatureSupportLevelID = "MTV"
 
+	// FeatureSupportLevelIDOSC captures enum value "OSC"
+	FeatureSupportLevelIDOSC FeatureSupportLevelID = "OSC"
+
 	// FeatureSupportLevelIDNUTANIXINTEGRATION captures enum value "NUTANIX_INTEGRATION"
 	FeatureSupportLevelIDNUTANIXINTEGRATION FeatureSupportLevelID = "NUTANIX_INTEGRATION"
 
@@ -131,6 +134,18 @@ const (
 
 	// FeatureSupportLevelIDAUTHORINO captures enum value "AUTHORINO"
 	FeatureSupportLevelIDAUTHORINO FeatureSupportLevelID = "AUTHORINO"
+
+	// FeatureSupportLevelIDUSERMANAGEDLOADBALANCER captures enum value "USER_MANAGED_LOAD_BALANCER"
+	FeatureSupportLevelIDUSERMANAGEDLOADBALANCER FeatureSupportLevelID = "USER_MANAGED_LOAD_BALANCER"
+
+	// FeatureSupportLevelIDNMSTATE captures enum value "NMSTATE"
+	FeatureSupportLevelIDNMSTATE FeatureSupportLevelID = "NMSTATE"
+
+	// FeatureSupportLevelIDAMDGPU captures enum value "AMD_GPU"
+	FeatureSupportLevelIDAMDGPU FeatureSupportLevelID = "AMD_GPU"
+
+	// FeatureSupportLevelIDKMM captures enum value "KMM"
+	FeatureSupportLevelIDKMM FeatureSupportLevelID = "KMM"
 )
 
 // for schema
@@ -138,7 +153,7 @@ var featureSupportLevelIdEnum []interface{}
 
 func init() {
 	var res []FeatureSupportLevelID
-	if err := json.Unmarshal([]byte(`["SNO","VIP_AUTO_ALLOC","CUSTOM_MANIFEST","SINGLE_NODE_EXPANSION","LVM","ODF","LSO","CNV","MCE","MTV","NUTANIX_INTEGRATION","BAREMETAL_PLATFORM","NONE_PLATFORM","VSPHERE_INTEGRATION","DUAL_STACK_VIPS","CLUSTER_MANAGED_NETWORKING","USER_MANAGED_NETWORKING","MINIMAL_ISO","FULL_ISO","EXTERNAL_PLATFORM_OCI","DUAL_STACK","PLATFORM_MANAGED_NETWORKING","SKIP_MCO_REBOOT","EXTERNAL_PLATFORM","OVN_NETWORK_TYPE","SDN_NETWORK_TYPE","NODE_FEATURE_DISCOVERY","NVIDIA_GPU","PIPELINES","SERVICEMESH","SERVERLESS","OPENSHIFT_AI","NON_STANDARD_HA_CONTROL_PLANE","AUTHORINO"]`), &res); err != nil {
+	if err := json.Unmarshal([]byte(`["SNO","VIP_AUTO_ALLOC","CUSTOM_MANIFEST","SINGLE_NODE_EXPANSION","LVM","ODF","LSO","CNV","MCE","MTV","OSC","NUTANIX_INTEGRATION","BAREMETAL_PLATFORM","NONE_PLATFORM","VSPHERE_INTEGRATION","DUAL_STACK_VIPS","CLUSTER_MANAGED_NETWORKING","USER_MANAGED_NETWORKING","MINIMAL_ISO","FULL_ISO","EXTERNAL_PLATFORM_OCI","DUAL_STACK","PLATFORM_MANAGED_NETWORKING","SKIP_MCO_REBOOT","EXTERNAL_PLATFORM","OVN_NETWORK_TYPE","SDN_NETWORK_TYPE","NODE_FEATURE_DISCOVERY","NVIDIA_GPU","PIPELINES","SERVICEMESH","SERVERLESS","OPENSHIFT_AI","NON_STANDARD_HA_CONTROL_PLANE","AUTHORINO","USER_MANAGED_LOAD_BALANCER","NMSTATE","AMD_GPU","KMM"]`), &res); err != nil {
 		panic(err)
 	}
 	for _, v := range res {

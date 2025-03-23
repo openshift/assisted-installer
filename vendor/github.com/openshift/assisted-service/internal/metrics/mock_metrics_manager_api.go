@@ -169,28 +169,52 @@ func (mr *MockAPIMockRecorder) InstallationStarted() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InstallationStarted", reflect.TypeOf((*MockAPI)(nil).InstallationStarted))
 }
 
-// MonitoredClusterCount mocks base method.
-func (m *MockAPI) MonitoredClusterCount(monitoredClusters int64) {
+// InstallerCacheGetReleaseCached mocks base method.
+func (m *MockAPI) InstallerCacheGetReleaseCached(releaseId string, cacheHit bool) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "MonitoredClusterCount", monitoredClusters)
+	m.ctrl.Call(m, "InstallerCacheGetReleaseCached", releaseId, cacheHit)
 }
 
-// MonitoredClusterCount indicates an expected call of MonitoredClusterCount.
-func (mr *MockAPIMockRecorder) MonitoredClusterCount(monitoredClusters interface{}) *gomock.Call {
+// InstallerCacheGetReleaseCached indicates an expected call of InstallerCacheGetReleaseCached.
+func (mr *MockAPIMockRecorder) InstallerCacheGetReleaseCached(releaseId, cacheHit interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MonitoredClusterCount", reflect.TypeOf((*MockAPI)(nil).MonitoredClusterCount), monitoredClusters)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InstallerCacheGetReleaseCached", reflect.TypeOf((*MockAPI)(nil).InstallerCacheGetReleaseCached), releaseId, cacheHit)
 }
 
-// MonitoredHostsCount mocks base method.
-func (m *MockAPI) MonitoredHostsCount(monitoredHosts int64) {
+// InstallerCacheReleaseEvicted mocks base method.
+func (m *MockAPI) InstallerCacheReleaseEvicted(success bool) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "MonitoredHostsCount", monitoredHosts)
+	m.ctrl.Call(m, "InstallerCacheReleaseEvicted", success)
 }
 
-// MonitoredHostsCount indicates an expected call of MonitoredHostsCount.
-func (mr *MockAPIMockRecorder) MonitoredHostsCount(monitoredHosts interface{}) *gomock.Call {
+// InstallerCacheReleaseEvicted indicates an expected call of InstallerCacheReleaseEvicted.
+func (mr *MockAPIMockRecorder) InstallerCacheReleaseEvicted(success interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MonitoredHostsCount", reflect.TypeOf((*MockAPI)(nil).MonitoredHostsCount), monitoredHosts)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InstallerCacheReleaseEvicted", reflect.TypeOf((*MockAPI)(nil).InstallerCacheReleaseEvicted), success)
+}
+
+// MonitoredClustersDurationMs mocks base method.
+func (m *MockAPI) MonitoredClustersDurationMs(monitoredClustersMillis float64) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "MonitoredClustersDurationMs", monitoredClustersMillis)
+}
+
+// MonitoredClustersDurationMs indicates an expected call of MonitoredClustersDurationMs.
+func (mr *MockAPIMockRecorder) MonitoredClustersDurationMs(monitoredClustersMillis interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MonitoredClustersDurationMs", reflect.TypeOf((*MockAPI)(nil).MonitoredClustersDurationMs), monitoredClustersMillis)
+}
+
+// MonitoredHostsDurationMs mocks base method.
+func (m *MockAPI) MonitoredHostsDurationMs(monitoredHostsMillis float64) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "MonitoredHostsDurationMs", monitoredHostsMillis)
+}
+
+// MonitoredHostsDurationMs indicates an expected call of MonitoredHostsDurationMs.
+func (mr *MockAPIMockRecorder) MonitoredHostsDurationMs(monitoredHostsMillis interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MonitoredHostsDurationMs", reflect.TypeOf((*MockAPI)(nil).MonitoredHostsDurationMs), monitoredHostsMillis)
 }
 
 // ReportHostInstallationMetrics mocks base method.
