@@ -2,12 +2,11 @@
 
 aliases:
   approvers:
+    - openshift-edge-bot
     - romfreiman
     - oourfali
-    - filanov
     - gamli75
     - eliorerz
-    - osherdp
-    - adriengentil
     - rccrdpccl
+    - adriengentil
     - danmanor
