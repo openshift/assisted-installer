@@ -34,8 +34,8 @@ type OperatorHandler interface {
 //  3. Returns true if the status changed to 'available', or false otherwise.
 func (c *controller) checkAndUpdateOperatorAvailability(handler OperatorHandler, useCache bool) bool {
 	operatorName := handler.GetName()
-	c.log.Infof("Checking <%s> operator availability status", operatorName)
 	operatorStatusInService, isAvailable := c.isOperatorAvailableInService(operatorName, c.OpenshiftVersion, useCache)
+	c.log.Infof("Checking availability of operator <%s>: %v", operatorName, isAvailable)
 	if isAvailable {
 		return true
 	}
