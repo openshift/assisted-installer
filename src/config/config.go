@@ -82,10 +82,9 @@ func (c *Config) ProcessArgs(args []string) {
 	flagSet.BoolVar(&c.NotifyNumReboots, "notify-num-reboots", false, "indicate number of reboots should be notified as event")
 	flagSet.StringVar(&c.CoreosImage, "coreos-image", "", "CoreOS image to install to the existing root")
 
-	var highAvailability, installerArgs string
+	var installerArgs string
 	flagSet.StringVar(&installerArgs, "installer-args", "", "JSON array of additional coreos-installer arguments")
 	h := flagSet.Bool("help", false, "Help message")
-	flagSet.StringVar(&highAvailability, "high-availability-mode", "", "high-availability expectations, \"Full\" which represents the behavior in a \"normal\" cluster. Use 'None' for single-node deployment. Leave this value as \"\" for workers as we do not care about HA mode for workers.")
 
 	// Add dry-run specific flag bindings.
 	err := envconfig.Process("dryconfig", &DefaultDryRunConfig)
@@ -122,13 +121,6 @@ func (c *Config) ProcessArgs(args []string) {
 
 	if c.NoProxy != "" {
 		utils.SetNoProxyEnv(c.NoProxy)
-	}
-
-	switch highAvailability {
-	case models.ClusterHighAvailabilityModeFull:
-		c.ControlPlaneCount = 3
-	case models.ClusterHighAvailabilityModeNone:
-		c.ControlPlaneCount = 1
 	}
 
 	c.SetDefaults()
