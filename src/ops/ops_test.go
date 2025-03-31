@@ -581,6 +581,7 @@ var _ = Describe("WriteImageToExistingRoot", func() {
 			"--karg", "$ignition_firstboot",
 			"--karg", defaultIgnitionPlatformId,
 			"--image", osImage)
+		expectExec("", nil, "ostree", "admin", "finalize-staged")
 		expectIgnitionSetup()
 
 		Expect(o.WriteImageToExistingRoot(io.Discard, ignitionPath, nil)).To(Succeed())
@@ -600,6 +601,7 @@ var _ = Describe("WriteImageToExistingRoot", func() {
 			"--karg", "$ignition_firstboot",
 			"--karg", defaultIgnitionPlatformId,
 			"--image", osImage)
+		expectExec("", nil, "ostree", "admin", "finalize-staged")
 		expectIgnitionSetup()
 
 		Expect(o.WriteImageToExistingRoot(io.Discard, ignitionPath, nil)).To(Succeed())
@@ -616,12 +618,13 @@ var _ = Describe("WriteImageToExistingRoot", func() {
 			"--karg", "$ignition_firstboot",
 			"--karg", defaultIgnitionPlatformId,
 			"--image", osImage)
+		expectExec("", nil, "ostree", "admin", "finalize-staged")
 
 		expectExec("", nil, "mkdir", "/boot/coreos-firstboot-network")
 		expectExec("", nil, "sh", "-c", "cp /etc/NetworkManager/system-connections/* /boot/coreos-firstboot-network")
 		expectIgnitionSetup()
 
-		installerArgs := []string{"--append-karg", "nameserver=8.8.8.8", "-n"}
+		installerArgs := []string{"-n"}
 		Expect(o.WriteImageToExistingRoot(io.Discard, ignitionPath, installerArgs)).To(Succeed())
 	})
 
@@ -636,12 +639,39 @@ var _ = Describe("WriteImageToExistingRoot", func() {
 			"--karg", "$ignition_firstboot",
 			"--karg", defaultIgnitionPlatformId,
 			"--image", osImage)
+		expectExec("", nil, "ostree", "admin", "finalize-staged")
 
 		expectExec("", nil, "mkdir", "/boot/coreos-firstboot-network")
 		expectExec("", nil, "sh", "-c", "cp /etc/NetworkManager/system-connections/* /boot/coreos-firstboot-network")
 		expectIgnitionSetup()
 
-		installerArgs := []string{"--append-karg", "nameserver=8.8.8.8", "--copy-network"}
+		installerArgs := []string{"--copy-network"}
+		Expect(o.WriteImageToExistingRoot(io.Discard, ignitionPath, installerArgs)).To(Succeed())
+	})
+
+	It("modifies kernel args when required", func() {
+		expectRemount()
+		expectExec("", fmt.Errorf("does not exist"), "stat", "/ostree/repo/refs/heads/coreos/node-image")
+		expectExec("", nil, "ostree", "admin", "stateroot-init", "install")
+		expectExec("", nil, "ostree", "container", "image", "deploy",
+			"--stateroot", "install",
+			"--sysroot", "/",
+			"--authfile", "/root/.docker/config.json",
+			"--karg", "$ignition_firstboot",
+			"--karg", defaultIgnitionPlatformId,
+			"--image", osImage)
+		expectExec("", nil, "ostree", "admin", "finalize-staged")
+
+		expectExec("", nil, "rpm-ostree", "kargs",
+			"--os", "install",
+			"--append", "nameserver=8.8.8.8",
+			"--append", "foo=bar",
+			"--delete-if-present", "baz",
+		)
+		expectExec("", nil, "ostree", "admin", "finalize-staged")
+		expectIgnitionSetup()
+
+		installerArgs := []string{"--append-karg", "nameserver=8.8.8.8", "--append-karg", "foo=bar", "--delete-karg", "baz"}
 		Expect(o.WriteImageToExistingRoot(io.Discard, ignitionPath, installerArgs)).To(Succeed())
 	})
 })

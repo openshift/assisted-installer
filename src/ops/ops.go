@@ -151,6 +151,40 @@ func (o *ops) removeNodeImage(liveLogger io.Writer) error {
 	return nil
 }
 
+func (o *ops) applyInstallKargs(liveLogger io.Writer, installerArgs []string) error {
+	commandArgs := []string{"kargs", "--os", installStateRootName}
+
+	lastArgIndex := len(installerArgs) - 1
+	for i, arg := range installerArgs {
+		if arg == "--append-karg" && i < lastArgIndex {
+			commandArgs = append(commandArgs, "--append", installerArgs[i+1])
+			continue
+		}
+		if arg == "--delete-karg" && i < lastArgIndex {
+			commandArgs = append(commandArgs, "--delete-if-present", installerArgs[i+1])
+			continue
+		}
+	}
+
+	if len(commandArgs) == 3 {
+		return nil
+	}
+
+	o.log.Info("Modifying install kernel args")
+
+	out, err := o.ExecPrivilegeCommand(liveLogger, "rpm-ostree", commandArgs...)
+	if err != nil {
+		return errors.Wrapf(err, "failed to apply kargs modifications: %s", out)
+	}
+
+	out, err = o.ExecPrivilegeCommand(liveLogger, "ostree", "admin", "finalize-staged")
+	if err != nil {
+		return errors.Wrapf(err, "failed to finalize staged deployment after kargs application: %s", out)
+	}
+
+	return nil
+}
+
 func (o *ops) WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string, installerArgs []string) error {
 	out, err := o.ExecPrivilegeCommand(liveLogger, "mount", "/sysroot", "-o", "remount,rw")
 	if err != nil {
@@ -161,7 +195,7 @@ func (o *ops) WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string
 		return errors.Wrapf(err, "failed to remount boot: %s", out)
 	}
 
-	if err := o.removeNodeImage(liveLogger); err != nil {
+	if err = o.removeNodeImage(liveLogger); err != nil {
 		return errors.Wrap(err, "failed to remove node image")
 	}
 
@@ -179,6 +213,15 @@ func (o *ops) WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string
 		"--image", o.installerConfig.CoreosImage)
 	if err != nil {
 		return errors.Wrapf(err, "failed to deploy container image %s to stateroot: %s", o.installerConfig.CoreosImage, out)
+	}
+
+	out, err = o.ExecPrivilegeCommand(liveLogger, "ostree", "admin", "finalize-staged")
+	if err != nil {
+		return errors.Wrapf(err, "failed to finalize staged deployment: %s", out)
+	}
+
+	if err = o.applyInstallKargs(liveLogger, installerArgs); err != nil {
+		return err
 	}
 
 	if slices.Contains(installerArgs, "--copy-network") || slices.Contains(installerArgs, "-n") {
