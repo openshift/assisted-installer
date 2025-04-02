@@ -83,6 +83,10 @@ const (
 	controllerDeployPodTemplate    = "assisted-installer-controller-pod.yaml.template"
 	renderedControllerSecret       = "assisted-installer-controller-secret.yaml"
 	controllerDeploySecretTemplate = "assisted-installer-controller-secret.yaml.template"
+	ostreeRepo                     = "/ostree/repo"
+	assistedInstallOSTreeRefName   = "assisted-installer/install-image"
+	nodeImageOSTreeRefName         = "coreos/node-image"
+	installStateRootName           = "install"
 	MustGatherFileName             = "must-gather.tar.gz"
 )
 
@@ -126,45 +130,7 @@ func (o *ops) SystemctlAction(action string, args ...string) error {
 	return errors.Wrapf(err, "Failed executing systemctl %s %s", action, args)
 }
 
-var ostreeOutputRegex = regexp.MustCompile(`Imported: (\w+)`)
-
-func (o *ops) importOSTreeCommit(liveLogger io.Writer) (string, error) {
-	ostreeReleasePullSpec := fmt.Sprintf("ostree-unverified-registry:%s", o.installerConfig.CoreosImage)
-	out, err := o.ExecPrivilegeCommand(liveLogger, "ostree", "container", "unencapsulate", "--authfile", dockerConfigFile, "--quiet", "--repo", "/ostree/repo", ostreeReleasePullSpec)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to unencapsulate rhcos payload image: %s", out)
-	}
-
-	matches := ostreeOutputRegex.FindStringSubmatch(out)
-	if matches == nil {
-		return "", fmt.Errorf("got unexpected output from unencapsulate: \"%s\"", out)
-	}
-
-	return matches[1], nil
-}
-
-func ostreeArgs(commit string, installerArgs []string) []string {
-	ostreeArgs := []string{"admin", "deploy",
-		"--stateroot", "install",
-		"--karg", "$ignition_firstboot",
-		"--karg", defaultIgnitionPlatformId,
-	}
-
-	lastArgIndex := len(installerArgs) - 1
-	for i, arg := range installerArgs {
-		if arg == "--append-karg" && i < lastArgIndex {
-			ostreeArgs = append(ostreeArgs, "--karg-append", installerArgs[i+1])
-			continue
-		}
-		if arg == "--delete-karg" && i < lastArgIndex {
-			ostreeArgs = append(ostreeArgs, "--karg-delete", installerArgs[i+1])
-			continue
-		}
-	}
-	return append(ostreeArgs, commit)
-}
-
-func (o *ops) WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string, installerArgs []string) error {
+func (o *ops) remountFilesystems(liveLogger io.Writer) error {
 	out, err := o.ExecPrivilegeCommand(liveLogger, "mount", "/sysroot", "-o", "remount,rw")
 	if err != nil {
 		return errors.Wrapf(err, "failed to remount sysroot: %s", out)
@@ -174,36 +140,110 @@ func (o *ops) WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string
 		return errors.Wrapf(err, "failed to remount boot: %s", out)
 	}
 
-	out, err = o.ExecPrivilegeCommand(liveLogger, "ostree", "admin", "stateroot-init", "install")
+	return nil
+}
+
+// Removes the node image reference if it still exists, but also ensure it isn't garbage collected just yet
+// Workaround until https://github.com/openshift/installer/pull/9570 is included in all 4.19 releases
+func (o *ops) removeNodeImage(liveLogger io.Writer) error {
+	if !o.FileExists(path.Join(ostreeRepo, "refs/heads", nodeImageOSTreeRefName)) {
+		return nil
+	}
+
+	o.log.Info("Removing existing node-image ref")
+
+	out, err := o.ExecPrivilegeCommand(liveLogger, "ostree", "refs", "--repo", ostreeRepo, "--delete", nodeImageOSTreeRefName)
+	if err != nil {
+		return errors.Wrapf(err, "failed deleting the coreos node image ref: %s", out)
+	}
+	out, err = o.ExecPrivilegeCommand(liveLogger, "touch", "/ostree/repo/tmp/node-image")
+	if err != nil {
+		return errors.Wrapf(err, "failed to update temp node image checkout: %s", out)
+	}
+
+	return nil
+}
+
+func (o *ops) installToNewStateroot(liveLogger io.Writer) error {
+	out, err := o.ExecPrivilegeCommand(liveLogger, "ostree", "admin", "stateroot-init", installStateRootName)
 	if err != nil {
 		return errors.Wrapf(err, "failed creating new stateroot: %s", out)
 	}
 
-	commit, err := o.importOSTreeCommit(liveLogger)
+	out, err = o.ExecPrivilegeCommand(liveLogger, "ostree", "container", "image", "deploy",
+		"--stateroot", installStateRootName,
+		"--sysroot", "/",
+		"--authfile", dockerConfigFile,
+		"--karg", "$ignition_firstboot",
+		"--karg", defaultIgnitionPlatformId,
+		"--image", o.installerConfig.CoreosImage)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to deploy container image %s to stateroot: %s", o.installerConfig.CoreosImage, out)
 	}
-	o.log.Infof("imported commit %s", commit)
 
-	out, err = o.ExecPrivilegeCommand(liveLogger, "ostree", ostreeArgs(commit, installerArgs)...)
+	out, err = o.ExecPrivilegeCommand(liveLogger, "ostree", "admin", "finalize-staged")
 	if err != nil {
-		return errors.Wrapf(err, "failed to deploy commit to stateroot: %s", out)
+		return errors.Wrapf(err, "failed to finalize staged deployment: %s", out)
 	}
 
-	if slices.Contains(installerArgs, "--copy-network") || slices.Contains(installerArgs, "-n") {
-		o.log.Info("copying network files from /etc/NetworkManager/system-connections to /boot/coreos-firstboot-network")
-		out, err = o.ExecPrivilegeCommand(liveLogger, "mkdir", "/boot/coreos-firstboot-network")
-		if err != nil {
-			return errors.Wrapf(err, "failed to create firstboot network directory: %s", out)
-		}
+	return nil
+}
 
-		out, err = o.ExecPrivilegeCommand(liveLogger, "sh", "-c", "cp /etc/NetworkManager/system-connections/* /boot/coreos-firstboot-network")
-		if err != nil {
-			return errors.Wrapf(err, "failed to copy network files to firstboot network directory: %s", out)
+func (o *ops) applyInstallKargs(liveLogger io.Writer, installerArgs []string) error {
+	commandArgs := []string{"kargs", "--os", installStateRootName}
+
+	lastArgIndex := len(installerArgs) - 1
+	for i, arg := range installerArgs {
+		if arg == "--append-karg" && i < lastArgIndex {
+			commandArgs = append(commandArgs, "--append", installerArgs[i+1])
+			continue
+		}
+		if arg == "--delete-karg" && i < lastArgIndex {
+			commandArgs = append(commandArgs, "--delete-if-present", installerArgs[i+1])
+			continue
 		}
 	}
 
-	out, err = o.ExecPrivilegeCommand(liveLogger, "mkdir", "/boot/ignition")
+	if len(commandArgs) == 3 {
+		return nil
+	}
+
+	o.log.Info("Modifying install kernel args")
+
+	out, err := o.ExecPrivilegeCommand(liveLogger, "rpm-ostree", commandArgs...)
+	if err != nil {
+		return errors.Wrapf(err, "failed to apply kargs modifications: %s", out)
+	}
+
+	out, err = o.ExecPrivilegeCommand(liveLogger, "ostree", "admin", "finalize-staged")
+	if err != nil {
+		return errors.Wrapf(err, "failed to finalize staged deployment after kargs application: %s", out)
+	}
+
+	return nil
+}
+
+func (o *ops) configureFirstBootNetworking(liveLogger io.Writer, installerArgs []string) error {
+	if !slices.Contains(installerArgs, "--copy-network") && !slices.Contains(installerArgs, "-n") {
+		return nil
+	}
+
+	o.log.Info("copying network files from /etc/NetworkManager/system-connections to /boot/coreos-firstboot-network")
+	out, err := o.ExecPrivilegeCommand(liveLogger, "mkdir", "/boot/coreos-firstboot-network")
+	if err != nil {
+		return errors.Wrapf(err, "failed to create firstboot network directory: %s", out)
+	}
+
+	out, err = o.ExecPrivilegeCommand(liveLogger, "sh", "-c", "cp /etc/NetworkManager/system-connections/* /boot/coreos-firstboot-network")
+	if err != nil {
+		return errors.Wrapf(err, "failed to copy network files to firstboot network directory: %s", out)
+	}
+
+	return nil
+}
+
+func (o *ops) configureFirstBootIgnition(liveLogger io.Writer, ignitionPath string) error {
+	out, err := o.ExecPrivilegeCommand(liveLogger, "mkdir", "/boot/ignition")
 	if err != nil {
 		return errors.Wrapf(err, "failed to create ignition directory: %s", out)
 	}
@@ -219,6 +259,30 @@ func (o *ops) WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string
 	}
 
 	return nil
+}
+
+func (o *ops) WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string, installerArgs []string) error {
+	if err := o.remountFilesystems(liveLogger); err != nil {
+		return err
+	}
+
+	if err := o.removeNodeImage(liveLogger); err != nil {
+		return errors.Wrap(err, "failed to remove node image")
+	}
+
+	if err := o.installToNewStateroot(liveLogger); err != nil {
+		return err
+	}
+
+	if err := o.applyInstallKargs(liveLogger, installerArgs); err != nil {
+		return err
+	}
+
+	if err := o.configureFirstBootNetworking(liveLogger, installerArgs); err != nil {
+		return err
+	}
+
+	return o.configureFirstBootIgnition(liveLogger, ignitionPath)
 }
 
 func (o *ops) WriteImageToDisk(liveLogger io.Writer, ignitionPath string, device string, extraArgs []string) error {
