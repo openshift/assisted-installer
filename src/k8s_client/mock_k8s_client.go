@@ -162,6 +162,21 @@ func (mr *MockK8SClientMockRecorder) GetAllInstallPlansOfSubscription(subscripti
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllInstallPlansOfSubscription", reflect.TypeOf((*MockK8SClient)(nil).GetAllInstallPlansOfSubscription), subscription)
 }
 
+// GetArbiterReplicas mocks base method.
+func (m *MockK8SClient) GetArbiterReplicas() (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetArbiterReplicas")
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetArbiterReplicas indicates an expected call of GetArbiterReplicas.
+func (mr *MockK8SClientMockRecorder) GetArbiterReplicas() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetArbiterReplicas", reflect.TypeOf((*MockK8SClient)(nil).GetArbiterReplicas))
+}
+
 // GetBMH mocks base method.
 func (m *MockK8SClient) GetBMH(name string) (*v1alpha1.BareMetalHost, error) {
 	m.ctrl.T.Helper()
@@ -477,21 +492,6 @@ func (mr *MockK8SClientMockRecorder) ListMachines() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListMachines", reflect.TypeOf((*MockK8SClient)(nil).ListMachines))
 }
 
-// ListMasterNodes mocks base method.
-func (m *MockK8SClient) ListMasterNodes() (*v12.NodeList, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListMasterNodes")
-	ret0, _ := ret[0].(*v12.NodeList)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListMasterNodes indicates an expected call of ListMasterNodes.
-func (mr *MockK8SClientMockRecorder) ListMasterNodes() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListMasterNodes", reflect.TypeOf((*MockK8SClient)(nil).ListMasterNodes))
-}
-
 // ListNodes mocks base method.
 func (m *MockK8SClient) ListNodes() (*v12.NodeList, error) {
 	m.ctrl.T.Helper()
@@ -505,6 +505,21 @@ func (m *MockK8SClient) ListNodes() (*v12.NodeList, error) {
 func (mr *MockK8SClientMockRecorder) ListNodes() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListNodes", reflect.TypeOf((*MockK8SClient)(nil).ListNodes))
+}
+
+// ListNodesByRole mocks base method.
+func (m *MockK8SClient) ListNodesByRole(role string) (*v12.NodeList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListNodesByRole", role)
+	ret0, _ := ret[0].(*v12.NodeList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListNodesByRole indicates an expected call of ListNodesByRole.
+func (mr *MockK8SClientMockRecorder) ListNodesByRole(role any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListNodesByRole", reflect.TypeOf((*MockK8SClient)(nil).ListNodesByRole), role)
 }
 
 // ListServices mocks base method.
