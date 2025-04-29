@@ -300,19 +300,31 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					}
 				}
 				WaitMasterNodesSucccessWithCluster := func(cluster *models.Cluster) {
+					mockk8sclient.EXPECT().GetControlPlaneReplicas().Return(3, nil).Times(1)
 					mockbmclient.EXPECT().GetEnabledHostsNamesHosts(gomock.Any(), gomock.Any()).Return(inventoryNamesHost, nil).AnyTimes()
-					mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(map[string]string{}), nil).Times(1)
+					mockk8sclient.EXPECT().ListNodesByRole("master").Return(GetKubeNodes(map[string]string{}), nil).Times(1)
 					kubeNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65"}
-					mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
+					mockk8sclient.EXPECT().ListNodesByRole("master").Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
 					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), inventoryNamesHost["node0"].Host.InfraEnvID.String(), inventoryNamesHost["node0"].Host.ID.String(), models.HostStageJoined, "").Times(1)
 					kubeNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65",
 						"node1": "eb82821f-bf21-4614-9a3b-ecb07929f238"}
-					mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
+					mockk8sclient.EXPECT().ListNodesByRole("master").Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
 					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), inventoryNamesHost["node1"].Host.InfraEnvID.String(), inventoryNamesHost["node1"].Host.ID.String(), models.HostStageJoined, "").Times(1)
 					mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(cluster, nil).Times(2)
 				}
 				WaitMasterNodesSucccess := func() {
 					WaitMasterNodesSucccessWithCluster(&models.Cluster{})
+				}
+				WaitArbiterNodesSucccessWithoutArbiter := func() {
+					mockk8sclient.EXPECT().GetArbiterReplicas().Return(0, nil).Times(1)
+				}
+				WaitArbiterNodesSucccessWithArbiter := func() {
+					mockk8sclient.EXPECT().GetArbiterReplicas().Return(1, nil).Times(1)
+					mockbmclient.EXPECT().GetEnabledHostsNamesHosts(gomock.Any(), gomock.Any()).Return(inventoryNamesHost, nil).AnyTimes()
+					mockk8sclient.EXPECT().ListNodesByRole("arbiter").Return(GetKubeNodes(map[string]string{}), nil).Times(1)
+					kubeNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65"}
+					mockk8sclient.EXPECT().ListNodesByRole("arbiter").Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
+					mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), inventoryNamesHost["node0"].Host.InfraEnvID.String(), inventoryNamesHost["node0"].Host.ID.String(), models.HostStageJoined, "").Times(1)
 				}
 				prepareControllerSuccess := func() {
 					mockops.EXPECT().PrepareController().Return(nil).Times(1)
@@ -379,6 +391,42 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							checkOcBinary(true)
 							startServicesSuccess()
 							WaitMasterNodesSucccess()
+							WaitArbiterNodesSucccessWithoutArbiter()
+							waitForBootkubeSuccess()
+							bootkubeStatusSuccess()
+							waitForETCDBootstrapSuccess()
+							bootstrapETCDStatusSuccess()
+							resolvConfSuccess()
+							waitForControllerSuccessfully(conf.ClusterID)
+							//HostRoleMaster flow:
+							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
+							writeToDiskSuccess(gomock.Any())
+							reportLogProgressSuccess()
+							setBootOrderSuccess()
+							uploadLogsSuccess(true)
+							ironicAgentDoesntExist()
+							rebootSuccess()
+							getEncapsulatedMcSuccess(nil)
+							overwriteImageSuccess()
+							ret := installerObj.InstallNode()
+							Expect(ret).Should(BeNil())
+						})
+						It("bootstrap role happy flow with arbiter", func() {
+							updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+								{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
+								{string(models.HostStageWaitingForControlPlane), waitingForMastersStatusInfo},
+								{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+								{string(models.HostStageWritingImageToDisk)},
+								{string(models.HostStageRebooting)},
+							})
+							bootstrapSetup()
+							checkLocalHostname("notlocalhost", nil)
+							restartNetworkManager(nil)
+							prepareControllerSuccess()
+							checkOcBinary(true)
+							startServicesSuccess()
+							WaitMasterNodesSucccess()
+							WaitArbiterNodesSucccessWithArbiter()
 							waitForBootkubeSuccess()
 							bootkubeStatusSuccess()
 							waitForETCDBootstrapSuccess()
@@ -415,6 +463,44 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							checkOcBinary(true)
 							startServicesSuccess()
 							WaitMasterNodesSucccess()
+							WaitArbiterNodesSucccessWithoutArbiter()
+							waitForBootkubeSuccess()
+							bootkubeStatusSuccess()
+							waitForETCDBootstrapSuccess()
+							bootstrapETCDStatusSuccess()
+							resolvConfSuccess()
+							waitForControllerSuccessfully(conf.ClusterID)
+							//HostRoleMaster flow:
+							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
+							writeToDiskSuccess(gomock.Any())
+							reportLogProgressSuccess()
+							setBootOrderSuccess()
+							uploadLogsSuccess(true)
+							ironicAgentDoesntExist()
+							rebootSuccess()
+							getEncapsulatedMcSuccess(nil)
+							overwriteImageSuccess()
+							ret := installerObj.InstallNode()
+							Expect(ret).Should(BeNil())
+						})
+						It("bootstrap role happy flow on RHEL-only bootimage with arbiter", func() {
+							updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+								{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
+								{string(models.HostStageWaitingForControlPlane), waitingForMastersStatusInfo},
+								{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+								{string(models.HostStageWritingImageToDisk)},
+								{string(models.HostStageRebooting)},
+							})
+							bootstrapSetup()
+							checkLocalHostname("notlocalhost", nil)
+							restartNetworkManager(nil)
+							prepareControllerSuccess()
+							checkOcBinary(false)
+							overlayNodeImage(false)
+							checkOcBinary(true)
+							startServicesSuccess()
+							WaitMasterNodesSucccess()
+							WaitArbiterNodesSucccessWithArbiter()
 							waitForBootkubeSuccess()
 							bootkubeStatusSuccess()
 							waitForETCDBootstrapSuccess()
@@ -460,6 +546,42 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							checkOcBinary(true)
 							startServicesSuccess()
 							WaitMasterNodesSucccess()
+							WaitArbiterNodesSucccessWithoutArbiter()
+							waitForBootkubeSuccess()
+							bootkubeStatusSuccess()
+							waitForETCDBootstrapSuccess()
+							bootstrapETCDStatusSuccess()
+							resolvConfSuccess()
+							waitForControllerSuccessfully(conf.ClusterID)
+							//HostRoleMaster flow:
+							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
+							writeToDiskSuccess(gomock.Any())
+							reportLogProgressSuccess()
+							setBootOrderSuccess()
+							uploadLogsSuccess(true)
+							ironicAgentDoesntExist()
+							rebootSuccess()
+							getEncapsulatedMcSuccess(nil)
+							overwriteImageSuccess()
+							ret := installerObj.InstallNode()
+							Expect(ret).Should(BeNil())
+						})
+						It("bootstrap role happy flow with invalid hostname with arbiter", func() {
+							updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+								{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
+								{string(models.HostStageWaitingForControlPlane), waitingForMastersStatusInfo},
+								{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+								{string(models.HostStageWritingImageToDisk)},
+								{string(models.HostStageRebooting)},
+							})
+							bootstrapSetup()
+							checkLocalHostname("InvalidHostname", nil)
+							restartNetworkManager(nil)
+							prepareControllerSuccess()
+							checkOcBinary(true)
+							startServicesSuccess()
+							WaitMasterNodesSucccess()
+							WaitArbiterNodesSucccessWithArbiter()
 							waitForBootkubeSuccess()
 							bootkubeStatusSuccess()
 							waitForETCDBootstrapSuccess()
@@ -494,6 +616,43 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							checkOcBinary(true)
 							startServicesSuccess()
 							WaitMasterNodesSucccess()
+							WaitArbiterNodesSucccessWithoutArbiter()
+							waitForBootkubeSuccess()
+							bootkubeStatusSuccess()
+							waitForETCDBootstrapSuccess()
+							bootstrapETCDStatusSuccess()
+							resolvConfSuccess()
+							waitForControllerSuccessfully(conf.ClusterID)
+							//HostRoleMaster flow:
+							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
+							writeToDiskSuccess(gomock.Any())
+							setBootOrderSuccess()
+							uploadLogsSuccess(true)
+							reportLogProgressSuccess()
+							ironicAgentDoesntExist()
+							rebootSuccess()
+							kargs := []string{"arg1", "arg2=val2"}
+							getEncapsulatedMcSuccess(kargs)
+							overwriteImageSuccess(kargs...)
+							ret := installerObj.InstallNode()
+							Expect(ret).Should(BeNil())
+						})
+						It("bootstrap role happy flow ovn-kubernetes with arbiter", func() {
+							updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+								{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
+								{string(models.HostStageWaitingForControlPlane), waitingForMastersStatusInfo},
+								{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+								{string(models.HostStageWritingImageToDisk)},
+								{string(models.HostStageRebooting)},
+							})
+							bootstrapSetup()
+							checkLocalHostname("localhost", nil)
+							restartNetworkManager(nil)
+							prepareControllerSuccess()
+							checkOcBinary(true)
+							startServicesSuccess()
+							WaitMasterNodesSucccess()
+							WaitArbiterNodesSucccessWithArbiter()
 							waitForBootkubeSuccess()
 							bootkubeStatusSuccess()
 							waitForETCDBootstrapSuccess()
@@ -533,6 +692,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 									Type: models.PlatformTypeBaremetal.Pointer(),
 								},
 							})
+							WaitArbiterNodesSucccessWithoutArbiter()
 							waitForBootkubeSuccess()
 							bootkubeStatusSuccess()
 							waitForETCDBootstrapSuccess()
@@ -586,6 +746,43 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					checkOcBinary(true)
 					startServicesSuccess()
 					WaitMasterNodesSucccess()
+					WaitArbiterNodesSucccessWithoutArbiter()
+					waitForBootkubeSuccess()
+					bootkubeStatusSuccess()
+					waitForETCDBootstrapSuccess()
+					bootstrapETCDStatusSuccess()
+					resolvConfSuccess()
+					waitForControllerSuccessfully(conf.ClusterID)
+					//HostRoleMaster flow:
+					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
+					writeToDiskSuccess(gomock.Any())
+					setBootOrderSuccess()
+					uploadLogsSuccess(true)
+					reportLogProgressSuccess()
+					ironicAgentDoesntExist()
+					rebootSuccess()
+					getEncapsulatedMcSuccess(nil)
+					overwriteImageSuccess()
+					ret := installerObj.InstallNode()
+					Expect(ret).Should(BeNil())
+				})
+				It("bootstrap role extract ignition retry with arbiter", func() {
+					updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+						{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
+						{string(models.HostStageWaitingForControlPlane), waitingForMastersStatusInfo},
+						{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+						{string(models.HostStageWritingImageToDisk)},
+						{string(models.HostStageRebooting)},
+					})
+					extractIgnitionToFS("extract failure", fmt.Errorf("extract failed"))
+					bootstrapSetup()
+					checkLocalHostname("notlocalhost", nil)
+					restartNetworkManager(nil)
+					prepareControllerSuccess()
+					checkOcBinary(true)
+					startServicesSuccess()
+					WaitMasterNodesSucccess()
+					WaitArbiterNodesSucccessWithArbiter()
 					waitForBootkubeSuccess()
 					bootkubeStatusSuccess()
 					waitForETCDBootstrapSuccess()
@@ -681,13 +878,14 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							checkOcBinary(true)
 							startServicesSuccess()
 
+							mockk8sclient.EXPECT().GetControlPlaneReplicas().Return(3, nil).Times(1)
 							mockbmclient.EXPECT().GetEnabledHostsNamesHosts(gomock.Any(), gomock.Any()).Return(inventoryNamesHost, nil).AnyTimes()
-							mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(map[string]string{}), nil).Times(1)
+							mockk8sclient.EXPECT().ListNodesByRole("master").Return(GetKubeNodes(map[string]string{}), nil).Times(1)
 							kubeNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65"}
-							mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
+							mockk8sclient.EXPECT().ListNodesByRole("master").Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
 							mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), inventoryNamesHost["node0"].Host.InfraEnvID.String(), inventoryNamesHost["node0"].Host.ID.String(), models.HostStageJoined, "").Times(1)
 							// node not ready
-							mockk8sclient.EXPECT().ListMasterNodes().Return(GetNotReadyKubeNodes(kubeNamesIds), nil).Times(1)
+							mockk8sclient.EXPECT().ListNodesByRole("master").Return(GetNotReadyKubeNodes(kubeNamesIds), nil).Times(1)
 							mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(cluster, nil).Times(2)
 							if expectedRemoveUninitializedTaint {
 								mockk8sclient.EXPECT().UntaintNode("node0").Return(nil).Times(1)
@@ -695,11 +893,12 @@ var _ = Describe("installer HostRoleMaster role", func() {
 								mockk8sclient.EXPECT().UntaintNode(gomock.Any()).Times(0)
 							}
 							// node becomes ready
-							mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
+							mockk8sclient.EXPECT().ListNodesByRole("master").Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
 							kubeNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65",
 								"node1": "eb82821f-bf21-4614-9a3b-ecb07929f238"}
-							mockk8sclient.EXPECT().ListMasterNodes().Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
+							mockk8sclient.EXPECT().ListNodesByRole("master").Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
 							mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), inventoryNamesHost["node1"].Host.InfraEnvID.String(), inventoryNamesHost["node1"].Host.ID.String(), models.HostStageJoined, "").Times(1)
+							mockk8sclient.EXPECT().GetArbiterReplicas().Return(0, nil).Times(1)
 							waitForBootkubeSuccess()
 							bootkubeStatusSuccess()
 							waitForETCDBootstrapSuccess()

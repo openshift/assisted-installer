@@ -48,7 +48,7 @@ import (
 
 //go:generate mockgen -source=k8s_client.go -package=k8s_client -destination=mock_k8s_client.go
 type K8SClient interface {
-	ListMasterNodes() (*v1.NodeList, error)
+	ListNodesByRole(role string) (*v1.NodeList, error)
 	EnableRouterAccessLogs() error
 	ListNodes() (*v1.NodeList, error)
 	ListMachines() (*machinev1beta1.MachineList, error)
@@ -73,6 +73,7 @@ type K8SClient interface {
 	GetClusterVersion() (*configv1.ClusterVersion, error)
 	GetServiceNetworks() ([]string, error)
 	GetControlPlaneReplicas() (int, error)
+	GetArbiterReplicas() (int, error)
 	ListServices(namespace string) (*v1.ServiceList, error)
 	ListEvents(namespace string) (*v1.EventList, error)
 	ListClusterOperators() (*configv1.ClusterOperatorList, error)
@@ -164,8 +165,8 @@ func NewK8SClient(configPath string, logger logrus.FieldLogger) (K8SClient, erro
 		configClient.Proxies(), configClient}, nil
 }
 
-func (c *k8sClient) ListMasterNodes() (*v1.NodeList, error) {
-	nodes, err := c.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: "node-role.kubernetes.io/master"})
+func (c *k8sClient) ListNodesByRole(role string) (*v1.NodeList, error) {
+	nodes, err := c.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: fmt.Sprintf("node-role.kubernetes.io/%s", role)})
 	if err != nil {
 		return &v1.NodeList{}, err
 	}
@@ -285,6 +286,27 @@ func (c *k8sClient) GetControlPlaneReplicas() (int, error) {
 		return 0, errors.Wrapf(err, "Failed to unmarshal %s", installConfig)
 	}
 	return controlPlaneDecoder.ControlPlane.Replicas, nil
+}
+
+func (c *k8sClient) GetArbiterReplicas() (int, error) {
+	installConfig, err := c.getInstallConfig()
+	if err != nil {
+		return 0, err
+	}
+
+	var arbiterDecoder struct {
+		Arbiter *struct {
+			Replicas int `yaml:"replicas"`
+		} `yaml:"arbiter,omitempty"`
+	}
+	err = yaml.Unmarshal([]byte(installConfig), &arbiterDecoder)
+	if err != nil {
+		return 0, errors.Wrapf(err, "Failed to unmarshal %s", installConfig)
+	}
+	if arbiterDecoder.Arbiter == nil {
+		return 0, nil
+	}
+	return arbiterDecoder.Arbiter.Replicas, nil
 }
 
 func updateItem(item *yaml.MapItem, path []string, value string) error {

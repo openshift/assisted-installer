@@ -588,6 +588,10 @@ func (i *installer) waitForControlPlane(ctx context.Context) error {
 		return err
 	}
 
+	if err = i.waitForMinArbiterNodes(ctx, kc, cluster.Platform, hasValidvSphereCredentials); err != nil {
+		return err
+	}
+
 	i.waitForBootkube(ctx)
 	if err = i.waitForETCDBootstrap(ctx); err != nil {
 		i.log.Error(err)
@@ -661,7 +665,25 @@ func (i *installer) workerWaitFor2ReadyMasters(ctx context.Context) error {
 }
 
 func (i *installer) waitForMinMasterNodes(ctx context.Context, kc k8s_client.K8SClient, platform *models.Platform, hasValidCredentials bool) error {
-	i.waitForMasterNodes(ctx, minMasterNodes, kc, platform, hasValidCredentials)
+	controlPlaneReplicas, err := kc.GetControlPlaneReplicas()
+	if err != nil {
+		i.log.WithError(err).Error("Failed to get the cluster's control plane replicas")
+		return err
+	}
+	i.waitForNodes(ctx, min(controlPlaneReplicas-1, minMasterNodes), "master", kc, platform, hasValidCredentials)
+	return nil
+}
+
+func (i *installer) waitForMinArbiterNodes(ctx context.Context, kc k8s_client.K8SClient, platform *models.Platform, hasValidCredentials bool) error {
+	arbiterReplicas, err := kc.GetArbiterReplicas()
+	if err != nil {
+		i.log.WithError(err).Error("Failed to get the cluster's arbiter replicas")
+		return err
+	}
+	if arbiterReplicas != 0 {
+		i.log.Info("Cluster has arbiter nodes, waiting for at least 1 ready arbiter node")
+		i.waitForNodes(ctx, 1, "arbiter", kc, platform, hasValidCredentials)
+	}
 	return nil
 }
 
@@ -786,20 +808,20 @@ func (i *installer) wasControllerReadyEventSet(kc k8s_client.K8SClient, previous
 	return readyEventFound
 }
 
-// wait for minimum master nodes to be in ready status
-func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, kc k8s_client.K8SClient, platform *models.Platform, hasValidvSphereCredentials bool) {
-	var readyMasters []string
+// wait for minimum nodes in a given role to be in ready status
+func (i *installer) waitForNodes(ctx context.Context, minNodes int, role string, kc k8s_client.K8SClient, platform *models.Platform, hasValidvSphereCredentials bool) {
+	var readyNodes []string
 	var inventoryHostsMap map[string]inventory_client.HostData
-	i.log.Infof("Waiting for %d master nodes", minMasterNodes)
-	sufficientMasterNodes := func() bool {
+	i.log.Infof("Waiting for %d %s nodes", minNodes, role)
+	sufficientNodes := func() bool {
 		var err error
 		inventoryHostsMap, err = i.getInventoryHostsMap(inventoryHostsMap)
 		if err != nil {
 			return false
 		}
-		nodes, err := kc.ListMasterNodes()
+		nodes, err := kc.ListNodesByRole(role)
 		if err != nil {
-			i.log.Warnf("Still waiting for master nodes: %v", err)
+			i.log.Warnf("Still waiting for %s nodes: %v", role, err)
 			return false
 		}
 
@@ -823,15 +845,15 @@ func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, 
 				}
 			}
 		}
-		if err = i.updateReadyMasters(nodes, &readyMasters, inventoryHostsMap); err != nil {
-			i.log.WithError(err).Warnf("Failed to update ready with masters")
+		if err = i.updateReadyNodes(nodes, role, &readyNodes, inventoryHostsMap); err != nil {
+			i.log.WithError(err).Warnf("Failed to update ready %s nodes", role)
 			// Re-fetch inventory on next invocation
 			inventoryHostsMap = nil
 			return false
 		}
-		i.log.Infof("Found %d ready master nodes", len(readyMasters))
-		if len(readyMasters) >= minMasterNodes {
-			i.log.Infof("Waiting for master nodes - Done")
+		i.log.Infof("Found %d ready %s nodes", len(readyNodes), role)
+		if len(readyNodes) >= minNodes {
+			i.log.Infof("Waiting for %s nodes - Done", role)
 			return true
 		}
 		return false
@@ -840,11 +862,11 @@ func (i *installer) waitForMasterNodes(ctx context.Context, minMasterNodes int, 
 	for {
 		select {
 		case <-ctx.Done():
-			i.log.Info("Context cancelled, terminating wait for master nodes\n")
+			i.log.Infof("Context cancelled, terminating wait for %s nodes\n", role)
 			return
 		case <-time.After(generalWaitInterval):
-			// check if we have sufficient master nodes is done every 5 seconds
-			if sufficientMasterNodes() {
+			// check if we have sufficient nodes is done every 5 seconds
+			if sufficientNodes() {
 				return
 			}
 		}
@@ -872,16 +894,16 @@ func (i *installer) getInventoryHostsMap(hostsMap map[string]inventory_client.Ho
 	return hostsMap, nil
 }
 
-func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]string, inventoryHostsMap map[string]inventory_client.HostData) error {
+func (i *installer) updateReadyNodes(nodes *v1.NodeList, role string, readyNodes *[]string, inventoryHostsMap map[string]inventory_client.HostData) error {
 	nodeNameAndCondition := map[string][]v1.NodeCondition{}
 	knownIpAddresses := common.BuildHostsMapIPAddressBased(inventoryHostsMap)
 
 	for _, node := range nodes.Items {
 		nodeNameAndCondition[node.Name] = node.Status.Conditions
-		if common.IsK8sNodeIsReady(node) && !funk.ContainsString(*readyMasters, node.Name) {
+		if common.IsK8sNodeIsReady(node) && !funk.ContainsString(*readyNodes, node.Name) {
 			ctx := utils.GenerateRequestContext()
 			log := utils.RequestIDLogger(ctx, i.log)
-			log.Infof("Found a new ready master node %s with id %s", node.Name, node.Status.NodeInfo.SystemUUID)
+			log.Infof("Found a new ready %s node %s with id %s", role, node.Name, node.Status.NodeInfo.SystemUUID)
 
 			host, ok := common.HostMatchByNameOrIPAddress(node, inventoryHostsMap, knownIpAddresses)
 			if ok && (host.Host.Status == nil || *host.Host.Status != models.HostStatusInstalled) {
@@ -890,14 +912,14 @@ func (i *installer) updateReadyMasters(nodes *v1.NodeList, readyMasters *[]strin
 					return err
 				}
 			}
-			*readyMasters = append(*readyMasters, node.Name)
+			*readyNodes = append(*readyNodes, node.Name)
 			if !ok {
 				return fmt.Errorf("node %s is not in inventory hosts", node.Name)
 			}
 		}
 	}
 
-	i.log.Infof("Found %d master nodes: %+v", len(nodes.Items), nodeNameAndCondition)
+	i.log.Infof("Found %d %s nodes: %+v", len(nodes.Items), role, nodeNameAndCondition)
 	return nil
 }
 

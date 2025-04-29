@@ -283,7 +283,7 @@ dEFgad6P3hMZTOg7yVkMOd3QtgVQ9I8dXqS2nG9EMEh97WIhi6f5ztvcQvQ5tXjh
 func PrepareInstallerDryK8sMock(mockk8sclient *k8s_client.MockK8SClient, logger logrus.FieldLogger, o ops.Ops, clusterHosts config.DryClusterHosts) {
 	// The installer compares AI host objects to cluster Node objects (either by name or by IP) to check which AI hosts are already
 	// joined as nodes. This fakes the node list so that check will pass
-	mockk8sclient.EXPECT().ListMasterNodes().DoAndReturn(func() (*v1.NodeList, error) {
+	mockk8sclient.EXPECT().ListNodesByRole(gomock.Any()).DoAndReturn(func() (*v1.NodeList, error) {
 		nodeListPopulated := mockNodeList(mockk8sclient, clusterHosts, o)
 		return &nodeListPopulated, nil
 	}).AnyTimes()
