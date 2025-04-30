@@ -300,7 +300,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					}
 				}
 				WaitMasterNodesSucccessWithCluster := func(cluster *models.Cluster) {
-					mockk8sclient.EXPECT().GetControlPlaneReplicas().Return(3, nil).Times(1)
+					mockk8sclient.EXPECT().GetControlPlaneReplicas().Return(3, nil).AnyTimes()
 					mockbmclient.EXPECT().GetEnabledHostsNamesHosts(gomock.Any(), gomock.Any()).Return(inventoryNamesHost, nil).AnyTimes()
 					mockk8sclient.EXPECT().ListNodesByRole("master").Return(GetKubeNodes(map[string]string{}), nil).Times(1)
 					kubeNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65"}
@@ -316,10 +316,10 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					WaitMasterNodesSucccessWithCluster(&models.Cluster{})
 				}
 				WaitArbiterNodesSucccessWithoutArbiter := func() {
-					mockk8sclient.EXPECT().GetArbiterReplicas().Return(0, nil).Times(1)
+					mockk8sclient.EXPECT().GetArbiterReplicas().Return(0, nil).AnyTimes()
 				}
 				WaitArbiterNodesSucccessWithArbiter := func() {
-					mockk8sclient.EXPECT().GetArbiterReplicas().Return(1, nil).Times(1)
+					mockk8sclient.EXPECT().GetArbiterReplicas().Return(1, nil).AnyTimes()
 					mockbmclient.EXPECT().GetEnabledHostsNamesHosts(gomock.Any(), gomock.Any()).Return(inventoryNamesHost, nil).AnyTimes()
 					mockk8sclient.EXPECT().ListNodesByRole("arbiter").Return(GetKubeNodes(map[string]string{}), nil).Times(1)
 					kubeNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65"}
@@ -878,7 +878,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							checkOcBinary(true)
 							startServicesSuccess()
 
-							mockk8sclient.EXPECT().GetControlPlaneReplicas().Return(3, nil).Times(1)
+							mockk8sclient.EXPECT().GetControlPlaneReplicas().Return(3, nil).AnyTimes()
 							mockbmclient.EXPECT().GetEnabledHostsNamesHosts(gomock.Any(), gomock.Any()).Return(inventoryNamesHost, nil).AnyTimes()
 							mockk8sclient.EXPECT().ListNodesByRole("master").Return(GetKubeNodes(map[string]string{}), nil).Times(1)
 							kubeNamesIds = map[string]string{"node0": "7916fa89-ea7a-443e-a862-b3e930309f65"}
@@ -898,7 +898,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 								"node1": "eb82821f-bf21-4614-9a3b-ecb07929f238"}
 							mockk8sclient.EXPECT().ListNodesByRole("master").Return(GetKubeNodes(kubeNamesIds), nil).Times(1)
 							mockbmclient.EXPECT().UpdateHostInstallProgress(gomock.Any(), inventoryNamesHost["node1"].Host.InfraEnvID.String(), inventoryNamesHost["node1"].Host.ID.String(), models.HostStageJoined, "").Times(1)
-							mockk8sclient.EXPECT().GetArbiterReplicas().Return(0, nil).Times(1)
+							mockk8sclient.EXPECT().GetArbiterReplicas().Return(0, nil).AnyTimes()
 							waitForBootkubeSuccess()
 							bootkubeStatusSuccess()
 							waitForETCDBootstrapSuccess()

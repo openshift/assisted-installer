@@ -665,25 +665,12 @@ func (i *installer) workerWaitFor2ReadyMasters(ctx context.Context) error {
 }
 
 func (i *installer) waitForMinMasterNodes(ctx context.Context, kc k8s_client.K8SClient, platform *models.Platform, hasValidCredentials bool) error {
-	controlPlaneReplicas, err := kc.GetControlPlaneReplicas()
-	if err != nil {
-		i.log.WithError(err).Error("Failed to get the cluster's control plane replicas")
-		return err
-	}
-	i.waitForNodes(ctx, min(controlPlaneReplicas-1, minMasterNodes), "master", kc, platform, hasValidCredentials)
+	i.waitForNodes(ctx, minMasterNodes, "master", kc.GetControlPlaneReplicas, kc, platform, hasValidCredentials)
 	return nil
 }
 
 func (i *installer) waitForMinArbiterNodes(ctx context.Context, kc k8s_client.K8SClient, platform *models.Platform, hasValidCredentials bool) error {
-	arbiterReplicas, err := kc.GetArbiterReplicas()
-	if err != nil {
-		i.log.WithError(err).Error("Failed to get the cluster's arbiter replicas")
-		return err
-	}
-	if arbiterReplicas != 0 {
-		i.log.Info("Cluster has arbiter nodes, waiting for at least 1 ready arbiter node")
-		i.waitForNodes(ctx, 1, "arbiter", kc, platform, hasValidCredentials)
-	}
+	i.waitForNodes(ctx, 1, "arbiter", kc.GetArbiterReplicas, kc, platform, hasValidCredentials)
 	return nil
 }
 
@@ -809,12 +796,30 @@ func (i *installer) wasControllerReadyEventSet(kc k8s_client.K8SClient, previous
 }
 
 // wait for minimum nodes in a given role to be in ready status
-func (i *installer) waitForNodes(ctx context.Context, minNodes int, role string, kc k8s_client.K8SClient, platform *models.Platform, hasValidvSphereCredentials bool) {
+func (i *installer) waitForNodes(ctx context.Context, minNodes int, role string, getNumNodesFn func() (int, error), kc k8s_client.K8SClient, platform *models.Platform, hasValidvSphereCredentials bool) {
 	var readyNodes []string
 	var inventoryHostsMap map[string]inventory_client.HostData
-	i.log.Infof("Waiting for %d %s nodes", minNodes, role)
+	i.log.Infof("Waiting for %s nodes", role)
 	sufficientNodes := func() bool {
 		var err error
+		numNodes, err := getNumNodesFn()
+		if err != nil {
+			i.log.Warn("Still waiting for the kube API server to be available to check node replicas are expected")
+			return false
+		}
+		if numNodes < 1 {
+			i.log.Infof("Waiting for %s nodes not needed as %d of this node was specified in the install config", role, numNodes)
+			return true
+		}
+		var trueMinNodes int
+		if role == "master" {
+			trueMinNodes = min(numNodes-1, minNodes)
+		} else if role == "arbiter" {
+			i.log.Info("Cluster has at least 1 arbiter node, waiting for at least 1 arbiter node to be ready")
+			trueMinNodes = 1
+		}
+		i.log.Infof("Waiting for %d %s nodes", trueMinNodes, role)
+
 		inventoryHostsMap, err = i.getInventoryHostsMap(inventoryHostsMap)
 		if err != nil {
 			return false
@@ -852,7 +857,7 @@ func (i *installer) waitForNodes(ctx context.Context, minNodes int, role string,
 			return false
 		}
 		i.log.Infof("Found %d ready %s nodes", len(readyNodes), role)
-		if len(readyNodes) >= minNodes {
+		if len(readyNodes) >= trueMinNodes {
 			i.log.Infof("Waiting for %s nodes - Done", role)
 			return true
 		}
