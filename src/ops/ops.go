@@ -1040,6 +1040,8 @@ func partitionNameForDeviceName(deviceName, partitionNumber string) string {
 		format = "%sp%s"
 	case strings.HasPrefix(deviceName, "mmcblk"):
 		format = "%sP%s"
+	case strings.HasPrefix(deviceName, "dm-"):
+		format = "%s-%s"
 	default:
 		format = "%s%s"
 	}
@@ -1078,7 +1080,7 @@ func (o *ops) calculateFreePercent(device string) (int64, error) {
 	partitionName := partitionNameForDeviceName(diskNode.Name, "4")
 	partitionNode, ok = funk.Find(diskNode.Children, func(n *node) bool { return partitionName == n.Name }).(*node)
 	if !ok {
-		return 0, errors.Errorf("failed to find partition node %s in lsblk output", device)
+		return 0, errors.Errorf("failed to find partition node %s in lsblk output", partitionName)
 	}
 	var usedSize int64
 	funk.ForEach(diskNode.Children, func(n *node) { usedSize += n.Size })
