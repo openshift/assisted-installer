@@ -580,6 +580,17 @@ func (c *controller) waitForOLMOperators(ctx context.Context) error {
 		errs = append(errs, err)
 	}
 
+	// Wait for all CSVs to be successful
+	c.updateFinalizingProgress(ctx, models.FinalizingStageWaitingForOlmOperatorsCsv)
+	err = c.waitForCSV(ctx)
+	if err != nil {
+		err = errors.Wrap(err, "Stopped waiting for OLM operators be installed")
+		c.log.WithError(err).Warning("Installing OLM operators")
+
+		// We continue in case of failure, because we want to try to apply manifest at least for operators which are ready.
+		errs = append(errs, err)
+	}
+
 	// Apply post install manifests
 	c.updateFinalizingProgress(ctx, models.FinalizingStageApplyingOlmManifests)
 	err = utils.WaitForeverForPredicateWithCancel(ctx, GeneralWaitInterval, utils.ToPredicate(c.applyPostInstallManifests, operators),
@@ -591,14 +602,6 @@ func (c *controller) waitForOLMOperators(ctx context.Context) error {
 		errs = append(errs, err)
 	}
 
-	c.updateFinalizingProgress(ctx, models.FinalizingStageWaitingForOlmOperatorsCsv)
-	err = c.waitForCSV(ctx)
-	if err != nil {
-		err = errors.Wrap(err, "Stopped waiting for OLM operators be installed")
-		c.log.WithError(err).Warning("Installing OLM operators")
-
-		errs = append(errs, err)
-	}
 	return stderrors.Join(errs...)
 }
 
