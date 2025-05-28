@@ -669,7 +669,7 @@ var _ = Describe("WriteImageToExistingRoot", func() {
 		expectExec("", nil, "ostree", "admin", "finalize-staged")
 
 		expectExec("", nil, "mkdir", "/boot/coreos-firstboot-network")
-		expectExec("", nil, "sh", "-c", "cp /etc/NetworkManager/system-connections/* /boot/coreos-firstboot-network")
+		expectExec("", nil, "rsync", "-av", "/etc/NetworkManager/system-connections/", "/boot/coreos-firstboot-network/")
 		expectIgnitionSetup()
 
 		installerArgs := []string{"-n"}
@@ -690,7 +690,7 @@ var _ = Describe("WriteImageToExistingRoot", func() {
 		expectExec("", nil, "ostree", "admin", "finalize-staged")
 
 		expectExec("", nil, "mkdir", "/boot/coreos-firstboot-network")
-		expectExec("", nil, "sh", "-c", "cp /etc/NetworkManager/system-connections/* /boot/coreos-firstboot-network")
+		expectExec("", nil, "rsync", "-av", "/etc/NetworkManager/system-connections/", "/boot/coreos-firstboot-network/")
 		expectIgnitionSetup()
 
 		installerArgs := []string{"--copy-network"}

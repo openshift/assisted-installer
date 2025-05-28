@@ -236,7 +236,7 @@ func (o *ops) configureFirstBootNetworking(liveLogger io.Writer, installerArgs [
 		return errors.Wrapf(err, "failed to create firstboot network directory: %s", out)
 	}
 
-	out, err = o.ExecPrivilegeCommand(liveLogger, "sh", "-c", "cp /etc/NetworkManager/system-connections/* /boot/coreos-firstboot-network")
+	out, err = o.ExecPrivilegeCommand(liveLogger, "rsync", "-av", "/etc/NetworkManager/system-connections/", "/boot/coreos-firstboot-network/")
 	if err != nil {
 		return errors.Wrapf(err, "failed to copy network files to firstboot network directory: %s", out)
 	}
