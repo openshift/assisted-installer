@@ -605,11 +605,30 @@ func (c *controller) waitForOLMOperators(ctx context.Context) error {
 	return stderrors.Join(errs...)
 }
 
-func (c *controller) getReadyOperators(operators []models.MonitoredOperator) ([]string, []models.MonitoredOperator, error) {
+func (c *controller) getInstalledOperators(operators []models.MonitoredOperator) ([]string, []models.MonitoredOperator, error) {
+	var installedOperators []string
+	for index := range operators {
+		handler := NewClusterServiceVersionHandler(c.log, c.kc, &operators[index], c.status)
+		c.log.Infof("Checking if %s operator is installed", operators[index].Name)
+		status, _, _, err := handler.GetStatus()
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "Failed to get status of operator %s", operators[index].Name)
+		}
+
+		if status == models.OperatorStatusAvailable {
+			c.log.Infof("%s operator is installed", operators[index].Name)
+			installedOperators = append(installedOperators, handler.GetName())
+		}
+	}
+
+	return installedOperators, operators, nil
+}
+
+func (c *controller) getInitializedOperators(operators []models.MonitoredOperator) ([]string, []models.MonitoredOperator, error) {
 	var readyOperators []string
 	for index := range operators {
 		handler := NewClusterServiceVersionHandler(c.log, c.kc, &operators[index], c.status)
-		c.log.Infof("Checking if %s operator is initialized", operators[index].Name)
+		c.log.Infof("Checking if %s operator is ready", operators[index].Name)
 		if handler.IsInitialized() {
 			c.log.Infof("%s operator is initialized", operators[index].Name)
 			readyOperators = append(readyOperators, handler.GetName())
@@ -620,7 +639,7 @@ func (c *controller) getReadyOperators(operators []models.MonitoredOperator) ([]
 
 func (c *controller) waitForCSVBeCreated(operators []models.MonitoredOperator) bool {
 	c.log.Infof("Waiting for csv to be created")
-	readyOperators, operators, err := c.getReadyOperators(operators)
+	readyOperators, operators, err := c.getInitializedOperators(operators)
 	if err != nil {
 		c.log.WithError(err).Warn("Error while fetch the operators state.")
 		return false
@@ -664,14 +683,14 @@ func (c *controller) applyPostInstallManifests(operators []models.MonitoredOpera
 		return false
 	}
 
-	// Create the manifests of the operators, which are properly initialized:
-	readyOperators, _, err := c.getReadyOperators(operators)
+	// Create the manifests of the operators which have installed successfully
+	installedOperators, _, err := c.getInstalledOperators(operators)
 	if err != nil {
-		c.log.WithError(err).Errorf("Failed to fetch operators from assisted-service")
+		c.log.WithError(err).Errorf("Failed to fetch installed operators")
 		return false
 	}
 
-	c.log.Infof("Ready operators to be applied: %v", readyOperators)
+	c.log.Infof("installed operators to be applied: %v", installedOperators)
 	applyErrOccured := false
 	ocpVer, err := version.NewVersion(c.OpenshiftVersion)
 	if err != nil {
@@ -691,7 +710,7 @@ func (c *controller) applyPostInstallManifests(operators []models.MonitoredOpera
 
 		// Check if the operator is properly initialized by CSV:
 		if !func() bool {
-			for _, readyOperator := range readyOperators {
+			for _, readyOperator := range installedOperators {
 				if readyOperator == manifest.Name {
 					return true
 				}

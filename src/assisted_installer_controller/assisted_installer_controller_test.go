@@ -21,10 +21,12 @@ import (
 	apischema "k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 
+	"github.com/blang/semver/v4"
 	"github.com/google/uuid"
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/apis/metal3.io/v1alpha1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/assisted-installer/src/common"
+	"github.com/operator-framework/api/pkg/lib/version"
 	olmv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 
@@ -297,8 +299,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		mockbmclient.EXPECT().GetClusterMonitoredOLMOperators(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(operators, nil).Times(1)
 	}
 
-	mockApplyPostInstallManifests := func(operators []models.MonitoredOperator) {
-		mockbmclient.EXPECT().GetClusterMonitoredOLMOperators(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(operators, nil).Times(1)
+	mockManifestsAndCredsDownload := func() {
 		mockbmclient.EXPECT().DownloadFile(gomock.Any(), customManifestsFile, gomock.Any()).DoAndReturn(
 			func(ctx context.Context, filename, dest string) error {
 				if err := os.WriteFile(dest, []byte("[]"), 0600); err != nil {
@@ -1076,46 +1077,151 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			})
 
 			It("waiting for single OLM operator", func() {
+				lsoName := "lso"
+				lsoSubscriptionName := "local-storage-operator"
+				lsoCSVName := lsoSubscriptionName
+				lsoNamespace := "openshift-local-storage"
+
 				mockAllCapabilitiesEnabled()
 				mockGetClusterForCancel()
 
 				By("setup", func() {
 					setControllerWaitForOLMOperators(assistedController.ClusterID)
-					operators := []models.MonitoredOperator{
-						{SubscriptionName: "local-storage-operator", Namespace: "openshift-local-storage", OperatorType: models.OperatorTypeOlm, Name: "lso", Status: "", TimeoutSeconds: 120 * 60},
-					}
-					mockGetOLMOperators(operators)
-					mockApplyPostInstallManifests(operators)
-					mockk8sclient.EXPECT().GetCSVFromSubscription(operators[0].Namespace, operators[0].SubscriptionName).Return("local-storage-operator", nil).Times(2)
-					mockk8sclient.EXPECT().GetCSV(operators[0].Namespace, operators[0].SubscriptionName).Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseNone}}, nil).Times(2)
+					mockGetOLMOperators([]models.MonitoredOperator{
+						{
+							SubscriptionName: lsoSubscriptionName,
+							Namespace:        lsoNamespace,
+							Name:             lsoName,
+							Status:           "", // starts empty
+						},
+					})
 				})
 
-				By("empty status", func() {
-					mockGetServiceOperators([]models.MonitoredOperator{{Name: "lso", Status: ""}})
-					mockGetCSV(
-						models.MonitoredOperator{SubscriptionName: "local-storage-operator", Namespace: "openshift-local-storage", Name: "lso"},
-						&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseInstalling}},
-					)
+				By("wait for CSV initialization", func() {
+					mockk8sclient.EXPECT().
+						GetCSVFromSubscription(lsoNamespace, lsoSubscriptionName).
+						Return(lsoCSVName, nil).
+						Times(1)
+
+					mockk8sclient.EXPECT().
+						GetCSV(lsoNamespace, lsoCSVName).
+						Return(&olmv1alpha1.ClusterServiceVersion{
+							Spec:   olmv1alpha1.ClusterServiceVersionSpec{Version: version.OperatorVersion{Version: semver.Version{Major: 4, Minor: 12, Patch: 0}}},
+							Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseNone},
+						}, nil).Times(1)
 				})
 
-				By("in progress", func() {
-					mockGetServiceOperators([]models.MonitoredOperator{{SubscriptionName: "local-storage-operator", Namespace: "openshift-local-storage", Name: "lso", Status: models.OperatorStatusProgressing}})
-					mockGetCSV(
-						models.MonitoredOperator{SubscriptionName: "local-storage-operator", Namespace: "openshift-local-storage", Name: "lso"},
-						&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseInstalling}},
-					)
-					mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), "cluster-id", "lso", "4.12.0", models.OperatorStatusProgressing, gomock.Any()).Return(nil).Times(1)
+				By("wait for CSV to be installed", func() {
+					mockGetOLMOperators([]models.MonitoredOperator{
+						{
+							SubscriptionName: lsoSubscriptionName,
+							Namespace:        lsoNamespace,
+							Name:             lsoName,
+							Status:           "",
+						},
+					})
+
+					// none
+					mockbmclient.EXPECT().
+						GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), lsoName, gomock.Any(), gomock.Any()).
+						Return(&models.MonitoredOperator{
+							SubscriptionName: lsoSubscriptionName,
+							Namespace:        lsoNamespace,
+							Name:             lsoName,
+							Status:           "",
+						}, nil).
+						Times(1)
+
+					// status != available -> continue checking
+					mockk8sclient.EXPECT().
+						GetCSVFromSubscription(lsoNamespace, lsoSubscriptionName).
+						Return(lsoCSVName, nil).
+						Times(1)
+
+					mockk8sclient.EXPECT().
+						GetCSV(lsoNamespace, lsoCSVName).
+						Return(&olmv1alpha1.ClusterServiceVersion{
+							Spec:   olmv1alpha1.ClusterServiceVersionSpec{Version: version.OperatorVersion{Version: semver.Version{Major: 4, Minor: 12, Patch: 0}}},
+							Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseNone},
+						}, nil).Times(1)
+
+					// should update to 'progressing'
+					mockbmclient.EXPECT().
+						UpdateClusterOperator(gomock.Any(), "cluster-id", "lso", "4.12.0", models.OperatorStatusProgressing, gomock.Any()).
+						Return(nil).
+						Times(1)
+
+					// installing
+					mockbmclient.EXPECT().
+						GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), lsoName, gomock.Any(), gomock.Any()).
+						Return(&models.MonitoredOperator{
+							SubscriptionName: lsoSubscriptionName,
+							Namespace:        lsoNamespace,
+							Name:             lsoName,
+							Status:           models.OperatorStatusProgressing,
+						}, nil).
+						Times(1)
+
+					mockk8sclient.EXPECT().
+						GetCSVFromSubscription(lsoNamespace, lsoSubscriptionName).
+						Return(lsoCSVName, nil).
+						Times(1)
+
+					mockk8sclient.EXPECT().
+						GetCSV(lsoNamespace, lsoCSVName).
+						Return(&olmv1alpha1.ClusterServiceVersion{
+							Spec:   olmv1alpha1.ClusterServiceVersionSpec{Version: version.OperatorVersion{Version: semver.Version{Major: 4, Minor: 12, Patch: 0}}},
+							Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseInstalling},
+						}, nil).Times(1)
+
+					// no update
+					// succeeded
+					mockbmclient.EXPECT().
+						GetClusterMonitoredOperator(gomock.Any(), gomock.Any(), lsoName, gomock.Any(), gomock.Any()).
+						Return(&models.MonitoredOperator{
+							SubscriptionName: lsoSubscriptionName,
+							Namespace:        lsoNamespace,
+							Name:             lsoName,
+							Status:           models.OperatorStatusProgressing,
+						}, nil).
+						Times(1)
+
+					mockk8sclient.EXPECT().
+						GetCSVFromSubscription(lsoNamespace, lsoSubscriptionName).
+						Return(lsoCSVName, nil).
+						Times(1)
+
+					mockk8sclient.EXPECT().
+						GetCSV(lsoNamespace, lsoCSVName).
+						Return(&olmv1alpha1.ClusterServiceVersion{
+							Spec:   olmv1alpha1.ClusterServiceVersionSpec{Version: version.OperatorVersion{Version: semver.Version{Major: 4, Minor: 12, Patch: 0}}},
+							Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseSucceeded},
+						}, nil).Times(1)
+
+					// should update to 'available'
+					mockbmclient.EXPECT().
+						UpdateClusterOperator(gomock.Any(), "cluster-id", "lso", "4.12.0", models.OperatorStatusAvailable, gomock.Any()).
+						Return(nil).
+						Times(1)
+
+					// available, exit
 				})
 
-				By("available", func() {
-					mockGetServiceOperators([]models.MonitoredOperator{{SubscriptionName: "local-storage-operator", Namespace: "openshift-local-storage", Name: "lso", Status: models.OperatorStatusProgressing}})
-					mockGetCSV(
-						models.MonitoredOperator{SubscriptionName: "local-storage-operator", Namespace: "openshift-local-storage", Name: "lso"},
-						&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseSucceeded}},
-					)
-					mockbmclient.EXPECT().UpdateClusterOperator(gomock.Any(), "cluster-id", "lso", "4.12.0", models.OperatorStatusAvailable, gomock.Any()).Return(nil).Times(1)
+				By("apply post install manifests", func() {
+					mockManifestsAndCredsDownload()
 
-					mockGetServiceOperators([]models.MonitoredOperator{{SubscriptionName: "local-storage-operator", Namespace: "openshift-local-storage", Name: "lso", Status: models.OperatorStatusAvailable}})
+					// lso available
+					mockk8sclient.EXPECT().
+						GetCSVFromSubscription(lsoNamespace, lsoSubscriptionName).
+						Return(lsoCSVName, nil).
+						Times(1)
+
+					mockk8sclient.EXPECT().
+						GetCSV(lsoNamespace, lsoCSVName).
+						Return(&olmv1alpha1.ClusterServiceVersion{
+							Spec:   olmv1alpha1.ClusterServiceVersionSpec{Version: version.OperatorVersion{Version: semver.Version{Major: 4, Minor: 12, Patch: 0}}},
+							Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseSucceeded},
+						}, nil).Times(1)
 				})
 
 				mockbmclient.EXPECT().CompleteInstallation(gomock.Any(), "cluster-id", true, "", nil).Return(fmt.Errorf("dummy")).Times(1)
@@ -1123,8 +1229,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockSuccessUpdateFinalizingStages(models.FinalizingStageWaitingForClusterOperators,
 					models.FinalizingStageAddingRouterCa,
 					models.FinalizingStageWaitingForOlmOperatorsCsvInitialization,
-					models.FinalizingStageApplyingOlmManifests,
 					models.FinalizingStageWaitingForOlmOperatorsCsv,
+					models.FinalizingStageApplyingOlmManifests,
 					models.FinalizingStageDone,
 				)
 
@@ -1144,7 +1250,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				By("setup", func() {
 					setControllerWaitForOLMOperators(assistedController.ClusterID)
 					operators := []models.MonitoredOperator{{SubscriptionName: "local-storage-operator", Namespace: "openshift-local-storage", OperatorType: models.OperatorTypeOlm, Name: "lso", Status: models.OperatorStatusProgressing, TimeoutSeconds: 0}}
-					mockApplyPostInstallManifests(operators)
+					mockManifestsAndCredsDownload()
 					mockbmclient.EXPECT().GetClusterMonitoredOLMOperators(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(operators, nil).AnyTimes()
 				})
 
@@ -1162,8 +1268,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockSuccessUpdateFinalizingStages(models.FinalizingStageWaitingForClusterOperators,
 					models.FinalizingStageAddingRouterCa,
 					models.FinalizingStageWaitingForOlmOperatorsCsvInitialization,
-					models.FinalizingStageApplyingOlmManifests,
 					models.FinalizingStageWaitingForOlmOperatorsCsv,
+					models.FinalizingStageApplyingOlmManifests,
 					models.FinalizingStageDone,
 				)
 				ctx, cancel := context.WithTimeout(context.TODO(), 100*time.Millisecond)
@@ -1182,7 +1288,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				By("setup", func() {
 					setControllerWaitForOLMOperators(assistedController.ClusterID)
 					operators := []models.MonitoredOperator{{SubscriptionName: "local-storage-operator", Namespace: "openshift-local-storage", OperatorType: models.OperatorTypeOlm, Name: "lso", Status: models.OperatorStatusProgressing, TimeoutSeconds: 0}}
-					mockApplyPostInstallManifests(operators)
+					mockManifestsAndCredsDownload()
 					mockbmclient.EXPECT().GetClusterMonitoredOLMOperators(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(operators, nil).AnyTimes()
 				})
 

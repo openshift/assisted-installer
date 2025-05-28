@@ -57,6 +57,7 @@ func (c *controller) checkAndUpdateOperatorAvailability(handler OperatorHandler,
 			operatorStatusInService.StatusInfo,
 			operatorMessage,
 		)
+
 		if !handler.OnChange(operatorStatus) {
 			c.log.WithError(err).Warnf("<%s> operator's OnChange() returned false. Will skip an update.", operatorName)
 			return false
