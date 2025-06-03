@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"strings"
 
 	"github.com/openshift/assisted-installer/src/ops/execute"
 	"github.com/openshift/assisted-installer/src/utils"
@@ -456,13 +457,23 @@ var _ = Describe("overwrite OS image", func() {
 				"--pid",
 				"--"), args...)...).Times(1)
 	}
+	formatPartitionName := func(deviceName string, partNum int) string {
+		// Generate partition names following the naming convention
+		if strings.HasPrefix(deviceName, "nvme") || strings.HasPrefix(deviceName, "mmcblk") {
+			if strings.HasPrefix(deviceName, "mmcblk") {
+				return fmt.Sprintf("%sP%d", deviceName, partNum)
+			}
+			return fmt.Sprintf("%sp%d", deviceName, partNum)
+		}
+		return fmt.Sprintf("%s%d", deviceName, partNum)
+	}
 	formatResult := func(device string) string {
 		deviceName := stripDev(device)
 		return fmt.Sprintf(lsblkResultFormat, deviceName,
-			partitionNameForDeviceName(deviceName, "1"),
-			partitionNameForDeviceName(deviceName, "2"),
-			partitionNameForDeviceName(deviceName, "3"),
-			partitionNameForDeviceName(deviceName, "4"))
+			formatPartitionName(deviceName, 1),
+			formatPartitionName(deviceName, 2),
+			formatPartitionName(deviceName, 3),
+			formatPartitionName(deviceName, 4))
 	}
 	runTest := func(device, part3, part4 string) {
 		execMock.EXPECT().ExecCommand(nil, "nsenter",
@@ -572,6 +583,144 @@ var _ = Describe("get number of reboots", func() {
 		expect("", errors.New("An error"))
 		_, err := o.GetNumberOfReboots(context.TODO(), nodeName, kubeconfigPath)
 		Expect(err).To(HaveOccurred())
+	})
+})
+
+var _ = Describe("getPartitionInLsblkOutput", func() {
+	const testLsblkJsonOutput = `{
+   "blockdevices": [
+      {
+         "name": "sda",
+         "type": "disk",
+         "size": 275200000000
+      },{
+         "name": "nvme1n1",
+         "type": "disk",
+         "size": 1980000000000,
+         "children": [
+            {
+               "name": "nvme1n1p1",
+               "type": "part",
+               "size": 512000000
+            },{
+               "name": "nvme1n1p2",
+               "type": "part",
+               "size": 1073741824
+            },{
+               "name": "nvme1n1p3",
+               "type": "part",
+               "size": 1900000000000,
+               "children": [
+                  {
+                     "name": "fedora-00",
+                     "type": "lvm",
+                     "size": 1900000000000
+                  }
+               ]
+            }
+         ]
+      },{
+         "name": "nvme0n1",
+         "type": "disk",
+         "size": 1980000000000,
+         "children": [
+            {
+               "name": "nvme0n1p1",
+               "type": "part",
+               "size": 16777216
+            },{
+               "name": "nvme0n1p2",
+               "type": "part",
+               "size": 1900000000000
+            },{
+               "name": "nvme0n1p3",
+               "type": "part",
+               "size": 763000000
+            }
+         ]
+      }
+   ]
+}`
+
+	It("should return correct partition name for valid inputs", func() {
+		partitionName, err := getPartitionInLsblkOutput("nvme1n1", 1, testLsblkJsonOutput)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(partitionName).To(Equal("nvme1n1p1"))
+
+		partitionName, err = getPartitionInLsblkOutput("nvme1n1", 2, testLsblkJsonOutput)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(partitionName).To(Equal("nvme1n1p2"))
+
+		partitionName, err = getPartitionInLsblkOutput("nvme1n1", 3, testLsblkJsonOutput)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(partitionName).To(Equal("nvme1n1p3"))
+	})
+
+	It("should work with different device types", func() {
+		partitionName, err := getPartitionInLsblkOutput("nvme0n1", 1, testLsblkJsonOutput)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(partitionName).To(Equal("nvme0n1p1"))
+
+		partitionName, err = getPartitionInLsblkOutput("nvme0n1", 2, testLsblkJsonOutput)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(partitionName).To(Equal("nvme0n1p2"))
+
+		partitionName, err = getPartitionInLsblkOutput("nvme0n1", 3, testLsblkJsonOutput)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(partitionName).To(Equal("nvme0n1p3"))
+	})
+
+	It("should return error for partition number less than 1", func() {
+		_, err := getPartitionInLsblkOutput("nvme1n1", 0, testLsblkJsonOutput)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("partition number must be greater than 0"))
+
+		_, err = getPartitionInLsblkOutput("nvme1n1", -1, testLsblkJsonOutput)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("partition number must be greater than 0"))
+	})
+
+	It("should return error for device not found", func() {
+		_, err := getPartitionInLsblkOutput("nonexistent", 1, testLsblkJsonOutput)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("device nonexistent not found in lsblk output"))
+	})
+
+	It("should return error for partition number exceeding available partitions", func() {
+		_, err := getPartitionInLsblkOutput("nvme1n1", 4, testLsblkJsonOutput)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("device nvme1n1 has less than 4 partitions"))
+
+		_, err = getPartitionInLsblkOutput("nvme0n1", 4, testLsblkJsonOutput)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("device nvme0n1 has less than 4 partitions"))
+	})
+
+	It("should return error for device with no partitions", func() {
+		_, err := getPartitionInLsblkOutput("sda", 1, testLsblkJsonOutput)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("device sda has less than 1 partitions"))
+	})
+
+	It("should return error for invalid JSON", func() {
+		invalidJson := `{"blockdevices": [invalid json}`
+		_, err := getPartitionInLsblkOutput("nvme1n1", 1, invalidJson)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed to parse lsblk JSON output"))
+	})
+
+	It("should return error for empty JSON", func() {
+		emptyJson := `{"blockdevices": []}`
+		_, err := getPartitionInLsblkOutput("nvme1n1", 1, emptyJson)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("device nvme1n1 not found in lsblk output"))
+	})
+
+	It("should ignore non-partition children", func() {
+		// nvme1n1p3 has an LVM child, but getPartitionInLsblkOutput should only look at "part" type children
+		partitionName, err := getPartitionInLsblkOutput("nvme1n1", 3, testLsblkJsonOutput)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(partitionName).To(Equal("nvme1n1p3"))
 	})
 })
 
