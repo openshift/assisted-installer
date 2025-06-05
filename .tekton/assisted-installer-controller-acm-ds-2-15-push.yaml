@@ -7,13 +7,13 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "release-ocm-2.14"
+      == "release-ocm-2.15"
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: assisted-installer-application-acm-ds-2-14
-    appstudio.openshift.io/component: assisted-installer-acm-ds-2-14
+    appstudio.openshift.io/application: assisted-installer-application-acm-ds-2-15
+    appstudio.openshift.io/component: assisted-installer-controller-acm-ds-2-15
     pipelines.appstudio.openshift.io/type: build
-  name: assisted-installer-acm-ds-2-14-on-push
+  name: assisted-installer-controller-acm-ds-2-15-on-push
   namespace: assisted-installer-tenant
 spec:
   params:
@@ -22,12 +22,12 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-acm-ds-2-14/assisted-installer-acm-ds-2-14:{{revision}}
+    value: quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-acm-ds-2-15/assisted-installer-controller-acm-ds-2-15:{{revision}}
   - name: build-platforms
     value:
     - linux/x86_64
   - name: dockerfile
-    value: Dockerfile.assisted-installer-mce
+    value: Dockerfile.assisted-installer-controller-mce
   - name: path-context
     value: .
   - name: build-args
@@ -37,7 +37,7 @@ spec:
   - name: hermetic
     value: "true"
   - name: prefetch-input
-    value: '[{"type": "gomod", "path": "."}]'
+    value: '[{"type": "gomod", "path": "."}, {"type": "rpm", "path": "./rpm-prefetching/assisted-installer-controller/"}]'
   - name: build-source-image
     value: "true"
   pipelineSpec:
