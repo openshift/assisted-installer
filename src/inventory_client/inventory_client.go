@@ -178,7 +178,11 @@ func readCACertificate(capath string, logger logrus.FieldLogger) (*x509.CertPool
 		return nil, err
 	}
 
-	pool := x509.NewCertPool()
+	pool, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load system cert pool: %w", err)
+	}
+
 	if !pool.AppendCertsFromPEM(caData) {
 		return nil, fmt.Errorf("certificate corrupted or in invalid format: %s", capath)
 	} else {
