@@ -1,7 +1,85 @@
 {
-    "schedule": ["on Saturday"],
-    "groupName": "Konflux build pipeline",
-    "includePaths": [".tekton/*"],
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+
+
     "commitMessagePrefix": "NO-ISSUE: ",
-    "labels": ["lgtm", "approved", "konflux"]
+    "labels": ["lgtm", "approved"],
+
+    "prHourlyLimit": 0,
+    "prConcurrentLimit": 0,
+
+    "enabledManagers": [
+        "custom.regex",
+        "tekton"
+    ],
+
+    "tekton": {
+        "fileMatch": ["^.tekton/*"]
+    },
+
+    "customManagers": [
+        {
+            "customType": "regex",
+            "fileMatch": [
+                "^Dockerfile.assisted-installer-build$"
+            ],
+            "matchStrings": [
+                "RUN curl .*https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- .* (?<currentValue>.*?) && .*"
+            ],
+            "depNameTemplate": "github.com/golangci/golangci-lint",
+            "datasourceTemplate": "go"
+        },
+        {
+            "customType": "regex",
+            "fileMatch": [
+                "^Dockerfile.assisted-installer$",
+                "^Dockerfile.assisted-installer-build$",
+                "^Dockerfile.assisted-installer-controller$",
+                "^Dockerfile.assisted-installer-controller-downstream$",
+                "^Dockerfile.assisted-installer-controller-mce$",
+                "^Dockerfile.assisted-installer-downstream$",
+                "^Dockerfile.assisted-installer-mce$"
+            ],
+            "matchStrings": [
+                "FROM registry.access.redhat.com/ubi9/go-toolset:(?<currentValue>.*?) AS .*\\n",
+                "FROM --platform=\\$BUILDPLATFORM registry.access.redhat.com/ubi9/go-toolset:(?<currentValue>.*?) AS builder\\n"
+            ],
+            "depNameTemplate": "registry.access.redhat.com/ubi9/go-toolset",
+            "datasourceTemplate": "docker"
+        }
+    ],
+
+    "packageRules": [
+        {
+            "groupName": "Go Builder",
+            "addLabels": ["golang"],
+            "matchDatasources": ["docker"],
+            "matchPackageNames": ["registry.access.redhat.com/ubi9/go-toolset"],
+            "allowedVersions": "/^[0-9]+\\.[0-9]+$/"
+        },
+        {
+            "matchUpdateTypes": ["major"],
+            "matchDatasources": ["docker"],
+            "matchPackageNames": ["registry.access.redhat.com/ubi9/go-toolset"],
+            "enabled": false
+        },
+        {
+            "groupName": "Linter",
+            "addLabels": ["linter"],
+            "matchDatasources": ["go"],
+            "matchPackageNames": ["github.com/golangci/golangci-lint"]
+        },
+        {
+            "matchUpdateTypes": ["major"],
+            "matchDatasources": ["go"],
+            "matchPackageNames": ["github.com/golangci/golangci-lint"],
+            "enabled": false
+        },
+        {
+            "groupName": "Konflux build pipeline",
+            "addLabels": ["konflux"],
+            "schedule": ["on Saturday"],
+            "matchManagers": ["tekton"]
+        }
+    ]
 }

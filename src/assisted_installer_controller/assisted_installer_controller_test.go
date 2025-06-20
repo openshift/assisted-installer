@@ -354,7 +354,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			configuringSuccess()
 			listNodes()
 
-			for name, value := range inventoryNamesIds {
+			for name, v := range inventoryNamesIds {
+				value := v
 				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, value.Host.ID, &value.Host.InfraEnvID, gomock.Any()).Times(1)
 			}
 			exit := assistedController.waitAndUpdateNodesStatus(false)
@@ -493,7 +494,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().ListNodes().Return(nodes, nil).Times(1)
 			updateProgressSuccess(done, hosts)
 			configuringSuccess()
-			for name, value := range inventoryNamesIds {
+			for name, v := range inventoryNamesIds {
+				value := v
 				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, value.Host.ID, &value.Host.InfraEnvID, gomock.Any()).Times(1)
 			}
 			exit := assistedController.waitAndUpdateNodesStatus(false)
@@ -548,7 +550,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				"node2": "57df89ee-3546-48a5-859a-0f1459485a66"}
 		})
 		It("WaitAndUpdateNodesStatus one by one", func() {
-			for name, value := range inventoryNamesIds {
+			for name, v := range inventoryNamesIds {
+				value := v
 				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, value.Host.ID, &value.Host.InfraEnvID, gomock.Any()).Times(1)
 			}
 			listNodesOneByOne := func() {
@@ -590,7 +593,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 	Context("UpdateStatusFails and then succeeds", func() {
 		It("UpdateStatus fails and then succeeds, list nodes failed ", func() {
-			for name, value := range inventoryNamesIds {
+			for name, v := range inventoryNamesIds {
+				value := v
 				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, value.Host.ID, &value.Host.InfraEnvID, gomock.Any()).Times(1)
 			}
 			updateProgressSuccessFailureTest := func(stages []models.HostStage, inventoryNamesIds map[string]inventory_client.HostData) {
@@ -641,7 +645,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			configuringSuccess()
 
 			mockk8sclient.EXPECT().ListCsrs().Return(nil, fmt.Errorf("no matter what")).AnyTimes()
-			for name, value := range inventoryNamesIds {
+			for name, v := range inventoryNamesIds {
+				value := v
 				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, value.Host.ID, &value.Host.InfraEnvID, gomock.Any()).Times(1)
 			}
 
