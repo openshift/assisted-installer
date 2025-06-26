@@ -80,6 +80,18 @@ func (mr *MockControllerMockRecorder) PostInstallConfigs(ctx, wg any) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostInstallConfigs", reflect.TypeOf((*MockController)(nil).PostInstallConfigs), ctx, wg)
 }
 
+// RelocateEtcdOperatorPod mocks base method.
+func (m *MockController) RelocateEtcdOperatorPod(ctx context.Context, wg *sync.WaitGroup) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "RelocateEtcdOperatorPod", ctx, wg)
+}
+
+// RelocateEtcdOperatorPod indicates an expected call of RelocateEtcdOperatorPod.
+func (mr *MockControllerMockRecorder) RelocateEtcdOperatorPod(ctx, wg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RelocateEtcdOperatorPod", reflect.TypeOf((*MockController)(nil).RelocateEtcdOperatorPod), ctx, wg)
+}
+
 // SetReadyState mocks base method.
 func (m *MockController) SetReadyState(waitTimeout time.Duration) *models.Cluster {
 	m.ctrl.T.Helper()

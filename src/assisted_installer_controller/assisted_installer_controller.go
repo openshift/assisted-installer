@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -114,6 +115,7 @@ type Controller interface {
 	PostInstallConfigs(ctx context.Context, wg *sync.WaitGroup)
 	UpdateNodeLabels(ctx context.Context, wg *sync.WaitGroup)
 	UpdateBMHs(ctx context.Context, wg *sync.WaitGroup)
+	RelocateEtcdOperatorPod(ctx context.Context, wg *sync.WaitGroup)
 	UploadLogs(ctx context.Context, wg *sync.WaitGroup, invoker string)
 	SetReadyState(waitTimeout time.Duration) *models.Cluster
 	GetStatus() *ControllerStatus
@@ -1524,4 +1526,76 @@ func (c controller) SetReadyState(waitTimeout time.Duration) *models.Cluster {
 
 func (c *controller) GetStatus() *ControllerStatus {
 	return c.status
+}
+
+func (c *controller) RelocateEtcdOperatorPod(ctx context.Context, wg *sync.WaitGroup) {
+	defer func() {
+		c.log.Infof("Finished RelocateEtcdOperatorPod")
+		wg.Done()
+	}()
+
+	c.log.Infof("Starting etcd operator pod relocation")
+	err := utils.WaitForeverForPredicate(ctx, GeneralWaitInterval, c.relocateEtcdOperatorPod)
+	if err != nil {
+		c.log.Warn("Failed to relocate etcd operator pods")
+	}
+}
+
+// relocateEtcdOperatorPod relocates of the etcd operator pod from the first master node if the cluster has 2 masters
+// This is done for 2 reasons:
+//  1. To avoid a race condition in the etcd operator that could result in the second master (the bootstrap) not being
+//     properly added to the etcd cluster - its etcd pod will be stuck at crash loopback
+//  2. To free up resources on the first master since with minimum resources we can run into a problem where 1 pod is
+//     stuck pending - because the pod is from a daemonset and should run on the first master, but its resource requests
+//     are too high for the pod to be scheduled on the first master
+func (c *controller) relocateEtcdOperatorPod() bool {
+	if c.ControlPlaneCount != 2 {
+		c.log.Infof("ControlPlaneCount is %d, not 2. Skipping etcd operator pod relocation", c.ControlPlaneCount)
+		return ExitWaiting
+	}
+
+	masters, err := c.kc.ListNodesByRole("master")
+	if err != nil {
+		c.log.WithError(err).Error("Failed to get list of nodes from k8s client")
+		return KeepWaiting
+	}
+
+	var readyMasters []v1.Node
+	for _, master := range masters.Items {
+		if common.IsK8sNodeIsReady(master) {
+			readyMasters = append(readyMasters, master)
+		}
+	}
+
+	if len(readyMasters) != 2 {
+		c.log.Infof("Expected 2 ready masters, found %d", len(readyMasters))
+		return KeepWaiting
+	}
+
+	sort.Slice(readyMasters, func(i, j int) bool {
+		return readyMasters[i].CreationTimestamp.Before(&readyMasters[j].CreationTimestamp)
+	})
+	firstMaster := readyMasters[0]
+	c.log.Infof("First master node identified: %s", firstMaster.Name)
+
+	pods, err := c.kc.GetPods("openshift-etcd-operator", map[string]string{}, fmt.Sprintf("spec.nodeName=%s", firstMaster.Name))
+	if err != nil {
+		c.log.WithError(err).Error("Failed to get pods from openshift-etcd-operator namespace")
+		return KeepWaiting
+	}
+
+	if funk.NotEmpty(pods) {
+		pod := pods[0]
+		c.log.Infof("Found pod %s on first master, deleting it", pod.Name)
+		err := c.kc.DeletePod(pod.Name, "openshift-etcd-operator")
+		if err != nil {
+			c.log.WithError(err).Errorf("Failed to delete pod %s", pod.Name)
+			return KeepWaiting
+		}
+		c.log.Infof("Successfully deleted pod %s from first master", pod.Name)
+		return KeepWaiting
+	}
+
+	c.log.Info("No etcd operator pods found running on first master")
+	return ExitWaiting
 }

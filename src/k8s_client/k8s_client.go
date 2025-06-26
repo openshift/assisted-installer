@@ -80,6 +80,7 @@ type K8SClient interface {
 	GetClusterOperator(name string) (*configv1.ClusterOperator, error)
 	CreateEvent(namespace, name, message, component string) (*v1.Event, error)
 	DeleteService(namespace, name string) error
+	DeletePod(name, namespace string) error
 	DeletePods(namespace string) error
 	PatchNamespace(namespace string, data []byte) error
 	GetNode(name string) (*v1.Node, error)
@@ -203,6 +204,10 @@ func (c *k8sClient) ListJobs(namespace string) (*batchV1.JobList, error) {
 
 func (c *k8sClient) DeleteJob(job types.NamespacedName) error {
 	return c.client.BatchV1().Jobs(job.Namespace).Delete(context.TODO(), job.Name, metav1.DeleteOptions{})
+}
+
+func (c *k8sClient) DeletePod(name, namespace string) error {
+	return c.client.CoreV1().Pods(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 }
 
 func (c *k8sClient) DeletePods(namespace string) error {
