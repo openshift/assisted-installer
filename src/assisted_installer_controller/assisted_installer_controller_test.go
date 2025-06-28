@@ -2198,6 +2198,190 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			hackConflict()
 		})
 	})
+
+	Context("RelocateEtcdOperatorPod", func() {
+		var oldControlPlaneCount int
+
+		BeforeEach(func() {
+			oldControlPlaneCount = assistedController.ControlPlaneCount
+			GeneralWaitInterval = 10 * time.Millisecond
+		})
+
+		AfterEach(func() {
+			assistedController.ControlPlaneCount = oldControlPlaneCount
+		})
+
+		createMasterNodes := func(count int) *v1.NodeList {
+			nodes := &v1.NodeList{
+				Items: make([]v1.Node, count),
+			}
+			for i := 0; i < count; i++ {
+				nodes.Items[i] = v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fmt.Sprintf("master-%d", i),
+						Labels: map[string]string{
+							"node-role.kubernetes.io/master": "",
+						},
+						CreationTimestamp: metav1.NewTime(time.Now().Add(time.Duration(i) * time.Hour)),
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: v1.ConditionTrue,
+							},
+						},
+					},
+				}
+			}
+			return nodes
+		}
+
+		createEtcdOperatorPod := func(nodeName string) []v1.Pod {
+			return []v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "etcd-operator-pod",
+						Namespace: "openshift-etcd-operator",
+					},
+					Spec: v1.PodSpec{
+						NodeName: nodeName,
+					},
+				},
+			}
+		}
+
+		It("success - ControlPlaneCount is not 2", func() {
+			assistedController.ControlPlaneCount = 3
+			wg.Add(1)
+			assistedController.RelocateEtcdOperatorPod(context.TODO(), &wg)
+			wg.Wait()
+		})
+
+		It("success - exactly 2 ready masters with no etcd operator pods on first master", func() {
+			assistedController.ControlPlaneCount = 2
+			masters := createMasterNodes(2)
+
+			mockk8sclient.EXPECT().ListNodesByRole("master").Return(masters, nil).Times(1)
+			mockk8sclient.EXPECT().GetPods("openshift-etcd-operator", map[string]string{}, "spec.nodeName=master-0").Return([]v1.Pod{}, nil).Times(1)
+
+			wg.Add(1)
+			assistedController.RelocateEtcdOperatorPod(context.TODO(), &wg)
+			wg.Wait()
+		})
+
+		It("relocates etcd operator pod from first master", func() {
+			assistedController.ControlPlaneCount = 2
+			masters := createMasterNodes(2)
+			pods := createEtcdOperatorPod("master-0") // first master
+
+			// First call - pod exists on first master, delete it
+			mockk8sclient.EXPECT().ListNodesByRole("master").Return(masters, nil).Times(1)
+			mockk8sclient.EXPECT().GetPods("openshift-etcd-operator", map[string]string{}, "spec.nodeName=master-0").Return(pods, nil).Times(1)
+			mockk8sclient.EXPECT().DeletePod("etcd-operator-pod", "openshift-etcd-operator").Return(nil).Times(1)
+
+			// Second call - pod no longer exists on first master
+			mockk8sclient.EXPECT().ListNodesByRole("master").Return(masters, nil).Times(1)
+			mockk8sclient.EXPECT().GetPods("openshift-etcd-operator", map[string]string{}, "spec.nodeName=master-0").Return([]v1.Pod{}, nil).Times(1)
+
+			wg.Add(1)
+			assistedController.RelocateEtcdOperatorPod(context.TODO(), &wg)
+			wg.Wait()
+		})
+
+		It("waits when less than 2 ready masters", func() {
+			assistedController.ControlPlaneCount = 2
+			masters := createMasterNodes(1) // Only 1 master
+
+			// First call - only 1 master, keep waiting
+			mockk8sclient.EXPECT().ListNodesByRole("master").Return(masters, nil).Times(1)
+
+			// Second call - now 2 masters, proceed
+			mastersUpdated := createMasterNodes(2)
+			mockk8sclient.EXPECT().ListNodesByRole("master").Return(mastersUpdated, nil).Times(1)
+			mockk8sclient.EXPECT().GetPods("openshift-etcd-operator", map[string]string{}, "spec.nodeName=master-0").Return([]v1.Pod{}, nil).Times(1)
+
+			wg.Add(1)
+			assistedController.RelocateEtcdOperatorPod(context.TODO(), &wg)
+			wg.Wait()
+		})
+
+		It("handles ListNodesByRole failure", func() {
+			assistedController.ControlPlaneCount = 2
+
+			// First call fails
+			mockk8sclient.EXPECT().ListNodesByRole("master").Return(nil, fmt.Errorf("k8s error")).Times(1)
+
+			// Second call succeeds
+			masters := createMasterNodes(2)
+			mockk8sclient.EXPECT().ListNodesByRole("master").Return(masters, nil).Times(1)
+			mockk8sclient.EXPECT().GetPods("openshift-etcd-operator", map[string]string{}, "spec.nodeName=master-0").Return([]v1.Pod{}, nil).Times(1)
+
+			wg.Add(1)
+			assistedController.RelocateEtcdOperatorPod(context.TODO(), &wg)
+			wg.Wait()
+		})
+
+		It("handles GetPods failure", func() {
+			assistedController.ControlPlaneCount = 2
+			masters := createMasterNodes(2)
+
+			// First call - GetPods fails
+			mockk8sclient.EXPECT().ListNodesByRole("master").Return(masters, nil).Times(1)
+			mockk8sclient.EXPECT().GetPods("openshift-etcd-operator", map[string]string{}, "spec.nodeName=master-0").Return(nil, fmt.Errorf("k8s error")).Times(1)
+
+			// Second call - GetPods succeeds
+			mockk8sclient.EXPECT().ListNodesByRole("master").Return(masters, nil).Times(1)
+			mockk8sclient.EXPECT().GetPods("openshift-etcd-operator", map[string]string{}, "spec.nodeName=master-0").Return([]v1.Pod{}, nil).Times(1)
+
+			wg.Add(1)
+			assistedController.RelocateEtcdOperatorPod(context.TODO(), &wg)
+			wg.Wait()
+		})
+
+		It("handles DeletePod failure and retries", func() {
+			assistedController.ControlPlaneCount = 2
+			masters := createMasterNodes(2)
+			pods := createEtcdOperatorPod("master-0") // first master
+
+			// First call - DeletePod fails
+			mockk8sclient.EXPECT().ListNodesByRole("master").Return(masters, nil).Times(1)
+			mockk8sclient.EXPECT().GetPods("openshift-etcd-operator", map[string]string{}, "spec.nodeName=master-0").Return(pods, nil).Times(1)
+			mockk8sclient.EXPECT().DeletePod("etcd-operator-pod", "openshift-etcd-operator").Return(fmt.Errorf("delete failed")).Times(1)
+
+			// Second call - DeletePod succeeds
+			mockk8sclient.EXPECT().ListNodesByRole("master").Return(masters, nil).Times(1)
+			mockk8sclient.EXPECT().GetPods("openshift-etcd-operator", map[string]string{}, "spec.nodeName=master-0").Return(pods, nil).Times(1)
+			mockk8sclient.EXPECT().DeletePod("etcd-operator-pod", "openshift-etcd-operator").Return(nil).Times(1)
+
+			// Third call - pod no longer exists
+			mockk8sclient.EXPECT().ListNodesByRole("master").Return(masters, nil).Times(1)
+			mockk8sclient.EXPECT().GetPods("openshift-etcd-operator", map[string]string{}, "spec.nodeName=master-0").Return([]v1.Pod{}, nil).Times(1)
+
+			wg.Add(1)
+			assistedController.RelocateEtcdOperatorPod(context.TODO(), &wg)
+			wg.Wait()
+		})
+
+		It("handles masters with different ready states", func() {
+			assistedController.ControlPlaneCount = 2
+			masters := createMasterNodes(2)
+			// Make second master not ready
+			masters.Items[1].Status.Conditions[0].Status = v1.ConditionFalse
+
+			// First call - only 1 ready master
+			mockk8sclient.EXPECT().ListNodesByRole("master").Return(masters, nil).Times(1)
+
+			// Second call - both masters ready
+			mastersUpdated := createMasterNodes(2)
+			mockk8sclient.EXPECT().ListNodesByRole("master").Return(mastersUpdated, nil).Times(1)
+			mockk8sclient.EXPECT().GetPods("openshift-etcd-operator", map[string]string{}, "spec.nodeName=master-0").Return([]v1.Pod{}, nil).Times(1)
+
+			wg.Add(1)
+			assistedController.RelocateEtcdOperatorPod(context.TODO(), &wg)
+			wg.Wait()
+		})
+	})
 })
 
 func GetKubeNodes(kubeNamesIds map[string]string) *v1.NodeList {

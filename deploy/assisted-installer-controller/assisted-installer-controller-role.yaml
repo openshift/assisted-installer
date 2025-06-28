@@ -179,6 +179,7 @@ rules:
     resources:
       - pods
     verbs:
+      - delete
       - deletecollection
   - apiGroups:
       - "security.openshift.io"
