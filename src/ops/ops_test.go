@@ -187,21 +187,28 @@ grw/ZQTTIVjjh4JBSW3WyWgNo/ikC1lrVxzl4iPUGptxT36Cr7Zk2Bsg0XqwbOvK
 5d+NTDREkSnUbie4GeutujmX3Dsx88UiV6UY/4lHJa6I5leHUNOHahRbpbWeOfs/
 WkBKOclmOV2xlTVuPw==
 -----END CERTIFICATE-----`)
-	buildPointerIgnition := func(source string) types.Config {
+	buildPointerIgnition := func(source string, withCert bool) types.Config {
 		ret := types.Config{}
 		ret.Ignition.Version = "3.2.0"
 		ret.Ignition.Config.Merge = append(ret.Ignition.Config.Merge,
 			types.Resource{
 				Source: swag.String(source),
 			})
+
+		if !withCert {
+			return ret
+		}
+
 		ret.Ignition.Security.TLS.CertificateAuthorities = append(ret.Ignition.Security.TLS.CertificateAuthorities,
 			types.Resource{
 				Source: swag.String(dataurl.EncodeBytes(localhostCert)),
 			})
+
 		return ret
 	}
-	buildPointerIgnitionFile := func(source string) string {
-		cfg := buildPointerIgnition(source)
+
+	buildPointerIgnitionFile := func(source string, withCert bool) string {
+		cfg := buildPointerIgnition(source, withCert)
 		b, err := json.Marshal(&cfg)
 		Expect(err).ToNot(HaveOccurred())
 		f, err := os.CreateTemp("", "ign")
@@ -213,7 +220,7 @@ WkBKOclmOV2xlTVuPw==
 	}
 	Context("get pointed ignition", func() {
 		checkSource := func(source string) {
-			ignitionPath := buildPointerIgnitionFile(source)
+			ignitionPath := buildPointerIgnitionFile(source, true)
 			defer func() {
 				_ = os.RemoveAll(ignitionPath)
 			}()
@@ -230,6 +237,7 @@ WkBKOclmOV2xlTVuPw==
 			checkSource(dataurl.EncodeBytes([]byte("source")))
 		})
 	})
+
 	Context("get MCS ignition", func() {
 		var (
 			osImageURL      string
@@ -264,8 +272,8 @@ WkBKOclmOV2xlTVuPw==
 			Expect(err).ToNot(HaveOccurred())
 			return string(b)
 		}
-		checkMcsIgnition := func(source string, shouldSucceed bool) {
-			ignitionPath := buildPointerIgnitionFile(source)
+		checkMcsIgnition := func(source string, withCert bool, shouldSucceed bool) {
+			ignitionPath := buildPointerIgnitionFile(source, withCert)
 			defer func() {
 				_ = os.RemoveAll(ignitionPath)
 			}()
@@ -296,7 +304,7 @@ WkBKOclmOV2xlTVuPw==
 			}
 		})
 		It("from bootstrap - non existant URL", func() {
-			checkMcsIgnition("https://127.0.0.1:44", false)
+			checkMcsIgnition("https://127.0.0.1:44", true, false)
 		})
 		It("from bootstrap - success", func() {
 			s := ghttp.NewTLSServer()
@@ -305,7 +313,7 @@ WkBKOclmOV2xlTVuPw==
 					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
 					Expect(err).ToNot(HaveOccurred())
 				})
-			checkMcsIgnition(s.URL(), true)
+			checkMcsIgnition(s.URL(), true, true)
 			s.Close()
 		})
 		It("from bootstrap - empty response", func() {
@@ -315,11 +323,51 @@ WkBKOclmOV2xlTVuPw==
 					_, err := io.WriteString(w, "")
 					Expect(err).ToNot(HaveOccurred())
 				})
-			checkMcsIgnition(s.URL(), false)
+			checkMcsIgnition(s.URL(), true, false)
+			s.Close()
+		})
+		It("from bootstrap - with http no cert should succeed", func() {
+			s := ghttp.NewServer()
+			s.RouteToHandler("GET", "/",
+				func(w http.ResponseWriter, req *http.Request) {
+					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
+					Expect(err).ToNot(HaveOccurred())
+				})
+			checkMcsIgnition(s.URL(), false, true)
+			s.Close()
+		})
+		It("from bootstrap - with http with cert should succeed", func() {
+			s := ghttp.NewServer()
+			s.RouteToHandler("GET", "/",
+				func(w http.ResponseWriter, req *http.Request) {
+					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
+					Expect(err).ToNot(HaveOccurred())
+				})
+			checkMcsIgnition(s.URL(), true, true)
+			s.Close()
+		})
+		It("from bootstrap - with https with cert should succeed", func() {
+			s := ghttp.NewTLSServer()
+			s.RouteToHandler("GET", "/",
+				func(w http.ResponseWriter, req *http.Request) {
+					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
+					Expect(err).ToNot(HaveOccurred())
+				})
+			checkMcsIgnition(s.URL(), true, true)
+			s.Close()
+		})
+		It("from bootstrap - with https no cert should fail", func() {
+			s := ghttp.NewTLSServer()
+			s.RouteToHandler("GET", "/",
+				func(w http.ResponseWriter, req *http.Request) {
+					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
+					Expect(err).ToNot(HaveOccurred())
+				})
+			checkMcsIgnition(s.URL(), false, false)
 			s.Close()
 		})
 		It("embedded - success", func() {
-			checkMcsIgnition(dataurl.EncodeBytes(compress([]byte(buildMcsIgnition(osImageURL, kernelArguments)))), true)
+			checkMcsIgnition(dataurl.EncodeBytes(compress([]byte(buildMcsIgnition(osImageURL, kernelArguments)))), true, true)
 		})
 	})
 })
