@@ -11,6 +11,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -45,6 +46,7 @@ const (
 	encapsulatedMachineConfigFile   = "/etc/ignition-machine-config-encapsulated.json"
 	defaultIgnitionPlatformId       = "ignition.platform.id=metal"
 	ignitionContent                 = "application/vnd.coreos.ignition+json; version=3.4.0"
+	schemeHTTPS                     = "https"
 )
 
 //go:generate mockgen -source=ops.go -package=ops -destination=mock_ops.go
@@ -855,32 +857,50 @@ func (o *ops) getEmbeddedIgnition(source string) ([]byte, error) {
 }
 
 func (o *ops) getIgnitionFromBoostrap(source, ca string) ([]byte, error) {
-	if ca == "" {
-		return nil, errors.New("CA cert is empty")
+	parsedURL, err := url.Parse(source)
+	if err != nil || parsedURL == nil {
+		return nil, errors.Wrapf(err, "failed to parse ignition source URL - %s", source)
 	}
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM([]byte(ca))
-	tr := &http.Transport{TLSClientConfig: &tls.Config{
-		MinVersion: tls.VersionTLS12,
-		RootCAs:    caCertPool,
-	}}
-	client := http.Client{Transport: tr}
+
+	client := &http.Client{}
+	if parsedURL.Scheme == schemeHTTPS && ca == "" {
+		return nil, fmt.Errorf("ignition endpoint %s was specified with HTTPS, but CA certificate is empty", source)
+	}
+
+	if parsedURL.Scheme == schemeHTTPS {
+		caCertPool := x509.NewCertPool()
+		if ok := caCertPool.AppendCertsFromPEM([]byte(ca)); !ok {
+			return nil, errors.New("failed to parse CA certificate")
+		}
+		o.log.Info("using HTTPS with given CA certificate to get ignition from bootstrap")
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+				RootCAs:    caCertPool,
+			},
+		}
+		client.Transport = tr
+	}
+
 	o.log.Infof("Getting ignition from %s", source)
 	req, err := http.NewRequest("GET", source, nil)
 	if err != nil {
 		return nil, err
 	}
+
 	req.Header.Add("Accept", ignitionContent)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get ignition from %s", source)
 	}
+
 	defer resp.Body.Close()
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, resp.Body)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to copy ignition from %s", source)
 	}
+
 	return buf.Bytes(), nil
 }
 
