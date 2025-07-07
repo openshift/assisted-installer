@@ -424,7 +424,11 @@ func (o *ops) findEfiDirectory(device string) (string, error) {
 		err error
 	)
 	if err = utils.Retry(3, 5*time.Second, o.log, func() (err error) {
-		_, err = o.ExecPrivilegeCommand(nil, "mount", partitionForDevice(device, "2"), "/mnt")
+		partitionPath, err := o.partitionForDevice(device, 2)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get partition for device %s", device)
+		}
+		_, err = o.ExecPrivilegeCommand(nil, "mount", partitionPath, "/mnt")
 		return
 	}); err != nil {
 		return "", errors.Wrap(err, "failed to mount efi device")
@@ -1029,41 +1033,104 @@ func (o *ops) ignitionPlatformId() string {
 	return id
 }
 
+type lsblkBlockDevice struct {
+	Name     string              `json:"name"`
+	Type     string              `json:"type"`
+	Size     int64               `json:"size"`
+	Children []*lsblkBlockDevice `json:"children"`
+}
+
+type lsblkOutput struct {
+	Blockdevices []*lsblkBlockDevice `json:"blockdevices"`
+}
+
 func stripDev(device string) string {
 	return strings.Replace(device, "/dev/", "", 1)
 }
 
-func partitionNameForDeviceName(deviceName, partitionNumber string) string {
-	var format string
-	switch {
-	case strings.HasPrefix(deviceName, "nvme"):
-		format = "%sp%s"
-	case strings.HasPrefix(deviceName, "mmcblk"):
-		format = "%sP%s"
-	default:
-		format = "%s%s"
+func findDeviceInLsblkOutput(device string, devices []*lsblkBlockDevice) (*lsblkBlockDevice, error) {
+	for _, blockDev := range devices {
+		if blockDev.Name == device {
+			return blockDev, nil
+		}
 	}
-	return fmt.Sprintf(format, deviceName, partitionNumber)
+
+	// Now recurse on Children
+	for _, blockDev := range devices {
+		if blockDev.Children == nil {
+			continue
+		}
+
+		if found, err := findDeviceInLsblkOutput(device, blockDev.Children); err == nil {
+			return found, nil
+		}
+	}
+
+	return nil, errors.Errorf("device %s not found in lsblk output", device)
 }
 
-func partitionForDevice(device, partitionNumber string) string {
-	return "/dev/" + partitionNameForDeviceName(stripDev(device), partitionNumber)
+func getPartitionInLsblkOutput(deviceName string, partitionNumber int, lsblkJsonOutRaw string) (string, error) {
+	if partitionNumber < 1 {
+		return "", errors.Errorf("partition number must be greater than 0, got %d", partitionNumber)
+	}
+
+	// The partition number is 1-based, so we need to subtract 1 to get the correct index
+	partitionIndex := partitionNumber - 1
+
+	var output lsblkOutput
+	if err := json.Unmarshal([]byte(lsblkJsonOutRaw), &output); err != nil {
+		return "", errors.Wrapf(err, "failed to parse lsblk JSON output for device %s", deviceName)
+	}
+
+	dev, err := findDeviceInLsblkOutput(deviceName, output.Blockdevices)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to find device %s in lsblk output", deviceName)
+	}
+
+	partitionChildren := funk.Filter(dev.Children, func(child *lsblkBlockDevice) bool {
+		return child.Type == "part"
+	}).([]*lsblkBlockDevice)
+
+	if len(partitionChildren) <= partitionIndex {
+		return "", errors.Errorf("device %s has less than %d partitions", deviceName, partitionNumber)
+	}
+
+	return partitionChildren[partitionIndex].Name, nil
+}
+
+func (o *ops) partitionNameForDeviceName(deviceName string, partitionNumber int) (string, error) {
+	devPath := fmt.Sprintf("/dev/%s", deviceName)
+	// We use --bytes because we want to share structs with calculateFreePercent which expects
+	// lsblk sizes in bytes. If you don't do that, size can be displayed as a human readable string which
+	// will cause an error when unmarshalling the JSON.
+	lsblkOutputRaw, err := o.ExecPrivilegeCommand(nil, "lsblk", "--bytes", "--json")
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to run lsblk on device %s", devPath)
+	}
+
+	partitionName, err := getPartitionInLsblkOutput(deviceName, partitionNumber, lsblkOutputRaw)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to get partition name for device %s", devPath)
+	}
+
+	return partitionName, nil
+}
+
+func (o *ops) partitionForDevice(device string, partitionNumber int) (string, error) {
+	partitionName, err := o.partitionNameForDeviceName(stripDev(device), partitionNumber)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to get partition name for device %s", device)
+	}
+	return fmt.Sprintf("/dev/%s", partitionName), nil
 }
 
 func (o *ops) calculateFreePercent(device string) (int64, error) {
-	type node struct {
-		Name     string
-		Size     int64
-		Children []*node
-	}
-	var disks struct {
-		Blockdevices []*node
-	}
+	var disks lsblkOutput
 	var (
-		diskNode, partitionNode *node
+		diskNode, partitionNode *lsblkBlockDevice
 		ok                      bool
 	)
-	ret, err := o.ExecPrivilegeCommand(nil, "lsblk", "-b", "-J")
+	ret, err := o.ExecPrivilegeCommand(nil, "lsblk", "--bytes", "--json")
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to run lsblk command")
 	}
@@ -1071,17 +1138,20 @@ func (o *ops) calculateFreePercent(device string) (int64, error) {
 		return 0, errors.Wrap(err, "failed to unmarshal lsblk output")
 	}
 	deviceName := stripDev(device)
-	diskNode, ok = funk.Find(disks.Blockdevices, func(n *node) bool { return deviceName == n.Name }).(*node)
+	diskNode, ok = funk.Find(disks.Blockdevices, func(n *lsblkBlockDevice) bool { return deviceName == n.Name }).(*lsblkBlockDevice)
 	if !ok {
 		return 0, errors.Errorf("failed to find device is %s in lsblk output", device)
 	}
-	partitionName := partitionNameForDeviceName(diskNode.Name, "4")
-	partitionNode, ok = funk.Find(diskNode.Children, func(n *node) bool { return partitionName == n.Name }).(*node)
+	partitionName, err := o.partitionNameForDeviceName(diskNode.Name, 4)
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to find partition name for device %s", diskNode.Name)
+	}
+	partitionNode, ok = funk.Find(diskNode.Children, func(n *lsblkBlockDevice) bool { return partitionName == n.Name }).(*lsblkBlockDevice)
 	if !ok {
 		return 0, errors.Errorf("failed to find partition node %s in lsblk output", device)
 	}
 	var usedSize int64
-	funk.ForEach(diskNode.Children, func(n *node) { usedSize += n.Size })
+	funk.ForEach(diskNode.Children, func(n *lsblkBlockDevice) { usedSize += n.Size })
 
 	// The assumption is that the extra space needed for image overwrite is not more than the existing partition size.  So
 	// the partition size will be doubled, and the rest will remain as free space.
@@ -1116,9 +1186,18 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 		o.log.Infof("Running on s390x archtiecture - skip overwrite image.")
 		return nil
 	}
+	mntPartition, err := o.partitionForDevice(device, 4)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get fourth partition for device %s", device)
+	}
+
+	mntBootPartition, err := o.partitionForDevice(device, 3)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get third (boot) partition for device %s", device)
+	}
 	cmds := []*cmd{
-		makecmd("mount", partitionForDevice(device, "4"), "/mnt"),
-		makecmd("mount", partitionForDevice(device, "3"), "/mnt/boot"),
+		makecmd("mount", mntPartition, "/mnt"),
+		makecmd("mount", mntBootPartition, "/mnt/boot"),
 		growpartcmd,
 		makecmd("xfs_growfs", "/mnt"),
 
