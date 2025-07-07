@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"strconv"
+	"strings"
 
 	"github.com/openshift/assisted-installer/src/ops/execute"
 	"github.com/openshift/assisted-installer/src/utils"
@@ -456,15 +458,52 @@ var _ = Describe("overwrite OS image", func() {
 				"--pid",
 				"--"), args...)...).Times(1)
 	}
+	// Helper function to generate correct partition names for all device types
+	getPartitionName := func(deviceName, partNum string) string {
+		switch {
+		case strings.HasPrefix(deviceName, "nvme"):
+			return fmt.Sprintf("%sp%s", deviceName, partNum)
+		case strings.HasPrefix(deviceName, "mmcblk"):
+			return fmt.Sprintf("%sP%s", deviceName, partNum)
+		case strings.HasPrefix(deviceName, "dm-"):
+			// Device mapper devices use a different numbering scheme
+			// For dm-0, partitions are dm-1, dm-2, dm-3, dm-4
+			baseNum, err := strconv.Atoi(deviceName[3:]) // Extract number after "dm-"
+			if err != nil {
+				return deviceName + partNum // fallback
+			}
+			partNumInt, err := strconv.Atoi(partNum)
+			if err != nil {
+				return deviceName + partNum // fallback
+			}
+			return fmt.Sprintf("dm-%d", baseNum+partNumInt)
+		default:
+			return fmt.Sprintf("%s%s", deviceName, partNum)
+		}
+	}
 	formatResult := func(device string) string {
 		deviceName := stripDev(device)
 		return fmt.Sprintf(lsblkResultFormat, deviceName,
-			partitionNameForDeviceName(deviceName, "1"),
-			partitionNameForDeviceName(deviceName, "2"),
-			partitionNameForDeviceName(deviceName, "3"),
-			partitionNameForDeviceName(deviceName, "4"))
+			getPartitionName(deviceName, "1"),
+			getPartitionName(deviceName, "2"),
+			getPartitionName(deviceName, "3"),
+			getPartitionName(deviceName, "4"))
 	}
 	runTest := func(device, part3, part4 string) {
+		// Mock lsblk calls for partition path discovery (called twice - once for partition 4, once for partition 3)
+		execMock.EXPECT().ExecCommand(nil, "nsenter",
+			append([]interface{}{},
+				"--target",
+				"1",
+				"--cgroup",
+				"--mount",
+				"--ipc",
+				"--pid",
+				"--",
+				"lsblk",
+				"-b",
+				"-J")...).Return(formatResult(device), nil).Times(2)
+		// Mock lsblk call for calculateFreePercent function
 		execMock.EXPECT().ExecCommand(nil, "nsenter",
 			append([]interface{}{},
 				"--target",
@@ -522,6 +561,9 @@ var _ = Describe("overwrite OS image", func() {
 	})
 	It("overwrite OS image - mmcblk", func() {
 		runTest("/dev/mmcblk1", "/dev/mmcblk1P3", "/dev/mmcblk1P4")
+	})
+	It("overwrite OS image - device mapper", func() {
+		runTest("/dev/dm-0", "/dev/dm-3", "/dev/dm-4")
 	})
 })
 
