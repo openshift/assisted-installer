@@ -216,6 +216,9 @@ func main() {
 	go assistedController.UpdateNodeLabels(mainContext, &wg)
 	wg.Add(1)
 
+	go assistedController.RelocateEtcdOperatorPod(mainContext, &wg)
+	wg.Add(1)
+
 	// monitoring installation by cluster status
 	switch invoker {
 	case common.InvokerAgent:

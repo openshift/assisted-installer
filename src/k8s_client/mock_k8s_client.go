@@ -105,6 +105,20 @@ func (mr *MockK8SClientMockRecorder) DeleteJob(job any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteJob", reflect.TypeOf((*MockK8SClient)(nil).DeleteJob), job)
 }
 
+// DeletePod mocks base method.
+func (m *MockK8SClient) DeletePod(name, namespace string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeletePod", name, namespace)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeletePod indicates an expected call of DeletePod.
+func (mr *MockK8SClientMockRecorder) DeletePod(name, namespace any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePod", reflect.TypeOf((*MockK8SClient)(nil).DeletePod), name, namespace)
+}
+
 // DeletePods mocks base method.
 func (m *MockK8SClient) DeletePods(namespace string) error {
 	m.ctrl.T.Helper()
