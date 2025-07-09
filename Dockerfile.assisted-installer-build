@@ -2,7 +2,7 @@ FROM registry.access.redhat.com/ubi9/go-toolset:1.21 AS golang
 
 ENV GOFLAGS=""
 
-RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.0 && \ 
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.8 && \ 
   go install golang.org/x/tools/cmd/goimports@v0.1.0 && \
   go install github.com/onsi/ginkgo/ginkgo@v1.16.1 && \
   go install go.uber.org/mock/mockgen@v0.4.0 && \
