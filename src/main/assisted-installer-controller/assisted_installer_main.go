@@ -149,12 +149,14 @@ func main() {
 			// node reboots to become the SNO cluster. SetReadyState will never be
 			// able to get a connection to assisted-service in this circumstance.
 			//
-			// Instead of exiting with panic with "invalid memory address or nil pointer
-			// dereference" and having the controller restart because cluster is nil,
-			// log warning and exit 0. Otherwise the controller will keep restarting
-			// leaving the controller in a running state, even through the cluster
-			// has finished install.
-			logger.Warnf("cluster is SNO and invoker = %v, skipping assisted-installer-controller", invoker)
+			// Using the k8s client to access the cluster can be done once the cluster is
+			// available.
+			logger.Warnf("cluster is SNO and invoker = %v, skipping access to assisted-service API", invoker)
+
+			wg.Add(1)
+			go assistedController.PostInstallConfigsK8sClient(mainContext, &wg, bootstrapKubeconfigForSNO)
+
+			waitForInstallationAgentBasedInstaller(kc, logger, false)
 			return
 		}
 		// With the agent-based installer, assisted-service runs on the bootstrap node.
@@ -200,7 +202,12 @@ func main() {
 
 	go assistedController.WaitAndUpdateNodesStatus(mainContext, &wg, removeUninitializedTaint)
 	wg.Add(1)
-	go assistedController.PostInstallConfigs(mainContext, &wg)
+	switch invoker {
+	case common.InvokerAgent:
+		go assistedController.PostInstallConfigsK8sClient(mainContext, &wg, "")
+	default:
+		go assistedController.PostInstallConfigs(mainContext, &wg)
+	}
 	wg.Add(1)
 
 	if cluster != nil && *cluster.Platform.Type == models.PlatformTypeBaremetal {
