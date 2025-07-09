@@ -80,6 +80,18 @@ func (mr *MockControllerMockRecorder) PostInstallConfigs(ctx, wg any) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostInstallConfigs", reflect.TypeOf((*MockController)(nil).PostInstallConfigs), ctx, wg)
 }
 
+// PostInstallConfigsK8sClient mocks base method.
+func (m *MockController) PostInstallConfigsK8sClient(ctx context.Context, wg *sync.WaitGroup, kubeconfigPath string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "PostInstallConfigsK8sClient", ctx, wg, kubeconfigPath)
+}
+
+// PostInstallConfigsK8sClient indicates an expected call of PostInstallConfigsK8sClient.
+func (mr *MockControllerMockRecorder) PostInstallConfigsK8sClient(ctx, wg, kubeconfigPath any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PostInstallConfigsK8sClient", reflect.TypeOf((*MockController)(nil).PostInstallConfigsK8sClient), ctx, wg, kubeconfigPath)
+}
+
 // SetReadyState mocks base method.
 func (m *MockController) SetReadyState(waitTimeout time.Duration) *models.Cluster {
 	m.ctrl.T.Helper()
