@@ -30,6 +30,7 @@ const (
 type RebootsNotifier interface {
 	Start(ctx context.Context, nodeName string, hostId, infraenvId, clusterId *strfmt.UUID)
 	Finalize()
+	GetKubeconfigPath(ctx context.Context) (string, error)
 }
 
 type rebootsNotifier struct {
@@ -52,7 +53,7 @@ func NewRebootsNotifier(ops ops.Ops, ic inventory_client.InventoryClient, enable
 	}
 }
 
-func (r *rebootsNotifier) getKubeconfigPath(ctx context.Context) (string, error) {
+func (r *rebootsNotifier) GetKubeconfigPath(ctx context.Context) (string, error) {
 	if r.kubeconfigPath != "" {
 		return r.kubeconfigPath, nil
 	}
@@ -75,7 +76,7 @@ func (r *rebootsNotifier) getKubeconfigPath(ctx context.Context) (string, error)
 
 func (r *rebootsNotifier) run(ctx context.Context, nodeName string, hostId, infraenvId, clusterId *strfmt.UUID) {
 	defer r.wg.Done()
-	kubeconfigPath, err := r.getKubeconfigPath(ctx)
+	kubeconfigPath, err := r.GetKubeconfigPath(ctx)
 	if err != nil {
 		r.log.Warningf("failed to get kubeconfig.  aborting notifying reboots for %s", nodeName)
 		return

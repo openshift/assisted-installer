@@ -52,6 +52,21 @@ func (mr *MockRebootsNotifierMockRecorder) Finalize() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Finalize", reflect.TypeOf((*MockRebootsNotifier)(nil).Finalize))
 }
 
+// GetKubeconfigPath mocks base method.
+func (m *MockRebootsNotifier) GetKubeconfigPath(ctx context.Context) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetKubeconfigPath", ctx)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetKubeconfigPath indicates an expected call of GetKubeconfigPath.
+func (mr *MockRebootsNotifierMockRecorder) GetKubeconfigPath(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetKubeconfigPath", reflect.TypeOf((*MockRebootsNotifier)(nil).GetKubeconfigPath), ctx)
+}
+
 // Start mocks base method.
 func (m *MockRebootsNotifier) Start(ctx context.Context, nodeName string, hostId, infraenvId, clusterId *strfmt.UUID) {
 	m.ctrl.T.Helper()
