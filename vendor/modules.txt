@@ -188,9 +188,11 @@ github.com/golang-jwt/jwt
 # github.com/golang-jwt/jwt/v4 v4.4.1
 ## explicit; go 1.16
 github.com/golang-jwt/jwt/v4
-# github.com/golang/glog v1.0.0
-## explicit; go 1.11
+# github.com/golang/glog v1.2.4
+## explicit; go 1.19
 github.com/golang/glog
+github.com/golang/glog/internal/logsink
+github.com/golang/glog/internal/stackdump
 # github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 ## explicit
 github.com/golang/groupcache/lru
@@ -211,7 +213,7 @@ github.com/google/gnostic/extensions
 github.com/google/gnostic/jsonschema
 github.com/google/gnostic/openapiv2
 github.com/google/gnostic/openapiv3
-# github.com/google/go-cmp v0.5.8
+# github.com/google/go-cmp v0.6.0
 ## explicit; go 1.13
 github.com/google/go-cmp/cmp
 github.com/google/go-cmp/cmp/internal/diff
@@ -602,8 +604,6 @@ golang.org/x/term
 # golang.org/x/text v0.21.0
 ## explicit; go 1.18
 golang.org/x/text/cases
-golang.org/x/text/collate
-golang.org/x/text/collate/build
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
 golang.org/x/text/encoding/htmlindex
@@ -615,13 +615,9 @@ golang.org/x/text/encoding/simplifiedchinese
 golang.org/x/text/encoding/traditionalchinese
 golang.org/x/text/encoding/unicode
 golang.org/x/text/internal
-golang.org/x/text/internal/colltab
-golang.org/x/text/internal/gen
 golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
 golang.org/x/text/internal/tag
-golang.org/x/text/internal/triegen
-golang.org/x/text/internal/ucd
 golang.org/x/text/internal/utf8internal
 golang.org/x/text/language
 golang.org/x/text/runes
@@ -629,9 +625,7 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/secure/precis
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
-golang.org/x/text/unicode/cldr
 golang.org/x/text/unicode/norm
-golang.org/x/text/unicode/rangetable
 golang.org/x/text/width
 # golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
 ## explicit
