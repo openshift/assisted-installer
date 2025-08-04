@@ -1060,7 +1060,7 @@ func (o *ops) getPartitionPathFromLsblk(device, partitionNumber string) (string,
 		return "", errors.Errorf("failed to find device %s in lsblk output", device)
 	}
 
-	if len(diskNode.Children) == 0 {
+	if diskNode.Children == nil || len(diskNode.Children) == 0 {
 		return "", errors.Errorf("device %s has no partitions", device)
 	}
 

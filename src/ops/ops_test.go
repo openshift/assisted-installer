@@ -765,3 +765,356 @@ var _ = Describe("WriteImageToExistingRoot", func() {
 		Expect(o.WriteImageToExistingRoot(io.Discard, ignitionPath, installerArgs)).To(Succeed())
 	})
 })
+
+var _ = Describe("getPartitionPathFromLsblk", func() {
+	var (
+		l        = logrus.New()
+		ctrl     *gomock.Controller
+		execMock *execute.MockExecute
+		conf     *config.Config
+		o        Ops
+	)
+
+	BeforeEach(func() {
+		ctrl = gomock.NewController(GinkgoT())
+		execMock = execute.NewMockExecute(ctrl)
+		conf = &config.Config{}
+		o = NewOpsWithConfig(conf, l, execMock)
+	})
+
+	mockLsblkCommand := func(output string, err error) {
+		execMock.EXPECT().ExecCommand(nil, "nsenter",
+			"--target", "1", "--cgroup", "--mount", "--ipc", "--pid", "--",
+			"lsblk", "-b", "-J").Return(output, err)
+	}
+
+	Context("Standard SATA devices", func() {
+		It("should find partition 3 for /dev/sda", func() {
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "sda",
+						"size": 100000000000,
+						"children": [
+							{"name": "sda1", "size": 1048576},
+							{"name": "sda2", "size": 133169152},
+							{"name": "sda3", "size": 402653184},
+							{"name": "sda4", "size": 3272588800}
+						]
+					}
+				]
+			}`
+			mockLsblkCommand(lsblkOutput, nil)
+
+			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "3")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(path).To(Equal("/dev/sda3"))
+		})
+
+		It("should find partition 4 for /dev/sda", func() {
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "sda",
+						"size": 100000000000,
+						"children": [
+							{"name": "sda1", "size": 1048576},
+							{"name": "sda2", "size": 133169152},
+							{"name": "sda3", "size": 402653184},
+							{"name": "sda4", "size": 3272588800}
+						]
+					}
+				]
+			}`
+			mockLsblkCommand(lsblkOutput, nil)
+
+			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "4")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(path).To(Equal("/dev/sda4"))
+		})
+	})
+
+	Context("NVMe devices", func() {
+		It("should find partition 3 for /dev/nvme0n1", func() {
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "nvme0n1",
+						"size": 100000000000,
+						"children": [
+							{"name": "nvme0n1p1", "size": 1048576},
+							{"name": "nvme0n1p2", "size": 133169152},
+							{"name": "nvme0n1p3", "size": 402653184},
+							{"name": "nvme0n1p4", "size": 3272588800}
+						]
+					}
+				]
+			}`
+			mockLsblkCommand(lsblkOutput, nil)
+
+			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/nvme0n1", "3")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(path).To(Equal("/dev/nvme0n1p3"))
+		})
+	})
+
+	Context("MMC devices", func() {
+		It("should find partition 4 for /dev/mmcblk1", func() {
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "mmcblk1",
+						"size": 100000000000,
+						"children": [
+							{"name": "mmcblk1P1", "size": 1048576},
+							{"name": "mmcblk1P2", "size": 133169152},
+							{"name": "mmcblk1P3", "size": 402653184},
+							{"name": "mmcblk1P4", "size": 3272588800}
+						]
+					}
+				]
+			}`
+			mockLsblkCommand(lsblkOutput, nil)
+
+			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/mmcblk1", "4")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(path).To(Equal("/dev/mmcblk1P4"))
+		})
+	})
+
+	Context("Device Mapper devices", func() {
+		It("should find partition 3 for /dev/dm-0", func() {
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "dm-0",
+						"size": 100000000000,
+						"children": [
+							{"name": "dm-1", "size": 1048576},
+							{"name": "dm-2", "size": 133169152},
+							{"name": "dm-3", "size": 402653184},
+							{"name": "dm-4", "size": 3272588800}
+						]
+					}
+				]
+			}`
+			mockLsblkCommand(lsblkOutput, nil)
+
+			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/dm-0", "3")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(path).To(Equal("/dev/dm-3"))
+		})
+
+		It("should find partition 4 for /dev/dm-0", func() {
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "dm-0",
+						"size": 100000000000,
+						"children": [
+							{"name": "dm-1", "size": 1048576},
+							{"name": "dm-2", "size": 133169152},
+							{"name": "dm-3", "size": 402653184},
+							{"name": "dm-4", "size": 3272588800}
+						]
+					}
+				]
+			}`
+			mockLsblkCommand(lsblkOutput, nil)
+
+			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/dm-0", "4")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(path).To(Equal("/dev/dm-4"))
+		})
+
+		It("should handle device mapper with higher numbers", func() {
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "dm-127",
+						"size": 100000000000,
+						"children": [
+							{"name": "dm-128", "size": 1048576},
+							{"name": "dm-129", "size": 133169152},
+							{"name": "dm-130", "size": 402653184},
+							{"name": "dm-131", "size": 3272588800}
+						]
+					}
+				]
+			}`
+			mockLsblkCommand(lsblkOutput, nil)
+
+			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/dm-127", "3")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(path).To(Equal("/dev/dm-130"))
+		})
+	})
+
+	Context("Error cases", func() {
+		It("should return error when lsblk command fails", func() {
+			mockLsblkCommand("", errors.New("lsblk command failed"))
+
+			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "3")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to run lsblk command"))
+		})
+
+		It("should return error when lsblk output is invalid JSON", func() {
+			mockLsblkCommand("invalid json", nil)
+
+			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "3")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to unmarshal lsblk output"))
+		})
+
+		It("should return error when device is not found", func() {
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "sda",
+						"size": 100000000000,
+						"children": [
+							{"name": "sda1", "size": 1048576}
+						]
+					}
+				]
+			}`
+			mockLsblkCommand(lsblkOutput, nil)
+
+			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sdb", "1")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to find device /dev/sdb in lsblk output"))
+		})
+
+		It("should return error when device has no partitions", func() {
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "sda",
+						"size": 100000000000,
+						"children": []
+					}
+				]
+			}`
+			mockLsblkCommand(lsblkOutput, nil)
+
+			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "1")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("device /dev/sda has no partitions"))
+		})
+
+		It("should return error when device has null children", func() {
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "sda",
+						"size": 100000000000,
+						"children": null
+					}
+				]
+			}`
+			mockLsblkCommand(lsblkOutput, nil)
+
+			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "1")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("device /dev/sda has no partitions"))
+		})
+
+		It("should return error for invalid partition number", func() {
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "sda",
+						"size": 100000000000,
+						"children": [
+							{"name": "sda1", "size": 1048576}
+						]
+					}
+				]
+			}`
+			mockLsblkCommand(lsblkOutput, nil)
+
+			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "invalid")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid partition number invalid"))
+		})
+
+		It("should return error for partition number 0", func() {
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "sda",
+						"size": 100000000000,
+						"children": [
+							{"name": "sda1", "size": 1048576}
+						]
+					}
+				]
+			}`
+			mockLsblkCommand(lsblkOutput, nil)
+
+			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "0")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("partition 0 not found on device /dev/sda"))
+		})
+
+		It("should return error for partition number higher than available partitions", func() {
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "sda",
+						"size": 100000000000,
+						"children": [
+							{"name": "sda1", "size": 1048576},
+							{"name": "sda2", "size": 133169152}
+						]
+					}
+				]
+			}`
+			mockLsblkCommand(lsblkOutput, nil)
+
+			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "5")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("partition 5 not found on device /dev/sda"))
+		})
+	})
+
+	Context("Multiple devices in lsblk output", func() {
+		It("should find the correct device when multiple devices exist", func() {
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "sda",
+						"size": 100000000000,
+						"children": [
+							{"name": "sda1", "size": 1048576},
+							{"name": "sda2", "size": 133169152}
+						]
+					},
+					{
+						"name": "dm-0",
+						"size": 100000000000,
+						"children": [
+							{"name": "dm-1", "size": 1048576},
+							{"name": "dm-2", "size": 133169152},
+							{"name": "dm-3", "size": 402653184},
+							{"name": "dm-4", "size": 3272588800}
+						]
+					},
+					{
+						"name": "nvme0n1",
+						"size": 100000000000,
+						"children": [
+							{"name": "nvme0n1p1", "size": 1048576}
+						]
+					}
+				]
+			}`
+			mockLsblkCommand(lsblkOutput, nil)
+
+			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/dm-0", "3")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(path).To(Equal("/dev/dm-3"))
+		})
+	})
+})
