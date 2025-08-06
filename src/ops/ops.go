@@ -1066,7 +1066,7 @@ func (o *ops) getPartitionPathFromLsblk(device, partitionNumber string) (string,
 	}
 	diskNode := disks.Blockdevices[0] // lsblk with device filter returns only that device
 
-	if diskNode.Children == nil || len(diskNode.Children) == 0 {
+	if len(diskNode.Children) == 0 {
 		return "", errors.Errorf("device %s has no partitions", device)
 	}
 
