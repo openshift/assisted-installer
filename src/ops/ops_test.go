@@ -501,8 +501,9 @@ var _ = Describe("overwrite OS image", func() {
 				"--pid",
 				"--",
 				"lsblk",
-				"-b",
-				"-J")...).Return(formatResult(device), nil).Times(2)
+				"--bytes",
+				"--json",
+				device)...).Return(formatResult(device), nil).Times(2)
 		// Mock lsblk call for calculateFreePercent function
 		execMock.EXPECT().ExecCommand(nil, "nsenter",
 			append([]interface{}{},
@@ -514,8 +515,9 @@ var _ = Describe("overwrite OS image", func() {
 				"--pid",
 				"--",
 				"lsblk",
-				"-b",
-				"-J")...).Return(formatResult(device), nil)
+				"--bytes",
+				"--json",
+				device)...).Return(formatResult(device), nil)
 		osImage := "quay.io/release-image:latest"
 		extraArgs := []string{
 			"--karg",
@@ -782,10 +784,10 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 		o = NewOpsWithConfig(conf, l, execMock)
 	})
 
-	mockLsblkCommand := func(output string, err error) {
+	mockLsblkCommand := func(device, output string, err error) {
 		execMock.EXPECT().ExecCommand(nil, "nsenter",
 			"--target", "1", "--cgroup", "--mount", "--ipc", "--pid", "--",
-			"lsblk", "-b", "-J").Return(output, err)
+			"lsblk", "--bytes", "--json", device).Return(output, err)
 	}
 
 	Context("Standard SATA devices", func() {
@@ -804,7 +806,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					}
 				]
 			}`
-			mockLsblkCommand(lsblkOutput, nil)
+			mockLsblkCommand("/dev/sda", lsblkOutput, nil)
 
 			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "3")
 			Expect(err).ToNot(HaveOccurred())
@@ -826,7 +828,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					}
 				]
 			}`
-			mockLsblkCommand(lsblkOutput, nil)
+			mockLsblkCommand("/dev/sda", lsblkOutput, nil)
 
 			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "4")
 			Expect(err).ToNot(HaveOccurred())
@@ -850,7 +852,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					}
 				]
 			}`
-			mockLsblkCommand(lsblkOutput, nil)
+			mockLsblkCommand("/dev/nvme0n1", lsblkOutput, nil)
 
 			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/nvme0n1", "3")
 			Expect(err).ToNot(HaveOccurred())
@@ -874,7 +876,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					}
 				]
 			}`
-			mockLsblkCommand(lsblkOutput, nil)
+			mockLsblkCommand("/dev/mmcblk1", lsblkOutput, nil)
 
 			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/mmcblk1", "4")
 			Expect(err).ToNot(HaveOccurred())
@@ -898,7 +900,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					}
 				]
 			}`
-			mockLsblkCommand(lsblkOutput, nil)
+			mockLsblkCommand("/dev/dm-0", lsblkOutput, nil)
 
 			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/dm-0", "3")
 			Expect(err).ToNot(HaveOccurred())
@@ -920,7 +922,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					}
 				]
 			}`
-			mockLsblkCommand(lsblkOutput, nil)
+			mockLsblkCommand("/dev/dm-0", lsblkOutput, nil)
 
 			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/dm-0", "4")
 			Expect(err).ToNot(HaveOccurred())
@@ -942,7 +944,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					}
 				]
 			}`
-			mockLsblkCommand(lsblkOutput, nil)
+			mockLsblkCommand("/dev/dm-127", lsblkOutput, nil)
 
 			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/dm-127", "3")
 			Expect(err).ToNot(HaveOccurred())
@@ -952,7 +954,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 
 	Context("Error cases", func() {
 		It("should return error when lsblk command fails", func() {
-			mockLsblkCommand("", errors.New("lsblk command failed"))
+			mockLsblkCommand("/dev/sda", "", errors.New("lsblk command failed"))
 
 			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "3")
 			Expect(err).To(HaveOccurred())
@@ -960,7 +962,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 		})
 
 		It("should return error when lsblk output is invalid JSON", func() {
-			mockLsblkCommand("invalid json", nil)
+			mockLsblkCommand("/dev/sda", "invalid json", nil)
 
 			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "3")
 			Expect(err).To(HaveOccurred())
@@ -968,22 +970,12 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 		})
 
 		It("should return error when device is not found", func() {
-			lsblkOutput := `{
-				"blockdevices": [
-					{
-						"name": "sda",
-						"size": 100000000000,
-						"children": [
-							{"name": "sda1", "size": 1048576}
-						]
-					}
-				]
-			}`
-			mockLsblkCommand(lsblkOutput, nil)
+			lsblkOutput := `{"blockdevices": []}`
+			mockLsblkCommand("/dev/sdb", lsblkOutput, nil)
 
 			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sdb", "1")
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("failed to find device /dev/sdb in lsblk output"))
+			Expect(err.Error()).To(ContainSubstring("no block device information returned for /dev/sdb"))
 		})
 
 		It("should return error when device has no partitions", func() {
@@ -996,7 +988,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					}
 				]
 			}`
-			mockLsblkCommand(lsblkOutput, nil)
+			mockLsblkCommand("/dev/sda", lsblkOutput, nil)
 
 			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "1")
 			Expect(err).To(HaveOccurred())
@@ -1013,7 +1005,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					}
 				]
 			}`
-			mockLsblkCommand(lsblkOutput, nil)
+			mockLsblkCommand("/dev/sda", lsblkOutput, nil)
 
 			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "1")
 			Expect(err).To(HaveOccurred())
@@ -1032,7 +1024,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					}
 				]
 			}`
-			mockLsblkCommand(lsblkOutput, nil)
+			mockLsblkCommand("/dev/sda", lsblkOutput, nil)
 
 			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "invalid")
 			Expect(err).To(HaveOccurred())
@@ -1051,7 +1043,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					}
 				]
 			}`
-			mockLsblkCommand(lsblkOutput, nil)
+			mockLsblkCommand("/dev/sda", lsblkOutput, nil)
 
 			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "0")
 			Expect(err).To(HaveOccurred())
@@ -1071,7 +1063,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					}
 				]
 			}`
-			mockLsblkCommand(lsblkOutput, nil)
+			mockLsblkCommand("/dev/sda", lsblkOutput, nil)
 
 			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "5")
 			Expect(err).To(HaveOccurred())
@@ -1084,14 +1076,6 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 			lsblkOutput := `{
 				"blockdevices": [
 					{
-						"name": "sda",
-						"size": 100000000000,
-						"children": [
-							{"name": "sda1", "size": 1048576},
-							{"name": "sda2", "size": 133169152}
-						]
-					},
-					{
 						"name": "dm-0",
 						"size": 100000000000,
 						"children": [
@@ -1100,17 +1084,10 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 							{"name": "dm-3", "size": 402653184},
 							{"name": "dm-4", "size": 3272588800}
 						]
-					},
-					{
-						"name": "nvme0n1",
-						"size": 100000000000,
-						"children": [
-							{"name": "nvme0n1p1", "size": 1048576}
-						]
 					}
 				]
 			}`
-			mockLsblkCommand(lsblkOutput, nil)
+			mockLsblkCommand("/dev/dm-0", lsblkOutput, nil)
 
 			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/dm-0", "3")
 			Expect(err).ToNot(HaveOccurred())
