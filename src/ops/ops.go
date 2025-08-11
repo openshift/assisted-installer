@@ -1046,7 +1046,7 @@ func (o *ops) getPartitionPathFromLsblk(device, partitionNumber string) (string,
 		Blockdevices []*node `json:"blockdevices"`
 	}
 
-	ret, err := o.ExecPrivilegeCommand(nil, "lsblk", "-b", "-J")
+	ret, err := o.ExecPrivilegeCommand(nil, "lsblk", "--bytes", "--json", device)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to run lsblk command")
 	}
@@ -1054,11 +1054,10 @@ func (o *ops) getPartitionPathFromLsblk(device, partitionNumber string) (string,
 		return "", errors.Wrap(err, "failed to unmarshal lsblk output")
 	}
 
-	deviceName := stripDev(device)
-	diskNode, ok := funk.Find(disks.Blockdevices, func(n *node) bool { return deviceName == n.Name }).(*node)
-	if !ok {
-		return "", errors.Errorf("failed to find device %s in lsblk output", device)
+	if len(disks.Blockdevices) == 0 {
+		return "", errors.Errorf("no block device information returned for %s", device)
 	}
+	diskNode := disks.Blockdevices[0] // lsblk with device filter returns only that device
 
 	if len(diskNode.Children) == 0 {
 		return "", errors.Errorf("device %s has no partitions", device)
@@ -1107,20 +1106,18 @@ func (o *ops) calculateFreePercent(device string) (int64, error) {
 	}
 	var (
 		diskNode, partitionNode *node
-		ok                      bool
 	)
-	ret, err := o.ExecPrivilegeCommand(nil, "lsblk", "-b", "-J")
+	ret, err := o.ExecPrivilegeCommand(nil, "lsblk", "--bytes", "--json", device)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to run lsblk command")
 	}
 	if err = json.Unmarshal([]byte(ret), &disks); err != nil {
 		return 0, errors.Wrap(err, "failed to unmarshal lsblk output")
 	}
-	deviceName := stripDev(device)
-	diskNode, ok = funk.Find(disks.Blockdevices, func(n *node) bool { return deviceName == n.Name }).(*node)
-	if !ok {
-		return 0, errors.Errorf("failed to find device is %s in lsblk output", device)
+	if len(disks.Blockdevices) == 0 {
+		return 0, errors.Errorf("no block device information returned for %s", device)
 	}
+	diskNode = disks.Blockdevices[0] // lsblk with device filter returns only that device
 	// Find partition 4 (1-based indexing, so array index 3)
 	if len(diskNode.Children) < 4 {
 		return 0, errors.Errorf("device %s does not have 4 partitions", device)
