@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -188,6 +189,12 @@ grw/ZQTTIVjjh4JBSW3WyWgNo/ikC1lrVxzl4iPUGptxT36Cr7Zk2Bsg0XqwbOvK
 5d+NTDREkSnUbie4GeutujmX3Dsx88UiV6UY/4lHJa6I5leHUNOHahRbpbWeOfs/
 WkBKOclmOV2xlTVuPw==
 -----END CERTIFICATE-----`)
+
+	// extract PEM-encoded certificate from a TLS ghttp server
+	serverCertPEM := func(s *ghttp.Server) []byte {
+		der := s.HTTPTestServer.TLS.Certificates[0].Certificate[0]
+		return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	}
 	buildPointerIgnition := func(source string, withCert bool) types.Config {
 		ret := types.Config{}
 		ret.Ignition.Version = "3.2.0"
@@ -309,6 +316,7 @@ WkBKOclmOV2xlTVuPw==
 		})
 		It("from bootstrap - success", func() {
 			s := ghttp.NewTLSServer()
+			localhostCert = serverCertPEM(s)
 			s.RouteToHandler("GET", "/",
 				func(w http.ResponseWriter, req *http.Request) {
 					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
@@ -319,6 +327,7 @@ WkBKOclmOV2xlTVuPw==
 		})
 		It("from bootstrap - empty response", func() {
 			s := ghttp.NewTLSServer()
+			localhostCert = serverCertPEM(s)
 			s.RouteToHandler("GET", "/",
 				func(w http.ResponseWriter, req *http.Request) {
 					_, err := io.WriteString(w, "")
@@ -349,6 +358,7 @@ WkBKOclmOV2xlTVuPw==
 		})
 		It("from bootstrap - with https with cert should succeed", func() {
 			s := ghttp.NewTLSServer()
+			localhostCert = serverCertPEM(s)
 			s.RouteToHandler("GET", "/",
 				func(w http.ResponseWriter, req *http.Request) {
 					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
