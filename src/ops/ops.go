@@ -1033,6 +1033,51 @@ func stripDev(device string) string {
 	return strings.Replace(device, "/dev/", "", 1)
 }
 
+// getPartitionPathFromLsblk uses lsblk to find the actual partition device path
+// for a given device and partition number. This handles all device types including
+// device mapper devices correctly.
+func (o *ops) getPartitionPathFromLsblk(device, partitionNumber string) (string, error) {
+	type node struct {
+		Name     string  `json:"name"`
+		Size     int64   `json:"size"`
+		Children []*node `json:"children"`
+	}
+	var disks struct {
+		Blockdevices []*node `json:"blockdevices"`
+	}
+
+	ret, err := o.ExecPrivilegeCommand(nil, "lsblk", "--bytes", "--json", device)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to run lsblk command")
+	}
+	if err = json.Unmarshal([]byte(ret), &disks); err != nil {
+		return "", errors.Wrap(err, "failed to unmarshal lsblk output")
+	}
+
+	if len(disks.Blockdevices) == 0 {
+		return "", errors.Errorf("no block device information returned for %s", device)
+	}
+	diskNode := disks.Blockdevices[0] // lsblk with device filter returns only that device
+
+	if len(diskNode.Children) == 0 {
+		return "", errors.Errorf("device %s has no partitions", device)
+	}
+
+	// Convert partition number to integer for indexing
+	partNum, err := strconv.Atoi(partitionNumber)
+	if err != nil {
+		return "", errors.Errorf("invalid partition number %s", partitionNumber)
+	}
+
+	// Partition numbers are 1-based, but array indices are 0-based
+	if partNum < 1 || partNum > len(diskNode.Children) {
+		return "", errors.Errorf("partition %s not found on device %s", partitionNumber, device)
+	}
+
+	partitionName := diskNode.Children[partNum-1].Name
+	return "/dev/" + partitionName, nil
+}
+
 func partitionNameForDeviceName(deviceName, partitionNumber string) string {
 	var format string
 	switch {
@@ -1061,25 +1106,23 @@ func (o *ops) calculateFreePercent(device string) (int64, error) {
 	}
 	var (
 		diskNode, partitionNode *node
-		ok                      bool
 	)
-	ret, err := o.ExecPrivilegeCommand(nil, "lsblk", "-b", "-J")
+	ret, err := o.ExecPrivilegeCommand(nil, "lsblk", "--bytes", "--json", device)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to run lsblk command")
 	}
 	if err = json.Unmarshal([]byte(ret), &disks); err != nil {
 		return 0, errors.Wrap(err, "failed to unmarshal lsblk output")
 	}
-	deviceName := stripDev(device)
-	diskNode, ok = funk.Find(disks.Blockdevices, func(n *node) bool { return deviceName == n.Name }).(*node)
-	if !ok {
-		return 0, errors.Errorf("failed to find device is %s in lsblk output", device)
+	if len(disks.Blockdevices) == 0 {
+		return 0, errors.Errorf("no block device information returned for %s", device)
 	}
-	partitionName := partitionNameForDeviceName(diskNode.Name, "4")
-	partitionNode, ok = funk.Find(diskNode.Children, func(n *node) bool { return partitionName == n.Name }).(*node)
-	if !ok {
-		return 0, errors.Errorf("failed to find partition node %s in lsblk output", device)
+	diskNode = disks.Blockdevices[0] // lsblk with device filter returns only that device
+	// Find partition 4 (1-based indexing, so array index 3)
+	if len(diskNode.Children) < 4 {
+		return 0, errors.Errorf("device %s does not have 4 partitions", device)
 	}
+	partitionNode = diskNode.Children[3] // partition 4 is at index 3
 	var usedSize int64
 	funk.ForEach(diskNode.Children, func(n *node) { usedSize += n.Size })
 
@@ -1116,9 +1159,19 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 		o.log.Infof("Running on s390x archtiecture - skip overwrite image.")
 		return nil
 	}
+
+	partition4, err := o.getPartitionPathFromLsblk(device, "4")
+	if err != nil {
+		return errors.Wrapf(err, "failed to find partition 4 for device %s", device)
+	}
+	partition3, err := o.getPartitionPathFromLsblk(device, "3")
+	if err != nil {
+		return errors.Wrapf(err, "failed to find partition 3 for device %s", device)
+	}
+
 	cmds := []*cmd{
-		makecmd("mount", partitionForDevice(device, "4"), "/mnt"),
-		makecmd("mount", partitionForDevice(device, "3"), "/mnt/boot"),
+		makecmd("mount", partition4, "/mnt"),
+		makecmd("mount", partition3, "/mnt/boot"),
 		growpartcmd,
 		makecmd("xfs_growfs", "/mnt"),
 
