@@ -423,13 +423,11 @@ func (o *ops) findEfiDirectory(device string) (string, error) {
 		out string
 		err error
 	)
-
 	// Find the actual path for partition 2 using lsblk
 	partition2Path, err := o.getPartitionPathFromLsblk(device, "2")
 	if err != nil {
 		return "", errors.Wrap(err, "failed to find partition 2 for EFI directory")
 	}
-
 	if err = utils.Retry(3, 5*time.Second, o.log, func() (err error) {
 		_, err = o.ExecPrivilegeCommand(nil, "mount", partition2Path, "/mnt")
 		return
