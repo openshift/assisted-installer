@@ -1083,23 +1083,6 @@ func (o *ops) getPartitionPathFromLsblk(device, partitionNumber string) (string,
 	return "/dev/" + partitionName, nil
 }
 
-func partitionNameForDeviceName(deviceName, partitionNumber string) string {
-	var format string
-	switch {
-	case strings.HasPrefix(deviceName, "nvme"):
-		format = "%sp%s"
-	case strings.HasPrefix(deviceName, "mmcblk"):
-		format = "%sP%s"
-	default:
-		format = "%s%s"
-	}
-	return fmt.Sprintf(format, deviceName, partitionNumber)
-}
-
-func partitionForDevice(device, partitionNumber string) string {
-	return "/dev/" + partitionNameForDeviceName(stripDev(device), partitionNumber)
-}
-
 func (o *ops) calculateFreePercent(device string) (int64, error) {
 	type node struct {
 		Name     string
