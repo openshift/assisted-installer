@@ -17,6 +17,8 @@ import (
 	"github.com/openshift/assisted-installer/src/ops/execute"
 	"github.com/openshift/assisted-installer/src/utils"
 
+	"encoding/pem"
+
 	"github.com/coreos/ignition/v2/config/v3_2/types"
 	"github.com/go-openapi/swag"
 	. "github.com/onsi/ginkgo"
@@ -170,26 +172,20 @@ var _ = Describe("Get encapsulated machine config", func() {
 	var (
 		l = logrus.New()
 	)
-	var localhostCert = []byte(`-----BEGIN CERTIFICATE-----
-MIIDOTCCAiGgAwIBAgIQSRJrEpBGFc7tNb1fb5pKFzANBgkqhkiG9w0BAQsFADAS
-MRAwDgYDVQQKEwdBY21lIENvMCAXDTcwMDEwMTAwMDAwMFoYDzIwODQwMTI5MTYw
-MDAwWjASMRAwDgYDVQQKEwdBY21lIENvMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A
-MIIBCgKCAQEA6Gba5tHV1dAKouAaXO3/ebDUU4rvwCUg/CNaJ2PT5xLD4N1Vcb8r
-bFSW2HXKq+MPfVdwIKR/1DczEoAGf/JWQTW7EgzlXrCd3rlajEX2D73faWJekD0U
-aUgz5vtrTXZ90BQL7WvRICd7FlEZ6FPOcPlumiyNmzUqtwGhO+9ad1W5BqJaRI6P
-YfouNkwR6Na4TzSj5BrqUfP0FwDizKSJ0XXmh8g8G9mtwxOSN3Ru1QFc61Xyeluk
-POGKBV/q6RBNklTNe0gI8usUMlYyoC7ytppNMW7X2vodAelSu25jgx2anj9fDVZu
-h7AXF5+4nJS4AAt0n1lNY7nGSsdZas8PbQIDAQABo4GIMIGFMA4GA1UdDwEB/wQE
-AwICpDATBgNVHSUEDDAKBggrBgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MB0GA1Ud
-DgQWBBStsdjh3/JCXXYlQryOrL4Sh7BW5TAuBgNVHREEJzAlggtleGFtcGxlLmNv
-bYcEfwAAAYcQAAAAAAAAAAAAAAAAAAAAATANBgkqhkiG9w0BAQsFAAOCAQEAxWGI
-5NhpF3nwwy/4yB4i/CwwSpLrWUa70NyhvprUBC50PxiXav1TeDzwzLx/o5HyNwsv
-cxv3HdkLW59i/0SlJSrNnWdfZ19oTcS+6PtLoVyISgtyN6DpkKpdG1cOkW3Cy2P2
-+tK/tKHRP1Y/Ra0RiDpOAmqn0gCOFGz8+lqDIor/T7MTpibL3IxqWfPrvfVRHL3B
-grw/ZQTTIVjjh4JBSW3WyWgNo/ikC1lrVxzl4iPUGptxT36Cr7Zk2Bsg0XqwbOvK
-5d+NTDREkSnUbie4GeutujmX3Dsx88UiV6UY/4lHJa6I5leHUNOHahRbpbWeOfs/
-WkBKOclmOV2xlTVuPw==
------END CERTIFICATE-----`)
+	var localhostCert []byte
+
+	// extract PEM-encoded certificate from a TLS ghttp server
+	serverCertPEM := func(s *ghttp.Server) []byte {
+		der := s.HTTPTestServer.TLS.Certificates[0].Certificate[0]
+		return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	}
+
+	BeforeEach(func() {
+		s := ghttp.NewTLSServer()
+		localhostCert = serverCertPEM(s)
+		s.Close()
+	})
+
 	buildPointerIgnition := func(source string, withCert bool) types.Config {
 		ret := types.Config{}
 		ret.Ignition.Version = "3.2.0"
