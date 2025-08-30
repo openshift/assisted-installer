@@ -423,8 +423,13 @@ func (o *ops) findEfiDirectory(device string) (string, error) {
 		out string
 		err error
 	)
+	// Find the actual path for partition 2 using lsblk
+	partition2Path, err := o.getPartitionPathFromLsblk(device, "2")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to find partition 2 for EFI directory")
+	}
 	if err = utils.Retry(3, 5*time.Second, o.log, func() (err error) {
-		_, err = o.ExecPrivilegeCommand(nil, "mount", partitionForDevice(device, "2"), "/mnt")
+		_, err = o.ExecPrivilegeCommand(nil, "mount", partition2Path, "/mnt")
 		return
 	}); err != nil {
 		return "", errors.Wrap(err, "failed to mount efi device")
@@ -1076,23 +1081,6 @@ func (o *ops) getPartitionPathFromLsblk(device, partitionNumber string) (string,
 
 	partitionName := diskNode.Children[partNum-1].Name
 	return "/dev/" + partitionName, nil
-}
-
-func partitionNameForDeviceName(deviceName, partitionNumber string) string {
-	var format string
-	switch {
-	case strings.HasPrefix(deviceName, "nvme"):
-		format = "%sp%s"
-	case strings.HasPrefix(deviceName, "mmcblk"):
-		format = "%sP%s"
-	default:
-		format = "%s%s"
-	}
-	return fmt.Sprintf(format, deviceName, partitionNumber)
-}
-
-func partitionForDevice(device, partitionNumber string) string {
-	return "/dev/" + partitionNameForDeviceName(stripDev(device), partitionNumber)
 }
 
 func (o *ops) calculateFreePercent(device string) (int64, error) {
