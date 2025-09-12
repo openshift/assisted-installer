@@ -139,6 +139,23 @@ var _ = Describe("Set Boot Order", func() {
 			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m1).Times(1).Return("", errors.New("Bootlist is not exist."))
 			m2 := MatcherContainsStringElements{[]string{"test", "-d", "/sys/firmware/efi"}, true}
 			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m2).Times(1)
+			// Mock the lsblk call for getPartitionPathFromLsblk in findEfiDirectory
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "sda",
+						"size": 100000000000,
+						"children": [
+							{"name": "sda1", "size": 1048576},
+							{"name": "sda2", "size": 133169152},
+							{"name": "sda3", "size": 402653184},
+							{"name": "sda4", "size": 3272588800}
+						]
+					}
+				]
+			}`
+			mLsblk := MatcherContainsStringElements{[]string{"lsblk", "--bytes", "--json", "/dev/sda"}, true}
+			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), mLsblk).Times(1).Return(lsblkOutput, nil)
 			m3 := MatcherContainsStringElements{[]string{"efibootmgr", "/dev/sda", "Red Hat Enterprise Linux"}, true}
 			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m3).Times(1).Return("", nil)
 			m4 := MatcherContainsStringElements{[]string{"efibootmgr", "-l"}, true}
