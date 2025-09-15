@@ -29,7 +29,8 @@ COPY --from=builder /app/deploy/assisted-installer-controller /assisted-installe
 ENTRYPOINT ["/installer"]
 
 LABEL com.redhat.component="assisted-installer-container" \
-      name="assisted-installer" \
+      name="rhai/assisted-installer-rhel9" \
+      cpe="cpe:/a:redhat:assisted_installer:2.38::el9" \
       version="${version}" \
       upstream-ref="${version}" \
       upstream-url="https://github.com/openshift/assisted-installer" \
