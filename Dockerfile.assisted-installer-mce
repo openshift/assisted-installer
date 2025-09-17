@@ -1,0 +1,51 @@
+FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi8/go-toolset:1.23 AS builder
+ARG TARGETOS
+ARG TARGETARCH
+
+ENV COMPONENT_NAME=installer
+ENV COMPONENT_VERSION=1.0.0
+ENV COMPONENT_TAG_EXTENSION=" "
+ENV GOFLAGS="-p=4"
+ENV GOEXPERIMENT=strictfipsruntime
+ENV BUILD_TAGS="strictfipsruntime"
+
+ENV USER_UID=1001 \
+    USER_NAME=assisted-installer
+
+COPY --chown=${USER_UID} . /app
+WORKDIR /app
+
+RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags strictfipsruntime -o installer src/main/main.go
+
+
+FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi8/ubi:8.10
+ARG release=main
+ARG version=latest
+
+# base image already includes util-linux
+# RUN dnf install -y util-linux && dnf clean all
+
+COPY LICENSE /licenses/
+COPY --from=builder /app/installer /installer
+COPY --from=builder /app/deploy/assisted-installer-controller /assisted-installer-controller/deploy
+
+ENTRYPOINT ["/installer"]
+
+LABEL com.redhat.component="multicluster-engine-assisted-installer-container" \
+      name="multicluster-engine/assisted-installer-rhel8" \
+      version="${version}" \
+      upstream-ref="${version}" \
+      upstream-url="https://github.com/openshift/assisted-installer" \
+      summary="OpenShift Assisted Installer" \
+      io.k8s.display-name="OpenShift Assisted Installer" \
+      maintainer="Liat Gamliel <lgamliel@redhat.com>" \
+      description="OpenShift Assisted Installer" \
+      io.k8s.description="OpenShift Assisted Installer" \
+      distribution-scope="public" \
+      release="${release}" \
+      vendor="Red Hat, Inc." \
+      io.openshift.tags="OpenShift 4" \
+      upstream_commit="${version}" \
+      org.label-schema.vcs-ref="${version}" \
+      org.label-schema.vcs-url="https://github.com/openshift/assisted-installer" \
+      cpe="cpe:/a:redhat:multicluster_engine:2.6::el8"
