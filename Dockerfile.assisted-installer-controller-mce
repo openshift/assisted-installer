@@ -1,0 +1,49 @@
+FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi9/go-toolset:1.21 AS builder
+ARG TARGETOS
+ARG TARGETARCH
+
+ENV COMPONENT_NAME=assisted-installer-controller
+ENV COMPONENT_VERSION=1.0.0
+ENV COMPONENT_TAG_EXTENSION=" "
+ENV GOFLAGS="-p=4"
+ENV GOEXPERIMENT=strictfipsruntime
+ENV BUILD_TAGS="strictfipsruntime"
+
+ENV USER_UID=1001 \
+    USER_NAME=assisted-installer
+
+COPY --chown=${USER_UID} . /app
+WORKDIR /app
+
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags strictfipsruntime -o assisted-installer-controller src/main/assisted-installer-controller/assisted_installer_main.go
+
+
+FROM --platform=$BUILDPLATFORM registry.redhat.io/rhel9-4-els/rhel:9.4
+ARG release=main
+ARG version=latest
+
+RUN dnf -y install openshift-clients tar gzip rsync && dnf clean all
+
+COPY LICENSE /licenses/
+COPY --from=builder /app/assisted-installer-controller /assisted-installer-controller
+
+ENTRYPOINT ["/assisted-installer-controller"]
+
+LABEL com.redhat.component="multicluster-engine-assisted-installer-controller-container" \
+      name="multicluster-engine/assisted-installer-controller-rhel9" \
+      version="${version}" \
+      upstream-ref="${version}" \
+      upstream-url="https://github.com/openshift/assisted-installer" \
+      summary="OpenShift Assisted Installer Controller" \
+      io.k8s.display-name="OpenShift Assisted Installer Controller" \
+      maintainer="Liat Gamliel <lgamliel@redhat.com>" \
+      description="OpenShift Assisted Installer Controller" \
+      io.k8s.description="OpenShift Assisted Installer Controller" \
+      distribution-scope="public" \
+      release="${release}" \
+      vendor="Red Hat, Inc." \
+      io.openshift.tags="OpenShift 4" \
+      upstream_commit="${version}" \
+      org.label-schema.vcs-ref="${version}" \
+      org.label-schema.vcs-url="https://github.com/openshift/assisted-installer" \
+      cpe="cpe:/a:redhat:multicluster_engine:2.7::el9"
