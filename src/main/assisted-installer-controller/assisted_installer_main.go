@@ -98,7 +98,8 @@ func main() {
 		mockController := gomock.NewController(logger)
 		kc = k8s_client.NewMockK8SClient(mockController)
 		mock, _ := kc.(*k8s_client.MockK8SClient)
-		drymock.PrepareControllerDryMock(mock, logger, o, Options.ControllerConfig.ParsedClusterHosts)
+		drymock.PrepareControllerDryMock(mock, logger, o, Options.ControllerConfig.ParsedClusterHosts,
+			Options.ControllerConfig.ControlPlaneCount)
 	}
 
 	err = kc.SetProxyEnvVars()
