@@ -83,20 +83,20 @@ var (
 // as a first step it will wait till nodes are added to cluster and update their status to Done
 
 type ControllerConfig struct {
-	ClusterID               string `envconfig:"CLUSTER_ID" required:"true"`
-	URL                     string `envconfig:"INVENTORY_URL" required:"true"`
-	PullSecretToken         string `envconfig:"PULL_SECRET_TOKEN" required:"true" secret:"true"`
-	SkipCertVerification    bool   `envconfig:"SKIP_CERT_VERIFICATION" required:"false" default:"false"`
-	CACertPath              string `envconfig:"CA_CERT_PATH" required:"false" default:""`
-	Namespace               string `envconfig:"NAMESPACE" required:"false" default:"assisted-installer"`
-	OpenshiftVersion        string `envconfig:"OPENSHIFT_VERSION" required:"true"`
-	ControlPlaneCount       int    `envconfig:"CONTROL_PLANE_COUNT" required:"false" default:"3"`
-	WaitForClusterVersion   bool   `envconfig:"CHECK_CLUSTER_VERSION" required:"false" default:"false"`
-	MustGatherImage         string `envconfig:"MUST_GATHER_IMAGE" required:"false" default:""`
-	DryRunEnabled           bool   `envconfig:"DRY_ENABLE" required:"false" default:"false"`
-	DryFakeRebootMarkerPath string `envconfig:"DRY_FAKE_REBOOT_MARKER_PATH" required:"false" default:""`
-	DryRunClusterHostsPath  string `envconfig:"DRY_CLUSTER_HOSTS_PATH"`
-	NotifyNumReboots        bool   `envconfig:"NOTIFY_NUM_REBOOTS" default:"false"`
+	ClusterID                     string `envconfig:"CLUSTER_ID" required:"true"`
+	URL                           string `envconfig:"INVENTORY_URL" required:"true"`
+	PullSecretToken               string `envconfig:"PULL_SECRET_TOKEN" required:"true" secret:"true"`
+	SkipCertVerification          bool   `envconfig:"SKIP_CERT_VERIFICATION" required:"false" default:"false"`
+	CACertPath                    string `envconfig:"CA_CERT_PATH" required:"false" default:""`
+	Namespace                     string `envconfig:"NAMESPACE" required:"false" default:"assisted-installer"`
+	OpenshiftVersion              string `envconfig:"OPENSHIFT_VERSION" required:"true"`
+	ControlPlaneCount             int    `envconfig:"CONTROL_PLANE_COUNT" required:"false" default:"3"`
+	WaitForClusterVersion         bool   `envconfig:"CHECK_CLUSTER_VERSION" required:"false" default:"false"`
+	MustGatherImage               string `envconfig:"MUST_GATHER_IMAGE" required:"false" default:""`
+	NotifyNumReboots              bool   `envconfig:"NOTIFY_NUM_REBOOTS" default:"false"`
+	DryRunEnabled                 bool   `envconfig:"DRY_ENABLE" required:"false" default:"false"`
+	DryFakeRebootMarkerPath       string `envconfig:"DRY_FAKE_REBOOT_MARKER_PATH" required:"false" default:""`
+	DryRunClusterHostsPath        string `envconfig:"DRY_CLUSTER_HOSTS_PATH"`
 	// DryRunClusterHostsPath gets read parsed into ParsedClusterHosts by DryParseClusterHosts
 	ParsedClusterHosts config.DryClusterHosts
 }
