@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Added to manage ignition versions in one file
+// Added to manage ignition versions in one file bla bla only to check
 var EmptyIgnitionConfig = types.IgnitionConfig{}
 var EmptyIgnition = types.Config{}
 
