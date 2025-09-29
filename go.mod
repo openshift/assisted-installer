@@ -2,6 +2,8 @@ module github.com/openshift/assisted-installer
 
 go 1.20
 
+toolchain go1.24.6
+
 require (
 	github.com/PuerkitoBio/rehttp v1.4.0
 	github.com/ReneKroon/ttlcache/v2 v2.11.0
