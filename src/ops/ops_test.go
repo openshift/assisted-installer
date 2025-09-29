@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -188,7 +189,7 @@ grw/ZQTTIVjjh4JBSW3WyWgNo/ikC1lrVxzl4iPUGptxT36Cr7Zk2Bsg0XqwbOvK
 5d+NTDREkSnUbie4GeutujmX3Dsx88UiV6UY/4lHJa6I5leHUNOHahRbpbWeOfs/
 WkBKOclmOV2xlTVuPw==
 -----END CERTIFICATE-----`)
-	buildPointerIgnition := func(source string, withCert bool) types.Config {
+	buildPointerIgnition := func(source string, ca []byte) types.Config {
 		ret := types.Config{}
 		ret.Ignition.Version = "3.2.0"
 		ret.Ignition.Config.Merge = append(ret.Ignition.Config.Merge,
@@ -196,20 +197,18 @@ WkBKOclmOV2xlTVuPw==
 				Source: swag.String(source),
 			})
 
-		if !withCert {
-			return ret
+		if len(ca) > 0 {
+			ret.Ignition.Security.TLS.CertificateAuthorities = append(ret.Ignition.Security.TLS.CertificateAuthorities,
+				types.Resource{
+					Source: swag.String(dataurl.EncodeBytes(ca)),
+				})
 		}
-
-		ret.Ignition.Security.TLS.CertificateAuthorities = append(ret.Ignition.Security.TLS.CertificateAuthorities,
-			types.Resource{
-				Source: swag.String(dataurl.EncodeBytes(localhostCert)),
-			})
 
 		return ret
 	}
 
-	buildPointerIgnitionFile := func(source string, withCert bool) string {
-		cfg := buildPointerIgnition(source, withCert)
+	buildPointerIgnitionFile := func(source string, ca []byte) string {
+		cfg := buildPointerIgnition(source, ca)
 		b, err := json.Marshal(&cfg)
 		Expect(err).ToNot(HaveOccurred())
 		f, err := os.CreateTemp("", "ign")
@@ -220,8 +219,8 @@ WkBKOclmOV2xlTVuPw==
 		return f.Name()
 	}
 	Context("get pointed ignition", func() {
-		checkSource := func(source string) {
-			ignitionPath := buildPointerIgnitionFile(source, true)
+		checkSource := func(source string, caBytes []byte) {
+			ignitionPath := buildPointerIgnitionFile(source, caBytes)
 			defer func() {
 				_ = os.RemoveAll(ignitionPath)
 			}()
@@ -229,13 +228,17 @@ WkBKOclmOV2xlTVuPw==
 			ign, ca, err := o.getPointedIgnitionAndCA(ignitionPath)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ign).To(Equal(source))
-			Expect(ca).To(Equal(string(localhostCert)))
+			expectedCA := ""
+			if len(caBytes) > 0 {
+				expectedCA = string(caBytes)
+			}
+			Expect(ca).To(Equal(expectedCA))
 		}
 		It("from bootstrap", func() {
-			checkSource("https://abc.com")
+			checkSource("https://abc.com", localhostCert)
 		})
 		It("embedded", func() {
-			checkSource(dataurl.EncodeBytes([]byte("source")))
+			checkSource(dataurl.EncodeBytes([]byte("source")), nil)
 		})
 	})
 
@@ -273,8 +276,8 @@ WkBKOclmOV2xlTVuPw==
 			Expect(err).ToNot(HaveOccurred())
 			return string(b)
 		}
-		checkMcsIgnition := func(source string, withCert bool, shouldSucceed bool) {
-			ignitionPath := buildPointerIgnitionFile(source, withCert)
+		checkMcsIgnition := func(source string, caBytes []byte, shouldSucceed bool) {
+			ignitionPath := buildPointerIgnitionFile(source, caBytes)
 			defer func() {
 				_ = os.RemoveAll(ignitionPath)
 			}()
@@ -305,7 +308,7 @@ WkBKOclmOV2xlTVuPw==
 			}
 		})
 		It("from bootstrap - non existant URL", func() {
-			checkMcsIgnition("https://127.0.0.1:44", true, false)
+			checkMcsIgnition("https://127.0.0.1:44", localhostCert, false)
 		})
 		It("from bootstrap - success", func() {
 			s := ghttp.NewTLSServer()
@@ -314,7 +317,10 @@ WkBKOclmOV2xlTVuPw==
 					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
 					Expect(err).ToNot(HaveOccurred())
 				})
-			checkMcsIgnition(s.URL(), true, true)
+			cert := s.HTTPTestServer.Certificate()
+			Expect(cert).ToNot(BeNil())
+			certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+			checkMcsIgnition(s.URL(), certPEM, true)
 			s.Close()
 		})
 		It("from bootstrap - empty response", func() {
@@ -324,7 +330,10 @@ WkBKOclmOV2xlTVuPw==
 					_, err := io.WriteString(w, "")
 					Expect(err).ToNot(HaveOccurred())
 				})
-			checkMcsIgnition(s.URL(), true, false)
+			cert := s.HTTPTestServer.Certificate()
+			Expect(cert).ToNot(BeNil())
+			certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+			checkMcsIgnition(s.URL(), certPEM, false)
 			s.Close()
 		})
 		It("from bootstrap - with http no cert should succeed", func() {
@@ -334,7 +343,7 @@ WkBKOclmOV2xlTVuPw==
 					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
 					Expect(err).ToNot(HaveOccurred())
 				})
-			checkMcsIgnition(s.URL(), false, true)
+			checkMcsIgnition(s.URL(), nil, true)
 			s.Close()
 		})
 		It("from bootstrap - with http with cert should succeed", func() {
@@ -344,7 +353,7 @@ WkBKOclmOV2xlTVuPw==
 					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
 					Expect(err).ToNot(HaveOccurred())
 				})
-			checkMcsIgnition(s.URL(), true, true)
+			checkMcsIgnition(s.URL(), localhostCert, true)
 			s.Close()
 		})
 		It("from bootstrap - with https with cert should succeed", func() {
@@ -354,7 +363,10 @@ WkBKOclmOV2xlTVuPw==
 					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
 					Expect(err).ToNot(HaveOccurred())
 				})
-			checkMcsIgnition(s.URL(), true, true)
+			cert := s.HTTPTestServer.Certificate()
+			Expect(cert).ToNot(BeNil())
+			certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+			checkMcsIgnition(s.URL(), certPEM, true)
 			s.Close()
 		})
 		It("from bootstrap - with https no cert should fail", func() {
@@ -364,11 +376,11 @@ WkBKOclmOV2xlTVuPw==
 					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
 					Expect(err).ToNot(HaveOccurred())
 				})
-			checkMcsIgnition(s.URL(), false, false)
+			checkMcsIgnition(s.URL(), nil, false)
 			s.Close()
 		})
 		It("embedded - success", func() {
-			checkMcsIgnition(dataurl.EncodeBytes(compress([]byte(buildMcsIgnition(osImageURL, kernelArguments)))), true, true)
+			checkMcsIgnition(dataurl.EncodeBytes(compress([]byte(buildMcsIgnition(osImageURL, kernelArguments)))), nil, true)
 		})
 	})
 })
