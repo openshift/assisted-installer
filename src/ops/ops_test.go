@@ -5,12 +5,15 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"reflect"
+
+	"github.com/openshift/assisted-installer/src/ops/execute"
 
 	"github.com/coreos/ignition/v2/config/v3_2/types"
 	"github.com/go-openapi/swag"
@@ -19,7 +22,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
 	"github.com/openshift/assisted-installer/src/config"
-	"github.com/openshift/assisted-installer/src/ops/execute"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/thoas/go-funk"
@@ -114,218 +116,6 @@ var _ = Describe("Upload logs", func() {
 	})
 })
 
-var _ = Describe("GetVolumeGroupsByDisk", func() {
-
-	var (
-		l        = logrus.New()
-		ctrl     *gomock.Controller
-		execMock *execute.MockExecute
-		conf     *config.Config
-		o        Ops
-	)
-
-	BeforeEach(func() {
-		ctrl = gomock.NewController(GinkgoT())
-		execMock = execute.NewMockExecute(ctrl)
-		conf = &config.Config{}
-		o = NewOpsWithConfig(conf, l, execMock)
-	})
-
-	It("When volume groups are available for a given disk, they should be returned", func() {
-		m := MatcherContainsStringElements{[]string{"vgs", "--noheadings", "-o", "vg_name,pv_name"}, true}
-		mockedVgsResult := `vg0 /dev/sda
-		vg1 /dev/sdb
-		vg2 /dev/sdx
-		vg3 /dev/sdx`
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m).Times(1).Return(mockedVgsResult, nil)
-		result, err := o.GetVolumeGroupsByDisk("/dev/sdx")
-		Expect(err).ToNot(HaveOccurred())
-		Expect(len(result)).To(Equal(2))
-		Expect(result[0]).To(Equal("vg2"))
-		Expect(result[1]).To(Equal("vg3"))
-	})
-
-	It("When no volume groups are available for a given group, none should be returned", func() {
-		m := MatcherContainsStringElements{[]string{"vgs", "--noheadings", "-o", "vg_name,pv_name"}, true}
-		mockedVgsResult := `vg0 /dev/sda
-		vg1 /dev/sdb`
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m).Times(1).Return(mockedVgsResult, nil)
-		result, err := o.GetVolumeGroupsByDisk("/dev/sdx")
-		Expect(err).ToNot(HaveOccurred())
-		Expect(len(result)).To(Equal(0))
-	})
-
-	It("When the command to fetch volume groups returns an error, no groups should be returned", func() {
-		m := MatcherContainsStringElements{[]string{"vgs", "--noheadings", "-o", "vg_name,pv_name"}, true}
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m).Times(1).Return("", errors.New("Some arbitrary error occurred!"))
-		result, err := o.GetVolumeGroupsByDisk("/dev/sdx")
-		Expect(err).To(HaveOccurred())
-		Expect(len(result)).To(Equal(0))
-	})
-})
-
-var _ = Describe("RemoveAllPVsOnDevice", func() {
-
-	var (
-		l        = logrus.New()
-		ctrl     *gomock.Controller
-		execMock *execute.MockExecute
-		conf     *config.Config
-		o        Ops
-	)
-
-	BeforeEach(func() {
-		ctrl = gomock.NewController(GinkgoT())
-		execMock = execute.NewMockExecute(ctrl)
-		conf = &config.Config{}
-		o = NewOpsWithConfig(conf, l, execMock)
-	})
-
-	It("When volume pvs are available for a given disk, they should be removed", func() {
-		m := MatcherContainsStringElements{[]string{"pvs", "--noheadings", "-o", "pv_name"}, true}
-		mockedVgsResult := `/dev/sda1
-		/dev/sdb1
-		/dev/sdx1
-		/dev/sdx2`
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m).Times(1).Return(mockedVgsResult, nil)
-
-		removeMatcher := MatcherContainsStringElements{[]string{"pvremove", "/dev/sdx1", "-y", "-ff"}, true}
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), removeMatcher).Times(1).Return("", nil)
-
-		removeMatcher = MatcherContainsStringElements{[]string{"pvremove", "/dev/sdx2", "-y", "-ff"}, true}
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), removeMatcher).Times(1).Return("", nil)
-
-		err := o.RemoveAllPVsOnDevice("/dev/sdx")
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	It("When no pvs are available for a given disk, nothing should be deleted", func() {
-		m := MatcherContainsStringElements{[]string{"pvs", "--noheadings", "-o", "pv_name"}, true}
-		mockedVgsResult := `/dev/sda1
-		/dev/sdb`
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m).Times(1).Return(mockedVgsResult, nil)
-		err := o.RemoveAllPVsOnDevice("/dev/sdx")
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	It("When the command to fetch pvs returns an error, error should be returned", func() {
-		m := MatcherContainsStringElements{[]string{"pvs", "--noheadings", "-o", "pv_name"}, true}
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m).Times(1).Return("", errors.New("Some arbitrary error occurred!"))
-		err := o.RemoveAllPVsOnDevice("/dev/sdx")
-		Expect(err).To(HaveOccurred())
-	})
-
-	It("When remove pvs returns an error, error should be returned", func() {
-		m := MatcherContainsStringElements{[]string{"pvs", "--noheadings", "-o", "pv_name"}, true}
-		mockedVgsResult := `/dev/sda1
-		/dev/sdb1
-		/dev/sdx1
-		/dev/sdx2`
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m).Times(1).Return(mockedVgsResult, nil)
-
-		removeMatcher := MatcherContainsStringElements{[]string{"pvremove", "/dev/sdx1", "-y", "-ff"}, true}
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), removeMatcher).Times(1).Return("", nil)
-
-		removeMatcher = MatcherContainsStringElements{[]string{"pvremove", "/dev/sdx2", "-y", "-ff"}, true}
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), removeMatcher).Times(1).Return("", errors.New("Some arbitrary error occurred!"))
-
-		err := o.RemoveAllPVsOnDevice("/dev/sdx")
-		Expect(err).To(HaveOccurred())
-	})
-})
-var _ = Describe("RemoveAllDMDevicesOnDisk", func() {
-
-	var (
-		l        = logrus.New()
-		ctrl     *gomock.Controller
-		execMock *execute.MockExecute
-		conf     *config.Config
-		o        Ops
-	)
-
-	BeforeEach(func() {
-		ctrl = gomock.NewController(GinkgoT())
-		execMock = execute.NewMockExecute(ctrl)
-		conf = &config.Config{}
-		o = NewOpsWithConfig(conf, l, execMock)
-	})
-
-	It("When DM devices are available for a given disk, they should be removed", func() {
-		dmsetupLsMatcher := MatcherContainsStringElements{[]string{"dmsetup", "ls"}, true}
-		mockedDmsetupLsResult := `volumegroup-logicalvolume	(253:0)`
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), dmsetupLsMatcher).Times(1).Return(mockedDmsetupLsResult, nil)
-
-		dmsetupDepsMatcher := MatcherContainsStringElements{[]string{"dmsetup", "deps", "-o", "devname", "volumegroup-logicalvolume"}, true}
-		mockedDmsetupDepsResult := `1 dependencies  : (sdx1)`
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), dmsetupDepsMatcher).Times(1).Return(mockedDmsetupDepsResult, nil)
-
-		removeMatcher := MatcherContainsStringElements{[]string{"dmsetup", "remove", "--retry", "volumegroup-logicalvolume"}, true}
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), removeMatcher).Times(1).Return("", nil)
-
-		err := o.RemoveAllDMDevicesOnDisk("/dev/sdx")
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	It("When no DM devices are available for a given disk, nothing should be deleted", func() {
-		dmsetupLsMatcher := MatcherContainsStringElements{[]string{"dmsetup", "ls"}, true}
-		mockedDmsetupLsResult := `volumegroup-logicalvolume	(253:0)`
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), dmsetupLsMatcher).Times(1).Return(mockedDmsetupLsResult, nil)
-
-		dmsetupDepsMatcher := MatcherContainsStringElements{[]string{"dmsetup", "deps", "-o", "devname", "volumegroup-logicalvolume"}, true}
-		mockedDmsetupDepsResult := `1 dependencies  : (vdb1)`
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), dmsetupDepsMatcher).Times(1).Return(mockedDmsetupDepsResult, nil)
-
-		err := o.RemoveAllDMDevicesOnDisk("/dev/sdx")
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	It("When no DM devices are available for a given disk, nothing should be done", func() {
-		dmsetupLsMatcher := MatcherContainsStringElements{[]string{"dmsetup", "ls"}, true}
-		mockedDmsetupLsResult := `No devices found`
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), dmsetupLsMatcher).Times(1).Return(mockedDmsetupLsResult, nil)
-
-		err := o.RemoveAllDMDevicesOnDisk("/dev/sdx")
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	It("When the command to list DM devices returns an error, error should be returned", func() {
-		dmsetupLsMatcher := MatcherContainsStringElements{[]string{"dmsetup", "ls"}, true}
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), dmsetupLsMatcher).Times(1).Return("", errors.New("Some arbitrary error occurred!"))
-
-		err := o.RemoveAllDMDevicesOnDisk("/dev/sdx")
-		Expect(err).To(HaveOccurred())
-	})
-
-	It("When the command to list DM device dependencies returns an error, error should be returned", func() {
-		dmsetupLsMatcher := MatcherContainsStringElements{[]string{"dmsetup", "ls"}, true}
-		mockedDmsetupLsResult := `volumegroup-logicalvolume	(253:0)`
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), dmsetupLsMatcher).Times(1).Return(mockedDmsetupLsResult, nil)
-
-		dmsetupDepsMatcher := MatcherContainsStringElements{[]string{"dmsetup", "deps", "-o", "devname", "volumegroup-logicalvolume"}, true}
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), dmsetupDepsMatcher).Times(1).Return("", errors.New("Some arbitrary error occurred!"))
-
-		err := o.RemoveAllDMDevicesOnDisk("/dev/sdx")
-		Expect(err).To(HaveOccurred())
-	})
-
-	It("When the command to remove DM device returns an error, error should be returned", func() {
-		dmsetupLsMatcher := MatcherContainsStringElements{[]string{"dmsetup", "ls"}, true}
-		mockedDmsetupLsResult := `volumegroup-logicalvolume	(253:0)`
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), dmsetupLsMatcher).Times(1).Return(mockedDmsetupLsResult, nil)
-
-		dmsetupDepsMatcher := MatcherContainsStringElements{[]string{"dmsetup", "deps", "-o", "devname", "volumegroup-logicalvolume"}, true}
-		mockedDmsetupDepsResult := `1 dependencies  : (sdx1)`
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), dmsetupDepsMatcher).Times(1).Return(mockedDmsetupDepsResult, nil)
-
-		removeMatcher := MatcherContainsStringElements{[]string{"dmsetup", "remove", "--retry", "volumegroup-logicalvolume"}, true}
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), removeMatcher).Times(1).Return("", errors.New("Some arbitrary error occurred!"))
-
-		err := o.RemoveAllDMDevicesOnDisk("/dev/sdx")
-		Expect(err).To(HaveOccurred())
-	})
-
-})
-
 var _ = Describe("Set Boot Order", func() {
 	var (
 		l        = logrus.New()
@@ -340,19 +130,28 @@ var _ = Describe("Set Boot Order", func() {
 		conf = &config.Config{}
 	})
 
-	It("Set boot order", func() {
-		m1 := MatcherContainsStringElements{[]string{"/usr/sbin/bootlist"}, true}
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m1).Times(1).Return("", errors.New("Bootlist is not exist."))
-		m2 := MatcherContainsStringElements{[]string{"test", "-d", "/sys/firmware/efi"}, true}
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m2).Times(1)
-		m3 := MatcherContainsStringElements{[]string{"efibootmgr", "/dev/sda", "Red Hat Enterprise Linux"}, true}
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m3).Times(1).Return("", nil)
-		m4 := MatcherContainsStringElements{[]string{"efibootmgr", "-l"}, true}
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m4).Times(1)
-		o := NewOpsWithConfig(conf, l, execMock)
-		err := o.SetBootOrder("/dev/sda")
-		Expect(err).ToNot(HaveOccurred())
-	})
+	for _, d := range []string{"redhat", "centos"} {
+		efiDirname := d
+		It(fmt.Sprintf("Set boot order for %s", efiDirname), func() {
+			m1 := MatcherContainsStringElements{[]string{"/usr/sbin/bootlist"}, true}
+			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m1).Times(1).Return("", errors.New("Bootlist is not exist."))
+			m2 := MatcherContainsStringElements{[]string{"test", "-d", "/sys/firmware/efi"}, true}
+			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m2).Times(1)
+			m3 := MatcherContainsStringElements{[]string{"efibootmgr", "/dev/sda", "Red Hat Enterprise Linux"}, true}
+			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m3).Times(1).Return("", nil)
+			m4 := MatcherContainsStringElements{[]string{"efibootmgr", "-l"}, true}
+			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m4).Times(1)
+			m5 := MatcherContainsStringElements{[]string{"mount", "/dev/sda2", "/mnt"}, true}
+			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m5).Times(1).Return("", nil)
+			m6 := MatcherContainsStringElements{[]string{"ls", "-1", "/mnt/EFI"}, true}
+			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m6).Times(1).Return(fmt.Sprintf("BOOT\n%s\n", efiDirname), nil)
+			m7 := MatcherContainsStringElements{[]string{"umount", "/mnt"}, true}
+			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m7).Times(1).Return("", nil)
+			o := NewOpsWithConfig(conf, l, execMock)
+			err := o.SetBootOrder("/dev/sda")
+			Expect(err).ToNot(HaveOccurred())
+		})
+	}
 
 	It("Set boot order for ppc64le", func() {
 		m1 := MatcherContainsStringElements{[]string{"/usr/sbin/bootlist"}, true}
@@ -389,21 +188,26 @@ grw/ZQTTIVjjh4JBSW3WyWgNo/ikC1lrVxzl4iPUGptxT36Cr7Zk2Bsg0XqwbOvK
 5d+NTDREkSnUbie4GeutujmX3Dsx88UiV6UY/4lHJa6I5leHUNOHahRbpbWeOfs/
 WkBKOclmOV2xlTVuPw==
 -----END CERTIFICATE-----`)
-	buildPointerIgnition := func(source string) types.Config {
+	buildPointerIgnition := func(source string, ca []byte) types.Config {
 		ret := types.Config{}
 		ret.Ignition.Version = "3.2.0"
 		ret.Ignition.Config.Merge = append(ret.Ignition.Config.Merge,
 			types.Resource{
 				Source: swag.String(source),
 			})
-		ret.Ignition.Security.TLS.CertificateAuthorities = append(ret.Ignition.Security.TLS.CertificateAuthorities,
-			types.Resource{
-				Source: swag.String(dataurl.EncodeBytes(localhostCert)),
-			})
+
+		if len(ca) > 0 {
+			ret.Ignition.Security.TLS.CertificateAuthorities = append(ret.Ignition.Security.TLS.CertificateAuthorities,
+				types.Resource{
+					Source: swag.String(dataurl.EncodeBytes(ca)),
+				})
+		}
+
 		return ret
 	}
-	buildPointerIgnitionFile := func(source string) string {
-		cfg := buildPointerIgnition(source)
+
+	buildPointerIgnitionFile := func(source string, ca []byte) string {
+		cfg := buildPointerIgnition(source, ca)
 		b, err := json.Marshal(&cfg)
 		Expect(err).ToNot(HaveOccurred())
 		f, err := os.CreateTemp("", "ign")
@@ -414,8 +218,8 @@ WkBKOclmOV2xlTVuPw==
 		return f.Name()
 	}
 	Context("get pointed ignition", func() {
-		checkSource := func(source string) {
-			ignitionPath := buildPointerIgnitionFile(source)
+		checkSource := func(source string, caBytes []byte) {
+			ignitionPath := buildPointerIgnitionFile(source, caBytes)
 			defer func() {
 				_ = os.RemoveAll(ignitionPath)
 			}()
@@ -423,15 +227,20 @@ WkBKOclmOV2xlTVuPw==
 			ign, ca, err := o.getPointedIgnitionAndCA(ignitionPath)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ign).To(Equal(source))
-			Expect(ca).To(Equal(string(localhostCert)))
+			expectedCA := ""
+			if len(caBytes) > 0 {
+				expectedCA = string(caBytes)
+			}
+			Expect(ca).To(Equal(expectedCA))
 		}
 		It("from bootstrap", func() {
-			checkSource("https://abc.com")
+			checkSource("https://abc.com", localhostCert)
 		})
 		It("embedded", func() {
-			checkSource(dataurl.EncodeBytes([]byte("source")))
+			checkSource(dataurl.EncodeBytes([]byte("source")), nil)
 		})
 	})
+
 	Context("get MCS ignition", func() {
 		var (
 			osImageURL      string
@@ -466,8 +275,8 @@ WkBKOclmOV2xlTVuPw==
 			Expect(err).ToNot(HaveOccurred())
 			return string(b)
 		}
-		checkMcsIgnition := func(source string, shouldSucceed bool) {
-			ignitionPath := buildPointerIgnitionFile(source)
+		checkMcsIgnition := func(source string, caBytes []byte, shouldSucceed bool) {
+			ignitionPath := buildPointerIgnitionFile(source, caBytes)
 			defer func() {
 				_ = os.RemoveAll(ignitionPath)
 			}()
@@ -498,7 +307,7 @@ WkBKOclmOV2xlTVuPw==
 			}
 		})
 		It("from bootstrap - non existant URL", func() {
-			checkMcsIgnition("https://127.0.0.1:44", false)
+			checkMcsIgnition("https://127.0.0.1:44", localhostCert, false)
 		})
 		It("from bootstrap - success", func() {
 			s := ghttp.NewTLSServer()
@@ -507,7 +316,10 @@ WkBKOclmOV2xlTVuPw==
 					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
 					Expect(err).ToNot(HaveOccurred())
 				})
-			checkMcsIgnition(s.URL(), true)
+			cert := s.HTTPTestServer.Certificate()
+			Expect(cert).ToNot(BeNil())
+			certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+			checkMcsIgnition(s.URL(), certPEM, true)
 			s.Close()
 		})
 		It("from bootstrap - empty response", func() {
@@ -517,11 +329,57 @@ WkBKOclmOV2xlTVuPw==
 					_, err := io.WriteString(w, "")
 					Expect(err).ToNot(HaveOccurred())
 				})
-			checkMcsIgnition(s.URL(), false)
+			cert := s.HTTPTestServer.Certificate()
+			Expect(cert).ToNot(BeNil())
+			certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+			checkMcsIgnition(s.URL(), certPEM, false)
+			s.Close()
+		})
+		It("from bootstrap - with http no cert should succeed", func() {
+			s := ghttp.NewServer()
+			s.RouteToHandler("GET", "/",
+				func(w http.ResponseWriter, req *http.Request) {
+					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
+					Expect(err).ToNot(HaveOccurred())
+				})
+			checkMcsIgnition(s.URL(), nil, true)
+			s.Close()
+		})
+		It("from bootstrap - with http with cert should succeed", func() {
+			s := ghttp.NewServer()
+			s.RouteToHandler("GET", "/",
+				func(w http.ResponseWriter, req *http.Request) {
+					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
+					Expect(err).ToNot(HaveOccurred())
+				})
+			checkMcsIgnition(s.URL(), localhostCert, true)
+			s.Close()
+		})
+		It("from bootstrap - with https with cert should succeed", func() {
+			s := ghttp.NewTLSServer()
+			s.RouteToHandler("GET", "/",
+				func(w http.ResponseWriter, req *http.Request) {
+					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
+					Expect(err).ToNot(HaveOccurred())
+				})
+			cert := s.HTTPTestServer.Certificate()
+			Expect(cert).ToNot(BeNil())
+			certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+			checkMcsIgnition(s.URL(), certPEM, true)
+			s.Close()
+		})
+		It("from bootstrap - with https no cert should fail", func() {
+			s := ghttp.NewTLSServer()
+			s.RouteToHandler("GET", "/",
+				func(w http.ResponseWriter, req *http.Request) {
+					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
+					Expect(err).ToNot(HaveOccurred())
+				})
+			checkMcsIgnition(s.URL(), nil, false)
 			s.Close()
 		})
 		It("embedded - success", func() {
-			checkMcsIgnition(dataurl.EncodeBytes(compress([]byte(buildMcsIgnition(osImageURL, kernelArguments)))), true)
+			checkMcsIgnition(dataurl.EncodeBytes(compress([]byte(buildMcsIgnition(osImageURL, kernelArguments)))), nil, true)
 		})
 	})
 })
@@ -636,6 +494,7 @@ var _ = Describe("overwrite OS image", func() {
 			"abc",
 		}
 		mockPrivileged("cat", "/proc/cmdline")
+		mockPrivileged("uname", "-m")
 		mockPrivileged("mount", part4, "/mnt")
 		mockPrivileged("mount", part3, "/mnt/boot")
 		mockPrivileged("growpart", "--free-percent=92", device, "4")
