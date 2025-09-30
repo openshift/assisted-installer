@@ -34,6 +34,7 @@ ENTRYPOINT ["/installer"]
 LABEL com.redhat.component="multicluster-engine-assisted-installer-container" \
       name="multicluster-engine/assisted-installer-rhel9" \
       version="${version}" \
+      cpe="cpe:/a:redhat:multicluster_engine:2.9::el9" \
       upstream-ref="${version}" \
       upstream-url="https://github.com/openshift/assisted-installer" \
       summary="OpenShift Assisted Installer" \
