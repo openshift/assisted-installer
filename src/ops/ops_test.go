@@ -1,6 +1,14 @@
 package ops
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
+	"net"
+	"net/http/httptest"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -398,7 +406,7 @@ WkBKOclmOV2xlTVuPw==
 			})
 		ret.Ignition.Security.TLS.CertificateAuthorities = append(ret.Ignition.Security.TLS.CertificateAuthorities,
 			types.Resource{
-				Source: swag.String(dataurl.EncodeBytes(localhostCert)),
+				Source: swag.String(dataurl.EncodeBytes(testBootstrapCA)),
 			})
 		return ret
 	}
@@ -423,7 +431,7 @@ WkBKOclmOV2xlTVuPw==
 			ign, ca, err := o.getPointedIgnitionAndCA(ignitionPath)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ign).To(Equal(source))
-			Expect(ca).To(Equal(string(localhostCert)))
+			Expect(ca).To(Equal(string(testBootstrapCA)))
 		}
 		It("from bootstrap", func() {
 			checkSource("https://abc.com")
@@ -432,6 +440,25 @@ WkBKOclmOV2xlTVuPw==
 			checkSource(dataurl.EncodeBytes([]byte("source")))
 		})
 	})
+	
+func newTLSServerWithIPCert(handler http.Handler) (*httptest.Server, []byte, error) {
+  caPriv, _ := rsa.GenerateKey(rand.Reader, 2048)
+  caTmpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "Test CA"}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(365*24*time.Hour), KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageCRLSign, IsCA: true, BasicConstraintsValid: true}
+  caDER, _ := x509.CreateCertificate(rand.Reader, caTmpl, caTmpl, &caPriv.PublicKey, caPriv)
+  caPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caDER})
+  srvPriv, _ := rsa.GenerateKey(rand.Reader, 2048)
+  srvTmpl := &x509.Certificate{SerialNumber: big.NewInt(2), Subject: pkix.Name{CommonName: "127.0.0.1"}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(365*24*time.Hour), KeyUsage: x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}}
+  caCert, _ := x509.ParseCertificate(caDER)
+  srvDER, _ := x509.CreateCertificate(rand.Reader, srvTmpl, caCert, &srvPriv.PublicKey, caPriv)
+  srvCertPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: srvDER})
+  srvKeyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(srvPriv)})
+  tlsCert, _ := tls.X509KeyPair(srvCertPEM, srvKeyPEM)
+  s := httptest.NewUnstartedServer(handler)
+  s.TLS = &tls.Config{Certificates: []tls.Certificate{tlsCert}, MinVersion: tls.VersionTLS12}
+  s.StartTLS()
+  return s, caPEM, nil
+}
+
 	Context("get MCS ignition", func() {
 		var (
 			osImageURL      string
@@ -501,12 +528,17 @@ WkBKOclmOV2xlTVuPw==
 			checkMcsIgnition("https://127.0.0.1:44", false)
 		})
 		It("from bootstrap - success", func() {
-			s := ghttp.NewTLSServer()
-			s.RouteToHandler("GET", "/",
-				func(w http.ResponseWriter, req *http.Request) {
-					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
-					Expect(err).ToNot(HaveOccurred())
-				})
+		h := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
+			Expect(err).ToNot(HaveOccurred())
+		})
+		srv, ca, _ := newTLSServerWithIPCert(h)
+		defer srv.Close()
+		oldCA := testBootstrapCA
+		testBootstrapCA = ca
+		defer func(){ testBootstrapCA = oldCA }()
+		checkMcsIgnition(srv.URL, true, true)
+	})
 			checkMcsIgnition(s.URL(), true)
 			s.Close()
 		})
