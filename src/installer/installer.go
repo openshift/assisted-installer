@@ -1020,7 +1020,7 @@ func (i *installer) checkHostname() error {
 	data := fmt.Sprintf("random-hostname-%s", uuid.New().String())
 	i.log.Infof("Hostname [%s] is invalid, generated random hostname [%s]", hostname, data)
 	if err := i.ops.CreateRandomHostname(data); err != nil {
-		i.log.Errorf("Failed to generate random hostname", err)
+		i.log.Errorf("Failed to generate random hostname, err %s", err)
 		return err
 	}
 	return nil
