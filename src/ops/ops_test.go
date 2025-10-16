@@ -539,6 +539,13 @@ func newTLSServerWithIPCert(handler http.Handler) (*httptest.Server, []byte, err
 		defer func(){ testBootstrapCA = oldCA }()
 		checkMcsIgnition(srv.URL, true, true)
 	})
+		srv, ca, _ := newTLSServerWithIPCert(h)
+		defer srv.Close()
+		oldCA := testBootstrapCA
+		testBootstrapCA = ca
+		defer func(){ testBootstrapCA = oldCA }()
+		checkMcsIgnition(srv.URL, true, true)
+	})
 			checkMcsIgnition(s.URL(), true)
 			s.Close()
 		})
