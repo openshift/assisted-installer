@@ -355,7 +355,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			listNodes()
 
 			for name, value := range inventoryNamesIds {
-				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, value.Host.ID, &value.Host.InfraEnvID, gomock.Any()).Times(1)
+				host := value.Host
+				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, host.ID, &host.InfraEnvID, gomock.Any()).Times(1)
 			}
 			exit := assistedController.waitAndUpdateNodesStatus(false)
 			Expect(exit).Should(Equal(false))
@@ -494,7 +495,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			updateProgressSuccess(done, hosts)
 			configuringSuccess()
 			for name, value := range inventoryNamesIds {
-				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, value.Host.ID, &value.Host.InfraEnvID, gomock.Any()).Times(1)
+				host := value.Host
+				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, host.ID, &host.InfraEnvID, gomock.Any()).Times(1)
 			}
 			exit := assistedController.waitAndUpdateNodesStatus(false)
 			Expect(exit).Should(Equal(false))
@@ -549,7 +551,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 		It("WaitAndUpdateNodesStatus one by one", func() {
 			for name, value := range inventoryNamesIds {
-				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, value.Host.ID, &value.Host.InfraEnvID, gomock.Any()).Times(1)
+				host := value.Host
+				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, host.ID, &host.InfraEnvID, gomock.Any()).Times(1)
 			}
 			listNodesOneByOne := func() {
 				kubeNameIdsToReturn := make(map[string]string)
@@ -591,7 +594,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	Context("UpdateStatusFails and then succeeds", func() {
 		It("UpdateStatus fails and then succeeds, list nodes failed ", func() {
 			for name, value := range inventoryNamesIds {
-				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, value.Host.ID, &value.Host.InfraEnvID, gomock.Any()).Times(1)
+				host := value.Host
+				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, host.ID, &host.InfraEnvID, gomock.Any()).Times(1)
 			}
 			updateProgressSuccessFailureTest := func(stages []models.HostStage, inventoryNamesIds map[string]inventory_client.HostData) {
 				var hostIds []string
@@ -642,7 +646,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 			mockk8sclient.EXPECT().ListCsrs().Return(nil, fmt.Errorf("no matter what")).AnyTimes()
 			for name, value := range inventoryNamesIds {
-				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, value.Host.ID, &value.Host.InfraEnvID, gomock.Any()).Times(1)
+				host := value.Host
+				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, host.ID, &host.InfraEnvID, gomock.Any()).Times(1)
 			}
 
 			go assistedController.WaitAndUpdateNodesStatus(context.TODO(), &wg, false)
