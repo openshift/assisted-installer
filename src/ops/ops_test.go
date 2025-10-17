@@ -5,10 +5,12 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"reflect"
 
@@ -188,7 +190,17 @@ grw/ZQTTIVjjh4JBSW3WyWgNo/ikC1lrVxzl4iPUGptxT36Cr7Zk2Bsg0XqwbOvK
 5d+NTDREkSnUbie4GeutujmX3Dsx88UiV6UY/4lHJa6I5leHUNOHahRbpbWeOfs/
 WkBKOclmOV2xlTVuPw==
 -----END CERTIFICATE-----`)
-	buildPointerIgnition := func(source string, withCert bool) types.Config {
+
+	newTLSTestServer := func(handler http.HandlerFunc) (*httptest.Server, []byte) {
+		ts := httptest.NewTLSServer(handler)
+		caPEM := pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: ts.Certificate().Raw,
+		})
+		return ts, caPEM
+	}
+
+	buildPointerIgnition := func(source string, ca []byte) types.Config {
 		ret := types.Config{}
 		ret.Ignition.Version = "3.2.0"
 		ret.Ignition.Config.Merge = append(ret.Ignition.Config.Merge,
@@ -196,20 +208,20 @@ WkBKOclmOV2xlTVuPw==
 				Source: swag.String(source),
 			})
 
-		if !withCert {
+		if len(ca) == 0 {
 			return ret
 		}
 
 		ret.Ignition.Security.TLS.CertificateAuthorities = append(ret.Ignition.Security.TLS.CertificateAuthorities,
 			types.Resource{
-				Source: swag.String(dataurl.EncodeBytes(localhostCert)),
+				Source: swag.String(dataurl.EncodeBytes(ca)),
 			})
 
 		return ret
 	}
 
-	buildPointerIgnitionFile := func(source string, withCert bool) string {
-		cfg := buildPointerIgnition(source, withCert)
+	buildPointerIgnitionFile := func(source string, ca []byte) string {
+		cfg := buildPointerIgnition(source, ca)
 		b, err := json.Marshal(&cfg)
 		Expect(err).ToNot(HaveOccurred())
 		f, err := os.CreateTemp("", "ign")
@@ -221,7 +233,7 @@ WkBKOclmOV2xlTVuPw==
 	}
 	Context("get pointed ignition", func() {
 		checkSource := func(source string) {
-			ignitionPath := buildPointerIgnitionFile(source, true)
+			ignitionPath := buildPointerIgnitionFile(source, localhostCert)
 			defer func() {
 				_ = os.RemoveAll(ignitionPath)
 			}()
@@ -273,8 +285,8 @@ WkBKOclmOV2xlTVuPw==
 			Expect(err).ToNot(HaveOccurred())
 			return string(b)
 		}
-		checkMcsIgnition := func(source string, withCert bool, shouldSucceed bool) {
-			ignitionPath := buildPointerIgnitionFile(source, withCert)
+		checkMcsIgnition := func(source string, ca []byte, shouldSucceed bool) {
+			ignitionPath := buildPointerIgnitionFile(source, ca)
 			defer func() {
 				_ = os.RemoveAll(ignitionPath)
 			}()
@@ -305,27 +317,25 @@ WkBKOclmOV2xlTVuPw==
 			}
 		})
 		It("from bootstrap - non existant URL", func() {
-			checkMcsIgnition("https://127.0.0.1:44", true, false)
+			checkMcsIgnition("https://127.0.0.1:44", localhostCert, false)
 		})
 		It("from bootstrap - success", func() {
-			s := ghttp.NewTLSServer()
-			s.RouteToHandler("GET", "/",
-				func(w http.ResponseWriter, req *http.Request) {
-					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
-					Expect(err).ToNot(HaveOccurred())
-				})
-			checkMcsIgnition(s.URL(), true, true)
-			s.Close()
+			ts, caPEM := newTLSTestServer(func(w http.ResponseWriter, req *http.Request) {
+				_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
+				Expect(err).ToNot(HaveOccurred())
+			})
+			defer ts.Close()
+
+			checkMcsIgnition(ts.URL, caPEM, true)
 		})
 		It("from bootstrap - empty response", func() {
-			s := ghttp.NewTLSServer()
-			s.RouteToHandler("GET", "/",
-				func(w http.ResponseWriter, req *http.Request) {
-					_, err := io.WriteString(w, "")
-					Expect(err).ToNot(HaveOccurred())
-				})
-			checkMcsIgnition(s.URL(), true, false)
-			s.Close()
+			ts, caPEM := newTLSTestServer(func(w http.ResponseWriter, req *http.Request) {
+				_, err := io.WriteString(w, "")
+				Expect(err).ToNot(HaveOccurred())
+			})
+			defer ts.Close()
+
+			checkMcsIgnition(ts.URL, caPEM, false)
 		})
 		It("from bootstrap - with http no cert should succeed", func() {
 			s := ghttp.NewServer()
@@ -334,7 +344,7 @@ WkBKOclmOV2xlTVuPw==
 					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
 					Expect(err).ToNot(HaveOccurred())
 				})
-			checkMcsIgnition(s.URL(), false, true)
+			checkMcsIgnition(s.URL(), nil, true)
 			s.Close()
 		})
 		It("from bootstrap - with http with cert should succeed", func() {
@@ -344,31 +354,29 @@ WkBKOclmOV2xlTVuPw==
 					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
 					Expect(err).ToNot(HaveOccurred())
 				})
-			checkMcsIgnition(s.URL(), true, true)
+			checkMcsIgnition(s.URL(), localhostCert, true)
 			s.Close()
 		})
 		It("from bootstrap - with https with cert should succeed", func() {
-			s := ghttp.NewTLSServer()
-			s.RouteToHandler("GET", "/",
-				func(w http.ResponseWriter, req *http.Request) {
-					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
-					Expect(err).ToNot(HaveOccurred())
-				})
-			checkMcsIgnition(s.URL(), true, true)
-			s.Close()
+			ts, caPEM := newTLSTestServer(func(w http.ResponseWriter, req *http.Request) {
+				_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
+				Expect(err).ToNot(HaveOccurred())
+			})
+			defer ts.Close()
+
+			checkMcsIgnition(ts.URL, caPEM, true)
 		})
 		It("from bootstrap - with https no cert should fail", func() {
-			s := ghttp.NewTLSServer()
-			s.RouteToHandler("GET", "/",
-				func(w http.ResponseWriter, req *http.Request) {
-					_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
-					Expect(err).ToNot(HaveOccurred())
-				})
-			checkMcsIgnition(s.URL(), false, false)
-			s.Close()
+			ts, _ := newTLSTestServer(func(w http.ResponseWriter, req *http.Request) {
+				_, err := io.WriteString(w, buildMcsIgnition(osImageURL, kernelArguments))
+				Expect(err).ToNot(HaveOccurred())
+			})
+			defer ts.Close()
+
+			checkMcsIgnition(ts.URL, nil, false)
 		})
 		It("embedded - success", func() {
-			checkMcsIgnition(dataurl.EncodeBytes(compress([]byte(buildMcsIgnition(osImageURL, kernelArguments)))), true, true)
+			checkMcsIgnition(dataurl.EncodeBytes(compress([]byte(buildMcsIgnition(osImageURL, kernelArguments)))), localhostCert, true)
 		})
 	})
 })
