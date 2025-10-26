@@ -103,6 +103,19 @@ func NewOps(logger *logrus.Logger, executor execute.Execute) Ops {
 	return NewOpsWithConfig(&config.Config{}, logger, executor)
 }
 
+func RetryFindDevice(attempts int, sleep time.Duration, fn func(device string) (string, error), device string) (string, error) {
+	var err error
+	var foundDevice string
+	for i := 0; i < attempts; i++ {
+		foundDevice, err = fn(device)
+		if err == nil {
+			return foundDevice, err
+		}
+		time.Sleep(sleep)
+	}
+	return "", fmt.Errorf("after %d attempts, last error: %w", attempts, err)
+}
+
 // NewOps return a new ops interface
 func NewOpsWithConfig(installerConfig *config.Config, logger logrus.FieldLogger, executor execute.Execute) Ops {
 	return &ops{
@@ -367,7 +380,7 @@ func (o *ops) SetBootOrder(device string) error {
 	}
 
 	o.log.Info("Setting efibootmgr to boot from disk")
-	efiDirname, err := o.findEfiDirectory(device)
+	efiDirname, err := RetryFindDevice(5, 5*time.Second, o.findEfiDirectory, device)
 	if err != nil {
 		o.log.WithError(err).Error("failed to find EFI directory")
 		return err
@@ -423,6 +436,7 @@ func (o *ops) findEfiDirectory(device string) (string, error) {
 		out string
 		err error
 	)
+	o.log.Infof("findEfiDirectory %s", device)
 	// Find the actual path for partition 2 using lsblk
 	partition2Path, err := o.getPartitionPathFromLsblk(device, "2")
 	if err != nil {
@@ -1045,6 +1059,7 @@ func (o *ops) getPartitionPathFromLsblk(device, partitionNumber string) (string,
 	type node struct {
 		Name     string  `json:"name"`
 		Size     int64   `json:"size"`
+		Type     string  `json:"type"`
 		Children []*node `json:"children"`
 	}
 	var disks struct {
@@ -1058,11 +1073,13 @@ func (o *ops) getPartitionPathFromLsblk(device, partitionNumber string) (string,
 	if err = json.Unmarshal([]byte(ret), &disks); err != nil {
 		return "", errors.Wrap(err, "failed to unmarshal lsblk output")
 	}
+	o.log.Infof("--> lsblk output before:  %s", ret)
 
 	if len(disks.Blockdevices) == 0 {
 		return "", errors.Errorf("no block device information returned for %s", device)
 	}
 	diskNode := disks.Blockdevices[0] // lsblk with device filter returns only that device
+	diskType := diskNode.Type
 
 	if len(diskNode.Children) == 0 {
 		return "", errors.Errorf("device %s has no partitions", device)
@@ -1080,7 +1097,15 @@ func (o *ops) getPartitionPathFromLsblk(device, partitionNumber string) (string,
 	}
 
 	partitionName := diskNode.Children[partNum-1].Name
-	return "/dev/" + partitionName, nil
+	var devicePath string
+	switch diskType {
+	case "mpath":
+		devicePath = "/dev/mapper/" + partitionName
+	default:
+		devicePath = "/dev/" + partitionName
+
+	}
+	return devicePath, nil
 }
 
 func (o *ops) calculateFreePercent(device string) (int64, error) {
