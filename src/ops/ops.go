@@ -367,9 +367,16 @@ func (o *ops) SetBootOrder(device string) error {
 	}
 
 	o.log.Info("Setting efibootmgr to boot from disk")
-	efiDirname, err := o.findEfiDirectory(device)
+	var efiDirname string
+	var findError error
+	//Retry find partitions due to delayed update on device-mappers
+	err = utils.WaitForPredicate(20*time.Second, 5*time.Second, func() bool {
+		efiDirname, findError = o.findEfiDirectory(device)
+		return findError == nil
+	})
 	if err != nil {
-		o.log.WithError(err).Error("failed to find EFI directory")
+		errMessage := "failed to find EFI directory: " + findError.Error()
+		o.log.WithError(err).Error(errMessage)
 		return err
 	}
 	efiFilepath := o.getEfiFilePath(efiDirname)
@@ -1045,6 +1052,7 @@ func (o *ops) getPartitionPathFromLsblk(device, partitionNumber string) (string,
 	type node struct {
 		Name     string  `json:"name"`
 		Size     int64   `json:"size"`
+		Type     string  `json:"type"`
 		Children []*node `json:"children"`
 	}
 	var disks struct {
@@ -1063,6 +1071,7 @@ func (o *ops) getPartitionPathFromLsblk(device, partitionNumber string) (string,
 		return "", errors.Errorf("no block device information returned for %s", device)
 	}
 	diskNode := disks.Blockdevices[0] // lsblk with device filter returns only that device
+	diskType := diskNode.Type
 
 	if len(diskNode.Children) == 0 {
 		return "", errors.Errorf("device %s has no partitions", device)
@@ -1080,7 +1089,15 @@ func (o *ops) getPartitionPathFromLsblk(device, partitionNumber string) (string,
 	}
 
 	partitionName := diskNode.Children[partNum-1].Name
-	return "/dev/" + partitionName, nil
+	var devicePath string
+	switch diskType {
+	case "mpath":
+		devicePath = "/dev/mapper/" + partitionName
+	default:
+		devicePath = "/dev/" + partitionName
+
+	}
+	return devicePath, nil
 }
 
 func (o *ops) calculateFreePercent(device string) (int64, error) {

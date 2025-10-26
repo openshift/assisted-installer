@@ -147,11 +147,12 @@ var _ = Describe("Set Boot Order", func() {
 					{
 						"name": "sda",
 						"size": 100000000000,
+						"type": "disk",
 						"children": [
-							{"name": "sda1", "size": 1048576},
-							{"name": "sda2", "size": 133169152},
-							{"name": "sda3", "size": 402653184},
-							{"name": "sda4", "size": 3272588800}
+							{"name": "sda1", "size": 1048576, "type": "part"},
+							{"name": "sda2", "size": 133169152, "type": "part"},
+							{"name": "sda3", "size": 402653184, "type": "part"},
+							{"name": "sda4", "size": 3272588800,"type": "part"}
 						]
 					}
 				]
@@ -810,11 +811,12 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					{
 						"name": "sda",
 						"size": 100000000000,
+						"type": "disk",
 						"children": [
-							{"name": "sda1", "size": 1048576},
-							{"name": "sda2", "size": 133169152},
-							{"name": "sda3", "size": 402653184},
-							{"name": "sda4", "size": 3272588800}
+							{"name": "sda1", "type": "part", "size": 1048576},
+							{"name": "sda2", "type": "part", "size": 133169152},
+							{"name": "sda3", "type": "part", "size": 402653184},
+							{"name": "sda4", "type": "part", "size": 3272588800}
 						]
 					}
 				]
@@ -832,11 +834,12 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					{
 						"name": "sda",
 						"size": 100000000000,
+						"type": "disk",
 						"children": [
-							{"name": "sda1", "size": 1048576},
-							{"name": "sda2", "size": 133169152},
-							{"name": "sda3", "size": 402653184},
-							{"name": "sda4", "size": 3272588800}
+							{"name": "sda1", "type": "part", "size": 1048576},
+							{"name": "sda2", "type": "part", "size": 133169152},
+							{"name": "sda3", "type": "part", "size": 402653184},
+							{"name": "sda4", "type": "part", "size": 3272588800}
 						]
 					}
 				]
@@ -856,11 +859,12 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					{
 						"name": "nvme0n1",
 						"size": 100000000000,
+						"type": "disk",
 						"children": [
-							{"name": "nvme0n1p1", "size": 1048576},
-							{"name": "nvme0n1p2", "size": 133169152},
-							{"name": "nvme0n1p3", "size": 402653184},
-							{"name": "nvme0n1p4", "size": 3272588800}
+							{"name": "nvme0n1p1", "type": "part", "size": 1048576},
+							{"name": "nvme0n1p2", "type": "part", "size": 133169152},
+							{"name": "nvme0n1p3", "type": "part", "size": 402653184},
+							{"name": "nvme0n1p4", "type": "part", "size": 3272588800}
 						]
 					}
 				]
@@ -880,11 +884,12 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					{
 						"name": "mmcblk1",
 						"size": 100000000000,
+						"type": "disk",
 						"children": [
-							{"name": "mmcblk1P1", "size": 1048576},
-							{"name": "mmcblk1P2", "size": 133169152},
-							{"name": "mmcblk1P3", "size": 402653184},
-							{"name": "mmcblk1P4", "size": 3272588800}
+							{"name": "mmcblk1P1", "type": "part", "size": 1048576},
+							{"name": "mmcblk1P2", "type": "part", "size": 133169152},
+							{"name": "mmcblk1P3", "type": "part", "size": 402653184},
+							{"name": "mmcblk1P4", "type": "part", "size": 3272588800}
 						]
 					}
 				]
@@ -904,11 +909,12 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					{
 						"name": "dm-0",
 						"size": 100000000000,
+						"type": "mpath",
 						"children": [
-							{"name": "dm-1", "size": 1048576},
-							{"name": "dm-2", "size": 133169152},
-							{"name": "dm-3", "size": 402653184},
-							{"name": "dm-4", "size": 3272588800}
+							{"name": "dm-1", "type": "part", "size": 1048576},
+							{"name": "dm-2", "type": "part", "size": 133169152},
+							{"name": "dm-3", "type": "part", "size": 402653184},
+							{"name": "dm-4", "type": "part", "size": 3272588800}
 						]
 					}
 				]
@@ -917,7 +923,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 
 			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/dm-0", "3")
 			Expect(err).ToNot(HaveOccurred())
-			Expect(path).To(Equal("/dev/dm-3"))
+			Expect(path).To(Equal("/dev/mapper/dm-3"))
 		})
 
 		It("should find partition 4 for /dev/dm-0", func() {
@@ -926,11 +932,12 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					{
 						"name": "dm-0",
 						"size": 100000000000,
+						"type": "mpath",
 						"children": [
-							{"name": "dm-1", "size": 1048576},
-							{"name": "dm-2", "size": 133169152},
-							{"name": "dm-3", "size": 402653184},
-							{"name": "dm-4", "size": 3272588800}
+							{"name": "dm-1", "type": "part", "size": 1048576},
+							{"name": "dm-2", "type": "part", "size": 133169152},
+							{"name": "dm-3", "type": "part", "size": 402653184},
+							{"name": "dm-4", "type": "part", "size": 3272588800}
 						]
 					}
 				]
@@ -939,7 +946,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 
 			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/dm-0", "4")
 			Expect(err).ToNot(HaveOccurred())
-			Expect(path).To(Equal("/dev/dm-4"))
+			Expect(path).To(Equal("/dev/mapper/dm-4"))
 		})
 
 		It("should handle device mapper with higher numbers", func() {
@@ -948,11 +955,12 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					{
 						"name": "dm-127",
 						"size": 100000000000,
+						"type": "mpath",
 						"children": [
-							{"name": "dm-128", "size": 1048576},
-							{"name": "dm-129", "size": 133169152},
-							{"name": "dm-130", "size": 402653184},
-							{"name": "dm-131", "size": 3272588800}
+							{"name": "dm-128", "type": "part", "size": 1048576},
+							{"name": "dm-129", "type": "part", "size": 133169152},
+							{"name": "dm-130", "type": "part", "size": 402653184},
+							{"name": "dm-131", "type": "part", "size": 3272588800}
 						]
 					}
 				]
@@ -961,7 +969,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 
 			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/dm-127", "3")
 			Expect(err).ToNot(HaveOccurred())
-			Expect(path).To(Equal("/dev/dm-130"))
+			Expect(path).To(Equal("/dev/mapper/dm-130"))
 		})
 	})
 
@@ -996,6 +1004,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 				"blockdevices": [
 					{
 						"name": "sda",
+						"type": "disk",
 						"size": 100000000000,
 						"children": []
 					}
@@ -1014,6 +1023,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					{
 						"name": "sda",
 						"size": 100000000000,
+						"type": "disk",
 						"children": null
 					}
 				]
@@ -1031,8 +1041,9 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					{
 						"name": "sda",
 						"size": 100000000000,
+						"type": "disk",
 						"children": [
-							{"name": "sda1", "size": 1048576}
+							{"name": "sda1", "type": "part", "size": 1048576}
 						]
 					}
 				]
@@ -1050,8 +1061,9 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					{
 						"name": "sda",
 						"size": 100000000000,
+						"type": "disk",
 						"children": [
-							{"name": "sda1", "size": 1048576}
+							{"name": "sda1", "type": "part", "size": 1048576}
 						]
 					}
 				]
@@ -1068,10 +1080,11 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 				"blockdevices": [
 					{
 						"name": "sda",
+						"type": "disk",
 						"size": 100000000000,
 						"children": [
-							{"name": "sda1", "size": 1048576},
-							{"name": "sda2", "size": 133169152}
+							{"name": "sda1", "type": "part", "size": 1048576},
+							{"name": "sda2", "type": "part", "size": 133169152}
 						]
 					}
 				]
@@ -1091,11 +1104,12 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 					{
 						"name": "dm-0",
 						"size": 100000000000,
+						"type": "mpath",
 						"children": [
-							{"name": "dm-1", "size": 1048576},
-							{"name": "dm-2", "size": 133169152},
-							{"name": "dm-3", "size": 402653184},
-							{"name": "dm-4", "size": 3272588800}
+							{"name": "dm-1", "type": "part", "size": 1048576},
+							{"name": "dm-2", "type": "part", "size": 133169152},
+							{"name": "dm-3", "type": "part", "size": 402653184},
+							{"name": "dm-4", "type": "part", "size": 3272588800}
 						]
 					}
 				]
@@ -1104,7 +1118,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 
 			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/dm-0", "3")
 			Expect(err).ToNot(HaveOccurred())
-			Expect(path).To(Equal("/dev/dm-3"))
+			Expect(path).To(Equal("/dev/mapper/dm-3"))
 		})
 	})
 })
