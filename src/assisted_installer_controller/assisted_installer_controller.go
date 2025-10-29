@@ -1240,7 +1240,7 @@ func (c *controller) operatorReport() []models.OperatorMonitorReport {
 }
 
 func (c *controller) logHostResolvConf() {
-	for _, filePath := range []string{"/etc/resolv.conf", "/tmp/var-run-resolv.conf", "/tmp/host-resolv.conf"} {
+	for _, filePath := range []string{"/etc/resolv.conf", path.Join(os.TempDir(), "var-run-resolv.conf"), path.Join(os.TempDir(), "host-resolv.conf")} {
 		content, err := c.ops.ReadFile(filePath)
 		if err != nil {
 			c.log.WithError(err).Warnf("Failed to read %s", filePath)
@@ -1406,7 +1406,7 @@ func (c *controller) parseMustGatherImages() []string {
 }
 
 func (c *controller) collectMustGatherLogs(ctx context.Context, images ...string) (string, error) {
-	mustGatherDir := "/tmp/must-gather-logs"
+	mustGatherDir := path.Join(os.TempDir(), "must-gather-logs")
 	// We should not create must-gather logs if they already were created and upload failed
 	if _, err := os.Stat(path.Join(mustGatherDir, ops.MustGatherFileName)); err == nil {
 		return path.Join(mustGatherDir, ops.MustGatherFileName), nil
