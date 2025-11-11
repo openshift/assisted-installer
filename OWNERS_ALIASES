@@ -19,6 +19,7 @@ aliases:
     - javipolo
     - CrystalChun
     - danmanor
+    - cve-automation
   emeritus_approvers:
     - empovit
     - celebdor
