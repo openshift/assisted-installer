@@ -73,7 +73,11 @@ Dry`)
 // PrepareControllerDryMock utilizes k8s_client.MockK8SClient to fake the k8s API to make the
 // controller think it's running on an actual cluster, just enough to make it pass an installation.
 // Used in dry mode.
-func PrepareControllerDryMock(mockk8sclient *k8s_client.MockK8SClient, logger *logrus.Logger, o ops.Ops, clusterHosts config.DryClusterHosts) {
+func PrepareControllerDryMock(mockk8sclient *k8s_client.MockK8SClient, logger *logrus.Logger, o ops.Ops, clusterHosts config.DryClusterHosts, controlPlaneCount int) {
+	mockk8sclient.EXPECT().GetControlPlaneReplicas().Return(controlPlaneCount, nil).AnyTimes()
+	// Dry run doesn't support arbiter for now
+	mockk8sclient.EXPECT().GetArbiterReplicas().Return(0, nil).AnyTimes()
+
 	// Called by main
 	mockk8sclient.EXPECT().SetProxyEnvVars().Return(nil).AnyTimes()
 
@@ -107,7 +111,7 @@ func PrepareControllerDryMock(mockk8sclient *k8s_client.MockK8SClient, logger *l
 				// Host didn't even reboot yet, don't pretend it fetched the ignition
 				continue
 			}
-			mcsLogs += fmt.Sprintf("%s.(Ignition)\n", clusterHost.Ip)
+			mcsLogs += fmt.Sprintf("%s:12345 User-Agent:\"Ignition\"\n", clusterHost.Ip)
 		}
 		return mcsLogs, nil
 	}).AnyTimes()
@@ -280,7 +284,11 @@ dEFgad6P3hMZTOg7yVkMOd3QtgVQ9I8dXqS2nG9EMEh97WIhi6f5ztvcQvQ5tXjh
 // PrepareInstallerDryK8sMock utilizes k8s_client.MockK8SClient to fake the k8s API to make the
 // installer think it's talking with an actual cluster, just enough to make it pass an installation.
 // Used in dry mode.
-func PrepareInstallerDryK8sMock(mockk8sclient *k8s_client.MockK8SClient, logger logrus.FieldLogger, o ops.Ops, clusterHosts config.DryClusterHosts) {
+func PrepareInstallerDryK8sMock(mockk8sclient *k8s_client.MockK8SClient, logger logrus.FieldLogger, o ops.Ops, clusterHosts config.DryClusterHosts,
+	controlPlaneCount int) {
+	mockk8sclient.EXPECT().GetControlPlaneReplicas().Return(controlPlaneCount, nil).AnyTimes()
+	// Dry run doesn't support arbiter for now
+	mockk8sclient.EXPECT().GetArbiterReplicas().Return(0, nil).AnyTimes()
 	// The installer compares AI host objects to cluster Node objects (either by name or by IP) to check which AI hosts are already
 	// joined as nodes. This fakes the node list so that check will pass
 	mockk8sclient.EXPECT().ListNodesByRole(gomock.Any()).DoAndReturn(func() (*v1.NodeList, error) {
@@ -307,7 +315,8 @@ func NewDryRunK8SClientBuilder(installerConfig *config.Config, ops ops.Ops) func
 		mockController := gomock.NewController(ginkgo.GinkgoT())
 		kc = k8s_client.NewMockK8SClient(mockController)
 		mock, _ := kc.(*k8s_client.MockK8SClient)
-		PrepareInstallerDryK8sMock(mock, logger, ops, installerConfig.ParsedClusterHosts)
+		PrepareInstallerDryK8sMock(mock, logger, ops, installerConfig.ParsedClusterHosts,
+			installerConfig.ControlPlaneCount)
 		return kc, nil
 	}
 }
