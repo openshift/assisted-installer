@@ -45,6 +45,9 @@ const (
 	defaultIgnitionPlatformId       = "ignition.platform.id=metal"
 	ignitionContent                 = "application/vnd.coreos.ignition+json; version=3.4.0"
 	schemeHTTPS                     = "https"
+	registryDataDirOnDevice         = "var/lib/iri-registry"
+	registryDataDirOnMnt            = "/mnt/agentdata"
+	ostreeDeployPath                = "/mnt/root/ostree/deploy/rhcos"
 )
 
 //go:generate mockgen -source=ops.go -package=ops -destination=mock_ops.go
@@ -74,6 +77,7 @@ type Ops interface {
 	ReadFile(filePath string) ([]byte, error)
 	GetEncapsulatedMC(ignitionPath string) (*mcfgv1.MachineConfig, error)
 	OverwriteOsImage(osImage, device string, extraArgs []string) error
+	CopyRegistryData(liveLogger io.Writer, device string) error
 }
 
 const (
@@ -1100,7 +1104,7 @@ func (o *ops) getPartitionPathFromLsblk(device, partitionNumber string) (string,
 	return devicePath, nil
 }
 
-func (o *ops) calculateFreePercent(device string) (int64, error) {
+func (o *ops) calculateFreePercent(device string, requiredSize *int64) (int64, error) {
 	type node struct {
 		Name     string
 		Size     int64
@@ -1127,13 +1131,17 @@ func (o *ops) calculateFreePercent(device string) (int64, error) {
 	if len(diskNode.Children) < 4 {
 		return 0, errors.Errorf("device %s does not have 4 partitions", device)
 	}
-	partitionNode = diskNode.Children[3] // partition 4 is at index 3
 	var usedSize int64
 	funk.ForEach(diskNode.Children, func(n *node) { usedSize += n.Size })
 
+	if requiredSize == nil {
+		partitionNode = diskNode.Children[3] // partition 4 is at index 3
+		requiredSize = &partitionNode.Size
+	}
+
 	// The assumption is that the extra space needed for image overwrite is not more than the existing partition size.  So
 	// the partition size will be doubled, and the rest will remain as free space.
-	totalRequiredSize := usedSize + partitionNode.Size
+	totalRequiredSize := usedSize + *requiredSize
 	if totalRequiredSize < diskNode.Size {
 		return ((diskNode.Size - totalRequiredSize) * 100) / diskNode.Size, nil
 	}
@@ -1149,7 +1157,7 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 	makecmd := func(commad string, args ...string) *cmd {
 		return &cmd{command: commad, args: args}
 	}
-	freePercent, err := o.calculateFreePercent(device)
+	freePercent, err := o.calculateFreePercent(device, nil)
 	if err != nil {
 		return err
 	}
@@ -1210,6 +1218,100 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 		o.log.Infof("Running %s with args %+v", c.command, c.args)
 		if err := utils.Retry(3, 5*time.Second, o.log, func() (ret error) {
 			_, ret = o.ExecPrivilegeCommand(nil, c.command, c.args...)
+			return
+		}); err != nil {
+			return errors.Wrapf(err, "failed to run %s with args %+v", c.command, c.args)
+		}
+	}
+	return nil
+}
+
+func (o *ops) getRegistryDataSize(dataPath string) (int64, error) {
+	// Get size of dataPath directory using du command
+	// du -sb outputs: "size_bytes path"
+	out, err := o.ExecPrivilegeCommand(nil, "du", "-sb", dataPath)
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to get size of %s", dataPath)
+	}
+
+	// Parse the output: "size_bytes path" -> extract just the number
+	fields := strings.Fields(out)
+	if len(fields) == 0 {
+		return 0, errors.Errorf("invalid du output for %s: %s", dataPath, out)
+	}
+
+	size, err := strconv.ParseInt(fields[0], 10, 64)
+	if err != nil {
+		return 0, errors.Wrapf(err, "failed to parse size from du output: %s", out)
+	}
+
+	return size, nil
+}
+
+func (o *ops) CopyRegistryData(liveLogger io.Writer, device string) error {
+	type cmd struct {
+		liveLogger io.Writer
+		command    string
+		args       []string
+	}
+
+	makecmd := func(liveLogger io.Writer, commad string, args ...string) *cmd {
+		return &cmd{liveLogger: liveLogger, command: commad, args: args}
+	}
+
+	// Get the size of the registry data
+	registryDataSize, err := o.getRegistryDataSize(registryDataDirOnMnt)
+	if err != nil {
+		return err
+	}
+
+	// Calculate the target free percent of the device
+	freePercent, err := o.calculateFreePercent(device, &registryDataSize)
+	if err != nil {
+		return err
+	}
+	if freePercent == 0 {
+		return errors.Errorf("device %s is not large enough to fit the registry data", device)
+	}
+
+	// Generate command for growing root partition to fit the registry data
+	growPartCmd := makecmd(nil, "growpart", fmt.Sprintf("--free-percent=%d", freePercent), device, "4")
+
+	// Get root partition path
+	partition4, err := o.getPartitionPathFromLsblk(device, "4")
+	if err != nil {
+		return errors.Wrapf(err, "failed to find partition 4 for device %s", device)
+	}
+
+	// Generate the path to the registry data directory on the mounted root partitio
+	registryDataDirOnRoot := filepath.Join(ostreeDeployPath, registryDataDirOnDevice)
+
+	// Generate the command for copying the registry data directory to the device
+	copyCmd := makecmd(liveLogger, "sh", "-c", fmt.Sprintf("rsync -ah --info=progress2 %s/ %s/", registryDataDirOnMnt, registryDataDirOnRoot))
+
+	// Generate the command for unfreezing the root partition (frozen by OverwriteOsImage func)
+	// Ignoring errors if the partition is already unfrozen
+	fsUnfreezeCmd := makecmd(nil, "sh", "-c", "fsfreeze --unfreeze /mnt/root || true")
+
+	cmds := []*cmd{
+		makecmd(nil, "mkdir", "-p", "/mnt/root"),
+		makecmd(nil, "mount", partition4, "/mnt/root"),
+		fsUnfreezeCmd,
+		growPartCmd,
+		makecmd(nil, "xfs_growfs", "/mnt/root"),
+		makecmd(nil, "mkdir", "-p", registryDataDirOnRoot),
+		copyCmd,
+		makecmd(nil, "fsfreeze", "--freeze", "/mnt/root"),
+		makecmd(nil, "umount", "/mnt/root"),
+	}
+	for i := range cmds {
+		c := cmds[i]
+		o.log.Infof("Running %s with args %+v", c.command, c.args)
+		if err := utils.Retry(3, 5*time.Second, o.log, func() (ret error) {
+			_, ret = o.ExecPrivilegeCommand(c.liveLogger, c.command, c.args...)
+			if ret != nil {
+				o.log.Warnf("Retrying command %s with args %+v (returned error %v)", c.command, c.args, ret)
+			}
 			return
 		}); err != nil {
 			return errors.Wrapf(err, "failed to run %s with args %+v", c.command, c.args)

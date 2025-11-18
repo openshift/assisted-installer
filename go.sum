@@ -1799,6 +1799,12 @@ github.com/d2g/dhcp4client v1.0.0/go.mod h1:j0hNfjhrt2SxUOw55nL0ATM/z4Yt3t2Kd1mW
 github.com/d2g/dhcp4server v0.0.0-20181031114812-7d4a0a7f59a5/go.mod h1:Eo87+Kg/IX2hfWJfwxMzLyuSZyxSoAug2nGa1G2QAi8=
 github.com/d2g/hardwareaddr v0.0.0-20190221164911-e7d9fbe030e4/go.mod h1:bMl4RjIciD2oAxI7DmWRx6gbeqrkoLqv3MV0vzNad+I=
 github.com/daixiang0/gci v0.10.1/go.mod h1:xtHP9N7AHdNvtRNfcx9gwTDfw7FRJx4bZUsiEfiNNAI=
+github.com/danielerez/assisted-service/api v0.0.0-20251126213714-3346a8f70da9 h1:2UFJ7GnEsJIPDnIXc2hC2Dq41KI7QLYxWlgSKfWz9vE=
+github.com/danielerez/assisted-service/api v0.0.0-20251126213714-3346a8f70da9/go.mod h1:796XMQuWnc8XIn3CgRJk3m2g5V3wjcUHrsqDEezE/SE=
+github.com/danielerez/assisted-service/client v0.0.0-20251126213714-3346a8f70da9 h1:90RlGyHLx1CgfHdns97lyGHMC4TNA/v6lCZ4JZHXwDU=
+github.com/danielerez/assisted-service/client v0.0.0-20251126213714-3346a8f70da9/go.mod h1:c9VBjlPBeTbiHKj4gYH8irWdPOfBV8AHxB5f259hMQU=
+github.com/danielerez/assisted-service/models v0.0.0-20251126213714-3346a8f70da9 h1:NTM4K3STPcRoWo/UBaEyv9XpNwSdEsDUqrzIli9+NS8=
+github.com/danielerez/assisted-service/models v0.0.0-20251126213714-3346a8f70da9/go.mod h1:5EkIueBSaLnt64HR8drgSewdm+GeuE7W5mr9pa2JXXk=
 github.com/danielerez/go-dns-client v0.0.0-20200630114514-0b60d1703f0b/go.mod h1:2l39JZ3DOxVtByPDmp0Zhh4xS7603UHmeRtLCKzqQdQ=
 github.com/danieljoos/wincred v1.1.0/go.mod h1:XYlo+eRTsVA9aHGp7NGjFkPla4m+DCL7hqDjlFjiygg=
 github.com/danieljoos/wincred v1.1.2/go.mod h1:GijpziifJoIBfYh+S7BbkdUTU4LfM+QnGqR5Vl2tAx0=
@@ -3278,12 +3284,6 @@ github.com/openshift/assisted-installer-agent v1.0.9 h1:s81YAJXegCHpRgLrZJZkscf+
 github.com/openshift/assisted-installer-agent v1.0.9/go.mod h1:9KhBmp9fvRY1spNbAtK2KbmGYSLBi0bP0GSsIXroyQY=
 github.com/openshift/assisted-service v0.0.0-20250321224641-189c9121f71f h1:wpbxS0wMWSixBlx1stAR+kdcEbibjwVT0Sk62nD9+pY=
 github.com/openshift/assisted-service v0.0.0-20250321224641-189c9121f71f/go.mod h1:aPB6axcfTQxq5sioqQpFcb7BCujZmmNq4EpVDjzzw88=
-github.com/openshift/assisted-service/api v0.0.0-20250321224641-189c9121f71f h1:3pR4k5VORwXpDCo2txmZ4z5LcZWCCdw2iFQa8AVm7Cw=
-github.com/openshift/assisted-service/api v0.0.0-20250321224641-189c9121f71f/go.mod h1:tvE25aC7I07Uz2jUt7gH2E8+a1Rw4W7qtW6/EFb8l64=
-github.com/openshift/assisted-service/client v0.0.0-20250321224641-189c9121f71f h1:oEIYiSoCNaIJNCbeQXoiZKt68KaTsaFXGR5xcKL52ps=
-github.com/openshift/assisted-service/client v0.0.0-20250321224641-189c9121f71f/go.mod h1:y+GNZgra/iQDYlacSjgscim8ldrSOMtV3jQaSKC3APc=
-github.com/openshift/assisted-service/models v0.0.0-20250321224641-189c9121f71f h1:Uc4EaABCVMUcRjDHh1bSKexWM3k++a3dNiAtg058+AY=
-github.com/openshift/assisted-service/models v0.0.0-20250321224641-189c9121f71f/go.mod h1:bx9NsPeBkhn7az/qFHo3hW8wFqFj4BmT3g1R7wR9gcw=
 github.com/openshift/baremetal-operator v0.0.0-20231019133159-8643f32fea3e/go.mod h1:RwPdWrCqs1Z9awdPveLs/i9s2a31ALI8hGPaP1S9Xos=
 github.com/openshift/baremetal-operator/apis v0.0.0-20231019133159-8643f32fea3e h1:wxkrIEx1lA6vdGAuBAgXmOVDJ+vX+4nhc7Cgu2jszSg=
 github.com/openshift/baremetal-operator/apis v0.0.0-20231019133159-8643f32fea3e/go.mod h1:124MbDDT1AWBpBNcnAPII2H+6p1Q7MIBF67egVtjYbc=
