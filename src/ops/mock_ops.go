@@ -41,6 +41,20 @@ func (m *MockOps) EXPECT() *MockOpsMockRecorder {
 	return m.recorder
 }
 
+// CopyRegistryData mocks base method.
+func (m *MockOps) CopyRegistryData(liveLogger io.Writer, device string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CopyRegistryData", liveLogger, device)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CopyRegistryData indicates an expected call of CopyRegistryData.
+func (mr *MockOpsMockRecorder) CopyRegistryData(liveLogger, device any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CopyRegistryData", reflect.TypeOf((*MockOps)(nil).CopyRegistryData), liveLogger, device)
+}
+
 // CreateManifests mocks base method.
 func (m *MockOps) CreateManifests(arg0 string, arg1 []byte) error {
 	m.ctrl.T.Helper()
