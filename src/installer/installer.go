@@ -176,9 +176,11 @@ func (i *installer) InstallNode() error {
 		// hence, ensuring the registry data exists on the media.
 		if i.ops.FileExists(registryDataDirOnMedia) && i.Config.Role == string(models.HostRoleMaster) {
 			i.log.Info("Start copying registry data to disk")
-			// TODO: create a new HostStage (e.g. models.HostStageCopyinRegistryDataToDisk)
+			hostStage := models.HostStageCopyingRegistryDataToDisk
 			liveLogger := rsync_logger.NewRsyncInstallerLogWriter(
-				i.log, i.inventoryClient, i.Config.InfraEnvID, i.Config.HostID, nil)
+				i.log, i.inventoryClient, i.Config.InfraEnvID, i.Config.HostID, &hostStage)
+
+			i.UpdateHostInstallProgress(hostStage, "")
 			if err = i.ops.CopyRegistryData(liveLogger, i.Device); err != nil {
 				return err
 			}

@@ -33,6 +33,9 @@ const (
 	// FeatureSupportLevelIDSNO captures enum value "SNO"
 	FeatureSupportLevelIDSNO FeatureSupportLevelID = "SNO"
 
+	// FeatureSupportLevelIDTNA captures enum value "TNA"
+	FeatureSupportLevelIDTNA FeatureSupportLevelID = "TNA"
+
 	// FeatureSupportLevelIDVIPAUTOALLOC captures enum value "VIP_AUTO_ALLOC"
 	FeatureSupportLevelIDVIPAUTOALLOC FeatureSupportLevelID = "VIP_AUTO_ALLOC"
 
@@ -99,9 +102,6 @@ const (
 	// FeatureSupportLevelIDPLATFORMMANAGEDNETWORKING captures enum value "PLATFORM_MANAGED_NETWORKING"
 	FeatureSupportLevelIDPLATFORMMANAGEDNETWORKING FeatureSupportLevelID = "PLATFORM_MANAGED_NETWORKING"
 
-	// FeatureSupportLevelIDSKIPMCOREBOOT captures enum value "SKIP_MCO_REBOOT"
-	FeatureSupportLevelIDSKIPMCOREBOOT FeatureSupportLevelID = "SKIP_MCO_REBOOT"
-
 	// FeatureSupportLevelIDEXTERNALPLATFORM captures enum value "EXTERNAL_PLATFORM"
 	FeatureSupportLevelIDEXTERNALPLATFORM FeatureSupportLevelID = "EXTERNAL_PLATFORM"
 
@@ -146,6 +146,42 @@ const (
 
 	// FeatureSupportLevelIDKMM captures enum value "KMM"
 	FeatureSupportLevelIDKMM FeatureSupportLevelID = "KMM"
+
+	// FeatureSupportLevelIDNODEHEALTHCHECK captures enum value "NODE_HEALTHCHECK"
+	FeatureSupportLevelIDNODEHEALTHCHECK FeatureSupportLevelID = "NODE_HEALTHCHECK"
+
+	// FeatureSupportLevelIDSELFNODEREMEDIATION captures enum value "SELF_NODE_REMEDIATION"
+	FeatureSupportLevelIDSELFNODEREMEDIATION FeatureSupportLevelID = "SELF_NODE_REMEDIATION"
+
+	// FeatureSupportLevelIDFENCEAGENTSREMEDIATION captures enum value "FENCE_AGENTS_REMEDIATION"
+	FeatureSupportLevelIDFENCEAGENTSREMEDIATION FeatureSupportLevelID = "FENCE_AGENTS_REMEDIATION"
+
+	// FeatureSupportLevelIDNODEMAINTENANCE captures enum value "NODE_MAINTENANCE"
+	FeatureSupportLevelIDNODEMAINTENANCE FeatureSupportLevelID = "NODE_MAINTENANCE"
+
+	// FeatureSupportLevelIDKUBEDESCHEDULER captures enum value "KUBE_DESCHEDULER"
+	FeatureSupportLevelIDKUBEDESCHEDULER FeatureSupportLevelID = "KUBE_DESCHEDULER"
+
+	// FeatureSupportLevelIDCLUSTEROBSERVABILITY captures enum value "CLUSTER_OBSERVABILITY"
+	FeatureSupportLevelIDCLUSTEROBSERVABILITY FeatureSupportLevelID = "CLUSTER_OBSERVABILITY"
+
+	// FeatureSupportLevelIDNUMARESOURCES captures enum value "NUMA_RESOURCES"
+	FeatureSupportLevelIDNUMARESOURCES FeatureSupportLevelID = "NUMA_RESOURCES"
+
+	// FeatureSupportLevelIDOADP captures enum value "OADP"
+	FeatureSupportLevelIDOADP FeatureSupportLevelID = "OADP"
+
+	// FeatureSupportLevelIDMETALLB captures enum value "METALLB"
+	FeatureSupportLevelIDMETALLB FeatureSupportLevelID = "METALLB"
+
+	// FeatureSupportLevelIDDUALSTACKPRIMARYIPV6 captures enum value "DUAL_STACK_PRIMARY_IPV6"
+	FeatureSupportLevelIDDUALSTACKPRIMARYIPV6 FeatureSupportLevelID = "DUAL_STACK_PRIMARY_IPV6"
+
+	// FeatureSupportLevelIDLOKI captures enum value "LOKI"
+	FeatureSupportLevelIDLOKI FeatureSupportLevelID = "LOKI"
+
+	// FeatureSupportLevelIDOPENSHIFTLOGGING captures enum value "OPENSHIFT_LOGGING"
+	FeatureSupportLevelIDOPENSHIFTLOGGING FeatureSupportLevelID = "OPENSHIFT_LOGGING"
 )
 
 // for schema
@@ -153,7 +189,7 @@ var featureSupportLevelIdEnum []interface{}
 
 func init() {
 	var res []FeatureSupportLevelID
-	if err := json.Unmarshal([]byte(`["SNO","VIP_AUTO_ALLOC","CUSTOM_MANIFEST","SINGLE_NODE_EXPANSION","LVM","ODF","LSO","CNV","MCE","MTV","OSC","NUTANIX_INTEGRATION","BAREMETAL_PLATFORM","NONE_PLATFORM","VSPHERE_INTEGRATION","DUAL_STACK_VIPS","CLUSTER_MANAGED_NETWORKING","USER_MANAGED_NETWORKING","MINIMAL_ISO","FULL_ISO","EXTERNAL_PLATFORM_OCI","DUAL_STACK","PLATFORM_MANAGED_NETWORKING","SKIP_MCO_REBOOT","EXTERNAL_PLATFORM","OVN_NETWORK_TYPE","SDN_NETWORK_TYPE","NODE_FEATURE_DISCOVERY","NVIDIA_GPU","PIPELINES","SERVICEMESH","SERVERLESS","OPENSHIFT_AI","NON_STANDARD_HA_CONTROL_PLANE","AUTHORINO","USER_MANAGED_LOAD_BALANCER","NMSTATE","AMD_GPU","KMM"]`), &res); err != nil {
+	if err := json.Unmarshal([]byte(`["SNO","TNA","VIP_AUTO_ALLOC","CUSTOM_MANIFEST","SINGLE_NODE_EXPANSION","LVM","ODF","LSO","CNV","MCE","MTV","OSC","NUTANIX_INTEGRATION","BAREMETAL_PLATFORM","NONE_PLATFORM","VSPHERE_INTEGRATION","DUAL_STACK_VIPS","CLUSTER_MANAGED_NETWORKING","USER_MANAGED_NETWORKING","MINIMAL_ISO","FULL_ISO","EXTERNAL_PLATFORM_OCI","DUAL_STACK","PLATFORM_MANAGED_NETWORKING","EXTERNAL_PLATFORM","OVN_NETWORK_TYPE","SDN_NETWORK_TYPE","NODE_FEATURE_DISCOVERY","NVIDIA_GPU","PIPELINES","SERVICEMESH","SERVERLESS","OPENSHIFT_AI","NON_STANDARD_HA_CONTROL_PLANE","AUTHORINO","USER_MANAGED_LOAD_BALANCER","NMSTATE","AMD_GPU","KMM","NODE_HEALTHCHECK","SELF_NODE_REMEDIATION","FENCE_AGENTS_REMEDIATION","NODE_MAINTENANCE","KUBE_DESCHEDULER","CLUSTER_OBSERVABILITY","NUMA_RESOURCES","OADP","METALLB","DUAL_STACK_PRIMARY_IPV6","LOKI","OPENSHIFT_LOGGING"]`), &res); err != nil {
 		panic(err)
 	}
 	for _, v := range res {
