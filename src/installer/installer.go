@@ -16,6 +16,7 @@ import (
 	"github.com/go-openapi/swag"
 	"github.com/google/uuid"
 	"github.com/openshift/assisted-installer/src/main/drymock"
+	"github.com/openshift/assisted-installer/src/rsync_logger"
 	"github.com/openshift/assisted-service/pkg/secretdump"
 	"github.com/openshift/assisted-service/pkg/validations"
 	"github.com/pkg/errors"
@@ -53,6 +54,7 @@ const (
 	nodeImagePullService         = "node-image-pull.service"
 	nodeImageOverlayService      = "node-image-overlay.service"
 	openshiftClientBin           = "/usr/bin/oc"
+	registryDataDirOnMedia       = "/run/media/iso/registry"
 )
 
 var generalWaitTimeout = 30 * time.Second
@@ -164,6 +166,23 @@ func (i *installer) InstallNode() error {
 			i.log.WithError(err).Warnf("Failed to set boot order")
 			// Ignore the error for now so it doesn't fail the installation in case it fails
 			//return err
+		}
+
+		// Write registry data to device only in the disconnected ABI flow.
+		// I.e. the openshift appliance ensures that the registry data is mounted,
+		// and the installer only needs to copy the registry data to the devices
+		// of the control plane nodes (for the post-bootstrap step).
+		// Note: this flow is relevant only when using the appliance live-iso,
+		// hence, ensuring the registry data exists on the media.
+		if i.ops.FileExists(registryDataDirOnMedia) && i.Config.Role == string(models.HostRoleMaster) {
+			i.log.Info("Start copying registry data to disk")
+			// TODO: create a new HostStage (e.g. models.HostStageCopyinRegistryDataToDisk)
+			liveLogger := rsync_logger.NewRsyncInstallerLogWriter(
+				i.log, i.inventoryClient, i.Config.InfraEnvID, i.Config.HostID, nil)
+			if err = i.ops.CopyRegistryData(liveLogger, i.Device); err != nil {
+				return err
+			}
+			i.log.Info("Done copying registry data to disk")
 		}
 	}
 
