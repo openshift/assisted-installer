@@ -126,6 +126,9 @@ const (
 	// ClusterValidationIDOpenshiftAiRequirementsSatisfied captures enum value "openshift-ai-requirements-satisfied"
 	ClusterValidationIDOpenshiftAiRequirementsSatisfied ClusterValidationID = "openshift-ai-requirements-satisfied"
 
+	// ClusterValidationIDOpenshiftAiGpuRequirementsSatisfied captures enum value "openshift-ai-gpu-requirements-satisfied"
+	ClusterValidationIDOpenshiftAiGpuRequirementsSatisfied ClusterValidationID = "openshift-ai-gpu-requirements-satisfied"
+
 	// ClusterValidationIDAuthorinoRequirementsSatisfied captures enum value "authorino-requirements-satisfied"
 	ClusterValidationIDAuthorinoRequirementsSatisfied ClusterValidationID = "authorino-requirements-satisfied"
 
@@ -137,6 +140,39 @@ const (
 
 	// ClusterValidationIDKmmRequirementsSatisfied captures enum value "kmm-requirements-satisfied"
 	ClusterValidationIDKmmRequirementsSatisfied ClusterValidationID = "kmm-requirements-satisfied"
+
+	// ClusterValidationIDNodeHealthcheckRequirementsSatisfied captures enum value "node-healthcheck-requirements-satisfied"
+	ClusterValidationIDNodeHealthcheckRequirementsSatisfied ClusterValidationID = "node-healthcheck-requirements-satisfied"
+
+	// ClusterValidationIDSelfNodeRemediationRequirementsSatisfied captures enum value "self-node-remediation-requirements-satisfied"
+	ClusterValidationIDSelfNodeRemediationRequirementsSatisfied ClusterValidationID = "self-node-remediation-requirements-satisfied"
+
+	// ClusterValidationIDFenceAgentsRemediationRequirementsSatisfied captures enum value "fence-agents-remediation-requirements-satisfied"
+	ClusterValidationIDFenceAgentsRemediationRequirementsSatisfied ClusterValidationID = "fence-agents-remediation-requirements-satisfied"
+
+	// ClusterValidationIDNodeMaintenanceRequirementsSatisfied captures enum value "node-maintenance-requirements-satisfied"
+	ClusterValidationIDNodeMaintenanceRequirementsSatisfied ClusterValidationID = "node-maintenance-requirements-satisfied"
+
+	// ClusterValidationIDKubeDeschedulerRequirementsSatisfied captures enum value "kube-descheduler-requirements-satisfied"
+	ClusterValidationIDKubeDeschedulerRequirementsSatisfied ClusterValidationID = "kube-descheduler-requirements-satisfied"
+
+	// ClusterValidationIDClusterObservabilityRequirementsSatisfied captures enum value "cluster-observability-requirements-satisfied"
+	ClusterValidationIDClusterObservabilityRequirementsSatisfied ClusterValidationID = "cluster-observability-requirements-satisfied"
+
+	// ClusterValidationIDNumaResourcesRequirementsSatisfied captures enum value "numa-resources-requirements-satisfied"
+	ClusterValidationIDNumaResourcesRequirementsSatisfied ClusterValidationID = "numa-resources-requirements-satisfied"
+
+	// ClusterValidationIDOadpRequirementsSatisfied captures enum value "oadp-requirements-satisfied"
+	ClusterValidationIDOadpRequirementsSatisfied ClusterValidationID = "oadp-requirements-satisfied"
+
+	// ClusterValidationIDMetallbRequirementsSatisfied captures enum value "metallb-requirements-satisfied"
+	ClusterValidationIDMetallbRequirementsSatisfied ClusterValidationID = "metallb-requirements-satisfied"
+
+	// ClusterValidationIDLokiRequirementsSatisfied captures enum value "loki-requirements-satisfied"
+	ClusterValidationIDLokiRequirementsSatisfied ClusterValidationID = "loki-requirements-satisfied"
+
+	// ClusterValidationIDOpenshiftLoggingRequirementsSatisfied captures enum value "openshift-logging-requirements-satisfied"
+	ClusterValidationIDOpenshiftLoggingRequirementsSatisfied ClusterValidationID = "openshift-logging-requirements-satisfied"
 )
 
 // for schema
@@ -144,7 +180,7 @@ var clusterValidationIdEnum []interface{}
 
 func init() {
 	var res []ClusterValidationID
-	if err := json.Unmarshal([]byte(`["machine-cidr-defined","cluster-cidr-defined","service-cidr-defined","no-cidrs-overlapping","networks-same-address-families","network-prefix-valid","machine-cidr-equals-to-calculated-cidr","api-vips-defined","api-vips-valid","ingress-vips-defined","ingress-vips-valid","all-hosts-are-ready-to-install","sufficient-masters-count","dns-domain-defined","pull-secret-set","ntp-server-configured","lso-requirements-satisfied","ocs-requirements-satisfied","odf-requirements-satisfied","cnv-requirements-satisfied","lvm-requirements-satisfied","mce-requirements-satisfied","mtv-requirements-satisfied","osc-requirements-satisfied","network-type-valid","platform-requirements-satisfied","node-feature-discovery-requirements-satisfied","nvidia-gpu-requirements-satisfied","pipelines-requirements-satisfied","servicemesh-requirements-satisfied","serverless-requirements-satisfied","openshift-ai-requirements-satisfied","authorino-requirements-satisfied","nmstate-requirements-satisfied","amd-gpu-requirements-satisfied","kmm-requirements-satisfied"]`), &res); err != nil {
+	if err := json.Unmarshal([]byte(`["machine-cidr-defined","cluster-cidr-defined","service-cidr-defined","no-cidrs-overlapping","networks-same-address-families","network-prefix-valid","machine-cidr-equals-to-calculated-cidr","api-vips-defined","api-vips-valid","ingress-vips-defined","ingress-vips-valid","all-hosts-are-ready-to-install","sufficient-masters-count","dns-domain-defined","pull-secret-set","ntp-server-configured","lso-requirements-satisfied","ocs-requirements-satisfied","odf-requirements-satisfied","cnv-requirements-satisfied","lvm-requirements-satisfied","mce-requirements-satisfied","mtv-requirements-satisfied","osc-requirements-satisfied","network-type-valid","platform-requirements-satisfied","node-feature-discovery-requirements-satisfied","nvidia-gpu-requirements-satisfied","pipelines-requirements-satisfied","servicemesh-requirements-satisfied","serverless-requirements-satisfied","openshift-ai-requirements-satisfied","openshift-ai-gpu-requirements-satisfied","authorino-requirements-satisfied","nmstate-requirements-satisfied","amd-gpu-requirements-satisfied","kmm-requirements-satisfied","node-healthcheck-requirements-satisfied","self-node-remediation-requirements-satisfied","fence-agents-remediation-requirements-satisfied","node-maintenance-requirements-satisfied","kube-descheduler-requirements-satisfied","cluster-observability-requirements-satisfied","numa-resources-requirements-satisfied","oadp-requirements-satisfied","metallb-requirements-satisfied","loki-requirements-satisfied","openshift-logging-requirements-satisfied"]`), &res); err != nil {
 		panic(err)
 	}
 	for _, v := range res {
