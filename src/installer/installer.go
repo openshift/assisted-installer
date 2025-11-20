@@ -53,6 +53,7 @@ const (
 	nodeImagePullService         = "node-image-pull.service"
 	nodeImageOverlayService      = "node-image-overlay.service"
 	openshiftClientBin           = "/usr/bin/oc"
+	registryDataDirOnMedia       = "/run/media/iso/registry"
 )
 
 var generalWaitTimeout = 30 * time.Second
@@ -164,6 +165,19 @@ func (i *installer) InstallNode() error {
 			i.log.WithError(err).Warnf("Failed to set boot order")
 			// Ignore the error for now so it doesn't fail the installation in case it fails
 			//return err
+		}
+
+		// Write registry data to device only in the disconnected ABI flow.
+		// I.e. the openshift appliance ensures that the registry data mounted
+		// to '/mnt/agentdata'. So the installer only needs to copy
+		// the registry data to the device (for the post-bootstrap step).
+		// Note: this flow is relevant only when using the discovery live-iso,
+		// hence, ensuring the registry data exists on the media.
+		if i.ops.FileExists(registryDataDirOnMedia) {
+			i.log.Info("Copying registry data to disk")
+			if err = i.ops.CopyRegistryData(i.Device); err != nil {
+				return err
+			}
 		}
 	}
 
