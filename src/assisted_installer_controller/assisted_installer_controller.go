@@ -38,6 +38,7 @@ import (
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/models"
+	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -112,6 +113,7 @@ type Controller interface {
 	WaitAndUpdateNodesStatus(ctx context.Context, wg *sync.WaitGroup, removeUninitializedTaint bool)
 	HackDNSAddressConflict(wg *sync.WaitGroup)
 	PostInstallConfigs(ctx context.Context, wg *sync.WaitGroup)
+	PostInstallConfigsK8sClient(ctx context.Context, wg *sync.WaitGroup, kubeconfigPath string)
 	UpdateNodeLabels(ctx context.Context, wg *sync.WaitGroup)
 	UpdateBMHs(ctx context.Context, wg *sync.WaitGroup)
 	UploadLogs(ctx context.Context, wg *sync.WaitGroup, invoker string)
@@ -129,12 +131,19 @@ type controller struct {
 	rebootsNotifier RebootsNotifier
 }
 
-// manifest store the operator manifest used by assisted-installer to create CRs of the OLM:
-type manifest struct {
+// Manifest stores the operator manifest used by assisted-installer to create CRs of the OLM:
+type Manifest struct {
 	// name of the operator the CR manifest we want create
 	Name string
-	// content of the manifest of the opreator
+	// content of the manifest of the operator
 	Content string
+}
+
+// Contents of ConfigMap containing operator manifests
+type operatorMetadata struct {
+	Namespace        string   `yaml:"namespace"`
+	SubscriptionName string   `yaml:"subscriptionName"`
+	Manifests        []string `yaml:"manifests"`
 }
 
 func newController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inventory_client.InventoryClient, kc k8s_client.K8SClient, rebootsNotifier RebootsNotifier) *controller {
@@ -487,6 +496,83 @@ func (c *controller) PostInstallConfigs(ctx context.Context, wg *sync.WaitGroup)
 	c.sendCompleteInstallation(ctx, success, errMessage, data)
 }
 
+func (c *controller) PostInstallConfigsK8sClient(ctx context.Context, wg *sync.WaitGroup, kubeconfigPath string) {
+	defer func() {
+		c.log.Infof("Finished PostInstallConfigsK8sClient")
+		wg.Done()
+	}()
+	err := utils.WaitForeverForPredicate(ctx, GeneralWaitInterval, func() bool {
+		// Get operator info from ConfigMap created by assisted-service
+		cm, err := c.kc.GetConfigMap(c.Namespace, "olm-operator-manifests")
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				c.log.Infof("ConfigMap not found yet, waiting...")
+				return false
+			}
+			// Check for permanent errors (permissions, invalid requests)
+			if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
+				c.log.Errorf("Permanent error accessing ConfigMap: %v", err)
+				return true // Exit loop
+			}
+			c.log.Errorf("Failed to get ConfigMap: %s", err.Error())
+			return false
+		}
+
+		var manifests []Manifest
+		var olmOperators []models.MonitoredOperator
+		// Iterate through the ConfigMap's Data to find metadata and manifests
+		for key, value := range cm.Data {
+			if strings.HasSuffix(key, ".metadata.yaml") {
+				// This is an operator metadata entry
+				var metadata operatorMetadata
+				if yamlErr := yaml.Unmarshal([]byte(value), &metadata); yamlErr != nil {
+					c.log.Warnf("Failed to unmarshal metadata for %s: %s, not retrying", key, yamlErr.Error())
+					return true
+				}
+
+				// Extract the operator name from the metadata key
+				operatorName := strings.TrimSuffix(key, ".metadata.yaml")
+
+				// Get manifests associated with this operator
+				for _, manifestFileName := range metadata.Manifests {
+					if content, found := cm.Data[manifestFileName]; found {
+						manifests = append(manifests, Manifest{operatorName, content})
+					} else {
+						c.log.Errorf("Manifest file %s listed in metadata but not found in ConfigMap data - retrying until ConfigMap is updated", manifestFileName)
+						return false // Keep waiting for proper ConfigMap
+					}
+				}
+
+				olmOperators = append(olmOperators, models.MonitoredOperator{
+					Name:             operatorName,
+					Namespace:        metadata.Namespace,
+					SubscriptionName: metadata.SubscriptionName,
+					OperatorType:     models.OperatorTypeOlm,
+				})
+			}
+		}
+
+		if kubeconfigPath == "" {
+			kubeconfigPath, err = c.rebootsNotifier.GetKubeconfigPath(ctx)
+			if err != nil {
+				c.log.Infof("Failed to get kubeconfig path %s", err.Error())
+				return false
+			}
+		}
+		// Apply manifests from configMap if ready
+		if !c.applyOperatorManifests(olmOperators, manifests, kubeconfigPath) {
+			c.log.Infof("Failed to apply manifests")
+		} else {
+			c.log.Infof("Successfully applied manifests")
+			return true
+		}
+		return false
+	})
+	if err != nil {
+		c.log.Infof("Error in wait %s", err.Error())
+	}
+}
+
 func (c *controller) postInstallConfigs(ctx context.Context) (error, map[string]interface{}) {
 	var err error
 	var data map[string]interface{}
@@ -650,7 +736,7 @@ func (c *controller) applyPostInstallManifests(operators []models.MonitoredOpera
 	}
 
 	// Unmarshall the content of the operators manifests:
-	var manifests []manifest
+	var manifests []Manifest
 	data, err := os.ReadFile(customManifestPath)
 	if err != nil {
 		c.log.WithError(err).Errorf("Failed to read the custom manifests file.")
@@ -661,10 +747,24 @@ func (c *controller) applyPostInstallManifests(operators []models.MonitoredOpera
 		return false
 	}
 
-	// Create the manifests of the operators, which are properly initialized:
+	if !c.applyOperatorManifests(operators, manifests, kubeconfigName) {
+		c.log.WithError(err).Errorf("Failed to apply operators to cluster")
+		return false
+	}
+
+	return true
+}
+
+// Apply the operator manifests to the cluster.
+func (c *controller) applyOperatorManifests(operators []models.MonitoredOperator, manifests []Manifest, kubeconfigName string) bool {
+
 	readyOperators, _, err := c.getReadyOperators(operators)
 	if err != nil {
-		c.log.WithError(err).Errorf("Failed to fetch operators from assisted-service")
+		c.log.WithError(err).Errorf("Failed to fetch operators from cluster")
+		return false
+	}
+	if len(operators) != len(readyOperators) {
+		c.log.Infof("Not all operators are currently ready")
 		return false
 	}
 
@@ -684,7 +784,7 @@ func (c *controller) applyPostInstallManifests(operators []models.MonitoredOpera
 		if manifest.Name == "odf" && constraints.Check(ocpVer) {
 			manifest.Name = "ocs"
 		}
-		c.log.Infof("Applying manifest %s: %s", manifest.Name, manifest.Content)
+		c.log.Infof("Applying manifest %s", manifest.Name)
 
 		// Check if the operator is properly initialized by CSV:
 		if !func() bool {
@@ -695,6 +795,7 @@ func (c *controller) applyPostInstallManifests(operators []models.MonitoredOpera
 			}
 			return false
 		}() {
+			c.log.Infof("Skipping operator %s as it's not initialized by CSV", manifest.Name)
 			continue
 		}
 
