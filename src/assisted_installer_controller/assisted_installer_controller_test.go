@@ -39,6 +39,7 @@ import (
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-service/models"
+	yaml "gopkg.in/yaml.v3"
 )
 
 func TestValidator(t *testing.T) {
@@ -106,6 +107,15 @@ var (
 	testIngressConfigMap = map[string]string{
 		"ca-bundle.crt": "CA",
 	}
+
+	testOperatorManifests = map[string]string{
+		"kube-descheduler": "LS0tCmFwaVZlcnNpb246IG9wZXJhdG9yLm9wZW5zaGlmdC5pby92MQpraW5kOiBLdWJlRGVzY2hlZHVsZXIKbWV0YWRhdGE6CiAgbmFtZTogY2x1c3RlcgogIG5hbWVzcGFjZTogb3BlbnNoaWZ0LWt1YmUtZGVzY2hlZHVsZXItb3BlcmF0b3IKc3BlYzoKICBsb2dMZXZlbDogTm9ybWFsCiAgbW9kZTogUHJlZGljdGl2ZQogIG9wZXJhdG9yTG9nTGV2ZWw6IE5vcm1hbAogIHByb2ZpbGVzOgogICAgLSBBZmZpbml0eUFuZFRhaW50cwogIGRlc2NoZWR1bGluZ0ludGVydmFsU2Vjb25kczogMzYwMAogIG1hbmFnZW1lbnRTdGF0ZTogTWFuYWdlZAo=",
+		"nmstate":          "CmFwaVZlcnNpb246IG5tc3RhdGUuaW8vdjEKa2luZDogTk1TdGF0ZQptZXRhZGF0YToKICBuYW1lOiBubXN0YXRlCg==",
+	}
+
+	testMonitoredOperators = []models.MonitoredOperator{
+		{Name: "kube-descheduler", Namespace: "openshift-kube-descheduler-operator", OperatorType: "olm", SubscriptionName: "cluster-kube-descheduler-operator"},
+		{Name: "nmstate", Namespace: "openshift-nmstate", OperatorType: "olm", SubscriptionName: "kubernetes-nmstate-operator"}}
 )
 
 var _ = Describe("installer HostRoleMaster role", func() {
@@ -494,9 +504,9 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			mockk8sclient.EXPECT().ListNodes().Return(nodes, nil).Times(1)
 			updateProgressSuccess(done, hosts)
 			configuringSuccess()
-			for name, v := range inventoryNamesIds {
-				value := v
-				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, value.Host.ID, &value.Host.InfraEnvID, gomock.Any()).Times(1)
+			for name, value := range inventoryNamesIds {
+				valueCopy := value
+				mockRebootsNotifier.EXPECT().Start(gomock.Any(), name, valueCopy.Host.ID, &valueCopy.Host.InfraEnvID, gomock.Any()).Times(1)
 			}
 			exit := assistedController.waitAndUpdateNodesStatus(false)
 			Expect(exit).Should(Equal(false))
@@ -1436,6 +1446,206 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 	})
 
+	Context("PostInstallConfigsK8sClient", func() {
+		Context("operator manifests", func() {
+			BeforeEach(func() {
+				GeneralWaitInterval = 1 * time.Millisecond
+			})
+
+			It("success", func() {
+				mockAllCapabilitiesEnabled()
+
+				operatorConfigMap := createConfigMap()
+
+				mockk8sclient.EXPECT().GetConfigMap(assistedController.Namespace, "olm-operator-manifests").Return(operatorConfigMap, nil).Times(1)
+				mockk8sclient.EXPECT().ListJobs(gomock.Any()).Return(&batchV1.JobList{}, nil).AnyTimes()
+				mockk8sclient.EXPECT().GetAllInstallPlansOfSubscription(gomock.Any()).Return([]olmv1alpha1.InstallPlan{}, nil).Times(2)
+				mockRebootsNotifier.EXPECT().GetKubeconfigPath(gomock.Any()).Return("", nil).Times(1)
+				randomCSV := uuid.New().String()
+				mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-kube-descheduler-operator", "cluster-kube-descheduler-operator").Return(randomCSV, nil).Times(1)
+				mockk8sclient.EXPECT().GetCSV("openshift-kube-descheduler-operator", gomock.Any()).Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseNone}}, nil).Times(1)
+				mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-nmstate", "kubernetes-nmstate-operator").Return(randomCSV, nil).Times(1)
+				mockk8sclient.EXPECT().GetCSV("openshift-nmstate", gomock.Any()).Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseNone}}, nil).Times(1)
+				mockops.EXPECT().CreateManifests(gomock.Any(), gomock.Any()).Times(2)
+
+				wg.Add(1)
+				assistedController.PostInstallConfigsK8sClient(context.TODO(), &wg, "")
+				wg.Wait()
+			})
+
+			It("failure on CSVs", func() {
+				GeneralProgressUpdateInt = 1 * time.Millisecond
+				mockAllCapabilitiesEnabled()
+
+				operatorConfigMap := createConfigMap()
+
+				mockk8sclient.EXPECT().GetConfigMap(assistedController.Namespace, "olm-operator-manifests").Return(operatorConfigMap, nil).AnyTimes()
+				mockk8sclient.EXPECT().ListJobs(gomock.Any()).Return(&batchV1.JobList{}, nil).AnyTimes()
+				mockk8sclient.EXPECT().GetAllInstallPlansOfSubscription(gomock.Any()).Return([]olmv1alpha1.InstallPlan{}, nil).AnyTimes()
+				mockRebootsNotifier.EXPECT().GetKubeconfigPath(gomock.Any()).Return("", nil).AnyTimes()
+				mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-kube-descheduler-operator", "cluster-kube-descheduler-operator").Return("", fmt.Errorf("dummy")).AnyTimes()
+				mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-nmstate", "kubernetes-nmstate-operator").Return("", fmt.Errorf("dummy")).AnyTimes()
+
+				wg.Add(1)
+				go func() {
+					defer GinkgoRecover()
+					ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Millisecond)
+					defer cancel()
+					assistedController.PostInstallConfigsK8sClient(ctx, &wg, "")
+				}()
+				wg.Wait()
+			})
+
+			It("ConfigMap not found - retries until timeout", func() {
+				mockAllCapabilitiesEnabled()
+
+				// ConfigMap doesn't exist yet, should keep retrying
+				mockk8sclient.EXPECT().GetConfigMap(assistedController.Namespace, "olm-operator-manifests").
+					Return(nil, apierrors.NewNotFound(apischema.GroupResource{}, "olm-operator-manifests")).
+					AnyTimes()
+
+				wg.Add(1)
+				go func() {
+					defer GinkgoRecover()
+					ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Millisecond)
+					defer cancel()
+					assistedController.PostInstallConfigsK8sClient(ctx, &wg, "")
+				}()
+				wg.Wait()
+
+				// Test passes if it keeps retrying until timeout (doesn't exit early)
+			})
+
+			It("malformed metadata YAML - retries", func() {
+				mockAllCapabilitiesEnabled()
+
+				// Create ConfigMap with invalid YAML
+				badConfigMap := &v1.ConfigMap{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "v1",
+						Kind:       "ConfigMap",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "olm-operator-manifests",
+						Namespace: assistedController.Namespace,
+					},
+					Data: map[string]string{
+						"kube-descheduler.metadata.yaml": "invalid: yaml: [syntax",
+					},
+				}
+
+				mockk8sclient.EXPECT().GetConfigMap(assistedController.Namespace, "olm-operator-manifests").
+					Return(badConfigMap, nil).AnyTimes()
+
+				wg.Add(1)
+				go func() {
+					defer GinkgoRecover()
+					ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Millisecond)
+					defer cancel()
+					assistedController.PostInstallConfigsK8sClient(ctx, &wg, "")
+				}()
+				wg.Wait()
+			})
+
+			It("missing manifest file in ConfigMap - retries", func() {
+				mockAllCapabilitiesEnabled()
+
+				// Create ConfigMap where metadata references a manifest that doesn't exist
+				incompleteConfigMap := &v1.ConfigMap{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "v1",
+						Kind:       "ConfigMap",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "olm-operator-manifests",
+						Namespace: assistedController.Namespace,
+					},
+					Data: map[string]string{
+						// Metadata references "kube-descheduler-1.yaml" but it's not in Data
+						"kube-descheduler.metadata.yaml": `namespace: openshift-kube-descheduler-operator
+subscriptionName: cluster-kube-descheduler-operator
+manifests:
+  - kube-descheduler-1.yaml`,
+					},
+				}
+
+				mockk8sclient.EXPECT().GetConfigMap(assistedController.Namespace, "olm-operator-manifests").
+					Return(incompleteConfigMap, nil).AnyTimes()
+
+				wg.Add(1)
+				go func() {
+					defer GinkgoRecover()
+					ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Millisecond)
+					defer cancel()
+					assistedController.PostInstallConfigsK8sClient(ctx, &wg, "")
+				}()
+				wg.Wait()
+
+				// Verify it keeps retrying instead of proceeding with incomplete data
+			})
+
+			It("kubeconfig path retrieval fails then succeeds", func() {
+				mockAllCapabilitiesEnabled()
+
+				operatorConfigMap := createConfigMap()
+
+				mockk8sclient.EXPECT().GetConfigMap(assistedController.Namespace, "olm-operator-manifests").
+					Return(operatorConfigMap, nil).Times(2)
+				mockk8sclient.EXPECT().ListJobs(gomock.Any()).Return(&batchV1.JobList{}, nil).AnyTimes()
+				mockk8sclient.EXPECT().GetAllInstallPlansOfSubscription(gomock.Any()).Return([]olmv1alpha1.InstallPlan{}, nil).Times(2)
+
+				// First attempt - kubeconfig path fails
+				mockRebootsNotifier.EXPECT().GetKubeconfigPath(gomock.Any()).
+					Return("", fmt.Errorf("kubeconfig not ready")).Times(1)
+
+				// Second attempt - kubeconfig path succeeds
+				mockRebootsNotifier.EXPECT().GetKubeconfigPath(gomock.Any()).
+					Return("/tmp/kubeconfig", nil).Times(1)
+
+				randomCSV := uuid.New().String()
+				mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-kube-descheduler-operator", "cluster-kube-descheduler-operator").
+					Return(randomCSV, nil).Times(1)
+				mockk8sclient.EXPECT().GetCSV("openshift-kube-descheduler-operator", gomock.Any()).
+					Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseNone}}, nil).Times(1)
+				mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-nmstate", "kubernetes-nmstate-operator").
+					Return(randomCSV, nil).Times(1)
+				mockk8sclient.EXPECT().GetCSV("openshift-nmstate", gomock.Any()).
+					Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseNone}}, nil).Times(1)
+				mockops.EXPECT().CreateManifests(gomock.Any(), gomock.Any()).Times(2)
+
+				wg.Add(1)
+				assistedController.PostInstallConfigsK8sClient(context.TODO(), &wg, "")
+				wg.Wait()
+			})
+
+			It("empty ConfigMap - exits successfully", func() {
+				mockAllCapabilitiesEnabled()
+
+				// ConfigMap exists but has no operator metadata
+				emptyConfigMap := &v1.ConfigMap{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "v1",
+						Kind:       "ConfigMap",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "olm-operator-manifests",
+						Namespace: assistedController.Namespace,
+					},
+					Data: map[string]string{},
+				}
+
+				mockk8sclient.EXPECT().GetConfigMap(assistedController.Namespace, "olm-operator-manifests").
+					Return(emptyConfigMap, nil).Times(1)
+
+				wg.Add(1)
+				assistedController.PostInstallConfigsK8sClient(context.TODO(), &wg, "/tmp/kubeconfig")
+				wg.Wait()
+
+				// Should exit successfully with no operators to process
+			})
+		})
+	})
+
 	Context("update BMHs", func() {
 		t := metav1.Unix(98754, 0)
 		bmhStatus := metal3v1alpha1.BareMetalHostStatus{
@@ -2251,4 +2461,46 @@ func create3Hosts(currentStatus string, stage models.HostStage, nodeLabels strin
 		"node0": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node0Id, NodeLabels: nodeLabels, Progress: &currentState, Status: &currentStatus}},
 		"node1": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node1Id, NodeLabels: nodeLabels, Progress: &currentState, Status: &currentStatus}},
 		"node2": {Host: &models.Host{InfraEnvID: infraEnvId, ID: &node2Id, NodeLabels: nodeLabels, Progress: &currentState, Status: &currentStatus}}}
+}
+
+func createConfigMap() *v1.ConfigMap {
+	type operatorMetadata struct {
+		Namespace        string   `yaml:"namespace"`
+		SubscriptionName string   `yaml:"subscriptionName"`
+		Manifests        []string `yaml:"manifests"`
+	}
+
+	configMap := v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "olm-operator-manifests",
+			Namespace: "assisted-installer",
+		},
+		Data: map[string]string{},
+	}
+
+	for _, operator := range testMonitoredOperators {
+		var manifestFileNames []string
+		manifestContent := testOperatorManifests[operator.Name]
+
+		fileName := fmt.Sprintf("%s-1.yaml", operator.Name)
+		configMap.Data[fileName] = manifestContent
+		manifestFileNames = append(manifestFileNames, fileName)
+
+		metadata := operatorMetadata{
+			Namespace:        operator.Namespace,
+			SubscriptionName: operator.SubscriptionName,
+			Manifests:        manifestFileNames,
+		}
+
+		metadataYAML, _ := yaml.Marshal(metadata)
+
+		metadataKey := fmt.Sprintf("%s.metadata.yaml", operator.Name)
+		configMap.Data[metadataKey] = string(metadataYAML)
+	}
+
+	return &configMap
 }
