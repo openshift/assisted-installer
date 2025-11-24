@@ -34,6 +34,7 @@ LABEL com.redhat.component="multicluster-engine-assisted-installer-controller-co
       version="${version}" \
       upstream-ref="${version}" \
       upstream-url="https://github.com/openshift/assisted-installer" \
+      url="https://github.com/openshift/assisted-installer" \
       summary="OpenShift Assisted Installer Controller" \
       io.k8s.display-name="OpenShift Assisted Installer Controller" \
       maintainer="Liat Gamliel <lgamliel@redhat.com>" \
