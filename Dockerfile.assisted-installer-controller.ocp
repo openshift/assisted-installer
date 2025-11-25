@@ -6,7 +6,7 @@ ENV GOFLAGS="-mod=vendor"
 COPY . .
 RUN make controller
 
-FROM registry.ci.openshift.org/ocp/4.21:base-rhel9
+FROM registry.ci.openshift.org/ocp/4.21:base-rhel9-minimal-test
 
 LABEL io.openshift.release.operator=true
 
