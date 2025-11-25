@@ -210,6 +210,12 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					}
 				}
 			}
+			checkAgentRegistryDir := func(exists bool) {
+				mockops.EXPECT().FileExists(registryDataDirOnMedia).Return(exists).Times(1)
+			}
+			copyRegistryDataSuccess := func() {
+				mockops.EXPECT().CopyRegistryData(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+			}
 			BeforeEach(func() {
 				ctrl = gomock.NewController(GinkgoT())
 				mockops = ops.NewMockOps(ctrl)
@@ -408,6 +414,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							rebootSuccess()
 							getEncapsulatedMcSuccess(nil)
 							overwriteImageSuccess()
+							checkAgentRegistryDir(false)
 							ret := installerObj.InstallNode()
 							Expect(ret).Should(BeNil())
 						})
@@ -443,6 +450,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							rebootSuccess()
 							getEncapsulatedMcSuccess(nil)
 							overwriteImageSuccess()
+							checkAgentRegistryDir(false)
 							ret := installerObj.InstallNode()
 							Expect(ret).Should(BeNil())
 						})
@@ -480,6 +488,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							rebootSuccess()
 							getEncapsulatedMcSuccess(nil)
 							overwriteImageSuccess()
+							checkAgentRegistryDir(false)
 							ret := installerObj.InstallNode()
 							Expect(ret).Should(BeNil())
 						})
@@ -517,6 +526,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							rebootSuccess()
 							getEncapsulatedMcSuccess(nil)
 							overwriteImageSuccess()
+							checkAgentRegistryDir(false)
 							ret := installerObj.InstallNode()
 							Expect(ret).Should(BeNil())
 						})
@@ -563,6 +573,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							rebootSuccess()
 							getEncapsulatedMcSuccess(nil)
 							overwriteImageSuccess()
+							checkAgentRegistryDir(false)
 							ret := installerObj.InstallNode()
 							Expect(ret).Should(BeNil())
 						})
@@ -598,6 +609,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							rebootSuccess()
 							getEncapsulatedMcSuccess(nil)
 							overwriteImageSuccess()
+							checkAgentRegistryDir(false)
 							ret := installerObj.InstallNode()
 							Expect(ret).Should(BeNil())
 						})
@@ -634,6 +646,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							kargs := []string{"arg1", "arg2=val2"}
 							getEncapsulatedMcSuccess(kargs)
 							overwriteImageSuccess(kargs...)
+							checkAgentRegistryDir(false)
 							ret := installerObj.InstallNode()
 							Expect(ret).Should(BeNil())
 						})
@@ -670,6 +683,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							kargs := []string{"arg1", "arg2=val2"}
 							getEncapsulatedMcSuccess(kargs)
 							overwriteImageSuccess(kargs...)
+							checkAgentRegistryDir(false)
 							ret := installerObj.InstallNode()
 							Expect(ret).Should(BeNil())
 						})
@@ -710,10 +724,77 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							rebootSuccess()
 							getEncapsulatedMcSuccess(nil)
 							overwriteImageSuccess()
+							checkAgentRegistryDir(false)
 							ret := installerObj.InstallNode()
 							Expect(ret).Should(BeNil())
 						})
-
+						It("bootstrap role happy flow with registry data (agent-based installer)", func() {
+							updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+								{string(models.HostStageWaitingForControlPlane), waitingForBootstrapToPrepare},
+								{string(models.HostStageWaitingForControlPlane), waitingForMastersStatusInfo},
+								{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+								{string(models.HostStageWritingImageToDisk)},
+								{string(models.HostStageRebooting)},
+							})
+							bootstrapSetup("agent-installer")
+							checkLocalHostname("notlocalhost", nil)
+							restartNetworkManager(nil)
+							prepareControllerSuccess()
+							checkOcBinary(true)
+							startServicesSuccess()
+							WaitMasterNodesSucccessWithCluster(&models.Cluster{
+								Platform: &models.Platform{
+									Type: models.PlatformTypeBaremetal.Pointer(),
+								},
+							})
+							WaitArbiterNodesSucccessWithoutArbiter()
+							waitForBootkubeSuccess()
+							bootkubeStatusSuccess()
+							waitForETCDBootstrapSuccess()
+							bootstrapETCDStatusSuccess()
+							resolvConfSuccess()
+							waitForControllerSuccessfully(conf.ClusterID)
+							waitForWorkersSuccessfully()
+							//HostRoleMaster flow:
+							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
+							writeToDiskSuccess(gomock.Any())
+							reportLogProgressSuccess()
+							setBootOrderSuccess()
+							uploadLogsSuccess(true)
+							ironicAgentDoesntExist()
+							rebootSuccess()
+							getEncapsulatedMcSuccess(nil)
+							overwriteImageSuccess()
+							checkAgentRegistryDir(true)
+							copyRegistryDataSuccess()
+							ret := installerObj.InstallNode()
+							Expect(ret).Should(BeNil())
+						})
+						It("bootstrap role failure flow with registry data (agent-based installer)", func() {
+							updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+								{string(models.HostStageInstalling), string(models.HostRoleMaster)},
+								{string(models.HostStageWritingImageToDisk)},
+							})
+							bootstrapSetup("agent-installer")
+							checkLocalHostname("notlocalhost", nil)
+							restartNetworkManager(nil)
+							prepareControllerSuccess()
+							checkOcBinary(true)
+							startServicesSuccess()
+							WaitArbiterNodesSucccessWithoutArbiter()
+							//HostRoleMaster flow:
+							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
+							writeToDiskSuccess(gomock.Any())
+							reportLogProgressSuccess()
+							setBootOrderSuccess()
+							getEncapsulatedMcSuccess(nil)
+							overwriteImageSuccess()
+							checkAgentRegistryDir(true)
+							err := errors.New("copy registry data failed")
+							mockops.EXPECT().CopyRegistryData(gomock.Any(), gomock.Any()).Return(err).Times(1)
+							ret := installerObj.InstallNode()
+							Expect(ret).To(HaveOccurred())
+						})
 					})
 				}
 				It("bootstrap role creating SSH manifest failed", func() {
@@ -763,6 +844,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					rebootSuccess()
 					getEncapsulatedMcSuccess(nil)
 					overwriteImageSuccess()
+					checkAgentRegistryDir(false)
 					ret := installerObj.InstallNode()
 					Expect(ret).Should(BeNil())
 				})
@@ -799,6 +881,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					rebootSuccess()
 					getEncapsulatedMcSuccess(nil)
 					overwriteImageSuccess()
+					checkAgentRegistryDir(false)
 					ret := installerObj.InstallNode()
 					Expect(ret).Should(BeNil())
 				})
@@ -915,6 +998,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							rebootSuccess()
 							getEncapsulatedMcSuccess(nil)
 							overwriteImageSuccess()
+							checkAgentRegistryDir(false)
 							ret := installerObj.InstallNode()
 							Expect(ret).Should(BeNil())
 						})
@@ -1045,6 +1129,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					rebootSuccess()
 					getEncapsulatedMcSuccess(nil)
 					overwriteImageSuccess()
+					checkAgentRegistryDir(false)
 					ret := installerObj.InstallNode()
 					Expect(ret).Should(BeNil())
 				})
@@ -1090,6 +1175,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					rebootSuccess()
 					getEncapsulatedMcSuccess(nil)
 					overwriteImageSuccess()
+					checkAgentRegistryDir(false)
 					ret := installerObj.InstallNode()
 					Expect(ret).Should(BeNil())
 				})
@@ -1155,6 +1241,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					reportLogProgressSuccess()
 					getEncapsulatedMcSuccess(nil)
 					overwriteImageSuccess()
+					checkAgentRegistryDir(false)
 					mockops.EXPECT().ExecPrivilegeCommand(gomock.Any(), "systemctl", "list-units", "--no-legend", "ironic-agent.service").Return("ironic-agent.service loaded active ", nil).Times(1)
 					mockops.EXPECT().SystemctlAction("stop", "agent.service").Return(nil).Times(1)
 					ret := installerObj.InstallNode()
@@ -1208,6 +1295,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					setBootOrderSuccess()
 					getEncapsulatedMcSuccess(nil)
 					overwriteImageSuccess()
+					checkAgentRegistryDir(false)
 					ironicAgentDoesntExist()
 					err := fmt.Errorf("failed to reboot")
 					mockops.EXPECT().Reboot("+1").Return(err).Times(1)
@@ -1265,6 +1353,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					rebootSuccess()
 					getEncapsulatedMcSuccess(nil)
 					overwriteImageSuccess()
+					checkAgentRegistryDir(false)
 					ret := installerObj.InstallNode()
 					Expect(ret).Should(BeNil())
 				})
@@ -1370,6 +1459,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					rebootNowSuccess()
 					getEncapsulatedMcSuccess(nil)
 					overwriteImageSuccess()
+					checkAgentRegistryDir(false)
 					ret := installerObj.InstallNode()
 					Expect(ret).Should(BeNil())
 				})
