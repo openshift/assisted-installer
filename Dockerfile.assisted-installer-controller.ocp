@@ -11,7 +11,7 @@ FROM registry.ci.openshift.org/ocp/4.21:base-rhel9-minimal-test
 LABEL io.openshift.release.operator=true
 
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/assisted-installer-controller /usr/bin/assisted-installer-controller
-RUN dnf install -y --nodocs --setopt=install_weak_deps=False openshift-clients \
+RUN dnf install -y --nodocs --setopt=install_weak_deps=0 openshift-clients \
   && dnf clean all && rm -rf /var/cache/*
 
 ENTRYPOINT ["/usr/bin/assisted-installer-controller"]
