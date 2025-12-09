@@ -18,11 +18,16 @@ WORKDIR /app
 RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags strictfipsruntime -o installer src/main/main.go
 
 
+# Package stage to install util-linux-core for nsenter
+FROM registry.access.redhat.com/ubi9/ubi:latest AS package-stage
+RUN dnf install -y util-linux-core && dnf clean all
+
 FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi9/ubi-minimal:latest
 ARG release=main
 ARG version=latest
 
-RUN microdnf install -y util-linux-core && microdnf clean all
+# Copy nsenter binary from package stage
+COPY --from=package-stage /usr/bin/nsenter /usr/bin/nsenter
 
 COPY LICENSE /licenses/
 COPY --from=builder /app/installer /installer

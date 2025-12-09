@@ -19,10 +19,14 @@ RUN git config --global --add safe.directory '*'; \
 # Extract the commit reference from which the image is built
 RUN git rev-parse --short HEAD > /commit-reference.txt
 
+# Package stage to install util-linux-core for nsenter
+FROM registry.access.redhat.com/ubi9/ubi:latest AS package-stage
+RUN dnf install -y util-linux-core && dnf clean all
+
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
-# required for nsenter
-RUN microdnf install -y util-linux-core && microdnf clean all
+# Copy nsenter binary from package stage
+COPY --from=package-stage /usr/bin/nsenter /usr/bin/nsenter
 
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/installer /usr/bin/installer
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/deploy/assisted-installer-controller /assisted-installer-controller/deploy
