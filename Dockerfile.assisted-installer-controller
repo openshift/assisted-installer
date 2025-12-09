@@ -19,7 +19,8 @@ RUN git config --global --add safe.directory '*'; \
 # Extract the commit reference from which the image is built
 RUN git rev-parse --short HEAD > /commit-reference.txt
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+# UBI9 version policy: See Dockerfile.assisted-installer for version selection rationale
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7
 ARG TARGETPLATFORM
 
 RUN microdnf install -y tar gzip && microdnf clean all

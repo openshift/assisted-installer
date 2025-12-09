@@ -20,10 +20,13 @@ RUN git config --global --add safe.directory '*'; \
 RUN git rev-parse --short HEAD > /commit-reference.txt
 
 # Package stage to install util-linux-core for nsenter
-FROM registry.access.redhat.com/ubi9/ubi:latest AS package-stage
+# NOTE: UBI9 version 9.7 chosen as vetted stable release (Dec 2025)
+# Update policy: Pin to specific UBI9 minor versions for reproducible builds
+# Verify new versions via: podman inspect registry.access.redhat.com/ubi9/ubi-minimal:latest | grep version
+FROM registry.access.redhat.com/ubi9/ubi:9.7 AS package-stage
 RUN dnf install -y util-linux-core && dnf clean all
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7
 
 # Copy nsenter binary from package stage
 COPY --from=package-stage /usr/bin/nsenter /usr/bin/nsenter

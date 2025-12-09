@@ -16,10 +16,11 @@ RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o installer sr
 
 
 # Package stage to install util-linux-core for nsenter
-FROM registry.access.redhat.com/ubi9/ubi:latest AS package-stage
+# UBI9 version policy: See Dockerfile.assisted-installer for version selection rationale
+FROM registry.access.redhat.com/ubi9/ubi:9.7 AS package-stage
 RUN dnf install -y util-linux-core && dnf clean all
 
-FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi9/ubi-minimal:latest
+FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi9/ubi-minimal:9.7
 ARG release=main
 ARG version=latest
 

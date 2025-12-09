@@ -10,7 +10,8 @@ RUN make controller
 FROM registry.ci.openshift.org/ocp/4.21:base-rhel9 AS packages
 RUN dnf install -y openshift-clients && dnf clean all
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+# UBI9 version policy: See Dockerfile.assisted-installer for version selection rationale
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7
 
 LABEL io.openshift.release.operator=true
 

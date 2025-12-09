@@ -11,7 +11,8 @@ RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/i
   go install github.com/AlekSi/gocov-xml@v1.1.0
 
 # Package installation stage with full UBI9 for external repositories access
-FROM registry.access.redhat.com/ubi9/ubi:latest AS package-stage
+# UBI9 version policy: See Dockerfile.assisted-installer for version selection rationale
+FROM registry.access.redhat.com/ubi9/ubi:9.7 AS package-stage
 
 RUN dnf install -y 'dnf-command(config-manager)' && \
     dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo && \
@@ -27,7 +28,8 @@ RUN dnf install -y 'dnf-command(config-manager)' && \
     && dnf clean all
 
 # Final stage with UBI9-minimal for smaller image size
-FROM registry.access.redhat.com/ubi9-minimal:latest
+# UBI9 version policy: See Dockerfile.assisted-installer for version selection rationale
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7
 
 # Copy Docker tools and dependencies
 COPY --from=package-stage /usr/bin/docker /usr/bin/docker
