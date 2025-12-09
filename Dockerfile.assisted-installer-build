@@ -10,7 +10,8 @@ RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/i
   go install github.com/axw/gocov/gocov@v1.1.0 && \
   go install github.com/AlekSi/gocov-xml@v1.1.0
 
-FROM quay.io/centos/centos:stream9
+# Package installation stage with full UBI9 for external repositories access
+FROM registry.access.redhat.com/ubi9/ubi:latest AS package-stage
 
 RUN dnf install -y 'dnf-command(config-manager)' && \
     dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo && \
@@ -18,15 +19,47 @@ RUN dnf install -y 'dnf-command(config-manager)' && \
         docker-ce \
         docker-ce-cli \
         containerd.io \
+        docker-compose-plugin \
         make \
         git \
         openssl-devel \
         gcc \
     && dnf clean all
 
+# Final stage with UBI9-minimal for smaller image size
+FROM registry.access.redhat.com/ubi9-minimal:latest
+
+# Copy Docker tools and dependencies
+COPY --from=package-stage /usr/bin/docker /usr/bin/docker
+RUN mkdir -p /usr/libexec/docker/cli-plugins/
+COPY --from=package-stage /usr/libexec/docker/cli-plugins/ /usr/libexec/docker/cli-plugins/
+COPY --from=package-stage /usr/bin/containerd* /usr/bin/
+COPY --from=package-stage /usr/bin/ctr /usr/bin/ctr
+COPY --from=package-stage /usr/bin/runc /usr/bin/runc
+
+# Copy development tools
+COPY --from=package-stage /usr/bin/make /usr/bin/make
+COPY --from=package-stage /usr/bin/git /usr/bin/git
+COPY --from=package-stage /usr/bin/gcc /usr/bin/gcc
+
+# Copy essential libraries for Docker/development tools
+COPY --from=package-stage /lib64/libssl.so* /lib64/
+COPY --from=package-stage /lib64/libcrypto.so* /lib64/
+COPY --from=package-stage /lib64/libgcc_s.so* /lib64/
+COPY --from=package-stage /usr/lib64/libstdc++.so* /usr/lib64/
+
+# Copy Docker systemd service files and configuration
+COPY --from=package-stage /usr/lib/systemd/system/docker* /usr/lib/systemd/system/
+COPY --from=package-stage /usr/lib/systemd/system/containerd* /usr/lib/systemd/system/
+
+# Install minimal base packages needed for development
+RUN microdnf install -y tar gzip && microdnf clean all
+
 ENV GOROOT=/usr/lib/golang
 ENV GOPATH=/opt/app-root/src/go
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
+# required due to issue https://github.com/docker/compose/issues/4060
+ENV LANG=en_US.UTF-8
 
 COPY --from=golang $GOPATH $GOPATH
 COPY --from=golang $GOROOT $GOROOT

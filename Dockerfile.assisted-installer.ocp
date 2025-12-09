@@ -7,7 +7,7 @@ COPY . .
 
 RUN make installer
 
-FROM registry.ci.openshift.org/ocp/4.21:base-rhel9
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 LABEL io.openshift.release.operator=true
 

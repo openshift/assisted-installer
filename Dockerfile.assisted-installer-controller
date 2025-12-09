@@ -19,8 +19,10 @@ RUN git config --global --add safe.directory '*'; \
 # Extract the commit reference from which the image is built
 RUN git rev-parse --short HEAD > /commit-reference.txt
 
-FROM quay.io/centos/centos:stream9
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 ARG TARGETPLATFORM
+
+RUN microdnf install -y tar gzip && microdnf clean all
 
 # openshift clients
 RUN case $TARGETPLATFORM in "") platform=amd64;; *) platform=`echo $TARGETPLATFORM | sed 's#linux/##'` ;; esac ; \
