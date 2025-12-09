@@ -27,7 +27,7 @@ RUN dnf install -y 'dnf-command(config-manager)' && \
         gcc \
     && dnf clean all
 
-# Final stage with UBI9-minimal for smaller image size
+# Final stage with UBI9-minimal
 # UBI9 version policy: See Dockerfile.assisted-installer for version selection rationale
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5
 
@@ -62,7 +62,9 @@ ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 # required due to issue https://github.com/docker/compose/issues/4060
 ENV LANG=en_US.UTF-8
 
-COPY --from=golang $GOPATH $GOPATH
-COPY --from=golang $GOROOT $GOROOT
+# Copy Go installation and tools from golang stage
+COPY --from=golang /opt/app-root/src/go $GOPATH
+COPY --from=golang /usr/lib/golang $GOROOT
+COPY --from=golang /usr/bin/go* /usr/bin/
 
 RUN chmod 775 -R $GOPATH && chmod 775 -R $GOROOT
