@@ -44,10 +44,9 @@ COPY --from=package-stage /usr/bin/make /usr/bin/make
 COPY --from=package-stage /usr/bin/git /usr/bin/git
 COPY --from=package-stage /usr/bin/gcc /usr/bin/gcc
 
-# Copy essential libraries for Docker/development tools
+# Copy essential libraries for Docker/development tools (excluding system libs that conflict)
 COPY --from=package-stage /lib64/libssl.so* /lib64/
 COPY --from=package-stage /lib64/libcrypto.so* /lib64/
-COPY --from=package-stage /lib64/libgcc_s.so* /lib64/
 COPY --from=package-stage /usr/lib64/libstdc++.so* /usr/lib64/
 
 # Copy Docker systemd service files and configuration
