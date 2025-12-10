@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -1120,5 +1121,204 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(path).To(Equal("/dev/mapper/dm-3"))
 		})
+	})
+})
+
+var _ = Describe("Copy registry data", func() {
+	const lsblkResultFormat = `{
+   "blockdevices": [
+		{
+         "name": "%s",
+         "size": 100000000000,
+         "ro": false,
+         "type": "disk",
+         "mountpoints": [
+             null
+         ],
+         "children": [
+            {
+               "name": "%s",
+               "maj:min": "8:1",
+               "rm": false,
+               "size": 1048576,
+               "ro": false,
+               "type": "part",
+               "mountpoints": [
+                   null
+               ]
+            },{
+               "name": "%s",
+               "maj:min": "8:2",
+               "rm": false,
+               "size": 133169152,
+               "ro": false,
+               "type": "part",
+               "mountpoints": [
+                   null
+               ]
+            },{
+               "name": "%s",
+               "maj:min": "8:3",
+               "rm": false,
+               "size": 402653184,
+               "ro": false,
+               "type": "part",
+               "mountpoints": [
+                   null
+               ]
+            },{
+               "name": "%s",
+               "maj:min": "8:4",
+               "rm": false,
+               "size": 3272588800,
+               "ro": false,
+               "type": "part",
+               "mountpoints": [
+                   null
+               ]
+            }
+         ]
+      }
+   ]
+}`
+	var (
+		l        = logrus.New()
+		ctrl     *gomock.Controller
+		execMock *execute.MockExecute
+		conf     *config.Config
+		o        Ops
+	)
+
+	BeforeEach(func() {
+		ctrl = gomock.NewController(GinkgoT())
+		execMock = execute.NewMockExecute(ctrl)
+		conf = &config.Config{}
+		o = NewOpsWithConfig(conf, l, execMock)
+	})
+
+	mockPrivileged := func(args ...interface{}) {
+		execMock.EXPECT().ExecCommand(nil, "nsenter",
+			append(append([]interface{}{},
+				"--target",
+				"1",
+				"--cgroup",
+				"--mount",
+				"--ipc",
+				"--pid",
+				"--"), args...)...).Times(1)
+	}
+	// Helper function to generate correct partition names for all device types
+	getPartitionName := func(deviceName, partNum string) string {
+		switch {
+		case strings.HasPrefix(deviceName, "nvme"):
+			return fmt.Sprintf("%sp%s", deviceName, partNum)
+		case strings.HasPrefix(deviceName, "mmcblk"):
+			return fmt.Sprintf("%sP%s", deviceName, partNum)
+		case strings.HasPrefix(deviceName, "dm-"):
+			// Device mapper devices use a different numbering scheme
+			// For dm-0, partitions are dm-1, dm-2, dm-3, dm-4
+			baseNum, err := strconv.Atoi(deviceName[3:]) // Extract number after "dm-"
+			if err != nil {
+				return deviceName + partNum // fallback
+			}
+			partNumInt, err := strconv.Atoi(partNum)
+			if err != nil {
+				return deviceName + partNum // fallback
+			}
+			return fmt.Sprintf("dm-%d", baseNum+partNumInt)
+		default:
+			return fmt.Sprintf("%s%s", deviceName, partNum)
+		}
+	}
+	formatResult := func(device string) string {
+		deviceName := stripDev(device)
+		return fmt.Sprintf(lsblkResultFormat, deviceName,
+			getPartitionName(deviceName, "1"),
+			getPartitionName(deviceName, "2"),
+			getPartitionName(deviceName, "3"),
+			getPartitionName(deviceName, "4"))
+	}
+	runTest := func(device, part4 string) {
+		dataDir := "/mnt/agentdata"
+		registryDataSize := 20 * 1024 * 1024 * 1024 // 20GB
+		registryDataDirOnRoot := filepath.Join("/mnt/root/ostree/deploy/rhcos", registryDataDirOnDevice)
+
+		// Mock du calls for getting registry data size
+		execMock.EXPECT().ExecCommand(nil, "nsenter",
+			append([]interface{}{},
+				"--target",
+				"1",
+				"--cgroup",
+				"--mount",
+				"--ipc",
+				"--pid",
+				"--",
+				"du",
+				"-sb",
+				dataDir)...).Return(strconv.FormatInt(int64(registryDataSize), 10), nil).Times(1)
+		// Mock lsblk calls for partition path discovery
+		execMock.EXPECT().ExecCommand(nil, "nsenter",
+			append([]interface{}{},
+				"--target",
+				"1",
+				"--cgroup",
+				"--mount",
+				"--ipc",
+				"--pid",
+				"--",
+				"lsblk",
+				"--bytes",
+				"--json",
+				device)...).Return(formatResult(device), nil).Times(1)
+		// Mock lsblk call for calculateFreePercent function
+		execMock.EXPECT().ExecCommand(nil, "nsenter",
+			append([]interface{}{},
+				"--target",
+				"1",
+				"--cgroup",
+				"--mount",
+				"--ipc",
+				"--pid",
+				"--",
+				"lsblk",
+				"--bytes",
+				"--json",
+				device)...).Return(formatResult(device), nil)
+		// Mock rsync call
+		execMock.EXPECT().ExecCommand(io.Discard, "nsenter",
+			append([]interface{}{},
+				"--target",
+				"1",
+				"--cgroup",
+				"--mount",
+				"--ipc",
+				"--pid",
+				"--",
+				"sh",
+				"-c",
+				fmt.Sprintf("rsync -ah --info=progress2 %s/ %s/", dataDir, registryDataDirOnRoot))...).Return("", nil).Times(1)
+
+		mockPrivileged("mkdir", "-p", "/mnt/root")
+		mockPrivileged("mount", part4, "/mnt/root")
+		mockPrivileged("sh", "-c", "fsfreeze --unfreeze /mnt/root || true")
+		mockPrivileged("growpart", "--free-percent=74", device, "4")
+		mockPrivileged("xfs_growfs", "/mnt/root")
+		mockPrivileged("mkdir", "-p", registryDataDirOnRoot)
+		mockPrivileged("fsfreeze", "--freeze", "/mnt/root")
+		mockPrivileged("umount", "/mnt/root")
+		err := o.CopyRegistryData(io.Discard, device)
+		Expect(err).ToNot(HaveOccurred())
+	}
+	It("Copy registry data - sda", func() {
+		runTest("/dev/sda", "/dev/sda4")
+	})
+	It("Copy registry data - nvme", func() {
+		runTest("/dev/nvme0n1", "/dev/nvme0n1p4")
+	})
+	It("Copy registry data - mmcblk", func() {
+		runTest("/dev/mmcblk1", "/dev/mmcblk1P4")
+	})
+	It("Copy registry data - device mapper", func() {
+		runTest("/dev/dm-0", "/dev/dm-4")
 	})
 })
