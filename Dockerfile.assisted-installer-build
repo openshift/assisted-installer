@@ -53,8 +53,8 @@ COPY --from=package-stage /usr/lib64/libstdc++.so* /usr/lib64/
 COPY --from=package-stage /usr/lib/systemd/system/docker* /usr/lib/systemd/system/
 COPY --from=package-stage /usr/lib/systemd/system/containerd* /usr/lib/systemd/system/
 
-# Install minimal base packages needed for development
-RUN microdnf install -y tar gzip && microdnf clean all
+# Install minimal base packages needed for development and CI
+RUN microdnf install -y tar gzip which procps-ng && microdnf clean all
 
 ENV GOROOT=/usr/lib/golang
 ENV GOPATH=/opt/app-root/src/go
