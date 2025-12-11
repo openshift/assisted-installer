@@ -23,7 +23,7 @@ RUN git rev-parse --short HEAD > /commit-reference.txt
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5
 ARG TARGETPLATFORM
 
-RUN microdnf install -y tar gzip which procps-ng findutils && microdnf clean all
+RUN microdnf install -y tar gzip rsync which procps-ng findutils && microdnf clean all
 
 # openshift clients
 RUN case $TARGETPLATFORM in "") platform=amd64;; *) platform=`echo $TARGETPLATFORM | sed 's#linux/##'` ;; esac ; \
