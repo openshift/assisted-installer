@@ -38,9 +38,9 @@ RUN dnf install -y 'dnf-command(config-manager)' && \
 # NOTE: UBI9 version 9.5 chosen as latest available stable release (Dec 2025)
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5
 
-# Copy Go toolchain and tools from golang stage
+# Copy complete Go environment from golang stage
 COPY --from=golang /usr/lib/golang /usr/lib/golang
-COPY --from=golang /opt/app-root/src/go/bin/* /usr/local/bin/
+COPY --from=golang /opt/app-root/src/go /opt/app-root/src/go
 
 # Copy essential build tools and Docker from build-tools stage
 COPY --from=build-tools /usr/bin/docker* /usr/bin/
@@ -69,13 +69,14 @@ COPY --from=build-tools /usr/libexec/docker/ /usr/libexec/docker/
 
 ENV GOROOT=/usr/lib/golang
 ENV GOPATH=/opt/app-root/src/go
+ENV GOMODCACHE=$GOPATH/pkg/mod
+ENV GOCACHE=$GOPATH/cache
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 # required due to issue https://github.com/docker/compose/issues/4060
 ENV LANG=en_US.UTF-8
 
-# Copy Go installation and tools from golang stage
-COPY --from=golang /opt/app-root/src/go $GOPATH
-COPY --from=golang /usr/lib/golang $GOROOT
+# Copy Go binaries from golang stage
 COPY --from=golang /usr/bin/go* /usr/bin/
 
-RUN chmod 775 -R $GOPATH && chmod 775 -R $GOROOT
+RUN chmod 775 -R $GOPATH && chmod 775 -R $GOROOT && \
+    mkdir -p $GOMODCACHE $GOCACHE
