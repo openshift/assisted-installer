@@ -22,7 +22,7 @@ RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags strictfip
 # NOTE: UBI9 version 9.5 chosen as latest available stable release (Dec 2025)
 FROM registry.access.redhat.com/ubi9/ubi:9.5 AS package-stage
 
-FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi9/ubi-minimal:9.5
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5
 ARG release=main
 ARG version=latest
 
