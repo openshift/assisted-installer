@@ -35,6 +35,12 @@ RUN dnf install -y 'dnf-command(config-manager)' && \
         libgcc \
     && dnf clean all
 
+# Copy libraries with symlink resolution to avoid broken symlinks
+RUN mkdir -p /tmp/libs && \
+    cp -L /usr/lib64/libssl.so* /tmp/libs/ && \
+    cp -L /usr/lib64/libcrypto.so* /tmp/libs/ && \
+    cp -L /usr/lib64/libgcc_s.so* /tmp/libs/
+
 # NOTE: UBI9 version 9.5 chosen as latest available stable release (Dec 2025)
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5
 
@@ -57,10 +63,8 @@ COPY --from=build-tools /usr/bin/ps /usr/bin/
 COPY --from=build-tools /usr/bin/find /usr/bin/
 COPY --from=build-tools /usr/bin/pkg-config /usr/bin/
 
-# Copy essential libraries for CGO
-COPY --from=build-tools /usr/lib64/libssl.so* /usr/lib64/
-COPY --from=build-tools /usr/lib64/libcrypto.so* /usr/lib64/
-COPY --from=build-tools /usr/lib64/libgcc_s.so* /usr/lib64/
+# Copy essential libraries for CGO (with symlinks resolved)
+COPY --from=build-tools /tmp/libs/* /usr/lib64/
 COPY --from=build-tools /usr/include/openssl/ /usr/include/openssl/
 
 # Copy Docker configuration and supporting files
