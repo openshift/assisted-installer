@@ -84,3 +84,7 @@ COPY --from=golang /usr/bin/go* /usr/bin/
 
 RUN chmod 775 -R $GOPATH && chmod 775 -R $GOROOT && \
     mkdir -p $GOMODCACHE $GOCACHE
+
+# Set working directory and user to match golang base image for CI compatibility
+WORKDIR /opt/app-root/src
+USER 1001
