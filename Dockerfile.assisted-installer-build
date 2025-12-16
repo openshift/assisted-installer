@@ -44,28 +44,18 @@ RUN mkdir -p /tmp/libs && \
 # NOTE: UBI9 version 9.5 chosen as latest available stable release (Dec 2025)
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5
 
+RUN microdnf install -y gcc git make tar gzip which procps-ng findutils pkg-config openssl-devel && microdnf clean all
+
 # Copy complete Go environment from golang stage
 COPY --from=golang /usr/lib/golang /usr/lib/golang
 COPY --from=golang /opt/app-root/src/go /opt/app-root/src/go
 
-# Copy essential build tools and Docker from build-tools stage
+# Copy essential libraries from build-tools stage
+COPY --from=build-tools /tmp/libs/* /usr/lib64/
 COPY --from=build-tools /usr/bin/docker* /usr/bin/
 COPY --from=build-tools /usr/bin/containerd* /usr/bin/
 COPY --from=build-tools /usr/bin/ctr /usr/bin/
 COPY --from=build-tools /usr/bin/runc /usr/bin/
-COPY --from=build-tools /usr/bin/make /usr/bin/
-COPY --from=build-tools /usr/bin/git /usr/bin/
-COPY --from=build-tools /usr/bin/gcc /usr/bin/
-COPY --from=build-tools /usr/bin/tar /usr/bin/
-COPY --from=build-tools /usr/bin/gzip /usr/bin/
-COPY --from=build-tools /usr/bin/which /usr/bin/
-COPY --from=build-tools /usr/bin/ps /usr/bin/
-COPY --from=build-tools /usr/bin/find /usr/bin/
-COPY --from=build-tools /usr/bin/pkg-config /usr/bin/
-
-# Copy essential libraries for CGO (with symlinks resolved)
-COPY --from=build-tools /tmp/libs/* /usr/lib64/
-COPY --from=build-tools /usr/include/openssl/ /usr/include/openssl/
 
 # Copy Docker configuration and supporting files
 COPY --from=build-tools /etc/docker/ /etc/docker/
