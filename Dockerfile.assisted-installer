@@ -19,10 +19,13 @@ RUN git config --global --add safe.directory '*'; \
 # Extract the commit reference from which the image is built
 RUN git rev-parse --short HEAD > /commit-reference.txt
 
-FROM quay.io/centos/centos:stream9
+# Package stage to provide nsenter (util-linux-core is pre-installed in UBI9)
+FROM registry.access.redhat.com/ubi9/ubi:9.5 AS package-stage
 
-# required for nsenter
-RUN dnf install -y util-linux-core && dnf clean all
+# NOTE: UBI9 version 9.5 chosen as latest available stable release (Dec 2025)
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5
+
+COPY --from=package-stage /usr/bin/nsenter /usr/bin/nsenter
 
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/installer /usr/bin/installer
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/deploy/assisted-installer-controller /assisted-installer-controller/deploy

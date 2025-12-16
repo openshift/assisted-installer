@@ -1,8 +1,9 @@
+# Install Go development tools
 FROM registry.access.redhat.com/ubi9/go-toolset:1.24 AS golang
 
 ENV GOFLAGS=""
 
-RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.7 && \ 
+RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.7 && \
   go install golang.org/x/tools/cmd/goimports@v0.1.0 && \
   go install github.com/onsi/ginkgo/ginkgo@v1.16.1 && \
   go install go.uber.org/mock/mockgen@v0.4.0 && \
@@ -10,7 +11,8 @@ RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/i
   go install github.com/axw/gocov/gocov@v1.1.0 && \
   go install github.com/AlekSi/gocov-xml@v1.1.0
 
-FROM quay.io/centos/centos:stream9
+# Install build tools and Docker in full UBI9 (needs external repos)
+FROM registry.access.redhat.com/ubi9/ubi:9.5 AS build-tools
 
 RUN dnf install -y 'dnf-command(config-manager)' && \
     dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo && \
@@ -18,17 +20,62 @@ RUN dnf install -y 'dnf-command(config-manager)' && \
         docker-ce \
         docker-ce-cli \
         containerd.io \
+        docker-compose-plugin \
         make \
         git \
         openssl-devel \
         gcc \
+        tar \
+        gzip \
+        which \
+        procps-ng \
+        findutils \
+        pkg-config \
+        glibc-devel \
+        libgcc \
     && dnf clean all
+
+# NOTE: UBI9 version 9.5 chosen as latest available stable release (Dec 2025)
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5
+
+# Copy Go toolchain and tools from golang stage
+COPY --from=golang /usr/lib/golang /usr/lib/golang
+COPY --from=golang /opt/app-root/src/go/bin/* /usr/local/bin/
+
+# Copy essential build tools and Docker from build-tools stage
+COPY --from=build-tools /usr/bin/docker* /usr/bin/
+COPY --from=build-tools /usr/bin/containerd* /usr/bin/
+COPY --from=build-tools /usr/bin/ctr /usr/bin/
+COPY --from=build-tools /usr/bin/runc /usr/bin/
+COPY --from=build-tools /usr/bin/make /usr/bin/
+COPY --from=build-tools /usr/bin/git /usr/bin/
+COPY --from=build-tools /usr/bin/gcc /usr/bin/
+COPY --from=build-tools /usr/bin/tar /usr/bin/
+COPY --from=build-tools /usr/bin/gzip /usr/bin/
+COPY --from=build-tools /usr/bin/which /usr/bin/
+COPY --from=build-tools /usr/bin/ps /usr/bin/
+COPY --from=build-tools /usr/bin/find /usr/bin/
+COPY --from=build-tools /usr/bin/pkg-config /usr/bin/
+
+# Copy essential libraries for CGO
+COPY --from=build-tools /usr/lib64/libssl.so* /usr/lib64/
+COPY --from=build-tools /usr/lib64/libcrypto.so* /usr/lib64/
+COPY --from=build-tools /usr/lib64/libgcc_s.so* /usr/lib64/
+COPY --from=build-tools /usr/include/openssl/ /usr/include/openssl/
+
+# Copy Docker configuration and supporting files
+COPY --from=build-tools /etc/docker/ /etc/docker/
+COPY --from=build-tools /usr/libexec/docker/ /usr/libexec/docker/
 
 ENV GOROOT=/usr/lib/golang
 ENV GOPATH=/opt/app-root/src/go
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
+# required due to issue https://github.com/docker/compose/issues/4060
+ENV LANG=en_US.UTF-8
 
-COPY --from=golang $GOPATH $GOPATH
-COPY --from=golang $GOROOT $GOROOT
+# Copy Go installation and tools from golang stage
+COPY --from=golang /opt/app-root/src/go $GOPATH
+COPY --from=golang /usr/lib/golang $GOROOT
+COPY --from=golang /usr/bin/go* /usr/bin/
 
 RUN chmod 775 -R $GOPATH && chmod 775 -R $GOROOT

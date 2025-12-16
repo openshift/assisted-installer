@@ -7,16 +7,14 @@ COPY . .
 
 RUN make installer
 
-# Package stage to install util-linux-core for nsenter
+# Package stage to provide nsenter (util-linux-core is pre-installed in UBI9)
 FROM registry.access.redhat.com/ubi9/ubi:9.5 AS package-stage
-RUN dnf install -y util-linux-core && dnf clean all
 
-# UBI9 version policy: See Dockerfile.assisted-installer for version selection rationale
+# NOTE: UBI9 version 9.5 chosen as latest available stable release (Dec 2025)
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5
 
 LABEL io.openshift.release.operator=true
 
-# Copy nsenter binary from package stage
 COPY --from=package-stage /usr/bin/nsenter /usr/bin/nsenter
 
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/installer /usr/bin/installer
