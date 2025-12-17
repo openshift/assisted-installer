@@ -44,13 +44,9 @@ RUN microdnf install -y \
 COPY --from=golang /usr/lib/golang /usr/lib/golang
 COPY --from=golang /opt/app-root/src/go /opt/app-root/src/go
 
-# Copy Docker tools from docker-tools stage
-COPY --from=docker-tools /usr/bin/docker* /usr/bin/
-COPY --from=docker-tools /usr/bin/containerd* /usr/bin/
-COPY --from=docker-tools /usr/bin/ctr /usr/bin/
-COPY --from=docker-tools /usr/bin/runc /usr/bin/
-COPY --from=docker-tools /etc/docker/ /etc/docker/
-COPY --from=docker-tools /usr/libexec/docker/ /usr/libexec/docker/
+# Copy Docker CLI tools from docker-tools stage (no daemon config needed)
+COPY --from=docker-tools /usr/bin/docker /usr/bin/
+COPY --from=docker-tools /usr/libexec/docker/cli-plugins/ /usr/libexec/docker/cli-plugins/
 
 # Set Go environment variables
 ENV GOROOT=/usr/lib/golang
