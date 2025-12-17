@@ -1,18 +1,5 @@
-# Install Go development tools
-FROM registry.access.redhat.com/ubi9/go-toolset:1.24 AS golang
-
-ENV GOFLAGS=""
-
-RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.7 && \
-  go install golang.org/x/tools/cmd/goimports@v0.1.0 && \
-  go install github.com/onsi/ginkgo/ginkgo@v1.16.1 && \
-  go install go.uber.org/mock/mockgen@v0.4.0 && \
-  go install gotest.tools/gotestsum@v1.6.3 && \
-  go install github.com/axw/gocov/gocov@v1.1.0 && \
-  go install github.com/AlekSi/gocov-xml@v1.1.0
-
-# Install build tools and Docker in full UBI9 (needs external repos)
-FROM registry.access.redhat.com/ubi9/ubi:9.5 AS build-tools
+# Install Docker tools in UBI9 for hermetic build compatibility
+FROM registry.access.redhat.com/ubi9/ubi:9.4 AS docker-tools
 
 RUN dnf install -y 'dnf-command(config-manager)' && \
     dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo && \
@@ -21,59 +8,65 @@ RUN dnf install -y 'dnf-command(config-manager)' && \
         docker-ce-cli \
         containerd.io \
         docker-compose-plugin \
+    && dnf clean all
+
+FROM registry.access.redhat.com/ubi9/go-toolset:1.24 AS golang
+
+ENV GOFLAGS=""
+
+RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.7 && \
+    go install golang.org/x/tools/cmd/goimports@v0.1.0 && \
+    go install github.com/onsi/ginkgo/ginkgo@v1.16.1 && \
+    go install go.uber.org/mock/mockgen@v0.4.0 && \
+    go install gotest.tools/gotestsum@v1.6.3 && \
+    go install github.com/axw/gocov/gocov@v1.1.0 && \
+    go install github.com/AlekSi/gocov-xml@v1.1.0
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5
+
+# Install gcc and development tools directly (brings GLIBC_2.35 symbols)
+RUN microdnf install -y \
+        gcc \
+        gcc-c++ \
         make \
         git \
-        openssl-devel \
-        gcc \
         tar \
         gzip \
         which \
         procps-ng \
         findutils \
         pkg-config \
+        openssl-devel \
         glibc-devel \
-        libgcc \
-    && dnf clean all
+    && microdnf clean all
 
-# Copy libraries with symlink resolution to avoid broken symlinks
-RUN mkdir -p /tmp/libs && \
-    cp -L /usr/lib64/libssl.so* /tmp/libs/ && \
-    cp -L /usr/lib64/libcrypto.so* /tmp/libs/ && \
-    cp -L /usr/lib64/libgcc_s.so* /tmp/libs/
-
-# NOTE: UBI9 version 9.5 chosen as latest available stable release (Dec 2025)
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5
-
-RUN microdnf install -y gcc git make tar gzip which procps-ng findutils pkg-config openssl-devel && microdnf clean all
-
-# Copy complete Go environment from golang stage
+# Copy Go environment from golang stage
 COPY --from=golang /usr/lib/golang /usr/lib/golang
 COPY --from=golang /opt/app-root/src/go /opt/app-root/src/go
 
-# Copy essential libraries from build-tools stage
-COPY --from=build-tools /tmp/libs/* /usr/lib64/
-COPY --from=build-tools /usr/bin/docker* /usr/bin/
-COPY --from=build-tools /usr/bin/containerd* /usr/bin/
-COPY --from=build-tools /usr/bin/ctr /usr/bin/
-COPY --from=build-tools /usr/bin/runc /usr/bin/
+# Copy Docker tools from docker-tools stage
+COPY --from=docker-tools /usr/bin/docker* /usr/bin/
+COPY --from=docker-tools /usr/bin/containerd* /usr/bin/
+COPY --from=docker-tools /usr/bin/ctr /usr/bin/
+COPY --from=docker-tools /usr/bin/runc /usr/bin/
+COPY --from=docker-tools /etc/docker/ /etc/docker/
+COPY --from=docker-tools /usr/libexec/docker/ /usr/libexec/docker/
 
-# Copy Docker configuration and supporting files
-COPY --from=build-tools /etc/docker/ /etc/docker/
-COPY --from=build-tools /usr/libexec/docker/ /usr/libexec/docker/
-
+# Set Go environment variables
 ENV GOROOT=/usr/lib/golang
 ENV GOPATH=/opt/app-root/src/go
 ENV GOMODCACHE=$GOPATH/pkg/mod
 ENV GOCACHE=$GOPATH/cache
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
-# required due to issue https://github.com/docker/compose/issues/4060
 ENV LANG=en_US.UTF-8
 
-# Copy Go binaries from golang stage
-COPY --from=golang /usr/bin/go* /usr/bin/
-
-RUN chmod 775 -R $GOPATH && chmod 775 -R $GOROOT && \
-    mkdir -p $GOMODCACHE $GOCACHE
+# Create user and set proper permissions for Go directories
+RUN groupadd -g 1001 app-root && \
+    useradd -u 1001 -g app-root -d /opt/app-root/src app-root && \
+    chmod 775 -R $GOPATH && \
+    chmod 775 -R $GOROOT && \
+    mkdir -p $GOMODCACHE $GOCACHE && \
+    chown -R 1001:1001 /opt/app-root
 
 # Set working directory and user to match golang base image for CI compatibility
 WORKDIR /opt/app-root/src
