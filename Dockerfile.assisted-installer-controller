@@ -26,8 +26,12 @@ ARG TARGETPLATFORM
 RUN microdnf install -y tar gzip rsync which procps-ng findutils && microdnf clean all
 
 # openshift clients
-RUN case $TARGETPLATFORM in "") platform=amd64;; *) platform=`echo $TARGETPLATFORM | sed 's#linux/##'` ;; esac ; \
-    curl -k -L -s "https://mirror.openshift.com/pub/openshift-v4/multi/clients/ocp/latest/amd64/openshift-client-linux-${platform}-rhel9.tar.gz" | tar xvz -C /usr/bin; \
+ARG TARGETARCH
+RUN case "${TARGETARCH}" in \
+        "") ARCH=amd64 ;; \
+        *) ARCH="${TARGETARCH}" ;; \
+    esac && \
+    curl -L -s "https://mirror.openshift.com/pub/openshift-v4/multi/clients/ocp/latest/${ARCH}/openshift-client-linux-${ARCH}-rhel9.tar.gz" | tar xvz -C /usr/bin && \
     chmod +x /usr/bin/oc /usr/bin/kubectl
 
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/assisted-installer-controller /usr/bin/assisted-installer-controller

@@ -11,7 +11,7 @@ RUN make installer
 FROM registry.access.redhat.com/ubi9/ubi:9.4 AS package-stage
 
 # Metadata stage for Konflux version resolution compatibility
-FROM registry.redhat.io/rhel9-4-els/rhel:9.4 AS rhel-metadata
+FROM registry.access.redhat.com/ubi9/ubi:9.4 AS rhel-metadata
 
 # NOTE: UBI9 version 9.4 chosen for Konflux compatibility (Dec 2025)
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.4

@@ -15,15 +15,22 @@ WORKDIR /app
 RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o assisted-installer-controller src/main/assisted-installer-controller/assisted_installer_main.go
 
 # Metadata stage for Konflux version resolution compatibility
-FROM registry.redhat.io/rhel9-4-els/rhel:9.4 AS rhel-metadata
+FROM registry.access.redhat.com/ubi9/ubi:9.4 AS rhel-metadata
 
 # UBI9 version policy: See Dockerfile.assisted-installer for version selection rationale
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.4
 ARG release=main
 ARG version=latest
 
-RUN microdnf install -y tar gzip rsync which procps-ng findutils && microdnf clean all && \
-    curl -k -L -s "https://mirror.openshift.com/pub/openshift-v4/multi/clients/ocp/latest/amd64/openshift-client-linux-amd64-rhel9.tar.gz" | tar xvz -C /usr/bin && \
+RUN microdnf install -y tar gzip rsync which procps-ng findutils && microdnf clean all
+
+# Install OpenShift clients with proper architecture support
+ARG TARGETARCH
+RUN case "${TARGETARCH}" in \
+        "") ARCH=amd64 ;; \
+        *) ARCH="${TARGETARCH}" ;; \
+    esac && \
+    curl -L -s "https://mirror.openshift.com/pub/openshift-v4/multi/clients/ocp/latest/${ARCH}/openshift-client-linux-${ARCH}-rhel9.tar.gz" | tar xvz -C /usr/bin && \
     chmod +x /usr/bin/oc /usr/bin/kubectl
 
 COPY LICENSE /licenses/
