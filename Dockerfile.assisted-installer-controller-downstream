@@ -14,8 +14,11 @@ COPY --chown=${USER_UID} . /app
 WORKDIR /app
 RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o assisted-installer-controller src/main/assisted-installer-controller/assisted_installer_main.go
 
+# Metadata stage for Konflux version resolution compatibility
+FROM registry.redhat.io/rhel9-4-els/rhel:9.4 AS rhel-metadata
+
 # UBI9 version policy: See Dockerfile.assisted-installer for version selection rationale
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.4
 ARG release=main
 ARG version=latest
 
@@ -25,6 +28,11 @@ RUN microdnf install -y tar gzip rsync which procps-ng findutils && microdnf cle
 
 COPY LICENSE /licenses/
 COPY --from=builder /app/assisted-installer-controller /assisted-installer-controller
+
+# Copy version metadata for Konflux machine-os version resolution
+COPY --from=rhel-metadata /etc/redhat-release /etc/redhat-release
+COPY --from=rhel-metadata /etc/system-release-cpe /etc/system-release-cpe
+COPY --from=rhel-metadata /usr/lib/os-release /usr/lib/os-release
 
 ENTRYPOINT ["/assisted-installer-controller"]
 

@@ -22,7 +22,7 @@ RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.7 && \
     go install github.com/axw/gocov/gocov@v1.1.0 && \
     go install github.com/AlekSi/gocov-xml@v1.1.0
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.4
 
 # Install gcc and development tools directly (brings GLIBC_2.35 symbols)
 RUN microdnf install -y \

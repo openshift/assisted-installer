@@ -19,8 +19,8 @@ RUN git config --global --add safe.directory '*'; \
 # Extract the commit reference from which the image is built
 RUN git rev-parse --short HEAD > /commit-reference.txt
 
-# NOTE: UBI9 version 9.5 chosen as latest available stable release (Dec 2025)
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5
+# NOTE: UBI9 version 9.4 chosen for Konflux compatibility (Dec 2025)
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.4
 ARG TARGETPLATFORM
 
 RUN microdnf install -y tar gzip rsync which procps-ng findutils && microdnf clean all
