@@ -8,7 +8,9 @@ RUN make controller
 
 FROM registry.ci.openshift.org/ocp/4.21:base-rhel9
 
-LABEL io.openshift.release.operator=true
+LABEL io.openshift.release.operator=true \
+      io.openshift.build.versions="machine-os=9.6.20251015-1" \
+      io.openshift.build.version-display-names="machine-os=Red Hat Enterprise Linux CoreOS"
 
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/assisted-installer-controller /usr/bin/assisted-installer-controller
 RUN dnf install -y --nodocs --setopt=install_weak_deps=False openshift-clients \
