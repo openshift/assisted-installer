@@ -16,10 +16,7 @@ FROM registry.access.redhat.com/ubi9/ubi:9.4 AS rhel-metadata
 # NOTE: UBI9 version 9.4 chosen for Konflux compatibility (Dec 2025)
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.4
 
-# NOTE: machine-os reference for OKD SCOS CI job 
-LABEL io.openshift.release.operator=true \
-      io.openshift.build.versions="machine-os=10.0.20251023-0" \
-      io.openshift.build.version-display-names="machine-os=CentOS Stream CoreOS"
+LABEL io.openshift.release.operator=true
 
 COPY --from=package-stage /usr/bin/nsenter /usr/bin/nsenter
 

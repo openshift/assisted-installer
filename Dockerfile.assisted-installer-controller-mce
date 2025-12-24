@@ -19,13 +19,19 @@ RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags strictfipsruntime -o as
 
 # Metadata stage for Konflux version resolution compatibility
 FROM registry.access.redhat.com/ubi9/ubi:9.4 AS rhel-metadata
+RUN dnf install -y tar gzip rsync which procps-ng findutils && dnf clean all
 
 # UBI9 version policy: See Dockerfile.assisted-installer for version selection rationale
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.4
 ARG release=main
 ARG version=latest
 
-RUN microdnf install -y tar gzip rsync which procps-ng findutils && microdnf clean all
+# Copy required tools from metadata stage (packages not available in UBI9-minimal during hermetic builds)
+COPY --from=rhel-metadata /usr/bin/tar /usr/bin/tar
+COPY --from=rhel-metadata /usr/bin/gzip /usr/bin/gzip
+COPY --from=rhel-metadata /usr/bin/rsync /usr/bin/rsync
+COPY --from=rhel-metadata /usr/bin/which /usr/bin/which
+COPY --from=rhel-metadata /usr/bin/find /usr/bin/find
 
 # Install OpenShift clients with proper architecture support
 ARG TARGETARCH
