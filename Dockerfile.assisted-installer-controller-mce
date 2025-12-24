@@ -19,7 +19,7 @@ RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags strictfipsruntime -o as
 
 # Metadata stage for Konflux version resolution compatibility
 FROM registry.access.redhat.com/ubi9/ubi:9.4 AS rhel-metadata
-RUN dnf install -y tar gzip rsync which procps-ng findutils && dnf clean all
+RUN dnf install -y rsync && dnf clean all
 
 # UBI9 version policy: See Dockerfile.assisted-installer for version selection rationale
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.4
