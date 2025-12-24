@@ -32,6 +32,9 @@ COPY --from=rhel-metadata /usr/bin/gzip /usr/bin/gzip
 COPY --from=rhel-metadata /usr/bin/rsync /usr/bin/rsync
 COPY --from=rhel-metadata /usr/bin/which /usr/bin/which
 COPY --from=rhel-metadata /usr/bin/find /usr/bin/find
+COPY --from=rhel-metadata /usr/lib64/libpopt.so.0 /usr/lib64/libpopt.so.0
+COPY --from=rhel-metadata /usr/lib64/libacl.so.1 /usr/lib64/libacl.so.1
+COPY --from=rhel-metadata /usr/lib64/libattr.so.1 /usr/lib64/libattr.so.1
 
 # Install OpenShift clients with proper architecture support
 ARG TARGETARCH
