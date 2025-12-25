@@ -5,8 +5,15 @@ packages:
   - tar
   - gzip
   - rsync
+  - which
+  - findutils
+  - procps-ng
 arches:
   - aarch64
   - x86_64
   - ppc64le
   - s390x
+
+context:
+  containerfile: ../../Dockerfile.assisted-installer-controller-mce
+

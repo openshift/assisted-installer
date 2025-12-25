@@ -16,24 +16,14 @@ RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o assisted-ins
 
 # Metadata stage for Konflux version resolution compatibility
 FROM registry.access.redhat.com/ubi9/ubi:9.4 AS rhel-metadata
-RUN dnf install -y rsync openshift-clients && dnf clean all
 
 # UBI9 version policy: See Dockerfile.assisted-installer for version selection rationale
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.4
 ARG release=main
 ARG version=latest
 
-# Provide tools unavailable in ubi-minimal during hermetic builds and supply version metadata
-COPY --from=rhel-metadata /usr/bin/tar /usr/bin/tar
-COPY --from=rhel-metadata /usr/bin/gzip /usr/bin/gzip
-COPY --from=rhel-metadata /usr/bin/rsync /usr/bin/rsync
-COPY --from=rhel-metadata /usr/bin/which /usr/bin/which
-COPY --from=rhel-metadata /usr/bin/find /usr/bin/find
-COPY --from=rhel-metadata /usr/lib64/libpopt.so.0 /usr/lib64/libpopt.so.0
-COPY --from=rhel-metadata /usr/lib64/libacl.so.1 /usr/lib64/libacl.so.1
-COPY --from=rhel-metadata /usr/lib64/libattr.so.1 /usr/lib64/libattr.so.1
-COPY --from=rhel-metadata /usr/bin/oc /usr/bin/oc
-COPY --from=rhel-metadata /usr/bin/kubectl /usr/bin/kubectl
+# Install tools using rpm-prefetching (configured in rpm-prefetching/assisted-installer-controller/rpms.in.yaml)
+RUN microdnf install -y openshift-clients tar gzip rsync which findutils procps-ng && microdnf clean all
 
 COPY LICENSE /licenses/
 COPY --from=builder /app/assisted-installer-controller /assisted-installer-controller
@@ -64,3 +54,4 @@ LABEL com.redhat.component="assisted-installer-controller" \
       upstream_commit="${version}" \
       org.label-schema.vcs-ref="${version}" \
       org.label-schema.vcs-url="https://github.com/openshift/assisted-installer"
+
