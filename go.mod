@@ -1,6 +1,6 @@
 module github.com/openshift/assisted-installer
 
-go 1.20
+go 1.25.5
 
 require (
 	github.com/PuerkitoBio/rehttp v1.4.0
