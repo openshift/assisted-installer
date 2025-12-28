@@ -17,9 +17,6 @@ WORKDIR /app
 
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags strictfipsruntime -o assisted-installer-controller src/main/assisted-installer-controller/assisted_installer_main.go
 
-# Metadata stage for Konflux version resolution compatibility
-FROM registry.access.redhat.com/ubi9/ubi:9.4 AS rhel-metadata
-
 # UBI9 version policy: See Dockerfile.assisted-installer for version selection rationale
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.4
 ARG release=main
@@ -30,11 +27,6 @@ RUN microdnf install -y openshift-clients tar gzip rsync which findutils procps-
 
 COPY LICENSE /licenses/
 COPY --from=builder /app/assisted-installer-controller /assisted-installer-controller
-
-# Copy version metadata for Konflux machine-os version resolution
-COPY --from=rhel-metadata /etc/redhat-release /etc/redhat-release
-COPY --from=rhel-metadata /etc/system-release-cpe /etc/system-release-cpe
-COPY --from=rhel-metadata /usr/lib/os-release /usr/lib/os-release
 
 ENTRYPOINT ["/assisted-installer-controller"]
 
