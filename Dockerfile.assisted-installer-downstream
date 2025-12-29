@@ -15,11 +15,9 @@ WORKDIR /app
 RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o installer src/main/main.go
 
 
-# Package stage to provide nsenter (util-linux-core is pre-installed in UBI9)
+# Package stage to provide nsenter (util-linux-core is pre-installed in UBI9) and version metadata
 FROM registry.access.redhat.com/ubi9/ubi:9.4 AS package-stage
 
-# Metadata stage for Konflux version resolution compatibility
-FROM registry.access.redhat.com/ubi9/ubi:9.4 AS rhel-metadata
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:9.4
 ARG release=main
@@ -31,10 +29,9 @@ COPY --from=builder /app/deploy/assisted-installer-controller /assisted-installe
 
 COPY --from=package-stage /usr/bin/nsenter /usr/bin/nsenter
 
-# Copy version metadata for Konflux machine-os version resolution
-COPY --from=rhel-metadata /etc/redhat-release /etc/redhat-release
-COPY --from=rhel-metadata /etc/system-release-cpe /etc/system-release-cpe
-COPY --from=rhel-metadata /usr/lib/os-release /usr/lib/os-release
+COPY --from=package-stage /etc/redhat-release /etc/redhat-release
+COPY --from=package-stage /etc/system-release-cpe /etc/system-release-cpe
+COPY --from=package-stage /usr/lib/os-release /usr/lib/os-release
 
 ENTRYPOINT ["/installer"]
 

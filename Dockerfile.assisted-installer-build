@@ -1,4 +1,4 @@
-# Install Docker tools in UBI9 for hermetic build compatibility
+# Install Docker tools
 FROM registry.access.redhat.com/ubi9/ubi:9.4 AS docker-tools
 
 RUN dnf install -y 'dnf-command(config-manager)' && \
