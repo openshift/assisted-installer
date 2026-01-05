@@ -6,12 +6,18 @@ ENV GOFLAGS="-mod=vendor"
 COPY . .
 RUN make controller
 
-FROM registry.ci.openshift.org/ocp/4.21:base-rhel9
+FROM registry.ci.openshift.org/ocp/4.21:base-rhel9 AS openshift-clients
+RUN dnf install -y --nodocs --setopt=install_weak_deps=False openshift-clients \
+  && dnf clean all && rm -rf /var/cache/*
+
+# Final stage - UBI9-minimal for MGMT-22131 compliance
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:6fc28bcb6776e387d7a35a2056d9d2b985dc4e26031e98a2bd35a7137cd6fd71
 
 LABEL io.openshift.release.operator=true
 
+COPY --from=openshift-clients /usr/bin/oc /usr/bin/oc
+COPY --from=openshift-clients /usr/bin/kubectl /usr/bin/kubectl
+
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/assisted-installer-controller /usr/bin/assisted-installer-controller
-RUN dnf install -y --nodocs --setopt=install_weak_deps=False openshift-clients \
-  && dnf clean all && rm -rf /var/cache/*
 
 ENTRYPOINT ["/usr/bin/assisted-installer-controller"]

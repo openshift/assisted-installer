@@ -14,15 +14,21 @@ COPY --chown=${USER_UID} . /app
 WORKDIR /app
 RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o assisted-installer-controller src/main/assisted-installer-controller/assisted_installer_main.go
 
+FROM registry.access.redhat.com/ubi9/ubi:latest@sha256:3816d303e75dec4da2d10eeb9e8651eef4393721598bea4690c607282635aa57 AS rhel-metadata
 
-FROM --platform=$BUILDPLATFORM registry.redhat.io/rhel9-4-els/rhel:9.4
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:6fc28bcb6776e387d7a35a2056d9d2b985dc4e26031e98a2bd35a7137cd6fd71
 ARG release=main
 ARG version=latest
 
-RUN dnf -y install openshift-clients tar gzip rsync && dnf clean all
+# Install tools using rpm-prefetching (configured in rpm-prefetching/assisted-installer-controller/rpms.in.yaml)
+RUN microdnf install -y openshift-clients tar gzip rsync which findutils procps-ng && microdnf clean all
 
 COPY LICENSE /licenses/
 COPY --from=builder /app/assisted-installer-controller /assisted-installer-controller
+
+COPY --from=rhel-metadata /etc/redhat-release /etc/redhat-release
+COPY --from=rhel-metadata /etc/system-release-cpe /etc/system-release-cpe
+COPY --from=rhel-metadata /usr/lib/os-release /usr/lib/os-release
 
 ENTRYPOINT ["/assisted-installer-controller"]
 
@@ -45,3 +51,4 @@ LABEL com.redhat.component="assisted-installer-controller" \
       upstream_commit="${version}" \
       org.label-schema.vcs-ref="${version}" \
       org.label-schema.vcs-url="https://github.com/openshift/assisted-installer"
+
