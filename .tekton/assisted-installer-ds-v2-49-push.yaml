@@ -6,13 +6,13 @@ metadata:
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "release-ocm-2.16"
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "v2.49"
   creationTimestamp:
   labels:
-    appstudio.openshift.io/application: assisted-installer-application-acm-ds-2-16
-    appstudio.openshift.io/component: assisted-installer-controller-acm-ds-2-16
+    appstudio.openshift.io/application: assisted-installer-application-ds-v2-49
+    appstudio.openshift.io/component: assisted-installer-ds-v2-49
     pipelines.appstudio.openshift.io/type: build
-  name: assisted-installer-controller-acm-ds-2-16-on-push
+  name: assisted-installer-ds-v2-49-on-push
   namespace: assisted-installer-tenant
 spec:
   params:
@@ -21,7 +21,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-acm-ds-2-16/assisted-installer-controller-acm-ds-2-16:{{revision}}
+    value: quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-ds-v2-49/assisted-installer-ds-v2-49:{{revision}}
   - name: build-platforms
     value:
     - linux/x86_64
@@ -29,7 +29,7 @@ spec:
     - linux/ppc64le
     - linux/s390x
   - name: dockerfile
-    value: Dockerfile.assisted-installer-controller-mce
+    value: Dockerfile.assisted-installer-downstream
   - name: path-context
     value: .
   - name: build-args
@@ -39,13 +39,15 @@ spec:
   - name: hermetic
     value: "true"
   - name: prefetch-input
-    value: '[{"type": "gomod", "path": "."}, {"type": "rpm", "path": "./rpm-prefetching/assisted-installer-controller/"}]'
+    value: '[{"type": "gomod", "path": "."}]'
   - name: build-source-image
     value: "true"
   - name: sast-snyk-check-args
     value: "--project-name=assisted-installer --report --org=3e6fd93b-b325-49dd-8a33-432a0160ab66"
   - name: sast-snyk-check-ignore-file-paths
     value: "vendor/sigs.k8s.io/controller-runtime/pkg/log/log.go"
+  - name: additional-tags
+    value: ["latest"]
   - name: send-slack-webhook-notification-on-fail
     value: "true"
   - name: slack-webhook-notification-secret
@@ -53,7 +55,7 @@ spec:
   - name: slack-webhook-notification-secret-key
     value: token
   - name: slack-webhook-notification-message
-    value: "[ACM] [2.16] [assisted-installer-controller] [<https://github.com/openshift/assisted-installer/commit/{{revision}}|{{revision}}>] [<https://konflux-ui.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/ns/assisted-installer-tenant/applications/assisted-installer-application-acm-ds-2-16/pipelineruns/$(context.pipelineRun.name)|pipeline>] Konflux build failed"
+    value: "[D/S] [2.49] [assisted-installer] [<https://github.com/openshift/assisted-installer/commit/{{revision}}|{{revision}}>] [<https://konflux-ui.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/ns/assisted-installer-tenant/applications/assisted-installer-application-ds-v2-49/pipelineruns/$(context.pipelineRun.name)|pipeline>] Konflux build failed"
   pipelineRef:
     resolver: git
     params:
@@ -64,7 +66,7 @@ spec:
       - name: pathInRepo
         value: "pipelines/standard-pipeline.yaml"
   taskRunTemplate:
-    serviceAccountName: build-pipeline-assisted-installer-controller-acm-ds-2-16
+    serviceAccountName: build-pipeline-assisted-installer-ds-v2-49
   workspaces:
   - name: git-auth
     secret:
