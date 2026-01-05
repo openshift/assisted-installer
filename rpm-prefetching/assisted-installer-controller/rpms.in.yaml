@@ -5,6 +5,9 @@ packages:
   - tar
   - gzip
   - rsync
+  - which
+  - findutils
+  - procps-ng
 arches:
   - aarch64
   - x86_64

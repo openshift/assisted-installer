@@ -19,12 +19,19 @@ RUN git config --global --add safe.directory '*'; \
 # Extract the commit reference from which the image is built
 RUN git rev-parse --short HEAD > /commit-reference.txt
 
-FROM quay.io/centos/centos:stream9
+# NOTE: UBI9 version 9.4 chosen for Konflux compatibility (Dec 2025)
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:6fc28bcb6776e387d7a35a2056d9d2b985dc4e26031e98a2bd35a7137cd6fd71
 ARG TARGETPLATFORM
 
+RUN microdnf install -y tar gzip rsync which procps-ng findutils && microdnf clean all
+
 # openshift clients
-RUN case $TARGETPLATFORM in "") platform=amd64;; *) platform=`echo $TARGETPLATFORM | sed 's#linux/##'` ;; esac ; \
-    curl -k -L -s "https://mirror.openshift.com/pub/openshift-v4/multi/clients/ocp/latest/amd64/openshift-client-linux-${platform}-rhel9.tar.gz" | tar xvz -C /usr/bin; \
+ARG TARGETARCH
+RUN case "${TARGETARCH}" in \
+        "") ARCH=amd64 ;; \
+        *) ARCH="${TARGETARCH}" ;; \
+    esac && \
+    curl -L -s "https://mirror.openshift.com/pub/openshift-v4/multi/clients/ocp/latest/${ARCH}/openshift-client-linux-${ARCH}-rhel9.tar.gz" | tar xvz -C /usr/bin && \
     chmod +x /usr/bin/oc /usr/bin/kubectl
 
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/assisted-installer-controller /usr/bin/assisted-installer-controller

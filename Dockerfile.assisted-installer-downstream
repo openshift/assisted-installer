@@ -15,7 +15,11 @@ WORKDIR /app
 RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o installer src/main/main.go
 
 
-FROM --platform=$BUILDPLATFORM registry.redhat.io/rhel9-4-els/rhel:9.4
+# Package stage to provide nsenter (util-linux-core is pre-installed in UBI9) and version metadata
+FROM registry.access.redhat.com/ubi9/ubi:latest@sha256:3816d303e75dec4da2d10eeb9e8651eef4393721598bea4690c607282635aa57 AS package-stage
+
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:6fc28bcb6776e387d7a35a2056d9d2b985dc4e26031e98a2bd35a7137cd6fd71
 ARG release=main
 ARG version=latest
 
@@ -23,8 +27,11 @@ COPY LICENSE /licenses/
 COPY --from=builder /app/installer /installer
 COPY --from=builder /app/deploy/assisted-installer-controller /assisted-installer-controller/deploy
 
-# base image already includes util-linux
-# RUN dnf install -y util-linux && dnf clean all
+COPY --from=package-stage /usr/bin/nsenter /usr/bin/nsenter
+
+COPY --from=package-stage /etc/redhat-release /etc/redhat-release
+COPY --from=package-stage /etc/system-release-cpe /etc/system-release-cpe
+COPY --from=package-stage /usr/lib/os-release /usr/lib/os-release
 
 ENTRYPOINT ["/installer"]
 
