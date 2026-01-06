@@ -20,15 +20,15 @@ RUN git config --global --add safe.directory '*'; \
 RUN git rev-parse --short HEAD > /commit-reference.txt
 
 # Package stage to provide version metadata
-FROM registry.access.redhat.com/ubi9/ubi:latest@sha256:3816d303e75dec4da2d10eeb9e8651eef4393721598bea4690c607282635aa57 AS package-stage
+# FROM registry.access.redhat.com/ubi9/ubi:latest@sha256:3816d303e75dec4da2d10eeb9e8651eef4393721598bea4690c607282635aa57 AS package-stage
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:6fc28bcb6776e387d7a35a2056d9d2b985dc4e26031e98a2bd35a7137cd6fd71
 
 RUN microdnf install -y util-linux-core && microdnf clean all
 
-COPY --from=package-stage /etc/redhat-release /etc/redhat-release
-COPY --from=package-stage /etc/system-release-cpe /etc/system-release-cpe
-COPY --from=package-stage /usr/lib/os-release /usr/lib/os-release
+# COPY --from=package-stage /etc/redhat-release /etc/redhat-release
+# COPY --from=package-stage /etc/system-release-cpe /etc/system-release-cpe
+# COPY --from=package-stage /usr/lib/os-release /usr/lib/os-release
 
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/installer /usr/bin/installer
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/deploy/assisted-installer-controller /assisted-installer-controller/deploy
