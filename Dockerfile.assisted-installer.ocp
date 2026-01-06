@@ -7,14 +7,14 @@ COPY . .
 
 RUN make installer
 
-# Package stage to provide nsenter (util-linux-core is pre-installed in UBI9) and version metadata
+# Package stage to provide version metadata
 FROM registry.access.redhat.com/ubi9/ubi:latest@sha256:3816d303e75dec4da2d10eeb9e8651eef4393721598bea4690c607282635aa57 AS package-stage
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:6fc28bcb6776e387d7a35a2056d9d2b985dc4e26031e98a2bd35a7137cd6fd71
 
 LABEL io.openshift.release.operator=true
 
-COPY --from=package-stage /usr/bin/nsenter /usr/bin/nsenter
+RUN microdnf install -y util-linux-core && microdnf clean all
 
 COPY --from=package-stage /etc/redhat-release /etc/redhat-release
 COPY --from=package-stage /etc/system-release-cpe /etc/system-release-cpe
