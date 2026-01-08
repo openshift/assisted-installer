@@ -42,7 +42,7 @@ spec:
   - name: hermetic
     value: "true"
   - name: prefetch-input
-    value: '[{"type": "gomod", "path": "."}]'
+    value: '[{"type": "gomod", "path": "."}, {"type": "rpm", "path": "./rpm-prefetching/assisted-installer/"}]'
   - name: build-source-image
     value: "true"
   - name: sast-snyk-check-args
