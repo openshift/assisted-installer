@@ -19,10 +19,9 @@ RUN git config --global --add safe.directory '*'; \
 # Extract the commit reference from which the image is built
 RUN git rev-parse --short HEAD > /commit-reference.txt
 
-FROM quay.io/centos/centos:stream9
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:6fc28bcb6776e387d7a35a2056d9d2b985dc4e26031e98a2bd35a7137cd6fd71
 
-# required for nsenter
-RUN dnf install -y util-linux-core && dnf clean all
+RUN microdnf install -y util-linux-core && microdnf clean all
 
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/installer /usr/bin/installer
 COPY --from=builder /go/src/github.com/openshift/assisted-installer/deploy/assisted-installer-controller /assisted-installer-controller/deploy

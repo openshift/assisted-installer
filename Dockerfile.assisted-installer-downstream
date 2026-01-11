@@ -14,17 +14,15 @@ COPY --chown=${USER_UID} . /app
 WORKDIR /app
 RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o installer src/main/main.go
 
-
-FROM --platform=$BUILDPLATFORM registry.redhat.io/rhel9-4-els/rhel:9.4
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:6fc28bcb6776e387d7a35a2056d9d2b985dc4e26031e98a2bd35a7137cd6fd71
 ARG release=main
 ARG version=latest
+
+RUN microdnf install -y util-linux-core && microdnf clean all
 
 COPY LICENSE /licenses/
 COPY --from=builder /app/installer /installer
 COPY --from=builder /app/deploy/assisted-installer-controller /assisted-installer-controller/deploy
-
-# base image already includes util-linux
-# RUN dnf install -y util-linux && dnf clean all
 
 ENTRYPOINT ["/installer"]
 
