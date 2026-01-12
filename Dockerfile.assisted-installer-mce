@@ -46,4 +46,5 @@ LABEL com.redhat.component="multicluster-engine-assisted-installer-container" \
       io.openshift.tags="OpenShift 4" \
       upstream_commit="${version}" \
       org.label-schema.vcs-ref="${version}" \
-      org.label-schema.vcs-url="https://github.com/openshift/assisted-installer"
+      org.label-schema.vcs-url="https://github.com/openshift/assisted-installer" \
+      cpe="cpe:/a:redhat:multicluster_engine:2.11::el9"
