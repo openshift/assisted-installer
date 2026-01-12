@@ -760,7 +760,7 @@ func (o *ops) GetMustGatherLogs(workDir, kubeconfigPath string, images ...string
 
 	if len(files) == 0 {
 		lerr := fmt.Errorf("Failed to find must-gather output")
-		o.log.Errorf(lerr.Error())
+		o.log.Error(lerr.Error())
 		return "", lerr
 	}
 	logsDir := filepath.Base(files[0])
