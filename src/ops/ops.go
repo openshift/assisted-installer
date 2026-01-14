@@ -268,6 +268,14 @@ func (o *ops) configureFirstBootIgnition(liveLogger io.Writer, ignitionPath stri
 }
 
 func (o *ops) WriteImageToExistingRoot(liveLogger io.Writer, ignitionPath string, installerArgs []string) error {
+	if o.installerConfig.DryRunEnabled {
+		// In dry run, we use an executable called dry-installer rather than ostree.
+		// This executable is expected to pretend to be doing coreos-installer stuff and print fake
+		// progress. It's up to the dry-mode user to make sure such executable is available in PATH
+		_, err := o.ExecPrivilegeCommand(liveLogger, dryRunCoreosInstallerExecutable)
+		return err
+	}
+
 	if err := o.remountFilesystems(liveLogger); err != nil {
 		return err
 	}

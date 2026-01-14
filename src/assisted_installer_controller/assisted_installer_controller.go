@@ -94,10 +94,10 @@ type ControllerConfig struct {
 	ControlPlaneCount       int    `envconfig:"CONTROL_PLANE_COUNT" required:"false" default:"3"`
 	WaitForClusterVersion   bool   `envconfig:"CHECK_CLUSTER_VERSION" required:"false" default:"false"`
 	MustGatherImage         string `envconfig:"MUST_GATHER_IMAGE" required:"false" default:""`
+	NotifyNumReboots        bool   `envconfig:"NOTIFY_NUM_REBOOTS" default:"false"`
 	DryRunEnabled           bool   `envconfig:"DRY_ENABLE" required:"false" default:"false"`
 	DryFakeRebootMarkerPath string `envconfig:"DRY_FAKE_REBOOT_MARKER_PATH" required:"false" default:""`
 	DryRunClusterHostsPath  string `envconfig:"DRY_CLUSTER_HOSTS_PATH"`
-	NotifyNumReboots        bool   `envconfig:"NOTIFY_NUM_REBOOTS" default:"false"`
 	// DryRunClusterHostsPath gets read parsed into ParsedClusterHosts by DryParseClusterHosts
 	ParsedClusterHosts config.DryClusterHosts
 }
