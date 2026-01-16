@@ -25,7 +25,7 @@ require (
 	github.com/operator-framework/api v0.17.1
 	github.com/operator-framework/operator-lifecycle-manager v0.22.0
 	github.com/pkg/errors v0.9.1
-	github.com/sirupsen/logrus v1.9.0
+	github.com/sirupsen/logrus v1.9.3
 	github.com/thoas/go-funk v0.9.2
 	github.com/vincent-petithory/dataurl v1.0.0
 	golang.org/x/net v0.24.0
