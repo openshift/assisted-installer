@@ -1345,7 +1345,7 @@ func (c *controller) uploadSummaryLogs(podName string, namespace string, sinceSe
 
 	if !ok {
 		msg := "Some Logs were not collected in summary"
-		c.log.Errorf(msg)
+		c.log.Error(msg)
 		return errors.New(msg)
 	}
 
