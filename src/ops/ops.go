@@ -25,16 +25,14 @@ import (
 
 	config_latest "github.com/coreos/ignition/v2/config/v3_2"
 	"github.com/go-openapi/swag"
-	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
-	"github.com/thoas/go-funk"
-	"github.com/vincent-petithory/dataurl"
-
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-
 	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/ops/execute"
 	"github.com/openshift/assisted-installer/src/utils"
+	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"github.com/thoas/go-funk"
+	"github.com/vincent-petithory/dataurl"
 )
 
 const (
@@ -760,7 +758,7 @@ func (o *ops) GetMustGatherLogs(workDir, kubeconfigPath string, images ...string
 
 	if len(files) == 0 {
 		lerr := fmt.Errorf("Failed to find must-gather output")
-		o.log.Errorf(lerr.Error())
+		o.log.Errorf("%s", lerr.Error())
 		return "", lerr
 	}
 	logsDir := filepath.Base(files[0])
