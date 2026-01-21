@@ -18,18 +18,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/thoas/go-funk"
-
 	"github.com/hashicorp/go-version"
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/apis/metal3.io/v1alpha1"
 	configv1 "github.com/openshift/api/config/v1"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	certificatesv1 "k8s.io/api/certificates/v1"
-	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	mapiv1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/assisted-installer/src/common"
 	"github.com/openshift/assisted-installer/src/config"
@@ -38,6 +29,13 @@ import (
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/models"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"github.com/thoas/go-funk"
+	certificatesv1 "k8s.io/api/certificates/v1"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -472,7 +470,7 @@ func (c *controller) PostInstallConfigs(ctx context.Context, wg *sync.WaitGroup)
 	}
 
 	errMessage := ""
-	err, data := c.postInstallConfigs(ctx)
+	data, err := c.postInstallConfigs(ctx)
 	// Even if the context was cancelled, the error is sent to the assisted service.
 	// The timeouts will be handled by the service
 	if err != nil {
@@ -487,7 +485,7 @@ func (c *controller) PostInstallConfigs(ctx context.Context, wg *sync.WaitGroup)
 	c.sendCompleteInstallation(ctx, success, errMessage, data)
 }
 
-func (c *controller) postInstallConfigs(ctx context.Context) (error, map[string]interface{}) {
+func (c *controller) postInstallConfigs(ctx context.Context) (map[string]interface{}, error) {
 	var err error
 	var data map[string]interface{}
 
@@ -499,12 +497,12 @@ func (c *controller) postInstallConfigs(ctx context.Context) (error, map[string]
 		data = map[string]interface{}{clusterOperatorReportKey: report}
 	}
 	if err != nil {
-		return errors.Wrapf(err, "Stopped waiting for cluster operators to be available"), data
+		return data, errors.Wrapf(err, "Stopped waiting for cluster operators to be available")
 	}
 
 	err = c.waitOnStage(ctx, models.FinalizingStageAddingRouterCa, failedOperatorRetry*time.Second, c.addRouterCAToClusterCA)
 	if err != nil {
-		return errors.Wrapf(err, "Stopped waiting for router ca data"), data
+		return data, errors.Wrapf(err, "Stopped waiting for router ca data")
 	}
 
 	// Wait for OLM operators
@@ -1345,7 +1343,7 @@ func (c *controller) uploadSummaryLogs(podName string, namespace string, sinceSe
 
 	if !ok {
 		msg := "Some Logs were not collected in summary"
-		c.log.Errorf(msg)
+		c.log.Errorf("%s", msg)
 		return errors.New(msg)
 	}
 
