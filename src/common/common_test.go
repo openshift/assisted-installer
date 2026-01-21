@@ -259,7 +259,7 @@ var _ = Describe("verify common", func() {
 		}
 
 		for _, test := range tests {
-			test := test
+
 			It(fmt.Sprintf("platform %v, invoker %v, version %v, cluster %v, is expected to remove uninitialized taint = %v", test.PlatformType, test.Invoker, test.VersionOpenshift, test.Cluster, test.ExpectedRemoveUninitializedTaint), func() {
 				if test.PlatformType == models.PlatformTypeVsphere {
 					mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(test.Cluster, nil).Times(1)
@@ -306,7 +306,7 @@ var _ = Describe("verify common", func() {
 			}
 
 			for _, test := range tests {
-				test := test
+
 				It(test.TestName, func() {
 					mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(test.Cluster, nil).Times(1)
 					hasValidvSphereCredentials := HasValidvSphereCredentials(context.TODO(), mockbmclient, mockkcclient, l)
@@ -352,7 +352,7 @@ var _ = Describe("verify common", func() {
 			}
 
 			for _, test := range configMapTests {
-				test := test
+
 				It(test.TestName, func() {
 					mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(nil, errors.New("some error")).Times(1)
 					mockkcclient.EXPECT().GetConfigMap(gomock.Any(), gomock.Any()).Return(test.ConfigMap, nil).Times(1)
