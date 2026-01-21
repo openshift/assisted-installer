@@ -24,18 +24,15 @@ import (
 
 	config_latest "github.com/coreos/ignition/v2/config/v3_2"
 	"github.com/go-openapi/swag"
-	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
-	"github.com/thoas/go-funk"
-	"github.com/vincent-petithory/dataurl"
-
-	"github.com/openshift/assisted-service/models"
-
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-
 	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/ops/execute"
 	"github.com/openshift/assisted-installer/src/utils"
+	"github.com/openshift/assisted-service/models"
+	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"github.com/thoas/go-funk"
+	"github.com/vincent-petithory/dataurl"
 )
 
 const (
