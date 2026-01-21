@@ -3,15 +3,13 @@ package rsync_logger
 import (
 	"io"
 
-	"github.com/openshift/assisted-installer/src/inventory_client"
-	"github.com/openshift/assisted-service/models"
-	gomock "go.uber.org/mock/gomock"
-
-	"github.com/sirupsen/logrus/hooks/test"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/openshift/assisted-installer/src/inventory_client"
+	"github.com/openshift/assisted-service/models"
 	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
+	gomock "go.uber.org/mock/gomock"
 )
 
 var _ = Describe("Verify RsyncInstallerLogger", func() {
