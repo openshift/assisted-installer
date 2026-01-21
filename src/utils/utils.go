@@ -12,19 +12,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/openshift/assisted-service/pkg/requestid"
-
-	"github.com/openshift/assisted-installer-agent/pkg/journalLogger"
-	"github.com/pkg/errors"
-	"golang.org/x/net/http/httpproxy"
-
 	ignition "github.com/coreos/ignition/v2/config"
-	"github.com/openshift/assisted-service/models"
-
 	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/assisted-installer-agent/pkg/journalLogger"
+	"github.com/openshift/assisted-service/models"
+	"github.com/openshift/assisted-service/pkg/requestid"
 	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/vincent-petithory/dataurl"
+	"golang.org/x/net/http/httpproxy"
 )
 
 var (
