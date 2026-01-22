@@ -2,6 +2,7 @@ registry: quay.io
 build-container-image: assisted-installer-build
 
 volumes:
+    - /tmp/jj-repos/patch/references/assisted-installer/objects:/tmp/jj-repos/patch/references/assisted-installer/objects:ro
     - $HOME/.cache/go-build:/go/pkg/mod
     - $HOME/.cache/golangci-lint:$HOME/.cache/golangci-lint
 env:
