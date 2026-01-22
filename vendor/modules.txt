@@ -162,7 +162,7 @@ github.com/fsnotify/fsnotify
 github.com/go-jose/go-jose/v4
 github.com/go-jose/go-jose/v4/cipher
 github.com/go-jose/go-jose/v4/json
-# github.com/go-logr/logr v1.4.1
+# github.com/go-logr/logr v1.4.2
 ## explicit; go 1.18
 github.com/go-logr/logr
 github.com/go-logr/logr/funcr
@@ -367,7 +367,7 @@ github.com/moby/patternmatcher/ignorefile
 # github.com/moby/sys/sequential v0.5.0
 ## explicit; go 1.17
 github.com/moby/sys/sequential
-# github.com/moby/sys/user v0.1.0
+# github.com/moby/sys/user v0.3.0
 ## explicit; go 1.17
 github.com/moby/sys/user
 # github.com/moby/sys/userns v0.1.0
@@ -722,7 +722,7 @@ go.opentelemetry.io/otel/trace/embedded
 # go.uber.org/mock v0.4.0
 ## explicit; go 1.20
 go.uber.org/mock/gomock
-# golang.org/x/crypto v0.32.0 => github.com/openshift/golang-crypto v0.33.1-0.20250310193910-9003f682e581
+# golang.org/x/crypto v0.40.0 => github.com/openshift/golang-crypto v0.33.1-0.20250310193910-9003f682e581
 ## explicit; go 1.20
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/chacha20
@@ -736,8 +736,8 @@ golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 ## explicit; go 1.20
 golang.org/x/exp/constraints
 golang.org/x/exp/slices
-# golang.org/x/net v0.33.0
-## explicit; go 1.18
+# golang.org/x/net v0.42.0
+## explicit; go 1.23.0
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/html/charset
@@ -746,25 +746,26 @@ golang.org/x/net/http/httpproxy
 golang.org/x/net/http2
 golang.org/x/net/http2/hpack
 golang.org/x/net/idna
-# golang.org/x/oauth2 v0.18.0
-## explicit; go 1.18
+golang.org/x/net/internal/httpcommon
+# golang.org/x/oauth2 v0.30.0
+## explicit; go 1.23.0
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sync v0.11.0
-## explicit; go 1.18
+# golang.org/x/sync v0.16.0
+## explicit; go 1.23.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.30.0
-## explicit; go 1.18
+# golang.org/x/sys v0.34.0
+## explicit; go 1.23.0
 golang.org/x/sys/cpu
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/term v0.29.0
-## explicit; go 1.18
+# golang.org/x/term v0.33.0
+## explicit; go 1.23.0
 golang.org/x/term
-# golang.org/x/text v0.22.0
-## explicit; go 1.18
+# golang.org/x/text v0.27.0
+## explicit; go 1.23.0
 golang.org/x/text/cases
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
@@ -789,27 +790,16 @@ golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
 golang.org/x/text/width
-# golang.org/x/time v0.5.0
-## explicit; go 1.18
+# golang.org/x/time v0.12.0
+## explicit; go 1.23.0
 golang.org/x/time/rate
 # gomodules.xyz/jsonpatch/v2 v2.4.0
 ## explicit; go 1.20
 gomodules.xyz/jsonpatch/v2
-# google.golang.org/appengine v1.6.8
-## explicit; go 1.11
-google.golang.org/appengine/internal
-google.golang.org/appengine/internal/base
-google.golang.org/appengine/internal/datastore
-google.golang.org/appengine/internal/log
-google.golang.org/appengine/internal/remote_api
-google.golang.org/appengine/internal/urlfetch
-google.golang.org/appengine/urlfetch
 # google.golang.org/genproto/googleapis/api v0.0.0-20240318140521-94a12d6c2237
 ## explicit; go 1.19
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20240318140521-94a12d6c2237
-## explicit; go 1.19
-# google.golang.org/protobuf v1.34.1
-## explicit; go 1.17
+# google.golang.org/protobuf v1.35.2
+## explicit; go 1.21
 google.golang.org/protobuf/encoding/protodelim
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire
@@ -1177,3 +1167,4 @@ sigs.k8s.io/yaml/goyaml.v2
 # sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v0.4.5
 # sigs.k8s.io/cluster-api-provider-aws => github.com/openshift/cluster-api-provider-aws v0.2.1-0.20201022175424-d30c7a274820
 # sigs.k8s.io/cluster-api-provider-azure => github.com/openshift/cluster-api-provider-azure v0.1.0-alpha.3.0.20201016155852-4090a6970205
+# github.com/containerd/containerd => github.com/containerd/containerd v1.7.29
