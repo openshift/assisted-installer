@@ -149,7 +149,7 @@ require (
 	github.com/spf13/pflag v1.0.6-0.20210604193023-d5e0c0615ace // indirect
 	github.com/ssgreg/journald v1.0.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	github.com/stretchr/testify v1.10.0 // indirect
+	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/testcontainers/testcontainers-go v0.29.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
@@ -199,3 +199,5 @@ replace (
 )
 
 replace github.com/sigstore/fulcio => github.com/sigstore/fulcio v1.8.3
+
+replace github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.13.0
