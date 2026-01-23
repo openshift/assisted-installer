@@ -201,3 +201,5 @@ replace (
 )
 
 replace github.com/containerd/containerd => github.com/containerd/containerd v1.7.29
+
+replace github.com/sigstore/fulcio => github.com/sigstore/fulcio v1.8.3
