@@ -58,6 +58,17 @@
             ],
             "depNameTemplate": "registry.access.redhat.com/ubi8/go-toolset",
             "datasourceTemplate": "docker"
+        },
+        {
+            "customType": "regex",
+            "fileMatch": [
+                "^Dockerfile\\.assisted-installer.*$"
+            ],
+            "matchStrings": [
+                "FROM registry.access.redhat.com/ubi9/ubi-minimal:(?<currentValue>[^@]+)@(?<currentDigest>sha256:[a-f0-9]+)\\n"
+            ],
+            "depNameTemplate": "registry.access.redhat.com/ubi9/ubi-minimal",
+            "datasourceTemplate": "docker"
         }
     ],
 
@@ -98,6 +109,27 @@
             "addLabels": ["konflux"],
             "schedule": ["on Saturday"],
             "matchManagers": ["tekton"]
+        },
+        {
+            "matchPackageNames": [
+                "registry.access.redhat.com/ubi9/ubi-minimal"
+            ],
+            "groupName": "UBI Runtime Images",
+            "addLabels": [
+                "ubi"
+            ]
+        },
+        {
+            "matchUpdateTypes": [
+                "major"
+            ],
+            "matchDatasources": [
+                "docker"
+            ],
+            "matchPackageNames": [
+                "registry.access.redhat.com/ubi9/ubi-minimal"
+            ],
+            "enabled": false
         }
     ]
 }
