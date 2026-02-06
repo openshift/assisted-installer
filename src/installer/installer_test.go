@@ -11,11 +11,6 @@ import (
 	"testing"
 	"time"
 
-	preinstallUtils "github.com/rh-ecosystem-edge/preinstall-utils/pkg"
-
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/go-openapi/strfmt"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -29,8 +24,11 @@ import (
 	"github.com/openshift/assisted-service/pkg/validations"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/pkg/errors"
+	preinstallUtils "github.com/rh-ecosystem-edge/preinstall-utils/pkg"
 	"github.com/sirupsen/logrus"
 	gomock "go.uber.org/mock/gomock"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestValidator(t *testing.T) {
