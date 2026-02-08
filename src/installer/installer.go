@@ -54,6 +54,8 @@ const (
 	registryDataDirOnMedia       = "/run/media/iso/registry"
 )
 
+// test
+
 var generalWaitTimeout = 30 * time.Second
 var generalWaitInterval = 5 * time.Second
 
