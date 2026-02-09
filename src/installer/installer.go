@@ -217,6 +217,12 @@ func (i *installer) waitForWorkers(ctx context.Context) error {
 		i.log.Error(err)
 		return err
 	}
+
+	if i.DryRunEnabled {
+		// In dry run mode we assume we're not ABI
+		return nil
+	}
+
 	if invoker := common.GetInvoker(kc, i.log); invoker != common.InvokerAgent {
 		return nil
 	}
@@ -396,6 +402,10 @@ func (i *installer) writeImageToDisk(ignitionPath string) error {
 }
 
 func (i *installer) skipMcoReboot(ignitionPath string) {
+	if i.DryRunEnabled {
+		return
+	}
+
 	var mc *mcfgv1.MachineConfig
 	mc, err := i.getEncapsulatedMC(ignitionPath)
 	if err != nil {
@@ -444,9 +454,11 @@ func (i *installer) startBootstrap() error {
 	}
 
 	// reload systemd configurations from filesystem and regenerate dependency trees
-	err = i.ops.SystemctlAction("daemon-reload")
-	if err != nil {
-		return err
+	if !i.DryRunEnabled {
+		err = i.ops.SystemctlAction("daemon-reload")
+		if err != nil {
+			return err
+		}
 	}
 
 	/* in case hostname is illegal (localhost, contains capital letters, etc.), we need to set hostname to
@@ -463,7 +475,7 @@ func (i *installer) startBootstrap() error {
 	// restart NetworkManager to trigger NetworkManager/dispatcher.d/30-local-dns-prepender
 	// we don't do it on SNO because the "local-dns-prepender" is not even
 	// available on none-platform
-	if i.ControlPlaneCount != 1 {
+	if i.ControlPlaneCount != 1 && !i.DryRunEnabled {
 		err = i.ops.SystemctlAction("restart", "NetworkManager.service")
 		if err != nil {
 			i.log.Error(err)
@@ -479,7 +491,7 @@ func (i *installer) startBootstrap() error {
 	// If we're in a pure RHEL/CentOS environment, we need to overlay the node image
 	// first to have access to e.g. oc, kubelet, cri-o, etc...
 	// https://github.com/openshift/enhancements/pull/1637
-	if !i.ops.FileExists(openshiftClientBin) {
+	if !i.ops.FileExists(openshiftClientBin) && !i.DryRunEnabled {
 		err = i.ops.SystemctlAction("start", "--no-block", nodeImagePullService, nodeImageOverlayService)
 		if err != nil {
 			return err
@@ -501,6 +513,9 @@ func (i *installer) startBootstrap() error {
 	}
 
 	servicesToStart := []string{"bootkube.service", "approve-csr.service", "progress.service"}
+	if i.DryRunEnabled {
+		servicesToStart = []string{}
+	}
 	for _, service := range servicesToStart {
 		err = i.ops.SystemctlAction("start", service)
 		if err != nil {
@@ -611,9 +626,12 @@ func (i *installer) waitForControlPlane(ctx context.Context) error {
 	}
 
 	i.waitForBootkube(ctx)
-	if err = i.waitForETCDBootstrap(ctx); err != nil {
-		i.log.Error(err)
-		return err
+
+	if !i.DryRunEnabled {
+		if err = i.waitForETCDBootstrap(ctx); err != nil {
+			i.log.Error(err)
+			return err
+		}
 	}
 
 	// waiting for controller pod to be running
