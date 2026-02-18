@@ -126,7 +126,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.0 // indirect
 	github.com/openshift-online/ocm-sdk-go v0.1.467 // indirect
 	github.com/openshift/assisted-service/api v0.0.0 // indirect
-	github.com/openshift/hive/apis v0.0.0-20260127213836-e33d70397d57 // indirect
+	github.com/openshift/hive/apis v0.0.0-20260218071745-29053bf0ec36 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
