@@ -87,7 +87,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/glog v1.2.4 // indirect
 	github.com/golang/mock v1.7.0-rc.1 // indirect
-	github.com/google/gnostic-models v0.7.0 // indirect
+	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
