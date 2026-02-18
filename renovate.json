@@ -136,6 +136,12 @@
             "matchManagers": [
                 "gomod"
             ],
+            "enabled": false
+        },
+        {
+            "matchManagers": [
+                "gomod"
+            ],
             "matchPackageNames": [
                 "github.com/openshift/hive/apis"
             ],
