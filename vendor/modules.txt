@@ -57,7 +57,7 @@ github.com/containerd/containerd/platforms
 # github.com/containerd/log v0.1.0
 ## explicit; go 1.20
 github.com/containerd/log
-# github.com/coreos/go-json v0.0.0-20230131223807-18775e0fb4fb
+# github.com/coreos/go-json v0.0.0-20231102161613-e49c8866685a
 ## explicit; go 1.18
 github.com/coreos/go-json
 # github.com/coreos/go-semver v0.3.1
