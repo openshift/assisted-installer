@@ -2,6 +2,7 @@ package core
 
 import (
 	"bufio"
+	"io"
 	"net/url"
 	"os"
 	"regexp"
@@ -25,23 +26,29 @@ const (
 
 var rxURL = regexp.MustCompile(URL)
 
+// ExtractImagesFromDockerfile extracts images from the Dockerfile sourced from dockerfile.
 func ExtractImagesFromDockerfile(dockerfile string, buildArgs map[string]*string) ([]string, error) {
-	var images []string
-
 	file, err := os.Open(dockerfile)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
+	return ExtractImagesFromReader(file, buildArgs)
+}
+
+// ExtractImagesFromReader extracts images from the Dockerfile sourced from r.
+func ExtractImagesFromReader(r io.Reader, buildArgs map[string]*string) ([]string, error) {
 	var lines []string
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
 	}
 	if scanner.Err() != nil {
 		return nil, scanner.Err()
 	}
+
+	images := make([]string, 0, len(lines))
 
 	// extract images from dockerfile
 	for _, line := range lines {
@@ -100,7 +107,7 @@ func ExtractRegistry(image string, fallback string) string {
 	return fallback
 }
 
-// IsURL checks if the string is an URL.
+// IsURL checks if the string is a URL.
 // Extracted from https://github.com/asaskevich/govalidator/blob/f21760c49a8d/validator.go#L104
 func IsURL(str string) bool {
 	if str == "" || utf8.RuneCountInString(str) >= maxURLRuneCount || len(str) <= minURLRuneCount || strings.HasPrefix(str, ".") {
