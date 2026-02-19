@@ -127,7 +127,7 @@ require (
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/image-spec v1.1.0 // indirect
+	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/openshift-online/ocm-sdk-go v0.1.205 // indirect
 	github.com/openshift/assisted-service/api v0.0.0 // indirect
 	github.com/openshift/hive/apis v0.0.0-20220222213051-def9088fdb5a // indirect
