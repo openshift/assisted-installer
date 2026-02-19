@@ -34,7 +34,7 @@ github.com/aws/aws-sdk-go/aws/arn
 ## explicit
 github.com/aymerick/douceur/css
 github.com/aymerick/douceur/parser
-# github.com/benbjohnson/clock v1.3.0
+# github.com/benbjohnson/clock v1.3.5
 ## explicit; go 1.15
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
