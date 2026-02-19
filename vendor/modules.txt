@@ -642,7 +642,7 @@ github.com/spf13/pflag
 # github.com/ssgreg/journald v1.0.0
 ## explicit
 github.com/ssgreg/journald
-# github.com/stretchr/objx v0.5.2
+# github.com/stretchr/objx v0.5.3
 ## explicit; go 1.20
 github.com/stretchr/objx
 # github.com/stretchr/testify v1.10.0
