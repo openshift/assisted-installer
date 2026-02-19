@@ -142,7 +142,7 @@ require (
 	github.com/slok/go-http-metrics v0.11.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/ssgreg/journald v1.0.0 // indirect
-	github.com/stretchr/objx v0.5.2 // indirect
+	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/testcontainers/testcontainers-go v0.33.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
