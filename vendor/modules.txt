@@ -254,8 +254,8 @@ github.com/google/go-cmp/cmp/internal/value
 # github.com/google/uuid v1.6.0
 ## explicit
 github.com/google/uuid
-# github.com/gorilla/css v1.0.0
-## explicit
+# github.com/gorilla/css v1.0.1
+## explicit; go 1.20
 github.com/gorilla/css/scanner
 # github.com/hashicorp/go-version v1.6.0
 ## explicit
@@ -335,8 +335,8 @@ github.com/mailru/easyjson/jwriter
 # github.com/metal3-io/baremetal-operator/apis v0.5.1 => github.com/openshift/baremetal-operator/apis v0.0.0-20260123083846-066225b39a39
 ## explicit; go 1.24.0
 github.com/metal3-io/baremetal-operator/apis/metal3.io/v1alpha1
-# github.com/microcosm-cc/bluemonday v1.0.26
-## explicit; go 1.21
+# github.com/microcosm-cc/bluemonday v1.0.27
+## explicit; go 1.19
 github.com/microcosm-cc/bluemonday
 github.com/microcosm-cc/bluemonday/css
 # github.com/mitchellh/mapstructure v1.5.0
