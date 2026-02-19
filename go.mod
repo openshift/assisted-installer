@@ -131,7 +131,7 @@ require (
 	github.com/openshift-online/ocm-sdk-go v0.1.467 // indirect
 	github.com/openshift/assisted-service/api v0.0.0 // indirect
 	github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87 // indirect
-	github.com/openshift/hive/apis v0.0.0-20231220215202-ad99b9e52d27 // indirect
+	github.com/openshift/hive/apis 29053bf0ec36 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
