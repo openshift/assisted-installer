@@ -365,7 +365,7 @@ github.com/moby/docker-image-spec/specs-go/v1
 ## explicit; go 1.19
 github.com/moby/patternmatcher
 github.com/moby/patternmatcher/ignorefile
-# github.com/moby/sys/sequential v0.5.0
+# github.com/moby/sys/sequential v0.6.0
 ## explicit; go 1.17
 github.com/moby/sys/sequential
 # github.com/moby/sys/user v0.3.0
