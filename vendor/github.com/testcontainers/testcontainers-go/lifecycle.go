@@ -5,13 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
+
+	"github.com/testcontainers/testcontainers-go/log"
 )
 
 // ContainerRequestHook is a hook that will be called before a container is created.
@@ -33,12 +35,14 @@ type ContainerRequestHook func(ctx context.Context, req ContainerRequest) error
 // - Terminating
 // - Terminated
 // For that, it will receive a Container, modify it and return an error if needed.
-type ContainerHook func(ctx context.Context, container Container) error
+type ContainerHook func(ctx context.Context, ctr Container) error
 
 // ContainerLifecycleHooks is a struct that contains all the hooks that can be used
 // to modify the container lifecycle. All the container lifecycle hooks except the PreCreates hooks
 // will be passed to the container once it's created
 type ContainerLifecycleHooks struct {
+	PreBuilds      []ContainerRequestHook
+	PostBuilds     []ContainerRequestHook
 	PreCreates     []ContainerRequestHook
 	PostCreates    []ContainerHook
 	PreStarts      []ContainerHook
@@ -51,62 +55,74 @@ type ContainerLifecycleHooks struct {
 }
 
 // DefaultLoggingHook is a hook that will log the container lifecycle events
-var DefaultLoggingHook = func(logger Logging) ContainerLifecycleHooks {
+var DefaultLoggingHook = func(logger log.Logger) ContainerLifecycleHooks {
 	shortContainerID := func(c Container) string {
 		return c.GetContainerID()[:12]
 	}
 
 	return ContainerLifecycleHooks{
+		PreBuilds: []ContainerRequestHook{
+			func(_ context.Context, req ContainerRequest) error {
+				logger.Printf("🐳 Building image %s:%s", req.GetRepo(), req.GetTag())
+				return nil
+			},
+		},
+		PostBuilds: []ContainerRequestHook{
+			func(_ context.Context, req ContainerRequest) error {
+				logger.Printf("✅ Built image %s", req.Image)
+				return nil
+			},
+		},
 		PreCreates: []ContainerRequestHook{
-			func(ctx context.Context, req ContainerRequest) error {
+			func(_ context.Context, req ContainerRequest) error {
 				logger.Printf("🐳 Creating container for image %s", req.Image)
 				return nil
 			},
 		},
 		PostCreates: []ContainerHook{
-			func(ctx context.Context, c Container) error {
+			func(_ context.Context, c Container) error {
 				logger.Printf("✅ Container created: %s", shortContainerID(c))
 				return nil
 			},
 		},
 		PreStarts: []ContainerHook{
-			func(ctx context.Context, c Container) error {
+			func(_ context.Context, c Container) error {
 				logger.Printf("🐳 Starting container: %s", shortContainerID(c))
 				return nil
 			},
 		},
 		PostStarts: []ContainerHook{
-			func(ctx context.Context, c Container) error {
+			func(_ context.Context, c Container) error {
 				logger.Printf("✅ Container started: %s", shortContainerID(c))
 				return nil
 			},
 		},
 		PostReadies: []ContainerHook{
-			func(ctx context.Context, c Container) error {
+			func(_ context.Context, c Container) error {
 				logger.Printf("🔔 Container is ready: %s", shortContainerID(c))
 				return nil
 			},
 		},
 		PreStops: []ContainerHook{
-			func(ctx context.Context, c Container) error {
+			func(_ context.Context, c Container) error {
 				logger.Printf("🐳 Stopping container: %s", shortContainerID(c))
 				return nil
 			},
 		},
 		PostStops: []ContainerHook{
-			func(ctx context.Context, c Container) error {
+			func(_ context.Context, c Container) error {
 				logger.Printf("✅ Container stopped: %s", shortContainerID(c))
 				return nil
 			},
 		},
 		PreTerminates: []ContainerHook{
-			func(ctx context.Context, c Container) error {
+			func(_ context.Context, c Container) error {
 				logger.Printf("🐳 Terminating container: %s", shortContainerID(c))
 				return nil
 			},
 		},
 		PostTerminates: []ContainerHook{
-			func(ctx context.Context, c Container) error {
+			func(_ context.Context, c Container) error {
 				logger.Printf("🚫 Container terminated: %s", shortContainerID(c))
 				return nil
 			},
@@ -173,10 +189,7 @@ var defaultLogConsumersHook = func(cfg *LogConsumerConfig) ContainerLifecycleHoo
 				}
 
 				dockerContainer := c.(*DockerContainer)
-				dockerContainer.consumers = dockerContainer.consumers[:0]
-				for _, consumer := range cfg.Consumers {
-					dockerContainer.followOutput(consumer)
-				}
+				dockerContainer.resetConsumers(cfg.Consumers)
 
 				return dockerContainer.startLogProduction(ctx, cfg.Opts...)
 			},
@@ -184,95 +197,38 @@ var defaultLogConsumersHook = func(cfg *LogConsumerConfig) ContainerLifecycleHoo
 		PostStops: []ContainerHook{
 			// Stop the log production.
 			// See combineContainerHooks for the order of execution.
-			func(ctx context.Context, c Container) error {
+			func(_ context.Context, c Container) error {
 				if cfg == nil || len(cfg.Consumers) == 0 {
 					return nil
 				}
 
 				dockerContainer := c.(*DockerContainer)
-
 				return dockerContainer.stopLogProduction()
 			},
 		},
 	}
 }
 
-func checkPortsMapped(exposedAndMappedPorts nat.PortMap, exposedPorts []string) error {
-	portMap, _, err := nat.ParsePortSpecs(exposedPorts)
-	if err != nil {
-		return fmt.Errorf("parse exposed ports: %w", err)
-	}
-
-	for exposedPort := range portMap {
-		// having entries in exposedAndMappedPorts, where the key is the exposed port,
-		// and the value is the mapped port, means that the port has been already mapped.
-		if _, ok := exposedAndMappedPorts[exposedPort]; ok {
-			continue
-		}
-
-		// check if the port is mapped with the protocol (default is TCP)
-		if strings.Contains(string(exposedPort), "/") {
-			return fmt.Errorf("port %s is not mapped yet", exposedPort)
-		}
-
-		// Port didn't have a type, default to tcp and retry.
-		exposedPort += "/tcp"
-		if _, ok := exposedAndMappedPorts[exposedPort]; !ok {
-			return fmt.Errorf("port %s is not mapped yet", exposedPort)
-		}
-	}
-
-	return nil
-}
-
 // defaultReadinessHook is a hook that will wait for the container to be ready
 var defaultReadinessHook = func() ContainerLifecycleHooks {
 	return ContainerLifecycleHooks{
 		PostStarts: []ContainerHook{
-			func(ctx context.Context, c Container) error {
-				// wait until all the exposed ports are mapped:
-				// it will be ready when all the exposed ports are mapped,
-				// checking every 50ms, up to 1s, and failing if all the
-				// exposed ports are not mapped in 5s.
-				dockerContainer := c.(*DockerContainer)
-
-				b := backoff.NewExponentialBackOff()
-
-				b.InitialInterval = 50 * time.Millisecond
-				b.MaxElapsedTime = 5 * time.Second
-				b.MaxInterval = time.Duration(float64(time.Second) * backoff.DefaultRandomizationFactor)
-
-				err := backoff.RetryNotify(
-					func() error {
-						jsonRaw, err := dockerContainer.inspectRawContainer(ctx)
-						if err != nil {
-							return err
-						}
-
-						return checkPortsMapped(jsonRaw.NetworkSettings.Ports, dockerContainer.exposedPorts)
-					},
-					b,
-					func(err error, duration time.Duration) {
-						dockerContainer.logger.Printf("All requested ports were not exposed: %v", err)
-					},
-				)
-				if err != nil {
-					return fmt.Errorf("all exposed ports, %s, were not mapped in 5s: %w", dockerContainer.exposedPorts, err)
-				}
-
-				return nil
-			},
 			// wait for the container to be ready
 			func(ctx context.Context, c Container) error {
 				dockerContainer := c.(*DockerContainer)
 
 				// if a Wait Strategy has been specified, wait before returning
 				if dockerContainer.WaitingFor != nil {
+					strategy := dockerContainer.WaitingFor
+					strategyDesc := "unknown strategy"
+					if s, ok := strategy.(fmt.Stringer); ok {
+						strategyDesc = s.String()
+					}
 					dockerContainer.logger.Printf(
 						"⏳ Waiting for container id %s image: %s. Waiting for: %+v",
-						dockerContainer.ID[:12], dockerContainer.Image, dockerContainer.WaitingFor,
+						dockerContainer.ID[:12], dockerContainer.Image, strategyDesc,
 					)
-					if err := dockerContainer.WaitingFor.WaitUntilReady(ctx, c); err != nil {
+					if err := strategy.WaitUntilReady(ctx, dockerContainer); err != nil {
 						return fmt.Errorf("wait until ready: %w", err)
 					}
 				}
@@ -285,11 +241,34 @@ var defaultReadinessHook = func() ContainerLifecycleHooks {
 	}
 }
 
+// buildingHook is a hook that will be called before a container image is built.
+func (req ContainerRequest) buildingHook(ctx context.Context) error {
+	return req.applyLifecycleHooks(func(lifecycleHooks ContainerLifecycleHooks) error {
+		return lifecycleHooks.Building(ctx)(req)
+	})
+}
+
+// builtHook is a hook that will be called after a container image is built.
+func (req ContainerRequest) builtHook(ctx context.Context) error {
+	return req.applyLifecycleHooks(func(lifecycleHooks ContainerLifecycleHooks) error {
+		return lifecycleHooks.Built(ctx)(req)
+	})
+}
+
 // creatingHook is a hook that will be called before a container is created.
 func (req ContainerRequest) creatingHook(ctx context.Context) error {
-	errs := make([]error, len(req.LifecycleHooks))
-	for i, lifecycleHooks := range req.LifecycleHooks {
-		errs[i] = lifecycleHooks.Creating(ctx)(req)
+	return req.applyLifecycleHooks(func(lifecycleHooks ContainerLifecycleHooks) error {
+		return lifecycleHooks.Creating(ctx)(req)
+	})
+}
+
+// applyLifecycleHooks calls hook on all LifecycleHooks.
+func (req ContainerRequest) applyLifecycleHooks(hook func(lifecycleHooks ContainerLifecycleHooks) error) error {
+	var errs []error
+	for _, lifecycleHooks := range req.LifecycleHooks {
+		if err := hook(lifecycleHooks); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	return errors.Join(errs...)
@@ -334,7 +313,11 @@ func (c *DockerContainer) printLogs(ctx context.Context, cause error) {
 
 	b, err := io.ReadAll(reader)
 	if err != nil {
-		c.logger.Printf("failed reading container logs: %v\n", err)
+		if len(b) > 0 {
+			c.logger.Printf("failed reading container logs: %v\npartial container logs (%s):\n%s", err, cause, b)
+		} else {
+			c.logger.Printf("failed reading container logs: %v\n", err)
+		}
 		return
 	}
 
@@ -371,9 +354,11 @@ func (c *DockerContainer) terminatedHook(ctx context.Context) error {
 
 // applyLifecycleHooks applies all lifecycle hooks reporting the container logs on error if logError is true.
 func (c *DockerContainer) applyLifecycleHooks(ctx context.Context, logError bool, hooks func(lifecycleHooks ContainerLifecycleHooks) []ContainerHook) error {
-	errs := make([]error, len(c.lifecycleHooks))
-	for i, lifecycleHooks := range c.lifecycleHooks {
-		errs[i] = containerHookFn(ctx, hooks(lifecycleHooks))(c)
+	var errs []error
+	for _, lifecycleHooks := range c.lifecycleHooks {
+		if err := containerHookFn(ctx, hooks(lifecycleHooks))(c); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	if err := errors.Join(errs...); err != nil {
@@ -395,10 +380,26 @@ func (c *DockerContainer) applyLifecycleHooks(ctx context.Context, logError bool
 	return nil
 }
 
+// Building is a hook that will be called before a container image is built.
+func (c ContainerLifecycleHooks) Building(ctx context.Context) func(req ContainerRequest) error {
+	return containerRequestHook(ctx, c.PreBuilds)
+}
+
+// Building is a hook that will be called before a container image is built.
+func (c ContainerLifecycleHooks) Built(ctx context.Context) func(req ContainerRequest) error {
+	return containerRequestHook(ctx, c.PostBuilds)
+}
+
 // Creating is a hook that will be called before a container is created.
 func (c ContainerLifecycleHooks) Creating(ctx context.Context) func(req ContainerRequest) error {
+	return containerRequestHook(ctx, c.PreCreates)
+}
+
+// containerRequestHook returns a function that will iterate over all
+// the hooks and call them one by one until there is an error.
+func containerRequestHook(ctx context.Context, hooks []ContainerRequestHook) func(req ContainerRequest) error {
 	return func(req ContainerRequest) error {
-		for _, hook := range c.PreCreates {
+		for _, hook := range hooks {
 			if err := hook(ctx, req); err != nil {
 				return err
 			}
@@ -411,10 +412,12 @@ func (c ContainerLifecycleHooks) Creating(ctx context.Context) func(req Containe
 // containerHookFn is a helper function that will create a function to be returned by all the different
 // container lifecycle hooks. The created function will iterate over all the hooks and call them one by one.
 func containerHookFn(ctx context.Context, containerHook []ContainerHook) func(container Container) error {
-	return func(container Container) error {
-		errs := make([]error, len(containerHook))
-		for i, hook := range containerHook {
-			errs[i] = hook(ctx, container)
+	return func(ctr Container) error {
+		var errs []error
+		for _, hook := range containerHook {
+			if err := hook(ctx, ctr); err != nil {
+				errs = append(errs, err)
+			}
 		}
 
 		return errors.Join(errs...)
@@ -462,6 +465,20 @@ func (c ContainerLifecycleHooks) Terminated(ctx context.Context) func(container 
 }
 
 func (p *DockerProvider) preCreateContainerHook(ctx context.Context, req ContainerRequest, dockerInput *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig) error {
+	var mountErrors []error
+	for _, m := range req.Mounts {
+		// validate only the mount sources that implement the Validator interface
+		if v, ok := m.Source.(Validator); ok {
+			if err := v.Validate(); err != nil {
+				mountErrors = append(mountErrors, err)
+			}
+		}
+	}
+
+	if len(mountErrors) > 0 {
+		return errors.Join(mountErrors...)
+	}
+
 	// prepare mounts
 	hostConfig.Mounts = mapToDockerMounts(req.Mounts)
 
@@ -489,17 +506,18 @@ func (p *DockerProvider) preCreateContainerHook(ctx context.Context, req Contain
 		}
 	}
 
-	if req.ConfigModifier != nil {
-		req.ConfigModifier(dockerInput)
+	if req.ConfigModifier == nil {
+		req.ConfigModifier = defaultConfigModifier(req)
 	}
+	req.ConfigModifier(dockerInput)
 
 	if req.HostConfigModifier == nil {
 		req.HostConfigModifier = defaultHostConfigModifier(req)
 	}
 	req.HostConfigModifier(hostConfig)
 
-	if req.EnpointSettingsModifier != nil {
-		req.EnpointSettingsModifier(endpointSettings)
+	if req.EndpointSettingsModifier != nil {
+		req.EndpointSettingsModifier(endpointSettings)
 	}
 
 	networkingConfig.EndpointsConfig = endpointSettings
@@ -507,7 +525,7 @@ func (p *DockerProvider) preCreateContainerHook(ctx context.Context, req Contain
 	exposedPorts := req.ExposedPorts
 	// this check must be done after the pre-creation Modifiers are called, so the network mode is already set
 	if len(exposedPorts) == 0 && !hostConfig.NetworkMode.IsContainer() {
-		image, _, err := p.client.ImageInspectWithRaw(ctx, dockerInput.Image)
+		image, err := p.client.ImageInspect(ctx, dockerInput.Image)
 		if err != nil {
 			return err
 		}
@@ -533,65 +551,50 @@ func (p *DockerProvider) preCreateContainerHook(ctx context.Context, req Contain
 	return nil
 }
 
-// combineContainerHooks it returns just one ContainerLifecycle hook, as the result of combining
-// the default hooks with the user-defined hooks. The function will loop over all the default hooks,
-// storing each of the hooks in a slice, and then it will loop over all the user-defined hooks,
-// appending or prepending them to the slice of hooks. The order of hooks is the following:
-// - for Pre-hooks, always run the default hooks first, then append the user-defined hooks
-// - for Post-hooks, always run the user-defined hooks first, then the default hooks
+// combineContainerHooks returns a ContainerLifecycle hook as the result
+// of combining the default hooks with the user-defined hooks.
+//
+// The order of hooks is the following:
+// - Pre-hooks run the default hooks first then the user-defined hooks
+// - Post-hooks run the user-defined hooks first then the default hooks
 func combineContainerHooks(defaultHooks, userDefinedHooks []ContainerLifecycleHooks) ContainerLifecycleHooks {
-	preCreates := []ContainerRequestHook{}
-	postCreates := []ContainerHook{}
-	preStarts := []ContainerHook{}
-	postStarts := []ContainerHook{}
-	postReadies := []ContainerHook{}
-	preStops := []ContainerHook{}
-	postStops := []ContainerHook{}
-	preTerminates := []ContainerHook{}
-	postTerminates := []ContainerHook{}
-
+	// We use reflection here to ensure that any new hooks are handled.
+	var hooks ContainerLifecycleHooks
+	hooksVal := reflect.ValueOf(&hooks).Elem()
+	hooksType := reflect.TypeOf(hooks)
 	for _, defaultHook := range defaultHooks {
-		preCreates = append(preCreates, defaultHook.PreCreates...)
-		preStarts = append(preStarts, defaultHook.PreStarts...)
-		preStops = append(preStops, defaultHook.PreStops...)
-		preTerminates = append(preTerminates, defaultHook.PreTerminates...)
+		defaultVal := reflect.ValueOf(defaultHook)
+		for i := range hooksType.NumField() {
+			if strings.HasPrefix(hooksType.Field(i).Name, "Pre") {
+				field := hooksVal.Field(i)
+				field.Set(reflect.AppendSlice(field, defaultVal.Field(i)))
+			}
+		}
 	}
 
-	// append the user-defined hooks after the default pre-hooks
-	// and because the post hooks are still empty, the user-defined post-hooks
-	// will be the first ones to be executed
+	// Append the user-defined hooks after the default pre-hooks
+	// and because the post hooks are still empty, the user-defined
+	// post-hooks will be the first ones to be executed.
 	for _, userDefinedHook := range userDefinedHooks {
-		preCreates = append(preCreates, userDefinedHook.PreCreates...)
-		postCreates = append(postCreates, userDefinedHook.PostCreates...)
-		preStarts = append(preStarts, userDefinedHook.PreStarts...)
-		postStarts = append(postStarts, userDefinedHook.PostStarts...)
-		postReadies = append(postReadies, userDefinedHook.PostReadies...)
-		preStops = append(preStops, userDefinedHook.PreStops...)
-		postStops = append(postStops, userDefinedHook.PostStops...)
-		preTerminates = append(preTerminates, userDefinedHook.PreTerminates...)
-		postTerminates = append(postTerminates, userDefinedHook.PostTerminates...)
+		userVal := reflect.ValueOf(userDefinedHook)
+		for i := range hooksType.NumField() {
+			field := hooksVal.Field(i)
+			field.Set(reflect.AppendSlice(field, userVal.Field(i)))
+		}
 	}
 
-	// finally, append the default post-hooks
+	// Finally, append the default post-hooks.
 	for _, defaultHook := range defaultHooks {
-		postCreates = append(postCreates, defaultHook.PostCreates...)
-		postStarts = append(postStarts, defaultHook.PostStarts...)
-		postReadies = append(postReadies, defaultHook.PostReadies...)
-		postStops = append(postStops, defaultHook.PostStops...)
-		postTerminates = append(postTerminates, defaultHook.PostTerminates...)
+		defaultVal := reflect.ValueOf(defaultHook)
+		for i := range hooksType.NumField() {
+			if strings.HasPrefix(hooksType.Field(i).Name, "Post") {
+				field := hooksVal.Field(i)
+				field.Set(reflect.AppendSlice(field, defaultVal.Field(i)))
+			}
+		}
 	}
 
-	return ContainerLifecycleHooks{
-		PreCreates:     preCreates,
-		PostCreates:    postCreates,
-		PreStarts:      preStarts,
-		PostStarts:     postStarts,
-		PostReadies:    postReadies,
-		PreStops:       preStops,
-		PostStops:      postStops,
-		PreTerminates:  preTerminates,
-		PostTerminates: postTerminates,
-	}
+	return hooks
 }
 
 func mergePortBindings(configPortMap, exposedPortMap nat.PortMap, exposedPorts []string) nat.PortMap {
@@ -610,7 +613,28 @@ func mergePortBindings(configPortMap, exposedPortMap nat.PortMap, exposedPorts [
 			exposedPortMap[k] = v
 		}
 	}
+
+	// Fix: Ensure that ports with empty HostPort get "0" for automatic allocation
+	// This fixes the UDP port binding issue where ports were getting HostPort:0 instead of being allocated
+	for k, v := range exposedPortMap {
+		for i := range v {
+			if v[i].HostPort == "" {
+				v[i].HostPort = "0" // Tell Docker to allocate a random port
+			}
+		}
+		exposedPortMap[k] = v
+	}
+
 	return exposedPortMap
+}
+
+// defaultHostConfigModifier provides a default modifier including the deprecated fields
+func defaultConfigModifier(req ContainerRequest) func(config *container.Config) {
+	return func(config *container.Config) {
+		config.Hostname = req.Hostname
+		config.WorkingDir = req.WorkingDir
+		config.User = req.User
+	}
 }
 
 // defaultHostConfigModifier provides a default modifier including the deprecated fields
@@ -623,5 +647,7 @@ func defaultHostConfigModifier(req ContainerRequest) func(hostConfig *container.
 		hostConfig.ExtraHosts = req.ExtraHosts
 		hostConfig.NetworkMode = req.NetworkMode
 		hostConfig.Resources = req.Resources
+		hostConfig.Privileged = req.Privileged
+		hostConfig.ShmSize = req.ShmSize
 	}
 }

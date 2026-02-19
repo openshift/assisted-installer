@@ -1,4 +1,4 @@
-# dario.cat/mergo v1.0.1
+# dario.cat/mergo v1.0.2
 ## explicit; go 1.13
 dario.cat/mergo
 # github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161
@@ -43,6 +43,13 @@ github.com/cenkalti/backoff/v4
 # github.com/cespare/xxhash/v2 v2.3.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
+# github.com/containerd/errdefs v1.0.0
+## explicit; go 1.20
+github.com/containerd/errdefs
+# github.com/containerd/errdefs/pkg v0.3.0
+## explicit; go 1.22
+github.com/containerd/errdefs/pkg/errhttp
+github.com/containerd/errdefs/pkg/internal/cause
 # github.com/containerd/log v0.1.0
 ## explicit; go 1.20
 github.com/containerd/log
@@ -92,7 +99,7 @@ github.com/coreos/vcontext/path
 github.com/coreos/vcontext/report
 github.com/coreos/vcontext/tree
 github.com/coreos/vcontext/validate
-# github.com/cpuguy83/dockercfg v0.3.1
+# github.com/cpuguy83/dockercfg v0.3.2
 ## explicit; go 1.13
 github.com/cpuguy83/dockercfg
 # github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
@@ -105,12 +112,14 @@ github.com/distribution/reference
 ## explicit
 github.com/docker/distribution/digestset
 github.com/docker/distribution/reference
-# github.com/docker/docker v27.3.1+incompatible
+# github.com/docker/docker v28.5.1+incompatible
 ## explicit
 github.com/docker/docker/api
 github.com/docker/docker/api/types
 github.com/docker/docker/api/types/blkiodev
+github.com/docker/docker/api/types/build
 github.com/docker/docker/api/types/checkpoint
+github.com/docker/docker/api/types/common
 github.com/docker/docker/api/types/container
 github.com/docker/docker/api/types/events
 github.com/docker/docker/api/types/filters
@@ -118,6 +127,7 @@ github.com/docker/docker/api/types/image
 github.com/docker/docker/api/types/mount
 github.com/docker/docker/api/types/network
 github.com/docker/docker/api/types/registry
+github.com/docker/docker/api/types/storage
 github.com/docker/docker/api/types/strslice
 github.com/docker/docker/api/types/swarm
 github.com/docker/docker/api/types/swarm/runtime
@@ -126,16 +136,9 @@ github.com/docker/docker/api/types/time
 github.com/docker/docker/api/types/versions
 github.com/docker/docker/api/types/volume
 github.com/docker/docker/client
-github.com/docker/docker/errdefs
-github.com/docker/docker/internal/multierror
-github.com/docker/docker/pkg/archive
-github.com/docker/docker/pkg/idtools
-github.com/docker/docker/pkg/ioutils
 github.com/docker/docker/pkg/jsonmessage
-github.com/docker/docker/pkg/pools
 github.com/docker/docker/pkg/stdcopy
-github.com/docker/docker/pkg/system
-# github.com/docker/go-connections v0.5.0
+# github.com/docker/go-connections v0.6.0
 ## explicit; go 1.18
 github.com/docker/go-connections/nat
 github.com/docker/go-connections/sockets
@@ -143,6 +146,12 @@ github.com/docker/go-connections/tlsconfig
 # github.com/docker/go-units v0.5.0
 ## explicit
 github.com/docker/go-units
+# github.com/ebitengine/purego v0.8.4
+## explicit; go 1.18
+github.com/ebitengine/purego
+github.com/ebitengine/purego/internal/cgo
+github.com/ebitengine/purego/internal/fakecgo
+github.com/ebitengine/purego/internal/strings
 # github.com/emicklei/go-restful/v3 v3.12.2
 ## explicit; go 1.13
 github.com/emicklei/go-restful/v3
@@ -324,7 +333,7 @@ github.com/lib/pq/scram
 # github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0
 ## explicit; go 1.16
 github.com/lufia/plan9stats
-# github.com/magiconair/properties v1.8.7
+# github.com/magiconair/properties v1.8.10
 ## explicit; go 1.19
 github.com/magiconair/properties
 # github.com/mailru/easyjson v0.7.7
@@ -345,14 +354,19 @@ github.com/mitchellh/mapstructure
 # github.com/moby/docker-image-spec v1.3.1
 ## explicit; go 1.18
 github.com/moby/docker-image-spec/specs-go/v1
+# github.com/moby/go-archive v0.1.0
+## explicit; go 1.23.0
+github.com/moby/go-archive
+github.com/moby/go-archive/compression
+github.com/moby/go-archive/tarheader
 # github.com/moby/patternmatcher v0.6.0
 ## explicit; go 1.19
 github.com/moby/patternmatcher
 github.com/moby/patternmatcher/ignorefile
-# github.com/moby/sys/sequential v0.5.0
+# github.com/moby/sys/sequential v0.6.0
 ## explicit; go 1.17
 github.com/moby/sys/sequential
-# github.com/moby/sys/user v0.3.0
+# github.com/moby/sys/user v0.4.0
 ## explicit; go 1.17
 github.com/moby/sys/user
 # github.com/moby/sys/userns v0.1.0
@@ -423,7 +437,7 @@ github.com/onsi/gomega/types
 # github.com/opencontainers/go-digest v1.0.0
 ## explicit; go 1.13
 github.com/opencontainers/go-digest
-# github.com/opencontainers/image-spec v1.1.0
+# github.com/opencontainers/image-spec v1.1.1
 ## explicit; go 1.18
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
@@ -597,17 +611,14 @@ github.com/prometheus/procfs/internal/util
 # github.com/rh-ecosystem-edge/preinstall-utils v0.0.0-20240722132034-cf015589a8b3
 ## explicit; go 1.20
 github.com/rh-ecosystem-edge/preinstall-utils/pkg
-# github.com/shirou/gopsutil/v3 v3.23.12
-## explicit; go 1.15
-github.com/shirou/gopsutil/v3/common
-github.com/shirou/gopsutil/v3/cpu
-github.com/shirou/gopsutil/v3/internal/common
-github.com/shirou/gopsutil/v3/mem
-github.com/shirou/gopsutil/v3/net
-github.com/shirou/gopsutil/v3/process
-# github.com/shoenig/go-m1cpu v0.1.6
-## explicit; go 1.20
-github.com/shoenig/go-m1cpu
+# github.com/shirou/gopsutil/v4 v4.25.6
+## explicit; go 1.23
+github.com/shirou/gopsutil/v4/common
+github.com/shirou/gopsutil/v4/cpu
+github.com/shirou/gopsutil/v4/internal/common
+github.com/shirou/gopsutil/v4/mem
+github.com/shirou/gopsutil/v4/net
+github.com/shirou/gopsutil/v4/process
 # github.com/sirupsen/logrus v1.9.3
 ## explicit; go 1.13
 github.com/sirupsen/logrus
@@ -633,14 +644,16 @@ github.com/stretchr/objx
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/assert/yaml
 github.com/stretchr/testify/mock
-# github.com/testcontainers/testcontainers-go v0.33.0
-## explicit; go 1.21
+github.com/stretchr/testify/require
+# github.com/testcontainers/testcontainers-go v0.40.0
+## explicit; go 1.24.0
 github.com/testcontainers/testcontainers-go
 github.com/testcontainers/testcontainers-go/exec
 github.com/testcontainers/testcontainers-go/internal
 github.com/testcontainers/testcontainers-go/internal/config
 github.com/testcontainers/testcontainers-go/internal/core
 github.com/testcontainers/testcontainers-go/internal/core/network
+github.com/testcontainers/testcontainers-go/log
 github.com/testcontainers/testcontainers-go/wait
 # github.com/thoas/go-funk v0.9.3
 ## explicit; go 1.13
@@ -666,7 +679,7 @@ github.com/vincent-petithory/dataurl
 # github.com/x448/float16 v0.8.4
 ## explicit; go 1.11
 github.com/x448/float16
-# github.com/yusufpapurcu/wmi v1.2.3
+# github.com/yusufpapurcu/wmi v1.2.4
 ## explicit; go 1.16
 github.com/yusufpapurcu/wmi
 # go.mongodb.org/mongo-driver v1.14.0

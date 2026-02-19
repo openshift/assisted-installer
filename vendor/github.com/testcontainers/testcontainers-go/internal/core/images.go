@@ -39,7 +39,6 @@ func ExtractImagesFromDockerfile(dockerfile string, buildArgs map[string]*string
 
 // ExtractImagesFromReader extracts images from the Dockerfile sourced from r.
 func ExtractImagesFromReader(r io.Reader, buildArgs map[string]*string) ([]string, error) {
-	var images []string
 	var lines []string
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
@@ -48,6 +47,8 @@ func ExtractImagesFromReader(r io.Reader, buildArgs map[string]*string) ([]strin
 	if scanner.Err() != nil {
 		return nil, scanner.Err()
 	}
+
+	images := make([]string, 0, len(lines))
 
 	// extract images from dockerfile
 	for _, line := range lines {
@@ -106,7 +107,7 @@ func ExtractRegistry(image string, fallback string) string {
 	return fallback
 }
 
-// IsURL checks if the string is an URL.
+// IsURL checks if the string is a URL.
 // Extracted from https://github.com/asaskevich/govalidator/blob/f21760c49a8d/validator.go#L104
 func IsURL(str string) bool {
 	if str == "" || utf8.RuneCountInString(str) >= maxURLRuneCount || len(str) <= minURLRuneCount || strings.HasPrefix(str, ".") {
