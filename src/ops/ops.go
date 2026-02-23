@@ -1263,22 +1263,29 @@ func (o *ops) CopyRegistryData(liveLogger io.Writer, device string) error {
 		return err
 	}
 
-	// Calculate the target free percent of the device
-	freePercent, err := o.calculateFreePercent(device, &registryDataSize)
+	// Calculate the target free percent of the device. Reserve at least 2.5 times
+	// the current data registry size.
+	requestedSize := registryDataSize * 5 / 2
+	freePercent, err := o.calculateFreePercent(device, &requestedSize)
 	if err != nil {
 		return err
 	}
-	if freePercent == 0 {
-		return errors.Errorf("device %s is not large enough to fit the registry data", device)
+	o.log.Infof("Requesting at least %d bytes for the root partition on device %s (current registry size: %d bytes)", requestedSize, device, registryDataSize)
+	// Ensure to have at least some minimum free space available otherwise coreos-gpt-setup.service may fail on the next reboot,
+	// since it requires at least some free blocks at the end of the disk.
+	minAllowedFreePercent := int64(1)
+	if freePercent < minAllowedFreePercent {
+		return errors.Errorf("device %s is not large enough to fit the registry data (%d bytes)", device, requestedSize)
 	}
 
-	// Generate command for growing root partition to fit the registry data
-	growPartCmd := makecmd(nil, "growpart", fmt.Sprintf("--free-percent=%d", freePercent), device, "4")
+	// Generate command for growing root partition to fit the requested size
+	partIndex := "4"
+	growPartCmd := makecmd(nil, "growpart", fmt.Sprintf("--free-percent=%d", freePercent), device, partIndex)
 
 	// Get root partition path
-	partition4, err := o.getPartitionPathFromLsblk(device, "4")
+	partition4, err := o.getPartitionPathFromLsblk(device, partIndex)
 	if err != nil {
-		return errors.Wrapf(err, "failed to find partition 4 for device %s", device)
+		return errors.Wrapf(err, "failed to find partition %s for device %s", partIndex, device)
 	}
 
 	// Generate the path to the registry data directory on the mounted root partitio
@@ -1289,18 +1296,43 @@ func (o *ops) CopyRegistryData(liveLogger io.Writer, device string) error {
 
 	// Generate the command for unfreezing the root partition (frozen by OverwriteOsImage func)
 	// Ignoring errors if the partition is already unfrozen
-	fsUnfreezeCmd := makecmd(nil, "sh", "-c", "fsfreeze --unfreeze /mnt/root || true")
+	mntTmpPath := "/mnt/root"
+	fsUnfreezeCmd := makecmd(nil, "sh", "-c", fmt.Sprintf("fsfreeze --unfreeze %s || true", mntTmpPath))
+	fsFreezeCmd := makecmd(nil, "fsfreeze", "--freeze", mntTmpPath)
+	mountCmd := makecmd(nil, "mount", partition4, mntTmpPath)
+	unmountCmd := makecmd(nil, "umount", mntTmpPath)
+
+	ignTransposeScript := "/usr/lib/dracut/modules.d/40ignition-ostree/ignition-ostree-transposefs.sh"
+	// The transposefs script does not have a way to apply unconditionally the autosave-xfs command
+	xfsForceAutosaveCmd := makecmd(nil, "bash", "-c", fmt.Sprintf(`sed 's/threshold=[0-9]*/threshold=0/' %s | bash -s autosave-xfs`, ignTransposeScript))
+	xfsRestoreCommand := makecmd(nil, "bash", "-c", fmt.Sprintf("%s restore", ignTransposeScript))
+	xfsCleanupCommand := makecmd(nil, "bash", "-c", fmt.Sprintf("%s cleanup", ignTransposeScript))
 
 	cmds := []*cmd{
-		makecmd(nil, "mkdir", "-p", "/mnt/root"),
-		makecmd(nil, "mount", partition4, "/mnt/root"),
+		makecmd(nil, "mkdir", "-p", mntTmpPath),
+
+		// Unfreeze
+		mountCmd,
 		fsUnfreezeCmd,
+		unmountCmd, // This is required before invoking the autosave-xfs
+
+		// Extend the root partition to allow the autosave-xfs command to recalculate the new AG size
+		// before copying the InternalReleaseImage registry data.
+		// See https://github.com/coreos/fedora-coreos-tracker/issues/1183 for more details.
 		growPartCmd,
-		makecmd(nil, "xfs_growfs", "/mnt/root"),
+		xfsForceAutosaveCmd,
+		xfsRestoreCommand,
+		xfsCleanupCommand,
+
+		// Copy registry data
+		mountCmd, // Re-mount before copying data
+		makecmd(nil, "xfs_growfs", mntTmpPath),
 		makecmd(nil, "mkdir", "-p", registryDataDirOnRoot),
 		copyCmd,
-		makecmd(nil, "fsfreeze", "--freeze", "/mnt/root"),
-		makecmd(nil, "umount", "/mnt/root"),
+
+		// Freeze
+		fsFreezeCmd,
+		unmountCmd,
 	}
 	for i := range cmds {
 		c := cmds[i]
