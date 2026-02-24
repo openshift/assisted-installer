@@ -11,11 +11,30 @@
     "enabledManagers": [
         "custom.regex",
         "tekton",
+        "gomod",
         "rpm-lockfile"
     ],
 
     "tekton": {
         "fileMatch": ["^.tekton/*"]
+    },
+
+    "gomod": {
+        "postUpdateOptions": [
+            "gomodUpdateImportPaths",
+            "gomodTidy"
+        ],
+        "packageRules": [
+            {
+                "matchManagers": [
+                    "gomod"
+                ],
+                "matchDepTypes": [
+                    "indirect"
+                ],
+                "enabled": false
+            }
+        ]
     },
 
     "customManagers": [
@@ -143,6 +162,26 @@
             "matchManagers": [
                 "rpm-lockfile"
             ]
+        },
+        {
+            "matchManagers": [
+                "gomod"
+            ],
+            "enabled": false
+        },
+        {
+            "matchManagers": [
+                "gomod"
+            ],
+            "matchPackageNames": [
+                "github.com/openshift/hive/apis"
+            ],
+            "groupName": "Hive API Synchronization",
+            "addLabels": [
+                "hive-api",
+                "api-sync"
+            ],
+            "enabled": true
         }
     ]
 }
