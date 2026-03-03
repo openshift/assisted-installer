@@ -1256,7 +1256,7 @@ var _ = Describe("Copy registry data", func() {
 				"du",
 				"-sb",
 				dataDir)...).Return(strconv.FormatInt(int64(registryDataSize), 10), nil).Times(1)
-		// Mock lsblk calls for partition path discovery
+		// Mock lsblk calls for partition path discovery / calculateFreePercent function
 		execMock.EXPECT().ExecCommand(nil, "nsenter",
 			append([]interface{}{},
 				"--target",
@@ -1269,21 +1269,22 @@ var _ = Describe("Copy registry data", func() {
 				"lsblk",
 				"--bytes",
 				"--json",
-				device)...).Return(formatResult(device), nil).Times(1)
-		// Mock lsblk call for calculateFreePercent function
-		execMock.EXPECT().ExecCommand(nil, "nsenter",
-			append([]interface{}{},
-				"--target",
-				"1",
-				"--cgroup",
-				"--mount",
-				"--ipc",
-				"--pid",
-				"--",
-				"lsblk",
-				"--bytes",
-				"--json",
-				device)...).Return(formatResult(device), nil)
+				device)...).Return(formatResult(device), nil).Times(2)
+
+		mockPrivileged("mkdir", "-p", "/mnt/root")
+		mockPrivileged("mount", part4, "/mnt/root")
+		mockPrivileged("sh", "-c", "fsfreeze --unfreeze /mnt/root || true")
+		mockPrivileged("umount", "/mnt/root")
+
+		mockPrivileged("growpart", "--free-percent=42", device, "4")
+		mockPrivileged("bash", "-c", "sed 's/threshold=[0-9]*/threshold=0/' /usr/lib/dracut/modules.d/40ignition-ostree/ignition-ostree-transposefs.sh | bash -s autosave-xfs")
+		mockPrivileged("bash", "-c", "/usr/lib/dracut/modules.d/40ignition-ostree/ignition-ostree-transposefs.sh restore")
+		mockPrivileged("bash", "-c", "/usr/lib/dracut/modules.d/40ignition-ostree/ignition-ostree-transposefs.sh cleanup")
+
+		mockPrivileged("mount", part4, "/mnt/root")
+		mockPrivileged("xfs_growfs", "/mnt/root")
+		mockPrivileged("mkdir", "-p", registryDataDirOnRoot)
+
 		// Mock rsync call
 		execMock.EXPECT().ExecCommand(io.Discard, "nsenter",
 			append([]interface{}{},
@@ -1298,14 +1299,9 @@ var _ = Describe("Copy registry data", func() {
 				"-c",
 				fmt.Sprintf("rsync -ah --info=progress2 %s/ %s/", dataDir, registryDataDirOnRoot))...).Return("", nil).Times(1)
 
-		mockPrivileged("mkdir", "-p", "/mnt/root")
-		mockPrivileged("mount", part4, "/mnt/root")
-		mockPrivileged("sh", "-c", "fsfreeze --unfreeze /mnt/root || true")
-		mockPrivileged("growpart", "--free-percent=74", device, "4")
-		mockPrivileged("xfs_growfs", "/mnt/root")
-		mockPrivileged("mkdir", "-p", registryDataDirOnRoot)
 		mockPrivileged("fsfreeze", "--freeze", "/mnt/root")
 		mockPrivileged("umount", "/mnt/root")
+
 		err := o.CopyRegistryData(io.Discard, device)
 		Expect(err).ToNot(HaveOccurred())
 	}
