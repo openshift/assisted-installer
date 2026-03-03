@@ -38,7 +38,6 @@ import (
 	certificatesClient "k8s.io/client-go/kubernetes/typed/certificates/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
-	runtimeconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-installer/src/utils"
@@ -89,6 +88,7 @@ type K8SClient interface {
 	IsClusterCapabilityEnabled(configv1.ClusterVersionCapability) (bool, error)
 	UntaintNode(name string) error
 	PatchMachineConfigPoolPaused(pause bool, mcpName string) error
+	GetMachineConfig(ctx context.Context, name string) (*mcfgv1.MachineConfig, error)
 }
 
 type K8SClientBuilder func(configPath string, logger logrus.FieldLogger) (K8SClient, error)
@@ -133,32 +133,33 @@ func NewK8SClient(configPath string, logger logrus.FieldLogger) (K8SClient, erro
 	if err != nil {
 		return &k8sClient{}, errors.Wrap(err, "creating openshift config client")
 	}
-	var runtimeClient runtimeclient.Client
-	if configPath == "" {
-		scheme := runtime.NewScheme()
-		err = clientgoscheme.AddToScheme(scheme)
-		if err != nil {
-			return &k8sClient{}, errors.Wrap(err, "failed to add scheme to")
-		}
 
-		err = metal3v1alpha1.AddToScheme(scheme)
-		if err != nil {
-			return &k8sClient{}, errors.Wrap(err, "failed to add BMH scheme")
-		}
-		err = machinev1beta1.AddToScheme(scheme)
-		if err != nil {
-			return &k8sClient{}, errors.Wrap(err, "failed to add Machine scheme")
-		}
+	// Always create runtime client with full scheme support
+	scheme := runtime.NewScheme()
+	err = clientgoscheme.AddToScheme(scheme)
+	if err != nil {
+		return &k8sClient{}, errors.Wrap(err, "failed to add scheme to")
+	}
 
-		err = mcfgv1.AddToScheme(scheme)
-		if err != nil {
-			return &k8sClient{}, errors.Wrap(err, "failed to add MCP scheme")
-		}
+	err = metal3v1alpha1.AddToScheme(scheme)
+	if err != nil {
+		return &k8sClient{}, errors.Wrap(err, "failed to add BMH scheme")
+	}
 
-		runtimeClient, err = runtimeclient.New(runtimeconfig.GetConfigOrDie(), runtimeclient.Options{Scheme: scheme})
-		if err != nil {
-			return &k8sClient{}, errors.Wrap(err, "failed to create runtime client")
-		}
+	err = machinev1beta1.AddToScheme(scheme)
+	if err != nil {
+		return &k8sClient{}, errors.Wrap(err, "failed to add Machine scheme")
+	}
+
+	err = mcfgv1.AddToScheme(scheme)
+	if err != nil {
+		return &k8sClient{}, errors.Wrap(err, "failed to add MCP scheme")
+	}
+
+	// Use the config we already loaded (works with both in-cluster and kubeconfig)
+	runtimeClient, err := runtimeclient.New(config, runtimeclient.Options{Scheme: scheme})
+	if err != nil {
+		return &k8sClient{}, errors.Wrap(err, "failed to create runtime client")
 	}
 
 	return &k8sClient{logger, client, ocClient, csvClient, runtimeClient, csrClient,
@@ -712,4 +713,15 @@ func (c *k8sClient) PatchMachineConfigPoolPaused(pause bool, mcpName string) err
 	pausePatch := []byte(fmt.Sprintf("{\"spec\":{\"paused\":%t}}", pause))
 	c.log.Infof("Setting pause MCP %s to %t", mcpName, pause)
 	return c.runtimeClient.Patch(context.TODO(), mcp, runtimeclient.RawPatch(types.MergePatchType, pausePatch))
+}
+
+func (c *k8sClient) GetMachineConfig(ctx context.Context, name string) (*mcfgv1.MachineConfig, error) {
+	mc := &mcfgv1.MachineConfig{}
+
+	err := c.runtimeClient.Get(ctx, types.NamespacedName{Name: name}, mc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get MachineConfig %s: %w", name, err)
+	}
+
+	return mc, nil
 }

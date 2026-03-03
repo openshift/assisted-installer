@@ -28,7 +28,9 @@ import (
 	"github.com/sirupsen/logrus"
 	gomock "go.uber.org/mock/gomock"
 	v1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestValidator(t *testing.T) {
@@ -141,6 +143,29 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							},
 						},
 					}, nil)
+			}
+
+			// waitForMCAnnotationsConsistentSuccess sets expectations for the MC annotations
+			// check that runs after waitForWorkers (bootstrap only). Call after WaitMasterNodesSucccess
+			// so that ListNodesByRole("master") expectations are consumed in the right order.
+			waitForMCAnnotationsConsistentSuccess := func() {
+				masterNodesWithMCAnnotations := &v1.NodeList{
+					Items: []v1.Node{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "master-0",
+								Annotations: map[string]string{
+									"machineconfiguration.openshift.io/currentConfig": "rendered-master-12345",
+									"machineconfiguration.openshift.io/desiredConfig": "rendered-master-12345",
+									"machineconfiguration.openshift.io/state":         "Done",
+								},
+							},
+						},
+					},
+				}
+
+				mockk8sclient.EXPECT().ListNodesByRole("master").Return(masterNodesWithMCAnnotations, nil).MinTimes(1)
+				mockk8sclient.EXPECT().GetMachineConfig(gomock.Any(), gomock.Any()).Return(&mcfgv1.MachineConfig{}, nil).MinTimes(1)
 			}
 
 			setupInvoker := func(invoker ...string) {
@@ -401,6 +426,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							waitForETCDBootstrapSuccess()
 							bootstrapETCDStatusSuccess()
 							resolvConfSuccess()
+							waitForMCAnnotationsConsistentSuccess()
 							waitForControllerSuccessfully(conf.ClusterID)
 							//HostRoleMaster flow:
 							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
@@ -438,6 +464,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							bootstrapETCDStatusSuccess()
 							resolvConfSuccess()
 							waitForControllerSuccessfully(conf.ClusterID)
+							waitForMCAnnotationsConsistentSuccess()
 							//HostRoleMaster flow:
 							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 							writeToDiskSuccess(gomock.Any())
@@ -476,6 +503,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							bootstrapETCDStatusSuccess()
 							resolvConfSuccess()
 							waitForControllerSuccessfully(conf.ClusterID)
+							waitForMCAnnotationsConsistentSuccess()
 							//HostRoleMaster flow:
 							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 							writeToDiskSuccess(gomock.Any())
@@ -514,6 +542,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							bootstrapETCDStatusSuccess()
 							resolvConfSuccess()
 							waitForControllerSuccessfully(conf.ClusterID)
+							waitForMCAnnotationsConsistentSuccess()
 							//HostRoleMaster flow:
 							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 							writeToDiskSuccess(gomock.Any())
@@ -561,6 +590,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							bootstrapETCDStatusSuccess()
 							resolvConfSuccess()
 							waitForControllerSuccessfully(conf.ClusterID)
+							waitForMCAnnotationsConsistentSuccess()
 							//HostRoleMaster flow:
 							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 							writeToDiskSuccess(gomock.Any())
@@ -597,6 +627,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							bootstrapETCDStatusSuccess()
 							resolvConfSuccess()
 							waitForControllerSuccessfully(conf.ClusterID)
+							waitForMCAnnotationsConsistentSuccess()
 							//HostRoleMaster flow:
 							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 							writeToDiskSuccess(gomock.Any())
@@ -633,6 +664,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							bootstrapETCDStatusSuccess()
 							resolvConfSuccess()
 							waitForControllerSuccessfully(conf.ClusterID)
+							waitForMCAnnotationsConsistentSuccess()
 							//HostRoleMaster flow:
 							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 							writeToDiskSuccess(gomock.Any())
@@ -670,6 +702,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							bootstrapETCDStatusSuccess()
 							resolvConfSuccess()
 							waitForControllerSuccessfully(conf.ClusterID)
+							waitForMCAnnotationsConsistentSuccess()
 							//HostRoleMaster flow:
 							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 							writeToDiskSuccess(gomock.Any())
@@ -712,6 +745,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							resolvConfSuccess()
 							waitForControllerSuccessfully(conf.ClusterID)
 							waitForWorkersSuccessfully()
+							waitForMCAnnotationsConsistentSuccess()
 							//HostRoleMaster flow:
 							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 							writeToDiskSuccess(gomock.Any())
@@ -754,6 +788,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							resolvConfSuccess()
 							waitForControllerSuccessfully(conf.ClusterID)
 							waitForWorkersSuccessfully()
+							waitForMCAnnotationsConsistentSuccess()
 							//HostRoleMaster flow:
 							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 							writeToDiskSuccess(gomock.Any())
@@ -834,6 +869,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					bootstrapETCDStatusSuccess()
 					resolvConfSuccess()
 					waitForControllerSuccessfully(conf.ClusterID)
+					waitForMCAnnotationsConsistentSuccess()
 					//HostRoleMaster flow:
 					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 					writeToDiskSuccess(gomock.Any())
@@ -871,6 +907,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					bootstrapETCDStatusSuccess()
 					resolvConfSuccess()
 					waitForControllerSuccessfully(conf.ClusterID)
+					waitForMCAnnotationsConsistentSuccess()
 					//HostRoleMaster flow:
 					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 					writeToDiskSuccess(gomock.Any())
@@ -988,6 +1025,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							bootstrapETCDStatusSuccess()
 							resolvConfSuccess()
 							waitForControllerSuccessfully(conf.ClusterID)
+							waitForMCAnnotationsConsistentSuccess()
 							//HostRoleMaster flow:
 							downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
 							writeToDiskSuccess(gomock.Any())
@@ -1524,3 +1562,179 @@ func GetNotReadyKubeNodes(kubeNamesIds map[string]string) *v1.NodeList {
 	}
 	return newNodeList
 }
+
+var _ = Describe("Testing installer.waitForMCAnnotationsConsistent", func() {
+	var (
+		ctrl *gomock.Controller
+
+		mockk8sclient *k8s_client.MockK8SClient
+		installer     = NewAssistedInstaller(logrus.New(), config.Config{}, nil, nil, nil, nil, nil)
+
+		originalGeneralWaitInterval time.Duration
+	)
+
+	validateIsContextDeadlineExceededError := func(err error) {
+		Expect(err).Should(HaveOccurred())
+		Expect(err).Should(MatchError(context.DeadlineExceeded))
+	}
+
+	type NodeToMock struct {
+		Name          string
+		CurrentConfig *string
+		DesiredConfig *string
+	}
+
+	addMasterNodesToMock := func(nodes ...NodeToMock) {
+		nodeList := &v1.NodeList{}
+		for _, node := range nodes {
+			annotations := make(map[string]string)
+
+			if node.CurrentConfig != nil {
+				annotations["machineconfiguration.openshift.io/currentConfig"] = *node.CurrentConfig
+			}
+
+			if node.DesiredConfig != nil {
+				annotations["machineconfiguration.openshift.io/desiredConfig"] = *node.DesiredConfig
+			}
+
+			nodeList.Items = append(nodeList.Items, v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        node.Name,
+					Annotations: annotations,
+				},
+			})
+		}
+
+		mockk8sclient.EXPECT().ListNodesByRole("master").Return(nodeList, nil).MinTimes(1)
+	}
+
+	addMachineConfigToMock := func(name string, exists bool) {
+		if exists {
+			mockk8sclient.EXPECT().GetMachineConfig(gomock.Any(), name).Return(&mcfgv1.MachineConfig{}, nil).AnyTimes()
+		} else {
+			mockk8sclient.EXPECT().GetMachineConfig(gomock.Any(), name).Return(nil, k8serrors.NewNotFound(v1.Resource("machineconfig"), name)).AnyTimes()
+		}
+	}
+
+	itShouldFailWhenContextExpires := func() {
+		It("should return an error when the context expired", func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*generalWaitInterval)
+
+			err := installer.waitForMCAnnotationsConsistent(ctx, mockk8sclient)
+			validateIsContextDeadlineExceededError(err)
+
+			cancel() // Should be already cancelled
+		}, float64(1)) // 1 second timeout
+	}
+
+	BeforeEach(func() {
+		ctrl = gomock.NewController(GinkgoT())
+		mockk8sclient = k8s_client.NewMockK8SClient(ctrl)
+
+		originalGeneralWaitInterval = generalWaitInterval
+		generalWaitInterval = 200 * time.Millisecond // Override package-level interval mutated by HostRoleMaster tests
+	})
+
+	AfterEach(func() {
+		generalWaitInterval = originalGeneralWaitInterval
+
+		ctrl.Finish()
+	})
+
+	Context("happy path", func() {
+		When("one master is mco-ready", func() {
+			BeforeEach(func() {
+				addMasterNodesToMock(NodeToMock{Name: "master-0", CurrentConfig: ptr.To("a"), DesiredConfig: ptr.To("a")})
+				addMachineConfigToMock("a", true)
+			})
+
+			It("should return nil", func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 2*generalWaitInterval)
+
+				err := installer.waitForMCAnnotationsConsistent(ctx, mockk8sclient)
+				Expect(err).Should(BeNil())
+
+				cancel()
+			}, float64(1)) // 1 second timeout
+		})
+
+		When("two masters are mco-ready and consistent", func() {
+			BeforeEach(func() {
+				addMasterNodesToMock(
+					NodeToMock{Name: "master-0", CurrentConfig: ptr.To("a"), DesiredConfig: ptr.To("a")},
+					NodeToMock{Name: "master-1", CurrentConfig: ptr.To("a"), DesiredConfig: ptr.To("a")},
+				)
+				addMachineConfigToMock("a", true)
+			})
+
+			It("should return nil", func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 2*generalWaitInterval)
+
+				err := installer.waitForMCAnnotationsConsistent(ctx, mockk8sclient)
+				Expect(err).Should(BeNil())
+
+				cancel()
+			}, float64(1)) // 1 second timeout
+		})
+	})
+
+	When("no masters are found", func() {
+		BeforeEach(func() {
+			mockk8sclient.EXPECT().ListNodesByRole("master").Return(&v1.NodeList{}, nil).MinTimes(1)
+		})
+
+		itShouldFailWhenContextExpires()
+	})
+
+	When("one master is returned", func() {
+		Context("and the currentConfig annotation is not set", func() {
+			BeforeEach(func() {
+				addMasterNodesToMock(NodeToMock{Name: "master-0", CurrentConfig: nil, DesiredConfig: ptr.To("a")})
+			})
+
+			itShouldFailWhenContextExpires()
+		})
+
+		Context("and the desiredConfig annotation is not set", func() {
+			BeforeEach(func() {
+				addMasterNodesToMock(NodeToMock{Name: "master-0", CurrentConfig: ptr.To("a"), DesiredConfig: nil})
+			})
+
+			itShouldFailWhenContextExpires()
+		})
+
+		Context("and the current machine config doesn't exist", func() {
+			BeforeEach(func() {
+				addMasterNodesToMock(NodeToMock{Name: "master-0", CurrentConfig: ptr.To("a"), DesiredConfig: ptr.To("b")})
+				addMachineConfigToMock("a", false)
+				addMachineConfigToMock("b", true)
+			})
+
+			itShouldFailWhenContextExpires()
+		})
+
+		Context("and the desired machine config doesn't exist", func() {
+			BeforeEach(func() {
+				addMasterNodesToMock(NodeToMock{Name: "master-0", CurrentConfig: ptr.To("a"), DesiredConfig: ptr.To("b")})
+				addMachineConfigToMock("a", true)
+				addMachineConfigToMock("b", false)
+			})
+
+			itShouldFailWhenContextExpires()
+		})
+
+	})
+
+	When("several masters are returned", func() {
+		Context("and two nodes don't have consistent desiredConfig annotations", func() {
+			BeforeEach(func() {
+				addMasterNodesToMock(NodeToMock{Name: "master-0", CurrentConfig: ptr.To("a"), DesiredConfig: ptr.To("b")}, NodeToMock{Name: "master-1", CurrentConfig: ptr.To("a"), DesiredConfig: ptr.To("c")})
+				addMachineConfigToMock("a", true)
+				addMachineConfigToMock("b", true)
+				addMachineConfigToMock("c", true)
+			})
+
+			itShouldFailWhenContextExpires()
+		})
+	})
+})
