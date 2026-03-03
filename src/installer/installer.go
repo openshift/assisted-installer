@@ -198,6 +198,22 @@ func (i *installer) InstallNode() error {
 		if err = i.waitForWorkers(ctx); err != nil {
 			return err
 		}
+
+		// Wait for MachineConfig annotations on all master nodes to be consistent
+		// before rebooting the bootstrap. This prevents the stale annotation deadlock
+		// where nodes point to non-existent MachineConfigs.
+		var kc k8s_client.K8SClient
+
+		kc, err = i.kcBuilder(KubeconfigPath, i.log)
+		if err != nil {
+			i.log.WithError(err).Error("failed to get K8s client")
+
+			return err
+		}
+
+		if err = i.waitForMCAnnotationsConsistent(ctx, kc); err != nil {
+			return fmt.Errorf("failed to wait for MachineConfig annotations to be consistent: %w", err)
+		}
 	}
 
 	//upload host logs and report log status before reboot
@@ -894,6 +910,76 @@ func (i *installer) waitForNodes(ctx context.Context, minNodes int, role string,
 			}
 		}
 	}
+}
+
+const (
+	mcCurrentConfigAnnotation = "machineconfiguration.openshift.io/currentConfig"
+	mcDesiredConfigAnnotation = "machineconfiguration.openshift.io/desiredConfig"
+	mcStateAnnotation         = "machineconfiguration.openshift.io/state"
+)
+
+// waitForMCAnnotationsConsistent waits for all master nodes to have MachineConfig annotations
+// that reference existing MachineConfig objects. This prevents the bootstrap from rebooting
+// while nodes have stale annotations pointing to non-existent MachineConfigs.
+func (i *installer) waitForMCAnnotationsConsistent(ctx context.Context, kc k8s_client.K8SClient) error {
+	i.log.Info("Waiting for MachineConfig annotations to be consistent on all master nodes")
+
+	return utils.WaitForPredicateWithContext(ctx, waitForeverTimeout, generalWaitInterval, func() bool {
+		nodes, err := kc.ListNodesByRole("master")
+		if err != nil {
+			i.log.WithError(err).Warn("Failed to list master nodes")
+
+			return false
+		}
+
+		if len(nodes.Items) == 0 {
+			i.log.Infof("No master nodes found, waiting...")
+
+			return false
+		}
+
+		var expectedDesiredConfig string
+		for _, node := range nodes.Items {
+			currentConfig := node.Annotations[mcCurrentConfigAnnotation]
+			desiredConfig := node.Annotations[mcDesiredConfigAnnotation]
+			state := node.Annotations[mcStateAnnotation]
+
+			// Skip if annotations are not set yet
+			if currentConfig == "" || desiredConfig == "" {
+				i.log.Infof("Node %s has no MC annotations yet, waiting...", node.Name)
+				return false
+			}
+
+			// Check if currentConfig exists
+			if _, err := kc.GetMachineConfig(ctx, currentConfig); err != nil {
+				i.log.Warnf("Node %s has currentConfig %s which does not exist (state=%s), waiting...",
+					node.Name, currentConfig, state)
+				return false
+			}
+
+			// Check if desiredConfig exists
+			if _, err := kc.GetMachineConfig(ctx, desiredConfig); err != nil {
+				i.log.Warnf("Node %s has desiredConfig %s which does not exist (state=%s), waiting...",
+					node.Name, desiredConfig, state)
+				return false
+			}
+
+			// Require all master nodes to target the same desiredConfig (pool is converged)
+			if expectedDesiredConfig == "" {
+				expectedDesiredConfig = desiredConfig
+			}
+
+			if desiredConfig != expectedDesiredConfig {
+				i.log.Warnf("Node %s has desiredConfig %s, expected %s (state=%s), waiting...",
+					node.Name, desiredConfig, expectedDesiredConfig, state)
+				return false
+			}
+		}
+
+		i.log.Infof("All master nodes have consistent MachineConfig annotations (desired=%s)", expectedDesiredConfig)
+
+		return true
+	})
 }
 
 func (i *installer) getInventoryHostsMap(hostsMap map[string]inventory_client.HostData) (map[string]inventory_client.HostData, error) {
