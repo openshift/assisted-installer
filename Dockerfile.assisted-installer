@@ -19,7 +19,7 @@ RUN git config --global --add safe.directory '*'; \
 # Extract the commit reference from which the image is built
 RUN git rev-parse --short HEAD > /commit-reference.txt
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:6fc28bcb6776e387d7a35a2056d9d2b985dc4e26031e98a2bd35a7137cd6fd71
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:69f5c9886ecb19b23e88275a5cd904c47dd982dfa370fbbd0c356d7b1047ef68
 
 RUN microdnf install -y util-linux-core && microdnf clean all
 
