@@ -202,6 +202,102 @@ var _ = Describe("installer HostRoleMaster role agent-based installation", func(
 	})
 })
 
+var _ = Describe("parsePullSecretToken", func() {
+	const pullSecretEnvKey = "PULL_SECRET_TOKEN"
+
+	var logger = logrus.New()
+
+	AfterEach(func() {
+		os.Unsetenv(pullSecretEnvKey)
+	})
+
+	createPullSecretFile := func(content string) string {
+		f, err := os.CreateTemp("", "pull-secret-*.txt")
+		Expect(err).ToNot(HaveOccurred())
+
+		_, err = f.WriteString(content)
+		if err != nil {
+			f.Close()
+			os.Remove(f.Name())
+		}
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(f.Close()).To(Succeed())
+
+		return f.Name()
+	}
+
+	It("returns token from file when file contains non-empty content", func() {
+		path := createPullSecretFile("my-secret-token")
+		defer os.Remove(path)
+
+		token, err := parsePullSecretToken(logger, path)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(token).To(Equal("my-secret-token"))
+	})
+
+	It("returns trimmed token when file has leading and trailing whitespace", func() {
+		path := createPullSecretFile("  \t\n my-token \n\t  ")
+		defer os.Remove(path)
+
+		token, err := parsePullSecretToken(logger, path)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(token).To(Equal("my-token"))
+	})
+
+	It("returns token from env when file does not exist and PULL_SECRET_TOKEN is set", func() {
+		os.Setenv(pullSecretEnvKey, "env-when-file-missing")
+
+		token, err := parsePullSecretToken(logger, "/nonexistent/path/pull-secret-token")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(token).To(Equal("env-when-file-missing"))
+	})
+
+	It("returns empty string when file does not exist and PULL_SECRET_TOKEN is unset", func() {
+		token, err := parsePullSecretToken(logger, "/nonexistent/path/pull-secret-token")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(token).To(BeEmpty())
+	})
+
+	It("returns empty string when file is empty (env fallback only when file missing)", func() {
+		path := createPullSecretFile("")
+		defer os.Remove(path)
+		os.Setenv(pullSecretEnvKey, "env-fallback-token")
+
+		token, err := parsePullSecretToken(logger, path)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(token).To(BeEmpty()) // file exists, so file content wins (empty)
+	})
+
+	It("returns empty string when file has only whitespace (env fallback only when file missing)", func() {
+		path := createPullSecretFile("   \n\t  ")
+		defer os.Remove(path)
+		os.Setenv(pullSecretEnvKey, "  env-token \n")
+
+		token, err := parsePullSecretToken(logger, path)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(token).To(BeEmpty()) // file exists, trimmed content is empty
+	})
+
+	It("returns empty string when file is empty and PULL_SECRET_TOKEN is unset", func() {
+		path := createPullSecretFile("")
+		defer os.Remove(path)
+
+		token, err := parsePullSecretToken(logger, path)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(token).To(BeEmpty())
+	})
+
+	It("returns empty string when file has only whitespace and PULL_SECRET_TOKEN is unset", func() {
+		path := createPullSecretFile("   \n\t  ")
+		defer os.Remove(path)
+
+		token, err := parsePullSecretToken(logger, path)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(token).To(BeEmpty())
+	})
+})
+
 // from assisted_installer_controller_test.go
 func GetKubeNodes(kubeNamesIds map[string]string) *v1.NodeList {
 	file, _ := os.ReadFile("../../../test_files/node.json")

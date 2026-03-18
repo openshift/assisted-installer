@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -39,6 +41,7 @@ const (
 	maximumInventoryClientRetries = 15
 	maximumErrorsBeforeExit       = 3
 	bootstrapKubeconfigForSNO     = "/tmp/bootstrap-secrets/kubeconfig"
+	pullSecretPath                = "/etc/assisted-installer-controller/token"
 )
 
 func DryRebootComplete() bool {
@@ -56,6 +59,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
+
+	token, err := parsePullSecretToken(logger, pullSecretPath)
+	if err != nil {
+		log.Fatalf("Failed to parse pull secret token: %v", err)
+	}
+
+	Options.ControllerConfig.PullSecretToken = token
 
 	if Options.ControllerConfig.DryRunEnabled {
 		if err = config.DryParseClusterHosts(Options.ControllerConfig.DryRunClusterHostsPath, &Options.ControllerConfig.ParsedClusterHosts); err != nil {
@@ -334,4 +344,22 @@ func didInstallationFinish(clusterStatus string, log logrus.FieldLogger, status 
 		return true
 	}
 	return false
+}
+
+func parsePullSecretToken(log logrus.FieldLogger, path string) (string, error) {
+	content, err := os.ReadFile(path)
+	ret := string(content)
+
+	if err != nil {
+		switch {
+		case os.IsNotExist(err):
+			log.Infof("Pull secret file %s does not exist, fall back to PULL_SECRET_TOKEN env variable", path)
+
+			ret = os.Getenv("PULL_SECRET_TOKEN")
+		default:
+			return "", fmt.Errorf("failed to read pull secret file %s: %w", path, err)
+		}
+	}
+
+	return strings.TrimSpace(ret), nil
 }

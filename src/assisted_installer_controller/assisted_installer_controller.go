@@ -84,7 +84,7 @@ var (
 type ControllerConfig struct {
 	ClusterID               string `envconfig:"CLUSTER_ID" required:"true"`
 	URL                     string `envconfig:"INVENTORY_URL" required:"true"`
-	PullSecretToken         string `envconfig:"PULL_SECRET_TOKEN" required:"true" secret:"true"`
+	PullSecretToken         string `secret:"true"`
 	SkipCertVerification    bool   `envconfig:"SKIP_CERT_VERIFICATION" required:"false" default:"false"`
 	CACertPath              string `envconfig:"CA_CERT_PATH" required:"false" default:""`
 	Namespace               string `envconfig:"NAMESPACE" required:"false" default:"assisted-installer"`
