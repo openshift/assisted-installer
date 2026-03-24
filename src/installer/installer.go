@@ -671,11 +671,21 @@ func (i *installer) workerWaitFor2ReadyMasters(ctx context.Context) error {
 		}
 
 		hosts, callErr := i.inventoryClient.ListsHostsForRole(ctx, string(models.HostRoleMaster))
+
 		if callErr != nil {
 			i.log.WithError(callErr).Errorf("Getting cluster %s hosts", i.ClusterID)
 			return false
 		}
-		return numDone(hosts) >= minMasterNodes
+
+		numberOfNodes := numDone(hosts)
+
+		// checking whether there are arbiter nodes in the cluster
+		arbiters, arbErr := i.inventoryClient.ListsHostsForRole(ctx, string(models.HostRoleArbiter))
+		if arbErr == nil && len(arbiters) > 0 {
+			numberOfNodes += numDone(arbiters)
+		}
+
+		return numberOfNodes >= minMasterNodes
 
 	})
 
