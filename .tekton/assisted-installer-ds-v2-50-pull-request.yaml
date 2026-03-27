@@ -7,13 +7,13 @@ metadata:
     build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch == "master"
+    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch == "v2.50"
   creationTimestamp:
   labels:
-    appstudio.openshift.io/application: assisted-installer-application-ds-main
-    appstudio.openshift.io/component: assisted-installer-ds-main
+    appstudio.openshift.io/application: assisted-installer-application-ds-v2-50
+    appstudio.openshift.io/component: assisted-installer-ds-v2-50
     pipelines.appstudio.openshift.io/type: build
-  name: assisted-installer-ds-main-on-pull-request
+  name: assisted-installer-ds-v2-50-on-pull-request
   namespace: assisted-installer-tenant
 spec:
   params:
@@ -22,7 +22,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-ds-main/assisted-installer-ds-main:on-pr-{{revision}}
+    value: quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-ds-v2-50/assisted-installer-ds-v2-50:on-pr-{{revision}}
   - name: image-expires-after
     value: 5d
   - name: build-platforms
@@ -42,7 +42,7 @@ spec:
   - name: hermetic
     value: "true"
   - name: prefetch-input
-    value: '[{"type": "gomod", "path": "."}, {"type": "rpm", "path": "./rpm-prefetching/assisted-installer/"}]'
+    value: '[{"type": "gomod", "path": "."}]'
   - name: build-source-image
     value: "true"
   - name: sast-snyk-check-args
@@ -59,7 +59,7 @@ spec:
       - name: pathInRepo
         value: "pipelines/standard-pipeline.yaml"
   taskRunTemplate:
-    serviceAccountName: build-pipeline-assisted-installer-ds-main
+    serviceAccountName: build-pipeline-assisted-installer-ds-v2-50
   workspaces:
   - name: git-auth
     secret:
