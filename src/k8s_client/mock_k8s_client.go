@@ -11,17 +11,19 @@ package k8s_client
 
 import (
 	bytes "bytes"
+	context "context"
 	reflect "reflect"
 
 	v1alpha1 "github.com/metal3-io/baremetal-operator/apis/metal3.io/v1alpha1"
 	v1 "github.com/openshift/api/config/v1"
 	v1beta1 "github.com/openshift/api/machine/v1beta1"
 	ops "github.com/openshift/assisted-installer/src/ops"
+	v10 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	v1alpha10 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	gomock "go.uber.org/mock/gomock"
-	v10 "k8s.io/api/batch/v1"
-	v11 "k8s.io/api/certificates/v1"
-	v12 "k8s.io/api/core/v1"
+	v11 "k8s.io/api/batch/v1"
+	v12 "k8s.io/api/certificates/v1"
+	v13 "k8s.io/api/core/v1"
 	types "k8s.io/apimachinery/pkg/types"
 )
 
@@ -49,7 +51,7 @@ func (m *MockK8SClient) EXPECT() *MockK8SClientMockRecorder {
 }
 
 // ApproveCsr mocks base method.
-func (m *MockK8SClient) ApproveCsr(csr *v11.CertificateSigningRequest) error {
+func (m *MockK8SClient) ApproveCsr(csr *v12.CertificateSigningRequest) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ApproveCsr", csr)
 	ret0, _ := ret[0].(error)
@@ -63,10 +65,10 @@ func (mr *MockK8SClientMockRecorder) ApproveCsr(csr any) *gomock.Call {
 }
 
 // CreateEvent mocks base method.
-func (m *MockK8SClient) CreateEvent(namespace, name, message, component string) (*v12.Event, error) {
+func (m *MockK8SClient) CreateEvent(namespace, name, message, component string) (*v13.Event, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateEvent", namespace, name, message, component)
-	ret0, _ := ret[0].(*v12.Event)
+	ret0, _ := ret[0].(*v13.Event)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -253,10 +255,10 @@ func (mr *MockK8SClientMockRecorder) GetClusterVersion() *gomock.Call {
 }
 
 // GetConfigMap mocks base method.
-func (m *MockK8SClient) GetConfigMap(namespace, name string) (*v12.ConfigMap, error) {
+func (m *MockK8SClient) GetConfigMap(namespace, name string) (*v13.ConfigMap, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetConfigMap", namespace, name)
-	ret0, _ := ret[0].(*v12.ConfigMap)
+	ret0, _ := ret[0].(*v13.ConfigMap)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -282,11 +284,26 @@ func (mr *MockK8SClientMockRecorder) GetControlPlaneReplicas() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetControlPlaneReplicas", reflect.TypeOf((*MockK8SClient)(nil).GetControlPlaneReplicas))
 }
 
+// GetMachineConfig mocks base method.
+func (m *MockK8SClient) GetMachineConfig(ctx context.Context, name string) (*v10.MachineConfig, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMachineConfig", ctx, name)
+	ret0, _ := ret[0].(*v10.MachineConfig)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMachineConfig indicates an expected call of GetMachineConfig.
+func (mr *MockK8SClientMockRecorder) GetMachineConfig(ctx, name any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMachineConfig", reflect.TypeOf((*MockK8SClient)(nil).GetMachineConfig), ctx, name)
+}
+
 // GetNode mocks base method.
-func (m *MockK8SClient) GetNode(name string) (*v12.Node, error) {
+func (m *MockK8SClient) GetNode(name string) (*v13.Node, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetNode", name)
-	ret0, _ := ret[0].(*v12.Node)
+	ret0, _ := ret[0].(*v13.Node)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -328,10 +345,10 @@ func (mr *MockK8SClientMockRecorder) GetPodLogsAsBuffer(namespace, podName, sinc
 }
 
 // GetPods mocks base method.
-func (m *MockK8SClient) GetPods(namespace string, labelMatch map[string]string, fieldSelector string) ([]v12.Pod, error) {
+func (m *MockK8SClient) GetPods(namespace string, labelMatch map[string]string, fieldSelector string) ([]v13.Pod, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPods", namespace, labelMatch, fieldSelector)
-	ret0, _ := ret[0].([]v12.Pod)
+	ret0, _ := ret[0].([]v13.Pod)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -433,10 +450,10 @@ func (mr *MockK8SClientMockRecorder) ListClusterOperators() *gomock.Call {
 }
 
 // ListCsrs mocks base method.
-func (m *MockK8SClient) ListCsrs() (*v11.CertificateSigningRequestList, error) {
+func (m *MockK8SClient) ListCsrs() (*v12.CertificateSigningRequestList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListCsrs")
-	ret0, _ := ret[0].(*v11.CertificateSigningRequestList)
+	ret0, _ := ret[0].(*v12.CertificateSigningRequestList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -448,10 +465,10 @@ func (mr *MockK8SClientMockRecorder) ListCsrs() *gomock.Call {
 }
 
 // ListEvents mocks base method.
-func (m *MockK8SClient) ListEvents(namespace string) (*v12.EventList, error) {
+func (m *MockK8SClient) ListEvents(namespace string) (*v13.EventList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListEvents", namespace)
-	ret0, _ := ret[0].(*v12.EventList)
+	ret0, _ := ret[0].(*v13.EventList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -463,10 +480,10 @@ func (mr *MockK8SClientMockRecorder) ListEvents(namespace any) *gomock.Call {
 }
 
 // ListJobs mocks base method.
-func (m *MockK8SClient) ListJobs(namespace string) (*v10.JobList, error) {
+func (m *MockK8SClient) ListJobs(namespace string) (*v11.JobList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListJobs", namespace)
-	ret0, _ := ret[0].(*v10.JobList)
+	ret0, _ := ret[0].(*v11.JobList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -493,10 +510,10 @@ func (mr *MockK8SClientMockRecorder) ListMachines() *gomock.Call {
 }
 
 // ListNodes mocks base method.
-func (m *MockK8SClient) ListNodes() (*v12.NodeList, error) {
+func (m *MockK8SClient) ListNodes() (*v13.NodeList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListNodes")
-	ret0, _ := ret[0].(*v12.NodeList)
+	ret0, _ := ret[0].(*v13.NodeList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -508,10 +525,10 @@ func (mr *MockK8SClientMockRecorder) ListNodes() *gomock.Call {
 }
 
 // ListNodesByRole mocks base method.
-func (m *MockK8SClient) ListNodesByRole(role string) (*v12.NodeList, error) {
+func (m *MockK8SClient) ListNodesByRole(role string) (*v13.NodeList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListNodesByRole", role)
-	ret0, _ := ret[0].(*v12.NodeList)
+	ret0, _ := ret[0].(*v13.NodeList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -523,10 +540,10 @@ func (mr *MockK8SClientMockRecorder) ListNodesByRole(role any) *gomock.Call {
 }
 
 // ListServices mocks base method.
-func (m *MockK8SClient) ListServices(namespace string) (*v12.ServiceList, error) {
+func (m *MockK8SClient) ListServices(namespace string) (*v13.ServiceList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListServices", namespace)
-	ret0, _ := ret[0].(*v12.ServiceList)
+	ret0, _ := ret[0].(*v13.ServiceList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
