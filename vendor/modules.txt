@@ -474,7 +474,7 @@ github.com/openshift/api/operator/v1alpha1
 # github.com/openshift/assisted-installer-agent v1.0.9
 ## explicit; go 1.13
 github.com/openshift/assisted-installer-agent/pkg/journalLogger
-# github.com/openshift/assisted-service v1.0.10-0.20241213170211-a5016f125538 => github.com/openshift/assisted-service v0.0.0-20250321224641-189c9121f71f
+# github.com/openshift/assisted-service v0.0.0-20200830102625-2f0da134c290 => github.com/openshift/assisted-service v0.0.0-20250321224641-189c9121f71f
 ## explicit; go 1.21
 github.com/openshift/assisted-service/internal/common
 github.com/openshift/assisted-service/internal/constants

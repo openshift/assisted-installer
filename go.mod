@@ -20,7 +20,7 @@ require (
 	github.com/onsi/gomega v1.38.3
 	github.com/openshift/api v0.0.0-20260107103503-6d35063ca179
 	github.com/openshift/assisted-installer-agent v1.0.9
-	github.com/openshift/assisted-service v1.0.10-0.20241213170211-a5016f125538
+	github.com/openshift/assisted-service v0.0.0-20200830102625-2f0da134c290
 	github.com/openshift/assisted-service/client v0.0.0
 	github.com/openshift/assisted-service/models v0.0.0
 	github.com/openshift/client-go v0.0.0-20260108185524-48f4ccfc4e13

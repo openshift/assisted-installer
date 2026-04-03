@@ -29,6 +29,7 @@ func (m HostRole) Pointer() *HostRole {
 }
 
 const (
+
 	// HostRoleAutoAssign captures enum value "auto-assign"
 	HostRoleAutoAssign HostRole = "auto-assign"
 
