@@ -1230,7 +1230,8 @@ func init() {
               "worker.ign",
               "install-config.yaml",
               "custom_manifests.json",
-              "custom_manifests.yaml"
+              "custom_manifests.yaml",
+              "arbiter.ign"
             ],
             "type": "string",
             "description": "The file to be downloaded.",
@@ -1446,6 +1447,7 @@ func init() {
           {
             "enum": [
               "master",
+              "arbiter",
               "worker",
               "auto-assign"
             ],
@@ -6000,21 +6002,28 @@ func init() {
               "items": {
                 "type": "string",
                 "enum": [
+                  "amd-gpu",
                   "lso",
                   "mtv",
-                  "openshift_ai",
+                  "openshift-ai",
                   "osc",
                   "servicemesh",
                   "authorino",
                   "cnv",
-                  "nvidia_gpu",
+                  "nvidia-gpu",
                   "pipelines",
                   "odf",
                   "lvm",
                   "mce",
-                  "node_feature_discovery",
+                  "node-feature-discovery",
                   "serverless",
-                  "nmstate"
+                  "nmstate",
+                  "kmm",
+                  "node-healthcheck",
+                  "self-node-remediation",
+                  "fence-agents-remediation",
+                  "node-maintenance",
+                  "kube-descheduler"
                 ]
               }
             }
@@ -7056,7 +7065,12 @@ func init() {
         "authorino-requirements-satisfied",
         "nmstate-requirements-satisfied",
         "amd-gpu-requirements-satisfied",
-        "kmm-requirements-satisfied"
+        "kmm-requirements-satisfied",
+        "node-healthcheck-requirements-satisfied",
+        "self-node-remediation-requirements-satisfied",
+        "fence-agents-remediation-requirements-satisfied",
+        "node-maintenance-requirements-satisfied",
+        "kube-descheduler-requirements-satisfied"
       ]
     },
     "cluster_default_config": {
@@ -7912,7 +7926,12 @@ func init() {
         "USER_MANAGED_LOAD_BALANCER",
         "NMSTATE",
         "AMD_GPU",
-        "KMM"
+        "KMM",
+        "NODE_HEALTHCHECK",
+        "SELF_NODE_REMEDIATION",
+        "FENCE_AGENTS_REMEDIATION",
+        "NODE_MAINTENANCE",
+        "KUBE_DESCHEDULER"
       ]
     },
     "finalizing-stage": {
@@ -8368,6 +8387,7 @@ func init() {
       "enum": [
         "auto-assign",
         "master",
+        "arbiter",
         "worker",
         "bootstrap"
       ]
@@ -8377,6 +8397,7 @@ func init() {
       "enum": [
         "auto-assign",
         "master",
+        "arbiter",
         "worker"
       ]
     },
@@ -8453,6 +8474,7 @@ func init() {
           "enum": [
             "auto-assign",
             "master",
+            "arbiter",
             "worker"
           ],
           "x-nullable": true
@@ -8541,7 +8563,12 @@ func init() {
         "mtu-valid",
         "nmstate-requirements-satisfied",
         "amd-gpu-requirements-satisfied",
-        "kmm-requirements-satisfied"
+        "kmm-requirements-satisfied",
+        "node-healthcheck-requirements-satisfied",
+        "self-node-remediation-requirements-satisfied",
+        "fence-agents-remediation-requirements-satisfied",
+        "node-maintenance-requirements-satisfied",
+        "kube-descheduler-requirements-satisfied"
       ]
     },
     "host_network": {
@@ -9663,6 +9690,10 @@ func init() {
           "type": "string",
           "format": "uuid",
           "x-go-custom-tag": "gorm:\"primaryKey\""
+        },
+        "dependency_only": {
+          "description": "Whether the operator can't be installed without being required by another operator.",
+          "type": "boolean"
         },
         "name": {
           "description": "Unique name of the operator.",
@@ -12189,7 +12220,8 @@ func init() {
               "worker.ign",
               "install-config.yaml",
               "custom_manifests.json",
-              "custom_manifests.yaml"
+              "custom_manifests.yaml",
+              "arbiter.ign"
             ],
             "type": "string",
             "description": "The file to be downloaded.",
@@ -12405,6 +12437,7 @@ func init() {
           {
             "enum": [
               "master",
+              "arbiter",
               "worker",
               "auto-assign"
             ],
@@ -16964,21 +16997,28 @@ func init() {
               "items": {
                 "type": "string",
                 "enum": [
+                  "amd-gpu",
                   "lso",
                   "mtv",
-                  "openshift_ai",
+                  "openshift-ai",
                   "osc",
                   "servicemesh",
                   "authorino",
                   "cnv",
-                  "nvidia_gpu",
+                  "nvidia-gpu",
                   "pipelines",
                   "odf",
                   "lvm",
                   "mce",
-                  "node_feature_discovery",
+                  "node-feature-discovery",
                   "serverless",
-                  "nmstate"
+                  "nmstate",
+                  "kmm",
+                  "node-healthcheck",
+                  "self-node-remediation",
+                  "fence-agents-remediation",
+                  "node-maintenance",
+                  "kube-descheduler"
                 ]
               }
             }
@@ -18138,7 +18178,12 @@ func init() {
         "authorino-requirements-satisfied",
         "nmstate-requirements-satisfied",
         "amd-gpu-requirements-satisfied",
-        "kmm-requirements-satisfied"
+        "kmm-requirements-satisfied",
+        "node-healthcheck-requirements-satisfied",
+        "self-node-remediation-requirements-satisfied",
+        "fence-agents-remediation-requirements-satisfied",
+        "node-maintenance-requirements-satisfied",
+        "kube-descheduler-requirements-satisfied"
       ]
     },
     "cluster_default_config": {
@@ -18961,7 +19006,12 @@ func init() {
         "USER_MANAGED_LOAD_BALANCER",
         "NMSTATE",
         "AMD_GPU",
-        "KMM"
+        "KMM",
+        "NODE_HEALTHCHECK",
+        "SELF_NODE_REMEDIATION",
+        "FENCE_AGENTS_REMEDIATION",
+        "NODE_MAINTENANCE",
+        "KUBE_DESCHEDULER"
       ]
     },
     "finalizing-stage": {
@@ -19417,6 +19467,7 @@ func init() {
       "enum": [
         "auto-assign",
         "master",
+        "arbiter",
         "worker",
         "bootstrap"
       ]
@@ -19426,6 +19477,7 @@ func init() {
       "enum": [
         "auto-assign",
         "master",
+        "arbiter",
         "worker"
       ]
     },
@@ -19502,6 +19554,7 @@ func init() {
           "enum": [
             "auto-assign",
             "master",
+            "arbiter",
             "worker"
           ],
           "x-nullable": true
@@ -19590,7 +19643,12 @@ func init() {
         "mtu-valid",
         "nmstate-requirements-satisfied",
         "amd-gpu-requirements-satisfied",
-        "kmm-requirements-satisfied"
+        "kmm-requirements-satisfied",
+        "node-healthcheck-requirements-satisfied",
+        "self-node-remediation-requirements-satisfied",
+        "fence-agents-remediation-requirements-satisfied",
+        "node-maintenance-requirements-satisfied",
+        "kube-descheduler-requirements-satisfied"
       ]
     },
     "host_network": {
@@ -20703,6 +20761,10 @@ func init() {
           "type": "string",
           "format": "uuid",
           "x-go-custom-tag": "gorm:\"primaryKey\""
+        },
+        "dependency_only": {
+          "description": "Whether the operator can't be installed without being required by another operator.",
+          "type": "boolean"
         },
         "name": {
           "description": "Unique name of the operator.",

@@ -28,7 +28,10 @@ const (
 
 	consoleUrlPrefix = "https://console-openshift-console.apps"
 
-	MirrorRegistriesCertificateFile = "tls-ca-bundle.pem"
+	SystemCertificateBundle     = "tls-ca-bundle.pem"
+	SystemCertificateBundlePath = "/etc/pki/ca-trust/extracted/pem/" + SystemCertificateBundle
+
+	MirrorRegistriesCertificateFile = "user-registry-ca-bundle.pem"
 	MirrorRegistriesCertificatePath = "/etc/pki/ca-trust/extracted/pem/" + MirrorRegistriesCertificateFile
 	MirrorRegistriesConfigDir       = "/etc/containers"
 	MirrorRegistriesConfigFile      = "registries.conf"
@@ -51,10 +54,12 @@ const (
 
 	MaxMasterHostsNeededForInstallationInHaModeOfOCP418OrNewer       = 5
 	MinMasterHostsNeededForInstallationInHaMode                      = 3
+	MinMasterHostsNeededForInstallationInHaArbiterMode               = 2
 	AllowedNumberOfMasterHostsForInstallationInHaModeOfOCP417OrOlder = 3
 	AllowedNumberOfMasterHostsInNoneHaMode                           = 1
 	AllowedNumberOfWorkersInNoneHaMode                               = 0
 	MinimumVersionForNonStandardHAOCPControlPlane                    = "4.18"
+	MinimumVersionForArbiterClusters                                 = "4.19"
 	MinimumNumberOfWorkersForNonSchedulableMastersClusterInHaMode    = 2
 
 	MinimumVersionForUserManagedLoadBalancerFeature = "4.16"
@@ -418,6 +423,42 @@ func VerifyCaBundle(pemCerts []byte) error {
 	return nil
 }
 
+// RemoveDuplicatesFromCaBundle removes duplicate certificates from a given CA bundle.
+func RemoveDuplicatesFromCaBundle(caBundle string) (string, int, error) {
+	// Parse certificates
+	certs, ok := ParsePemCerts([]byte(caBundle))
+	if !ok {
+		return "", 0, errors.New("failed to remove duplicate certificate")
+	}
+
+	// Remove duplicates by serial number
+	uniqueCerts := funk.UniqBy(certs, func(cert x509.Certificate) string {
+		return fmt.Sprintf("%x", cert.SerialNumber)
+	})
+
+	// Convert certs back to a string
+	certStrings := funk.Map(uniqueCerts, func(cert x509.Certificate) string {
+		// Encode certificate to PEM format
+		block := &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: cert.Raw,
+		}
+		var sb strings.Builder
+		if err := pem.Encode(&sb, block); err != nil {
+			// Error encoding certificate
+			return ""
+		}
+		return sb.String()
+	})
+
+	numOfCerts := len(certs)
+	numOfUniqueCerts := len(uniqueCerts.([]x509.Certificate))
+	numOfDuplicates := numOfCerts - numOfUniqueCerts
+
+	// Join the PEM-encoded certificates into a single string
+	return strings.Join(certStrings.([]string), "\n"), numOfDuplicates, nil
+}
+
 func CanonizeStrings(slice []string) (ret []string) {
 	if len(slice) == 0 {
 		return
@@ -649,13 +690,15 @@ func GetEffectiveRole(host *models.Host) models.HostRole {
 	return host.Role
 }
 
-// GetHostsByEachRole returns the 3 slices of hosts by their effective role for a given cluster:
+// GetHostsByEachRole returns the 4 slices of hosts by their effective role for a given cluster:
 // 1. bootstrap/master hosts
-// 2. worker hosts
-// 3. auto-assign hosts
+// 2. arbiter hosts
+// 3. worker hosts
+// 4. auto-assign hosts
 // Note - The hosts should be preloaded in the cluster
-func GetHostsByEachRole(cluster *models.Cluster, effectiveRoles bool) ([]*models.Host, []*models.Host, []*models.Host) {
+func GetHostsByEachRole(cluster *models.Cluster, effectiveRoles bool) ([]*models.Host, []*models.Host, []*models.Host, []*models.Host) {
 	masterHosts := make([]*models.Host, 0)
+	arbiterHosts := make([]*models.Host, 0)
 	workerHosts := make([]*models.Host, 0)
 	autoAssignHosts := make([]*models.Host, 0)
 
@@ -671,6 +714,8 @@ func GetHostsByEachRole(cluster *models.Cluster, effectiveRoles bool) ([]*models
 		switch role := roleFunction(host); role {
 		case models.HostRoleMaster, models.HostRoleBootstrap:
 			masterHosts = append(masterHosts, host)
+		case models.HostRoleArbiter:
+			arbiterHosts = append(arbiterHosts, host)
 		case models.HostRoleWorker:
 			workerHosts = append(workerHosts, host)
 		case models.HostRoleAutoAssign:
@@ -678,7 +723,7 @@ func GetHostsByEachRole(cluster *models.Cluster, effectiveRoles bool) ([]*models
 		}
 	}
 
-	return masterHosts, workerHosts, autoAssignHosts
+	return masterHosts, arbiterHosts, workerHosts, autoAssignHosts
 }
 
 func ShouldMastersBeSchedulable(cluster *models.Cluster) bool {
@@ -686,7 +731,7 @@ func ShouldMastersBeSchedulable(cluster *models.Cluster) bool {
 		return true
 	}
 
-	_, workers, _ := GetHostsByEachRole(cluster, true)
+	_, _, workers, _ := GetHostsByEachRole(cluster, true)
 	return len(workers) < MinimumNumberOfWorkersForNonSchedulableMastersClusterInHaMode
 }
 
@@ -729,4 +774,8 @@ func GetDefaultHighAvailabilityAndMasterCountParams(highAvailabilityMode *string
 
 	// both are set
 	return highAvailabilityMode, controlPlaneCount
+}
+
+func IsClusterTopologyHighlyAvailableArbiter(cluster *Cluster) bool {
+	return funk.NotEmpty(GetHostsByRole(cluster, models.HostRoleArbiter))
 }

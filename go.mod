@@ -18,7 +18,7 @@ require (
 	github.com/onsi/gomega v1.34.1
 	github.com/openshift/api v0.0.0-20240521212423-414cf30d37be
 	github.com/openshift/assisted-installer-agent v1.0.9
-	github.com/openshift/assisted-service v1.0.10-0.20241213170211-a5016f125538
+	github.com/openshift/assisted-service v1.0.10-0.20260205202633-e07e2c76e143
 	github.com/openshift/assisted-service/client v0.0.0
 	github.com/openshift/assisted-service/models v0.0.0
 	github.com/openshift/client-go v0.0.0-20230926161409-848405da69e1
@@ -189,10 +189,10 @@ replace (
 	github.com/metal3-io/baremetal-operator/apis => github.com/openshift/baremetal-operator/apis v0.0.0-20231019133159-8643f32fea3e
 	github.com/metal3-io/baremetal-operator/pkg/hardwareutils => github.com/openshift/baremetal-operator/pkg/hardwareutils v0.0.0-20231019133159-8643f32fea3e
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.12
-	github.com/openshift/assisted-service => github.com/openshift/assisted-service v0.0.0-20250321224641-189c9121f71f
-	github.com/openshift/assisted-service/api => github.com/openshift/assisted-service/api v0.0.0-20250321224641-189c9121f71f
-	github.com/openshift/assisted-service/client => github.com/openshift/assisted-service/client v0.0.0-20250321224641-189c9121f71f
-	github.com/openshift/assisted-service/models => github.com/openshift/assisted-service/models v0.0.0-20250321224641-189c9121f71f
+	github.com/openshift/assisted-service => github.com/openshift/assisted-service v0.0.0-20250430094626-07e5c4388c55
+	github.com/openshift/assisted-service/api => github.com/openshift/assisted-service/api v0.0.0-20250430094626-07e5c4388c55
+	github.com/openshift/assisted-service/client => github.com/openshift/assisted-service/client v0.0.0-20250430094626-07e5c4388c55
+	github.com/openshift/assisted-service/models => github.com/openshift/assisted-service/models v0.0.0-20250430094626-07e5c4388c55
 	golang.org/x/crypto => github.com/openshift/golang-crypto v0.33.1-0.20250310193910-9003f682e581
 	k8s.io/apimachinery => k8s.io/apimachinery v0.28.0
 	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v0.4.5
