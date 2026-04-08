@@ -1253,12 +1253,55 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					}
 					mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(&cluster, nil).Times(1)
 					mockbmclient.EXPECT().ListsHostsForRole(gomock.Any(), "master").Return(hosts, nil).Times(1)
+					mockbmclient.EXPECT().ListsHostsForRole(gomock.Any(), "arbiter").Return(models.HostList{}, nil).Times(1)
 					cleanInstallDevice()
 					mkdirSuccess(InstallDir)
 					downloadHostIgnitionSuccess(infraEnvId, hostId, "worker-host-id.ign")
 					mockops.EXPECT().WriteImageToDisk(gomock.Any(), filepath.Join(InstallDir, "worker-host-id.ign"), device, nil).Return(nil).Times(1)
 					setBootOrderSuccess()
-					// failure must do nothing
+					reportLogProgressSuccess()
+					mockops.EXPECT().UploadInstallationLogs(false).Return("", errors.Errorf("Dummy")).Times(1)
+					ironicAgentDoesntExist()
+					rebootSuccess()
+					getEncapsulatedMcSuccess(nil)
+					overwriteImageSuccess()
+					ret := installerObj.InstallNode()
+					Expect(ret).Should(BeNil())
+				})
+				It("worker role happy flow (TNA with arbiter)", func() {
+					updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
+						{string(models.HostStageInstalling), conf.Role},
+						{string(models.HostStageWritingImageToDisk)},
+						{string(models.HostStageWaitingForControlPlane)},
+						{string(models.HostStageRebooting)},
+					})
+					cluster := models.Cluster{}
+					// Only 1 master done (the other is the bootstrap, not yet rebooted)
+					masters := models.HostList{
+						{
+							Role: models.HostRoleMaster,
+							Progress: &models.HostProgressInfo{
+								CurrentStage: models.HostStageDone,
+							},
+						},
+					}
+					// Arbiter is done
+					arbiters := models.HostList{
+						{
+							Role: models.HostRoleArbiter,
+							Progress: &models.HostProgressInfo{
+								CurrentStage: models.HostStageDone,
+							},
+						},
+					}
+					mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(&cluster, nil).Times(1)
+					mockbmclient.EXPECT().ListsHostsForRole(gomock.Any(), "master").Return(masters, nil).Times(1)
+					mockbmclient.EXPECT().ListsHostsForRole(gomock.Any(), "arbiter").Return(arbiters, nil).Times(1)
+					cleanInstallDevice()
+					mkdirSuccess(InstallDir)
+					downloadHostIgnitionSuccess(infraEnvId, hostId, "worker-host-id.ign")
+					mockops.EXPECT().WriteImageToDisk(gomock.Any(), filepath.Join(InstallDir, "worker-host-id.ign"), device, nil).Return(nil).Times(1)
+					setBootOrderSuccess()
 					reportLogProgressSuccess()
 					mockops.EXPECT().UploadInstallationLogs(false).Return("", errors.Errorf("Dummy")).Times(1)
 					ironicAgentDoesntExist()
