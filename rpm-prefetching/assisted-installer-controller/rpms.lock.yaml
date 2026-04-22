@@ -67,13 +67,13 @@ arches:
     name: procps-ng
     evr: 3.3.17-14.el9
     sourcerpm: procps-ng-3.3.17-14.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/r/rsync-3.2.5-3.el9.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/r/rsync-3.2.5-3.el9_7.2.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 416293
-    checksum: sha256:99235a7555f6454898ebbcdcf927ebed68e3a60599c9226b9d1d60578d292878
+    size: 418979
+    checksum: sha256:25f8e769ed6e442259025b1c33d11aa1be0746b0a6fc9e68b942fbd04c01f31a
     name: rsync
-    evr: 3.2.5-3.el9
-    sourcerpm: rsync-3.2.5-3.el9.src.rpm
+    evr: 3.2.5-3.el9_7.2
+    sourcerpm: rsync-3.2.5-3.el9_7.2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/t/tar-1.34-9.el9_7.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 898317
@@ -155,13 +155,13 @@ arches:
     name: procps-ng
     evr: 3.3.17-14.el9
     sourcerpm: procps-ng-3.3.17-14.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/r/rsync-3.2.5-3.el9.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/r/rsync-3.2.5-3.el9_7.2.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 449938
-    checksum: sha256:1fd8762ad73a60556c9808a5bf2a9d964965adec91c026ef27058266dc75e1f0
+    size: 452530
+    checksum: sha256:146da2c7f92cea7c0642d1d584a0e2435d4ef288bbe10db55dbdb9cdd2919ed6
     name: rsync
-    evr: 3.2.5-3.el9
-    sourcerpm: rsync-3.2.5-3.el9.src.rpm
+    evr: 3.2.5-3.el9_7.2
+    sourcerpm: rsync-3.2.5-3.el9_7.2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/t/tar-1.34-9.el9_7.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 938310
@@ -243,13 +243,13 @@ arches:
     name: procps-ng
     evr: 3.3.17-14.el9
     sourcerpm: procps-ng-3.3.17-14.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/r/rsync-3.2.5-3.el9.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/r/rsync-3.2.5-3.el9_7.2.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 418877
-    checksum: sha256:2d1a87e86fb23bc665b7c7ce8775c73d500ef6e152f15c78493b95638dfb7925
+    size: 421587
+    checksum: sha256:0de316c64f8546c2809d3d7ac732ba96bbeaad9b285a92c994c576adab21bab9
     name: rsync
-    evr: 3.2.5-3.el9
-    sourcerpm: rsync-3.2.5-3.el9.src.rpm
+    evr: 3.2.5-3.el9_7.2
+    sourcerpm: rsync-3.2.5-3.el9_7.2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/t/tar-1.34-9.el9_7.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 900131
@@ -331,13 +331,13 @@ arches:
     name: procps-ng
     evr: 3.3.17-14.el9
     sourcerpm: procps-ng-3.3.17-14.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/r/rsync-3.2.5-3.el9.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/r/rsync-3.2.5-3.el9_7.2.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 421930
-    checksum: sha256:b1d90c38b613f2d66dfe0c7c3d067a3ce429f7b2ec5224e560f326fc2fd8d1e5
+    size: 424416
+    checksum: sha256:8ee9ecceb953b6083284a9fb595fb1b98be7382e269ec9cfc7ecb1c9d27fbe5c
     name: rsync
-    evr: 3.2.5-3.el9
-    sourcerpm: rsync-3.2.5-3.el9.src.rpm
+    evr: 3.2.5-3.el9_7.2
+    sourcerpm: rsync-3.2.5-3.el9_7.2.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/t/tar-1.34-9.el9_7.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 906521
