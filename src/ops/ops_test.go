@@ -14,14 +14,13 @@ import (
 	"os"
 	"reflect"
 
-	"github.com/openshift/assisted-installer/src/ops/execute"
-
 	"github.com/coreos/ignition/v2/config/v3_2/types"
 	"github.com/go-openapi/swag"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
 	"github.com/openshift/assisted-installer/src/config"
+	"github.com/openshift/assisted-installer/src/ops/execute"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/thoas/go-funk"

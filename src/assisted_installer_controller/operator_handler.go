@@ -3,16 +3,15 @@ package assisted_installer_controller
 import (
 	"context"
 
+	"github.com/openshift/assisted-installer/src/k8s_client"
+	"github.com/openshift/assisted-installer/src/utils"
+	"github.com/openshift/assisted-service/models"
 	olmv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	"github.com/sirupsen/logrus"
 	batchV1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-
-	"github.com/openshift/assisted-installer/src/k8s_client"
-	"github.com/openshift/assisted-installer/src/utils"
-	"github.com/openshift/assisted-service/models"
 )
 
 const (
