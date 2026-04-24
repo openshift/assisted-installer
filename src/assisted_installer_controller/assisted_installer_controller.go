@@ -1251,39 +1251,49 @@ func (c *controller) logRouterStatus() {
 	}
 
 	var consoleUrl string
-	// run every 30 seconds router check and log the result
+	// Resolve cluster before the periodic goroutine runs so the first GetCluster cannot race with callers
+	// that return immediately (e.g. final log upload in unit tests or fast shutdown).
+	if cl, err = c.ic.GetCluster(context.Background(), false); err != nil {
+		c.log.WithError(err).Errorf("Failed to get cluster %s from assisted-service", c.ClusterID)
+	} else {
+		consoleUrl = fmt.Sprintf("https://canary-openshift-ingress-canary.apps.%s.%s/health", cl.Name, cl.BaseDNSDomain)
+	}
+
+	routerProbe := func() bool {
+		if consoleUrl == "" {
+			cl, err = c.ic.GetCluster(context.Background(), false)
+			if err != nil {
+				c.log.WithError(err).Errorf("Failed to get cluster %s from assisted-service", c.ClusterID)
+				return false
+			}
+		}
+
+		consoleUrl = fmt.Sprintf("https://canary-openshift-ingress-canary.apps.%s.%s/health", cl.Name, cl.BaseDNSDomain)
+		r, err := client.Get(consoleUrl)
+		if err != nil {
+			c.log.WithError(err).Warning("Failed to reach console")
+		} else {
+			defer r.Body.Close()
+			response, errR := io.ReadAll(r.Body)
+			if errR != nil {
+				response = []byte("Failed to read response")
+			}
+			c.log.Infof("canary url status %s, response %s", r.Status, string(response))
+		}
+
+		url := fmt.Sprintf("http://%s/_______internal_router_healthz", localIp)
+		r, err = client.Get(url)
+		if err != nil {
+			c.log.WithError(err).Warning("Failed to reach internal router health")
+		} else {
+			c.log.Infof("route internal health status %s", r.Status)
+		}
+		return false
+	}
+
+	// run every SummaryLogsPeriod router check and log the result
 	go func() {
-		_ = utils.WaitForPredicate(WaitTimeout, SummaryLogsPeriod, func() bool {
-			if consoleUrl == "" {
-				cl, err = c.ic.GetCluster(context.Background(), false)
-				if err != nil {
-					c.log.WithError(err).Errorf("Failed to get cluster %s from assisted-service", c.ClusterID)
-					return false
-				}
-			}
-
-			consoleUrl = fmt.Sprintf("https://canary-openshift-ingress-canary.apps.%s.%s/health", cl.Name, cl.BaseDNSDomain)
-			r, err := client.Get(consoleUrl)
-			if err != nil {
-				c.log.WithError(err).Warning("Failed to reach console")
-			} else {
-				defer r.Body.Close()
-				response, errR := io.ReadAll(r.Body)
-				if errR != nil {
-					response = []byte("Failed to read response")
-				}
-				c.log.Infof("canary url status %s, response %s", r.Status, string(response))
-			}
-
-			url := fmt.Sprintf("http://%s/_______internal_router_healthz", localIp)
-			r, err = client.Get(url)
-			if err != nil {
-				c.log.WithError(err).Warning("Failed to reach internal router health")
-			} else {
-				c.log.Infof("route internal health status %s", r.Status)
-			}
-			return false
-		})
+		_ = utils.WaitForPredicate(WaitTimeout, SummaryLogsPeriod, routerProbe)
 	}()
 }
 
