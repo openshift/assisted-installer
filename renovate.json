@@ -1,42 +1,22 @@
 {
     "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-
-
     "commitMessagePrefix": "NO-ISSUE: ",
-    "labels": ["lgtm", "approved"],
-
+    "labels": [
+        "lgtm",
+        "approved"
+    ],
     "prHourlyLimit": 0,
     "prConcurrentLimit": 0,
-
     "enabledManagers": [
         "custom.regex",
         "tekton",
-        "gomod",
         "rpm-lockfile"
     ],
-
     "tekton": {
-        "fileMatch": ["^.tekton/*"]
-    },
-
-    "gomod": {
-        "postUpdateOptions": [
-            "gomodUpdateImportPaths",
-            "gomodTidy"
-        ],
-        "packageRules": [
-            {
-                "matchManagers": [
-                    "gomod"
-                ],
-                "matchDepTypes": [
-                    "indirect"
-                ],
-                "enabled": false
-            }
+        "fileMatch": [
+            "^.tekton/*"
         ]
     },
-
     "customManagers": [
         {
             "customType": "regex",
@@ -91,12 +71,15 @@
             "datasourceTemplate": "docker"
         }
     ],
-
     "packageRules": [
         {
             "groupName": "Go Builder",
-            "addLabels": ["golang"],
-            "matchDatasources": ["docker"],
+            "addLabels": [
+                "golang"
+            ],
+            "matchDatasources": [
+                "docker"
+            ],
             "matchPackageNames": [
                 "registry.access.redhat.com/ubi8/go-toolset",
                 "registry.access.redhat.com/ubi9/go-toolset"
@@ -104,8 +87,12 @@
             "allowedVersions": "/^[0-9]+\\.[0-9]+$/"
         },
         {
-            "matchUpdateTypes": ["major"],
-            "matchDatasources": ["docker"],
+            "matchUpdateTypes": [
+                "major"
+            ],
+            "matchDatasources": [
+                "docker"
+            ],
             "matchPackageNames": [
                 "registry.access.redhat.com/ubi8/go-toolset",
                 "registry.access.redhat.com/ubi9/go-toolset"
@@ -114,21 +101,39 @@
         },
         {
             "groupName": "Linter",
-            "addLabels": ["linter"],
-            "matchDatasources": ["go"],
-            "matchPackageNames": ["github.com/golangci/golangci-lint"]
+            "addLabels": [
+                "linter"
+            ],
+            "matchDatasources": [
+                "go"
+            ],
+            "matchPackageNames": [
+                "github.com/golangci/golangci-lint"
+            ]
         },
         {
-            "matchUpdateTypes": ["major"],
-            "matchDatasources": ["go"],
-            "matchPackageNames": ["github.com/golangci/golangci-lint"],
+            "matchUpdateTypes": [
+                "major"
+            ],
+            "matchDatasources": [
+                "go"
+            ],
+            "matchPackageNames": [
+                "github.com/golangci/golangci-lint"
+            ],
             "enabled": false
         },
         {
             "groupName": "Konflux build pipeline",
-            "addLabels": ["konflux"],
-            "schedule": ["on Saturday"],
-            "matchManagers": ["tekton"]
+            "addLabels": [
+                "konflux"
+            ],
+            "schedule": [
+                "on Saturday"
+            ],
+            "matchManagers": [
+                "tekton"
+            ]
         },
         {
             "matchPackageNames": [
@@ -162,26 +167,6 @@
             "matchManagers": [
                 "rpm-lockfile"
             ]
-        },
-        {
-            "matchManagers": [
-                "gomod"
-            ],
-            "enabled": false
-        },
-        {
-            "matchManagers": [
-                "gomod"
-            ],
-            "matchPackageNames": [
-                "github.com/openshift/hive/apis"
-            ],
-            "groupName": "Hive API Synchronization",
-            "addLabels": [
-                "hive-api",
-                "api-sync"
-            ],
-            "enabled": true
         }
     ]
 }
