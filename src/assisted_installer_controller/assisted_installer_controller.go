@@ -18,18 +18,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/thoas/go-funk"
-
 	"github.com/hashicorp/go-version"
 	metal3v1alpha1 "github.com/metal3-io/baremetal-operator/apis/metal3.io/v1alpha1"
 	configv1 "github.com/openshift/api/config/v1"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	certificatesv1 "k8s.io/api/certificates/v1"
-	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	mapiv1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/assisted-installer/src/common"
 	"github.com/openshift/assisted-installer/src/config"
@@ -38,6 +29,13 @@ import (
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/models"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"github.com/thoas/go-funk"
+	certificatesv1 "k8s.io/api/certificates/v1"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -1253,39 +1251,49 @@ func (c *controller) logRouterStatus() {
 	}
 
 	var consoleUrl string
-	// run every 30 seconds router check and log the result
+	// Resolve cluster before the periodic goroutine runs so the first GetCluster cannot race with callers
+	// that return immediately (e.g. final log upload in unit tests or fast shutdown).
+	if cl, err = c.ic.GetCluster(context.Background(), false); err != nil {
+		c.log.WithError(err).Errorf("Failed to get cluster %s from assisted-service", c.ClusterID)
+	} else {
+		consoleUrl = fmt.Sprintf("https://canary-openshift-ingress-canary.apps.%s.%s/health", cl.Name, cl.BaseDNSDomain)
+	}
+
+	routerProbe := func() bool {
+		if consoleUrl == "" {
+			cl, err = c.ic.GetCluster(context.Background(), false)
+			if err != nil {
+				c.log.WithError(err).Errorf("Failed to get cluster %s from assisted-service", c.ClusterID)
+				return false
+			}
+		}
+
+		consoleUrl = fmt.Sprintf("https://canary-openshift-ingress-canary.apps.%s.%s/health", cl.Name, cl.BaseDNSDomain)
+		r, err := client.Get(consoleUrl)
+		if err != nil {
+			c.log.WithError(err).Warning("Failed to reach console")
+		} else {
+			defer r.Body.Close()
+			response, errR := io.ReadAll(r.Body)
+			if errR != nil {
+				response = []byte("Failed to read response")
+			}
+			c.log.Infof("canary url status %s, response %s", r.Status, string(response))
+		}
+
+		url := fmt.Sprintf("http://%s/_______internal_router_healthz", localIp)
+		r, err = client.Get(url)
+		if err != nil {
+			c.log.WithError(err).Warning("Failed to reach internal router health")
+		} else {
+			c.log.Infof("route internal health status %s", r.Status)
+		}
+		return false
+	}
+
+	// run every SummaryLogsPeriod router check and log the result
 	go func() {
-		_ = utils.WaitForPredicate(WaitTimeout, SummaryLogsPeriod, func() bool {
-			if consoleUrl == "" {
-				cl, err = c.ic.GetCluster(context.Background(), false)
-				if err != nil {
-					c.log.WithError(err).Errorf("Failed to get cluster %s from assisted-service", c.ClusterID)
-					return false
-				}
-			}
-
-			consoleUrl = fmt.Sprintf("https://canary-openshift-ingress-canary.apps.%s.%s/health", cl.Name, cl.BaseDNSDomain)
-			r, err := client.Get(consoleUrl)
-			if err != nil {
-				c.log.WithError(err).Warning("Failed to reach console")
-			} else {
-				defer r.Body.Close()
-				response, errR := io.ReadAll(r.Body)
-				if errR != nil {
-					response = []byte("Failed to read response")
-				}
-				c.log.Infof("canary url status %s, response %s", r.Status, string(response))
-			}
-
-			url := fmt.Sprintf("http://%s/_______internal_router_healthz", localIp)
-			r, err = client.Get(url)
-			if err != nil {
-				c.log.WithError(err).Warning("Failed to reach internal router health")
-			} else {
-				c.log.Infof("route internal health status %s", r.Status)
-			}
-			return false
-		})
+		_ = utils.WaitForPredicate(WaitTimeout, SummaryLogsPeriod, routerProbe)
 	}()
 }
 
@@ -1345,7 +1353,7 @@ func (c *controller) uploadSummaryLogs(podName string, namespace string, sinceSe
 
 	if !ok {
 		msg := "Some Logs were not collected in summary"
-		c.log.Errorf(msg)
+		c.log.Error(msg)
 		return errors.New(msg)
 	}
 

@@ -8,17 +8,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/openshift/assisted-installer/src/common"
-
-	"github.com/openshift/assisted-installer/src/ops/execute"
-
 	"github.com/kelseyhightower/envconfig"
 	assistedinstallercontroller "github.com/openshift/assisted-installer/src/assisted_installer_controller"
+	"github.com/openshift/assisted-installer/src/common"
 	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/main/drymock"
 	"github.com/openshift/assisted-installer/src/ops"
+	"github.com/openshift/assisted-installer/src/ops/execute"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/client/installer"
 	"github.com/openshift/assisted-service/models"

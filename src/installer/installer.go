@@ -9,31 +9,28 @@ import (
 	"strings"
 	"time"
 
-	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
-
-	"golang.org/x/sync/errgroup"
-	v1 "k8s.io/api/core/v1"
-
 	"github.com/go-openapi/swag"
 	"github.com/google/uuid"
-	"github.com/openshift/assisted-installer/src/main/drymock"
-	"github.com/openshift/assisted-service/pkg/secretdump"
-	"github.com/openshift/assisted-service/pkg/validations"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	"github.com/thoas/go-funk"
-
 	"github.com/openshift/assisted-installer/src/common"
 	"github.com/openshift/assisted-installer/src/config"
 	"github.com/openshift/assisted-installer/src/coreos_logger"
 	"github.com/openshift/assisted-installer/src/ignition"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/k8s_client"
+	"github.com/openshift/assisted-installer/src/main/drymock"
 	"github.com/openshift/assisted-installer/src/ops"
 	"github.com/openshift/assisted-installer/src/ops/execute"
 	"github.com/openshift/assisted-installer/src/utils"
 	"github.com/openshift/assisted-service/models"
+	"github.com/openshift/assisted-service/pkg/secretdump"
+	"github.com/openshift/assisted-service/pkg/validations"
+	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	"github.com/pkg/errors"
 	preinstallUtils "github.com/rh-ecosystem-edge/preinstall-utils/pkg"
+	"github.com/sirupsen/logrus"
+	"github.com/thoas/go-funk"
+	"golang.org/x/sync/errgroup"
+	v1 "k8s.io/api/core/v1"
 )
 
 // In dry run mode we prefer to get quick feedback about errors rather

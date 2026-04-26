@@ -3,9 +3,8 @@ package config
 import (
 	"encoding/json"
 	"flag"
-	"os"
-
 	"fmt"
+	"os"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/openshift/assisted-installer/src/utils"
