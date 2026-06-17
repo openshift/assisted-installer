@@ -46,13 +46,13 @@ arches:
     name: pkgconf-pkg-config
     evr: 1.7.3-10.el9
     sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/r/rsync-3.2.5-7.el9_8.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/r/rsync-3.2.5-7.el9_8.2.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 420142
-    checksum: sha256:39ba71d3677854505524df265ed828c7e00f026ecfe83df6ba86c7586588cae7
+    size: 425538
+    checksum: sha256:1e1fa89a9a4b843862fb9436295f187c55d314a9eb23d4bb8d6b07b2f41ba067
     name: rsync
-    evr: 3.2.5-7.el9_8
-    sourcerpm: rsync-3.2.5-7.el9_8.src.rpm
+    evr: 3.2.5-7.el9_8.2
+    sourcerpm: rsync-3.2.5-7.el9_8.2.src.rpm
   source: []
   module_metadata: []
 - arch: ppc64le
@@ -99,13 +99,13 @@ arches:
     name: pkgconf-pkg-config
     evr: 1.7.3-10.el9
     sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/r/rsync-3.2.5-7.el9_8.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/r/rsync-3.2.5-7.el9_8.2.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 453342
-    checksum: sha256:0570a89b350ada78d86d87afa90b101a7dc9791e5868b6f33fba00727440cd74
+    size: 459875
+    checksum: sha256:5e75716946f15a560fffc57967390adfdfc812d6b85997b9d712f041657cfd1f
     name: rsync
-    evr: 3.2.5-7.el9_8
-    sourcerpm: rsync-3.2.5-7.el9_8.src.rpm
+    evr: 3.2.5-7.el9_8.2
+    sourcerpm: rsync-3.2.5-7.el9_8.2.src.rpm
   source: []
   module_metadata: []
 - arch: s390x
@@ -152,13 +152,13 @@ arches:
     name: pkgconf-pkg-config
     evr: 1.7.3-10.el9
     sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/r/rsync-3.2.5-7.el9_8.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/r/rsync-3.2.5-7.el9_8.2.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 422461
-    checksum: sha256:e937047c63e4f5501bc08aeada17ec184254cdc2d5cd6a1a9e39b6477bf2bb72
+    size: 427539
+    checksum: sha256:d85d04511788214c554ff3068632f9e0edb39c8e7544f0610927f79d76677182
     name: rsync
-    evr: 3.2.5-7.el9_8
-    sourcerpm: rsync-3.2.5-7.el9_8.src.rpm
+    evr: 3.2.5-7.el9_8.2
+    sourcerpm: rsync-3.2.5-7.el9_8.2.src.rpm
   source: []
   module_metadata: []
 - arch: x86_64
@@ -205,12 +205,12 @@ arches:
     name: pkgconf-pkg-config
     evr: 1.7.3-10.el9
     sourcerpm: pkgconf-1.7.3-10.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/r/rsync-3.2.5-7.el9_8.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/r/rsync-3.2.5-7.el9_8.2.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 424707
-    checksum: sha256:6c1d064c38e4a3f4bcb756cb9ea0382cccf7a262433c286db45931d114074ff3
+    size: 430699
+    checksum: sha256:73c95e6404602b407a3cced5f1ae769a2c32b5b4ce9d646fc42617941863082c
     name: rsync
-    evr: 3.2.5-7.el9_8
-    sourcerpm: rsync-3.2.5-7.el9_8.src.rpm
+    evr: 3.2.5-7.el9_8.2
+    sourcerpm: rsync-3.2.5-7.el9_8.2.src.rpm
   source: []
   module_metadata: []
