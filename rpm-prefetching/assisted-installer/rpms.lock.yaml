@@ -39,13 +39,13 @@ arches:
     name: libdb
     evr: 5.3.28-57.el9_6
     sourcerpm: libdb-5.3.28-57.el9_6.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libeconf-0.4.1-5.el9.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libeconf-0.4.1-7.el9_8.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 25806
-    checksum: sha256:e1a899e85549254117622b7e6bf58a8fb8f4d0484773d1bf3fc7753b559f82d8
+    size: 32324
+    checksum: sha256:8a5e117c2690c82835c6013f1fbac37b026f3e953fbffbd84c2f5ef6cf8df571
     name: libeconf
-    evr: 0.4.1-5.el9
-    sourcerpm: libeconf-0.4.1-5.el9.src.rpm
+    evr: 0.4.1-7.el9_8
+    sourcerpm: libeconf-0.4.1-7.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libfdisk-2.37.4-25.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 156711
@@ -155,13 +155,13 @@ arches:
     name: libdb
     evr: 5.3.28-57.el9_6
     sourcerpm: libdb-5.3.28-57.el9_6.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libeconf-0.4.1-5.el9.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libeconf-0.4.1-7.el9_8.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 29147
-    checksum: sha256:fb259a32af3af28236a1b8c6d436fb3c02c9eb7b8e54631a830ffa63c033a122
+    size: 35680
+    checksum: sha256:4a26999b09960559538b2fbee1aece9f6c3c47e386b918f3f50260dd125e1ac4
     name: libeconf
-    evr: 0.4.1-5.el9
-    sourcerpm: libeconf-0.4.1-5.el9.src.rpm
+    evr: 0.4.1-7.el9_8
+    sourcerpm: libeconf-0.4.1-7.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libfdisk-2.37.4-25.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 176392
@@ -278,13 +278,13 @@ arches:
     name: libdb
     evr: 5.3.28-57.el9_6
     sourcerpm: libdb-5.3.28-57.el9_6.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libeconf-0.4.1-5.el9.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libeconf-0.4.1-7.el9_8.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 26645
-    checksum: sha256:1c2c6196da476519dfe2e7f6220bd6b5d5e449195f077997dcc49d7f89837c78
+    size: 33180
+    checksum: sha256:37d39a7fa03848dde2f48a0f32cd27b182317f9a5b85ce0af7252a44ffc42155
     name: libeconf
-    evr: 0.4.1-5.el9
-    sourcerpm: libeconf-0.4.1-5.el9.src.rpm
+    evr: 0.4.1-7.el9_8
+    sourcerpm: libeconf-0.4.1-7.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libfdisk-2.37.4-25.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 156062
@@ -394,13 +394,13 @@ arches:
     name: libdb
     evr: 5.3.28-57.el9_6
     sourcerpm: libdb-5.3.28-57.el9_6.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libeconf-0.4.1-5.el9.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libeconf-0.4.1-7.el9_8.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 26622
-    checksum: sha256:7fe6bfb72cd91d17d64d5dab0a8914532403a33236676fb7c948692fb5128632
+    size: 33179
+    checksum: sha256:a570c5baaedeb1445bc2e4f3930b0a709411bbefbdbf463c3e006cbfc7018894
     name: libeconf
-    evr: 0.4.1-5.el9
-    sourcerpm: libeconf-0.4.1-5.el9.src.rpm
+    evr: 0.4.1-7.el9_8
+    sourcerpm: libeconf-0.4.1-7.el9_8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libfdisk-2.37.4-25.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 161769
