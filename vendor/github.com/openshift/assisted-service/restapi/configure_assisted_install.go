@@ -52,8 +52,14 @@ type InstallerAPI interface {
 	 */
 	DownloadMinimalInitrd(ctx context.Context, params installer.DownloadMinimalInitrdParams) middleware.Responder
 
-	/* GetClusterSupportedPlatforms A list of platforms that this cluster can support in its current configuration. */
+	/* GetClusterSupportedPlatforms Deprecated. Returns a list of platforms that this cluster can support in its current configuration.
+	   Prefer deriving platform eligibility from cluster hosts and inventory together with
+	   GET /v2/support-levels/features (or GET /v2/support-levels/features/detailed) for the cluster OpenShift version and CPU architecture.
+	*/
 	GetClusterSupportedPlatforms(ctx context.Context, params installer.GetClusterSupportedPlatformsParams) middleware.Responder
+
+	/* GetDetailedSupportedFeatures Retrieves detailed features information including support level, incompatibilities, and operator dependencies. */
+	GetDetailedSupportedFeatures(ctx context.Context, params installer.GetDetailedSupportedFeaturesParams) middleware.Responder
 
 	/* GetInfraEnv Retrieves the details of the infra-env. */
 	GetInfraEnv(ctx context.Context, params installer.GetInfraEnvParams) middleware.Responder
@@ -187,6 +193,9 @@ type InstallerAPI interface {
 	/* V2RegisterCluster Creates a new OpenShift cluster definition. */
 	V2RegisterCluster(ctx context.Context, params installer.V2RegisterClusterParams) middleware.Responder
 
+	/* V2RegisterDisconnectedCluster Create a disconnected OpenShift cluster for offline installation with embedded ignition */
+	V2RegisterDisconnectedCluster(ctx context.Context, params installer.V2RegisterDisconnectedClusterParams) middleware.Responder
+
 	/* V2RegisterHost Registers a new OpenShift agent. */
 	V2RegisterHost(ctx context.Context, params installer.V2RegisterHostParams) middleware.Responder
 
@@ -265,7 +274,7 @@ type OperatorsAPI interface {
 	/* V2GetBundle Get operator properties for a bundle */
 	V2GetBundle(ctx context.Context, params operators.V2GetBundleParams) middleware.Responder
 
-	/* V2ListBundles Get list of avaliable bundles */
+	/* V2ListBundles Get list of available bundles */
 	V2ListBundles(ctx context.Context, params operators.V2ListBundlesParams) middleware.Responder
 
 	/* V2ListOfClusterOperators Lists operators to be monitored for a cluster. */
@@ -446,6 +455,11 @@ func HandlerAPI(c Config) (http.Handler, *operations.AssistedInstallAPI, error) 
 		ctx := params.HTTPRequest.Context()
 		ctx = storeAuth(ctx, principal)
 		return c.InstallerAPI.GetClusterSupportedPlatforms(ctx, params)
+	})
+	api.InstallerGetDetailedSupportedFeaturesHandler = installer.GetDetailedSupportedFeaturesHandlerFunc(func(params installer.GetDetailedSupportedFeaturesParams, principal interface{}) middleware.Responder {
+		ctx := params.HTTPRequest.Context()
+		ctx = storeAuth(ctx, principal)
+		return c.InstallerAPI.GetDetailedSupportedFeatures(ctx, params)
 	})
 	api.InstallerGetInfraEnvHandler = installer.GetInfraEnvHandlerFunc(func(params installer.GetInfraEnvParams, principal interface{}) middleware.Responder {
 		ctx := params.HTTPRequest.Context()
@@ -741,6 +755,11 @@ func HandlerAPI(c Config) (http.Handler, *operations.AssistedInstallAPI, error) 
 		ctx := params.HTTPRequest.Context()
 		ctx = storeAuth(ctx, principal)
 		return c.InstallerAPI.V2RegisterCluster(ctx, params)
+	})
+	api.InstallerV2RegisterDisconnectedClusterHandler = installer.V2RegisterDisconnectedClusterHandlerFunc(func(params installer.V2RegisterDisconnectedClusterParams, principal interface{}) middleware.Responder {
+		ctx := params.HTTPRequest.Context()
+		ctx = storeAuth(ctx, principal)
+		return c.InstallerAPI.V2RegisterDisconnectedCluster(ctx, params)
 	})
 	api.InstallerV2RegisterHostHandler = installer.V2RegisterHostHandlerFunc(func(params installer.V2RegisterHostParams, principal interface{}) middleware.Responder {
 		ctx := params.HTTPRequest.Context()
