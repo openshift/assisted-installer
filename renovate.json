@@ -10,11 +10,30 @@
 
     "enabledManagers": [
         "custom.regex",
-        "tekton"
+        "tekton",
+        "gomod"
     ],
 
     "tekton": {
         "fileMatch": ["^.tekton/*"]
+    },
+
+    "gomod": {
+        "postUpdateOptions": [
+            "gomodUpdateImportPaths",
+            "gomodTidy"
+        ],
+        "packageRules": [
+            {
+                "matchManagers": [
+                    "gomod"
+                ],
+                "matchDepTypes": [
+                    "indirect"
+                ],
+                "enabled": false
+            }
+        ]
     },
 
     "customManagers": [
@@ -98,6 +117,26 @@
             "addLabels": ["konflux"],
             "schedule": ["on Saturday"],
             "matchManagers": ["tekton"]
+        },
+        {
+            "matchManagers": [
+                "gomod"
+            ],
+            "enabled": false
+        },
+        {
+            "matchManagers": [
+                "gomod"
+            ],
+            "matchPackageNames": [
+                "github.com/openshift/hive/apis"
+            ],
+            "groupName": "Hive API Synchronization",
+            "addLabels": [
+                "hive-api",
+                "api-sync"
+            ],
+            "enabled": true
         }
     ]
 }
