@@ -5,7 +5,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 
 	"github.com/testcontainers/testcontainers-go/exec"
@@ -33,6 +33,11 @@ func (ws *NopStrategy) Timeout() *time.Duration {
 	return ws.timeout
 }
 
+// String returns a human-readable description of the wait strategy.
+func (ws *NopStrategy) String() string {
+	return "custom wait condition"
+}
+
 func (ws *NopStrategy) WithStartupTimeout(timeout time.Duration) *NopStrategy {
 	ws.timeout = &timeout
 	return ws
@@ -44,14 +49,14 @@ func (ws *NopStrategy) WaitUntilReady(ctx context.Context, target StrategyTarget
 
 type NopStrategyTarget struct {
 	ReaderCloser   io.ReadCloser
-	ContainerState types.ContainerState
+	ContainerState container.State
 }
 
 func (st NopStrategyTarget) Host(_ context.Context) (string, error) {
 	return "", nil
 }
 
-func (st NopStrategyTarget) Inspect(_ context.Context) (*types.ContainerJSON, error) {
+func (st NopStrategyTarget) Inspect(_ context.Context) (*container.InspectResponse, error) {
 	return nil, nil
 }
 
@@ -72,6 +77,10 @@ func (st NopStrategyTarget) Exec(_ context.Context, _ []string, _ ...exec.Proces
 	return 0, nil, nil
 }
 
-func (st NopStrategyTarget) State(_ context.Context) (*types.ContainerState, error) {
+func (st NopStrategyTarget) State(_ context.Context) (*container.State, error) {
 	return &st.ContainerState, nil
+}
+
+func (st NopStrategyTarget) CopyFileFromContainer(context.Context, string) (io.ReadCloser, error) {
+	return st.ReaderCloser, nil
 }
