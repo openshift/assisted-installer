@@ -38,6 +38,17 @@ type Notifiable interface {
 	Payload() any
 }
 
+// PrimaryIPStack defines which IP family is considered primary in a dual-stack configuration.
+type PrimaryIPStack int
+
+const (
+	// PrimaryIPStackV4 indicates the primary stack is IPv4.
+	PrimaryIPStackV4 PrimaryIPStack = 4
+
+	// PrimaryIPStackV6 indicates the primary stack is IPv6.
+	PrimaryIPStackV6 PrimaryIPStack = 6
+)
+
 type Cluster struct {
 	models.Cluster
 	// The pull secret that obtained from the Pull Secret page on the Red Hat OpenShift Cluster Manager site.
@@ -87,6 +98,11 @@ type Cluster struct {
 
 	// A JSON blob in which holds the cluster mirror registry if set
 	MirrorRegistryConfiguration string `json:"mirror_registry_configuration" gorm:"type:TEXT"`
+
+	// PrimaryIPStack will be 'nil' for single-stack clusters
+	// and populated only when the configuration is dual-stack.
+	// The `omitempty` tag ensures it's omitted from JSON when nil.
+	PrimaryIPStack *PrimaryIPStack `json:"primary_ip_stack,omitempty"`
 }
 
 func (c *Cluster) GetClusterID() *strfmt.UUID {
@@ -316,7 +332,10 @@ func AutoMigrate(db *gorm.DB) error {
 }
 
 func LoadTableFromDB(db *gorm.DB, tableName string, conditions ...interface{}) *gorm.DB {
-	return db.Preload(tableName, conditions...)
+	// Anytime a cluster is loaded from the database, the network tables need to be ordered
+	// by IP family according to the cluster's primary_ip_stack.
+	tableConditions := addNetworkCondition(tableName, conditions...)
+	return db.Preload(tableName, tableConditions...)
 }
 
 func LoadClusterTablesFromDB(db *gorm.DB, excludeTables ...string) *gorm.DB {
@@ -407,8 +426,71 @@ func prepareClusterDB(db *gorm.DB, eagerLoading EagerLoadingState, includeDelete
 			db = LoadTableFromDB(db, tableName, conditions...)
 		}
 	}
-
 	return db
+}
+
+// OrderByIPFamily returns a GORM callback that orders network items by IP family
+// according to the cluster's primary_ip_stack setting.
+// It joins with the clusters table to get primary_ip_stack and uses PostgreSQL's
+// family() function which returns 4 for IPv4 and 6 for IPv6.
+// Rows matching the cluster's primary_ip_stack are ordered first.
+func OrderByIPFamily(column, tableName string) func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		joinClause := fmt.Sprintf(
+			"INNER JOIN clusters ON clusters.id = %s.cluster_id",
+			tableName,
+		)
+		orderClause := fmt.Sprintf(
+			"CASE WHEN clusters.primary_ip_stack = family(%s) THEN 0 ELSE 1 END ASC",
+			column,
+		)
+		return db.Joins(joinClause).Order(orderClause)
+	}
+}
+
+// OrderByBootstrapNetwork orders machine networks so the one containing the
+// bootstrap host's IP comes first. cluster-etcd-operator relies on this ordering.
+// ref: https://github.com/openshift/cluster-etcd-operator/blob/cee7f9bbea0fce240a74872e3c3baf069bc5eaac/pkg/cmd/render/render.go#L490
+func OrderByBootstrapNetwork() func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		orderClause := `CASE WHEN EXISTS (
+			SELECT 1 FROM hosts h,
+				jsonb_array_elements(h.inventory::jsonb->'interfaces') AS iface,
+				jsonb_array_elements_text(
+					CASE WHEN family(machine_networks.cidr::inet) = 4
+						THEN COALESCE(NULLIF(iface->'ipv4_addresses', 'null'::jsonb), '[]'::jsonb)
+						ELSE COALESCE(NULLIF(iface->'ipv6_addresses', 'null'::jsonb), '[]'::jsonb)
+					END
+				) AS addr
+			WHERE h.cluster_id = machine_networks.cluster_id
+				AND h.bootstrap = true
+				AND h.deleted_at IS NULL
+				AND h.inventory IS NOT NULL
+				AND h.inventory != ''
+				AND host(addr::inet)::inet << machine_networks.cidr::cidr
+		) THEN 0 ELSE 1 END ASC`
+		return db.Order(orderClause)
+	}
+}
+
+// addNetworkCondition adds the order by clause for network tables based on the cluster's primary_ip_stack setting
+// to the conditions for a given table.
+func addNetworkCondition(tableName string, conditions ...interface{}) []interface{} {
+	allConditions := conditions
+	switch tableName {
+	case MachineNetworksTable:
+		allConditions = append(allConditions, OrderByIPFamily("cidr", "machine_networks"))
+		allConditions = append(allConditions, OrderByBootstrapNetwork())
+	case ClusterNetworksTable:
+		allConditions = append(allConditions, OrderByIPFamily("cidr", "cluster_networks"))
+	case ServiceNetworksTable:
+		allConditions = append(allConditions, OrderByIPFamily("cidr", "service_networks"))
+	case APIVIPsTable:
+		allConditions = append(allConditions, OrderByIPFamily("ip", "api_vips"))
+	case IngressVIPsTable:
+		allConditions = append(allConditions, OrderByIPFamily("ip", "ingress_vips"))
+	}
+	return allConditions
 }
 
 func GetClusterFromDBWhere(db *gorm.DB, eagerLoading EagerLoadingState, includeDeleted DeleteRecordsState, where ...interface{}) (*Cluster, error) {
@@ -475,6 +557,17 @@ func GetClusterHostFromDB(db *gorm.DB, clusterId, hostId string) (*Host, error) 
 		return nil, errors.Wrapf(err, "failed to get host %s in cluster %s", hostId, clusterId)
 	}
 	return &host, nil
+}
+
+// DeleteSoftDeletedHost hard-deletes any soft-deleted host with the given composite key (ID, InfraEnvID).
+// This is used before registering or creating a host to prevent primary key conflicts.
+// Returns nil if no soft-deleted host exists.
+func DeleteSoftDeletedHost(db *gorm.DB, hostId, infraEnvId string) error {
+	err := db.Unscoped().Where("deleted_at IS NOT NULL").Delete(&Host{}, "id = ? and infra_env_id = ?", hostId, infraEnvId).Error
+	if err != nil {
+		return errors.Wrapf(err, "error while trying to delete soft-deleted host %s in infra env %s from db", hostId, infraEnvId)
+	}
+	return nil
 }
 
 func GetHostFromDBWhere(db *gorm.DB, where ...interface{}) (*Host, error) {

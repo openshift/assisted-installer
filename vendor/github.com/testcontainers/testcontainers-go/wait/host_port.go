@@ -4,13 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/docker/go-connections/nat"
+
+	"github.com/testcontainers/testcontainers-go/log"
+)
+
+const (
+	exitEaccess     = 126 // container cmd can't be invoked (permission denied)
+	exitCmdNotFound = 127 // container cmd not found/does not exist or invalid bind-mount
 )
 
 // Implement interface
@@ -19,7 +24,10 @@ var (
 	_ StrategyTimeout = (*HostPortStrategy)(nil)
 )
 
-var errShellNotExecutable = errors.New("/bin/sh command not executable")
+var (
+	errShellNotExecutable = errors.New("/bin/sh command not executable")
+	errShellNotFound      = errors.New("/bin/sh command not found")
+)
 
 type HostPortStrategy struct {
 	// Port is a string containing port number and protocol in the format "80/tcp"
@@ -33,6 +41,11 @@ type HostPortStrategy struct {
 	// a shell is not available in the container or when the container doesn't bind
 	// the port internally until additional conditions are met.
 	skipInternalCheck bool
+
+	// skipExternalCheck is a flag to skip the external check, which, if used with
+	// skipInternalCheck, makes strategy waiting only for port mapping completion
+	// without accessing port.
+	skipExternalCheck bool
 }
 
 // NewHostPortStrategy constructs a default host port strategy that waits for the given
@@ -61,11 +74,26 @@ func ForExposedPort() *HostPortStrategy {
 	return NewHostPortStrategy("")
 }
 
+// ForMappedPort returns a host port strategy that waits for the given port
+// to be mapped without accessing the port itself.
+func ForMappedPort(port nat.Port) *HostPortStrategy {
+	return NewHostPortStrategy(port).SkipInternalCheck().SkipExternalCheck()
+}
+
 // SkipInternalCheck changes the host port strategy to skip the internal check,
 // which is useful when a shell is not available in the container or when the
 // container doesn't bind the port internally until additional conditions are met.
 func (hp *HostPortStrategy) SkipInternalCheck() *HostPortStrategy {
 	hp.skipInternalCheck = true
+
+	return hp
+}
+
+// SkipExternalCheck changes the host port strategy to skip the external check,
+// which, if used with SkipInternalCheck, makes strategy waiting only for port
+// mapping completion without accessing port.
+func (hp *HostPortStrategy) SkipExternalCheck() *HostPortStrategy {
+	hp.skipExternalCheck = true
 
 	return hp
 }
@@ -86,6 +114,47 @@ func (hp *HostPortStrategy) Timeout() *time.Duration {
 	return hp.timeout
 }
 
+// String returns a human-readable description of the wait strategy.
+func (hp *HostPortStrategy) String() string {
+	port := "first exposed port"
+	if hp.Port != "" {
+		port = fmt.Sprintf("port %s", hp.Port)
+	}
+
+	var checks string
+	switch {
+	case hp.skipInternalCheck && hp.skipExternalCheck:
+		checks = " to be mapped"
+	case hp.skipInternalCheck:
+		checks = " to be accessible externally"
+	case hp.skipExternalCheck:
+		checks = " to be listening internally"
+	default:
+		checks = " to be listening"
+	}
+
+	return fmt.Sprintf("%s%s", port, checks)
+}
+
+// detectInternalPort returns the lowest internal port that is currently bound.
+// If no internal port is found, it returns the zero nat.Port value which
+// can be checked against an empty string.
+func (hp *HostPortStrategy) detectInternalPort(ctx context.Context, target StrategyTarget) (nat.Port, error) {
+	var internalPort nat.Port
+	inspect, err := target.Inspect(ctx)
+	if err != nil {
+		return internalPort, fmt.Errorf("inspect: %w", err)
+	}
+
+	for port := range inspect.NetworkSettings.Ports {
+		if internalPort == "" || port.Int() < internalPort.Int() {
+			internalPort = port
+		}
+	}
+
+	return internalPort, nil
+}
+
 // WaitUntilReady implements Strategy.WaitUntilReady
 func (hp *HostPortStrategy) WaitUntilReady(ctx context.Context, target StrategyTarget) error {
 	timeout := defaultStartupTimeout()
@@ -96,65 +165,81 @@ func (hp *HostPortStrategy) WaitUntilReady(ctx context.Context, target StrategyT
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	ipAddress, err := target.Host(ctx)
-	if err != nil {
-		return err
-	}
-
 	waitInterval := hp.PollInterval
 
 	internalPort := hp.Port
+	i := 0
 	if internalPort == "" {
-		inspect, err := target.Inspect(ctx)
+		var err error
+		// Port is not specified, so we need to detect it.
+		internalPort, err = hp.detectInternalPort(ctx, target)
 		if err != nil {
-			return err
+			return fmt.Errorf("detect internal port: %w", err)
 		}
 
-		for port := range inspect.NetworkSettings.Ports {
-			if internalPort == "" || port.Int() < internalPort.Int() {
-				internalPort = port
+		for internalPort == "" {
+			select {
+			case <-ctx.Done():
+				return fmt.Errorf("detect internal port: retries: %d, last err: %w, ctx err: %w", i, err, ctx.Err())
+			case <-time.After(waitInterval):
+				if err := checkTarget(ctx, target); err != nil {
+					return fmt.Errorf("detect internal port: check target: retries: %d, last err: %w", i, err)
+				}
+
+				internalPort, err = hp.detectInternalPort(ctx, target)
+				if err != nil {
+					return fmt.Errorf("detect internal port: %w", err)
+				}
 			}
 		}
 	}
 
-	if internalPort == "" {
-		return fmt.Errorf("no port to wait for")
-	}
-
-	var port nat.Port
-	port, err = target.MappedPort(ctx, internalPort)
-	i := 0
+	port, err := target.MappedPort(ctx, internalPort)
+	i = 0
 
 	for port == "" {
 		i++
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("%w: %w", ctx.Err(), err)
+			return fmt.Errorf("mapped port: retries: %d, port: %q, last err: %w, ctx err: %w", i, port, err, ctx.Err())
 		case <-time.After(waitInterval):
 			if err := checkTarget(ctx, target); err != nil {
-				return err
+				return fmt.Errorf("mapped port: check target: retries: %d, port: %q, last err: %w", i, port, err)
 			}
 			port, err = target.MappedPort(ctx, internalPort)
 			if err != nil {
-				log.Printf("(%d) [%s] %s\n", i, port, err)
+				log.Printf("mapped port: retries: %d, port: %q, err: %s\n", i, port, err)
 			}
 		}
 	}
 
-	if err := externalCheck(ctx, ipAddress, port, target, waitInterval); err != nil {
-		return err
+	if !hp.skipExternalCheck {
+		ipAddress, err := target.Host(ctx)
+		if err != nil {
+			return fmt.Errorf("host: %w", err)
+		}
+
+		if err := externalCheck(ctx, ipAddress, port, target, waitInterval); err != nil {
+			return fmt.Errorf("external check: %w", err)
+		}
 	}
 
 	if hp.skipInternalCheck {
 		return nil
 	}
 
-	err = internalCheck(ctx, internalPort, target)
-	if err != nil && errors.Is(errShellNotExecutable, err) {
-		log.Println("Shell not executable in container, only external port check will be performed")
-	} else {
-		return err
+	if err = internalCheck(ctx, internalPort, target); err != nil {
+		switch {
+		case errors.Is(err, errShellNotExecutable):
+			log.Printf("Shell not executable in container, only external port validated")
+			return nil
+		case errors.Is(err, errShellNotFound):
+			log.Printf("Shell not found in container")
+			return nil
+		default:
+			return fmt.Errorf("internal check: %w", err)
+		}
 	}
 
 	return nil
@@ -162,14 +247,12 @@ func (hp *HostPortStrategy) WaitUntilReady(ctx context.Context, target StrategyT
 
 func externalCheck(ctx context.Context, ipAddress string, port nat.Port, target StrategyTarget, waitInterval time.Duration) error {
 	proto := port.Proto()
-	portNumber := port.Int()
-	portString := strconv.Itoa(portNumber)
 
 	dialer := net.Dialer{}
-	address := net.JoinHostPort(ipAddress, portString)
-	for {
+	address := net.JoinHostPort(ipAddress, port.Port())
+	for i := 0; ; i++ {
 		if err := checkTarget(ctx, target); err != nil {
-			return err
+			return fmt.Errorf("check target: retries: %d address: %s: %w", i, address, err)
 		}
 		conn, err := dialer.DialContext(ctx, proto, address)
 		if err != nil {
@@ -183,7 +266,7 @@ func externalCheck(ctx context.Context, ipAddress string, port nat.Port, target 
 					}
 				}
 			}
-			return err
+			return fmt.Errorf("dial: %w", err)
 		}
 
 		conn.Close()
@@ -205,13 +288,18 @@ func internalCheck(ctx context.Context, internalPort nat.Port, target StrategyTa
 			return fmt.Errorf("%w, host port waiting failed", err)
 		}
 
-		if exitCode == 0 {
-			break
-		} else if exitCode == 126 {
+		// Docker has an issue which override exit code 127 to 126 due to:
+		// https://github.com/moby/moby/issues/45795
+		// Handle both to ensure compatibility with Docker and Podman for now.
+		switch exitCode {
+		case 0:
+			return nil
+		case exitEaccess:
 			return errShellNotExecutable
+		case exitCmdNotFound:
+			return errShellNotFound
 		}
 	}
-	return nil
 }
 
 func buildInternalCheckCommand(internalPort int) string {

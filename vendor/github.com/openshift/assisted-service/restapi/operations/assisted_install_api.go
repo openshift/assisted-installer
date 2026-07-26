@@ -63,6 +63,9 @@ func NewAssistedInstallAPI(spec *loads.Document) *AssistedInstallAPI {
 		InstallerGetClusterSupportedPlatformsHandler: installer.GetClusterSupportedPlatformsHandlerFunc(func(params installer.GetClusterSupportedPlatformsParams, principal interface{}) middleware.Responder {
 			return middleware.NotImplemented("operation installer.GetClusterSupportedPlatforms has not yet been implemented")
 		}),
+		InstallerGetDetailedSupportedFeaturesHandler: installer.GetDetailedSupportedFeaturesHandlerFunc(func(params installer.GetDetailedSupportedFeaturesParams, principal interface{}) middleware.Responder {
+			return middleware.NotImplemented("operation installer.GetDetailedSupportedFeatures has not yet been implemented")
+		}),
 		InstallerGetInfraEnvHandler: installer.GetInfraEnvHandlerFunc(func(params installer.GetInfraEnvParams, principal interface{}) middleware.Responder {
 			return middleware.NotImplemented("operation installer.GetInfraEnv has not yet been implemented")
 		}),
@@ -240,6 +243,9 @@ func NewAssistedInstallAPI(spec *loads.Document) *AssistedInstallAPI {
 		InstallerV2RegisterClusterHandler: installer.V2RegisterClusterHandlerFunc(func(params installer.V2RegisterClusterParams, principal interface{}) middleware.Responder {
 			return middleware.NotImplemented("operation installer.V2RegisterCluster has not yet been implemented")
 		}),
+		InstallerV2RegisterDisconnectedClusterHandler: installer.V2RegisterDisconnectedClusterHandlerFunc(func(params installer.V2RegisterDisconnectedClusterParams, principal interface{}) middleware.Responder {
+			return middleware.NotImplemented("operation installer.V2RegisterDisconnectedCluster has not yet been implemented")
+		}),
 		InstallerV2RegisterHostHandler: installer.V2RegisterHostHandlerFunc(func(params installer.V2RegisterHostParams, principal interface{}) middleware.Responder {
 			return middleware.NotImplemented("operation installer.V2RegisterHost has not yet been implemented")
 		}),
@@ -392,6 +398,8 @@ type AssistedInstallAPI struct {
 	InstallerDownloadMinimalInitrdHandler installer.DownloadMinimalInitrdHandler
 	// InstallerGetClusterSupportedPlatformsHandler sets the operation handler for the get cluster supported platforms operation
 	InstallerGetClusterSupportedPlatformsHandler installer.GetClusterSupportedPlatformsHandler
+	// InstallerGetDetailedSupportedFeaturesHandler sets the operation handler for the get detailed supported features operation
+	InstallerGetDetailedSupportedFeaturesHandler installer.GetDetailedSupportedFeaturesHandler
 	// InstallerGetInfraEnvHandler sets the operation handler for the get infra env operation
 	InstallerGetInfraEnvHandler installer.GetInfraEnvHandler
 	// InstallerGetInfraEnvDownloadURLHandler sets the operation handler for the get infra env download URL operation
@@ -510,6 +518,8 @@ type AssistedInstallAPI struct {
 	InstallerV2PostStepReplyHandler installer.V2PostStepReplyHandler
 	// InstallerV2RegisterClusterHandler sets the operation handler for the v2 register cluster operation
 	InstallerV2RegisterClusterHandler installer.V2RegisterClusterHandler
+	// InstallerV2RegisterDisconnectedClusterHandler sets the operation handler for the v2 register disconnected cluster operation
+	InstallerV2RegisterDisconnectedClusterHandler installer.V2RegisterDisconnectedClusterHandler
 	// InstallerV2RegisterHostHandler sets the operation handler for the v2 register host operation
 	InstallerV2RegisterHostHandler installer.V2RegisterHostHandler
 	// OperatorsV2ReportMonitoredOperatorStatusHandler sets the operation handler for the v2 report monitored operator status operation
@@ -655,6 +665,9 @@ func (o *AssistedInstallAPI) Validate() error {
 	}
 	if o.InstallerGetClusterSupportedPlatformsHandler == nil {
 		unregistered = append(unregistered, "installer.GetClusterSupportedPlatformsHandler")
+	}
+	if o.InstallerGetDetailedSupportedFeaturesHandler == nil {
+		unregistered = append(unregistered, "installer.GetDetailedSupportedFeaturesHandler")
 	}
 	if o.InstallerGetInfraEnvHandler == nil {
 		unregistered = append(unregistered, "installer.GetInfraEnvHandler")
@@ -832,6 +845,9 @@ func (o *AssistedInstallAPI) Validate() error {
 	}
 	if o.InstallerV2RegisterClusterHandler == nil {
 		unregistered = append(unregistered, "installer.V2RegisterClusterHandler")
+	}
+	if o.InstallerV2RegisterDisconnectedClusterHandler == nil {
+		unregistered = append(unregistered, "installer.V2RegisterDisconnectedClusterHandler")
 	}
 	if o.InstallerV2RegisterHostHandler == nil {
 		unregistered = append(unregistered, "installer.V2RegisterHostHandler")
@@ -1018,6 +1034,10 @@ func (o *AssistedInstallAPI) initHandlerCache() {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}
 	o.handlers["GET"]["/v2/clusters/{cluster_id}/supported-platforms"] = installer.NewGetClusterSupportedPlatforms(o.context, o.InstallerGetClusterSupportedPlatformsHandler)
+	if o.handlers["GET"] == nil {
+		o.handlers["GET"] = make(map[string]http.Handler)
+	}
+	o.handlers["GET"]["/v2/support-levels/features/detailed"] = installer.NewGetDetailedSupportedFeatures(o.context, o.InstallerGetDetailedSupportedFeaturesHandler)
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}
@@ -1254,6 +1274,10 @@ func (o *AssistedInstallAPI) initHandlerCache() {
 		o.handlers["POST"] = make(map[string]http.Handler)
 	}
 	o.handlers["POST"]["/v2/clusters"] = installer.NewV2RegisterCluster(o.context, o.InstallerV2RegisterClusterHandler)
+	if o.handlers["POST"] == nil {
+		o.handlers["POST"] = make(map[string]http.Handler)
+	}
+	o.handlers["POST"]["/v2/clusters/disconnected"] = installer.NewV2RegisterDisconnectedCluster(o.context, o.InstallerV2RegisterDisconnectedClusterHandler)
 	if o.handlers["POST"] == nil {
 		o.handlers["POST"] = make(map[string]http.Handler)
 	}
