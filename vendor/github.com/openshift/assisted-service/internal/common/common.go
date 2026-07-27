@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/docker/distribution/reference"
+	"github.com/distribution/reference"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
 	yamlpatch "github.com/krishicks/yaml-patch"
@@ -28,7 +28,10 @@ const (
 
 	consoleUrlPrefix = "https://console-openshift-console.apps"
 
-	MirrorRegistriesCertificateFile = "tls-ca-bundle.pem"
+	SystemCertificateBundle     = "tls-ca-bundle.pem"
+	SystemCertificateBundlePath = "/etc/pki/ca-trust/extracted/pem/" + SystemCertificateBundle
+
+	MirrorRegistriesCertificateFile = "user-registry-ca-bundle.pem"
 	MirrorRegistriesCertificatePath = "/etc/pki/ca-trust/extracted/pem/" + MirrorRegistriesCertificateFile
 	MirrorRegistriesConfigDir       = "/etc/containers"
 	MirrorRegistriesConfigFile      = "registries.conf"
@@ -418,6 +421,42 @@ func VerifyCaBundle(pemCerts []byte) error {
 	return nil
 }
 
+// RemoveDuplicatesFromCaBundle removes duplicate certificates from a given CA bundle.
+func RemoveDuplicatesFromCaBundle(caBundle string) (string, int, error) {
+	// Parse certificates
+	certs, ok := ParsePemCerts([]byte(caBundle))
+	if !ok {
+		return "", 0, errors.New("failed to remove duplicate certificate")
+	}
+
+	// Remove duplicates by serial number
+	uniqueCerts := funk.UniqBy(certs, func(cert x509.Certificate) string {
+		return fmt.Sprintf("%x", cert.SerialNumber)
+	})
+
+	// Convert certs back to a string
+	certStrings := funk.Map(uniqueCerts, func(cert x509.Certificate) string {
+		// Encode certificate to PEM format
+		block := &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: cert.Raw,
+		}
+		var sb strings.Builder
+		if err := pem.Encode(&sb, block); err != nil {
+			// Error encoding certificate
+			return ""
+		}
+		return sb.String()
+	})
+
+	numOfCerts := len(certs)
+	numOfUniqueCerts := len(uniqueCerts.([]x509.Certificate))
+	numOfDuplicates := numOfCerts - numOfUniqueCerts
+
+	// Join the PEM-encoded certificates into a single string
+	return strings.Join(certStrings.([]string), "\n"), numOfDuplicates, nil
+}
+
 func CanonizeStrings(slice []string) (ret []string) {
 	if len(slice) == 0 {
 		return
@@ -700,4 +739,50 @@ func IsMirrorConfigurationSet(conf *MirrorRegistryConfiguration) bool {
 	}
 
 	return false
+}
+
+func HostsInStatus(c *Cluster, statuses []string) (masters, workers int) {
+	for _, host := range c.Hosts {
+		if funk.ContainsString(statuses, swag.StringValue(host.Status)) {
+			switch GetEffectiveRole(host) {
+			case models.HostRoleMaster, models.HostRoleBootstrap:
+				masters++
+			case models.HostRoleWorker:
+				workers++
+			}
+		}
+	}
+	return
+}
+
+// enoughMastersAndWorkers returns whether the number of master and worker nodes in the specified cluster with the given status
+// meets the required criteria. The conditions are as follows:
+//   - For SNO (Single Node OpenShift), there must be exactly one master node and zero worker nodes.
+//   - For High Availability cluster, the number of master nodes should match the user's request, and not less than the minimum. The worker node requirement depends on this request:
+//     If the user requested at least two workers, there must be at least two, indicating non-schedulable masters were intended.
+//     If the user requested fewer than two workers, any number of workers is acceptable.
+func HasEnoughMastersAndWorkers(c *Cluster, statuses []string) bool {
+	mastersInStatus, workersInStatus := HostsInStatus(c, statuses)
+
+	if swag.StringValue(c.HighAvailabilityMode) == models.ClusterHighAvailabilityModeNone {
+		return mastersInStatus == AllowedNumberOfMasterHostsInNoneHaMode &&
+			workersInStatus == AllowedNumberOfWorkersInNoneHaMode
+	}
+
+	// hosts roles are known at this stage
+	masters, workers, _ := GetHostsByEachRole(&c.Cluster, false)
+	numberOfExpectedMasters := len(masters)
+
+	// validate masters
+	if numberOfExpectedMasters < MinMasterHostsNeededForInstallationInHaMode ||
+		mastersInStatus < numberOfExpectedMasters {
+		return false
+	}
+
+	numberOfExpectedWorkers := len(workers)
+
+	// validate workers
+	return numberOfExpectedWorkers < MinimumNumberOfWorkersForNonSchedulableMastersClusterInHaMode ||
+		numberOfExpectedWorkers >= MinimumNumberOfWorkersForNonSchedulableMastersClusterInHaMode &&
+			workersInStatus >= MinimumNumberOfWorkersForNonSchedulableMastersClusterInHaMode
 }
