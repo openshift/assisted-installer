@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -157,10 +158,11 @@ var _ = Describe("installer HostRoleMaster role", func() {
 
 var _ = Describe("installer HostRoleMaster role agent-based installation", func() {
 	var (
-		l             = logrus.New()
-		ctrl          *gomock.Controller
-		mockk8sclient *k8s_client.MockK8SClient
-		kubeNamesIds  map[string]string
+		l                                = logrus.New()
+		ctrl                             *gomock.Controller
+		mockk8sclient                    *k8s_client.MockK8SClient
+		kubeNamesIds                     map[string]string
+		savedWaitForInstallationInterval time.Duration
 	)
 
 	l.SetOutput(io.Discard)
@@ -168,8 +170,11 @@ var _ = Describe("installer HostRoleMaster role agent-based installation", func(
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockk8sclient = k8s_client.NewMockK8SClient(ctrl)
+		savedWaitForInstallationInterval = waitForInstallationInterval
+		waitForInstallationInterval = 10 * time.Millisecond
 	})
 	AfterEach(func() {
+		waitForInstallationInterval = savedWaitForInstallationInterval
 		ctrl.Finish()
 	})
 
@@ -198,7 +203,35 @@ var _ = Describe("installer HostRoleMaster role agent-based installation", func(
 		mockk8sclient.EXPECT().UntaintNode(gomock.Any()).Return(nil).Times(1)
 		mockk8sclient.EXPECT().GetPods(gomock.Any(), gomock.Any(), "").Return([]v1.Pod{}, nil).AnyTimes()
 		mockk8sclient.EXPECT().GetClusterVersion().Return(availableClusterVersionCondition, nil).Times(1)
-		waitForInstallationAgentBasedInstaller(mockk8sclient, l, true)
+		waitForInstallationAgentBasedInstaller(context.Background(), mockk8sclient, l, true, 0)
+	})
+
+	It("waits for all expected nodes to join after ClusterVersion is available", func() {
+		partialNodes := GetKubeNodes(map[string]string{
+			"master-1": "6d6f00e8-70dd-48a5-859a-0f1459485ad1",
+			"master-2": "6d6f00e8-70dd-48a5-859a-0f1459485ad2",
+		})
+		allNodes := GetKubeNodes(map[string]string{
+			"master-0": "6d6f00e8-70dd-48a5-859a-0f1459485ad0",
+			"master-1": "6d6f00e8-70dd-48a5-859a-0f1459485ad1",
+			"master-2": "6d6f00e8-70dd-48a5-859a-0f1459485ad2",
+		})
+
+		mockk8sclient.EXPECT().GetClusterVersion().Return(availableClusterVersionCondition, nil).Times(1)
+		// First call returns only 2 of 3 expected control-plane nodes
+		mockk8sclient.EXPECT().ListNodesByRole("master").Return(partialNodes, nil).Times(1)
+		// Second call returns all 3 control-plane nodes
+		mockk8sclient.EXPECT().ListNodesByRole("master").Return(allNodes, nil).Times(1)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		waitForInstallationAgentBasedInstaller(ctx, mockk8sclient, l, false, 3)
+	})
+
+	It("exits immediately when expectedNodes is 0 and ClusterVersion is available", func() {
+		mockk8sclient.EXPECT().GetClusterVersion().Return(availableClusterVersionCondition, nil).Times(1)
+		// ListNodes should not be called when expectedNodes is 0
+		waitForInstallationAgentBasedInstaller(context.Background(), mockk8sclient, l, false, 0)
 	})
 })
 
