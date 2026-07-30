@@ -164,7 +164,7 @@ func main() {
 			wg.Add(1)
 			go assistedController.PostInstallConfigsK8sClient(mainContext, &wg, bootstrapKubeconfigForSNO)
 
-			waitForInstallationAgentBasedInstaller(kc, logger, false)
+			waitForInstallationAgentBasedInstaller(mainContext, kc, logger, false, 0)
 			return
 		}
 		// With the agent-based installer, assisted-service runs on the bootstrap node.
@@ -234,7 +234,7 @@ func main() {
 	// monitoring installation by cluster status
 	switch invoker {
 	case common.InvokerAgent:
-		waitForInstallationAgentBasedInstaller(kc, logger, removeUninitializedTaint)
+		waitForInstallationAgentBasedInstaller(mainContext, kc, logger, removeUninitializedTaint, Options.ControllerConfig.ControlPlaneCount)
 	default:
 		waitForInstallation(client, logger, assistedController)
 	}
@@ -289,7 +289,16 @@ func waitForInstallation(client inventory_client.InventoryClient, log logrus.Fie
 // the inventory client because assisted-service is deployed on the bootstrap node
 // and when the bootstrap node reboots to join the cluster, assisted-service becomes
 // unavailable.
-func waitForInstallationAgentBasedInstaller(kubeClient k8s_client.K8SClient, log logrus.FieldLogger, removeUninitializedTaint bool) {
+//
+// When expectedNodes > 0, the function waits not only for ClusterVersion Available=True
+// but also for all expected nodes to join the cluster. This prevents the controller
+// from exiting before the rendezvous (bootstrap) node has rebooted and joined,
+// which is necessary because the controller's ApproveCsrs goroutine must keep
+// running to approve the rendezvous node's kubelet CSRs.
+func waitForInstallationAgentBasedInstaller(ctx context.Context, kubeClient k8s_client.K8SClient, log logrus.FieldLogger, removeUninitializedTaint bool, expectedNodes int) {
+	clusterVersionAvailable := false
+	ticker := time.NewTicker(waitForInstallationInterval)
+	defer ticker.Stop()
 	for {
 		if removeUninitializedTaint {
 			// After the boostrap node has rebooted, assisted-service becomes unavailable
@@ -310,19 +319,43 @@ func waitForInstallationAgentBasedInstaller(kubeClient k8s_client.K8SClient, log
 				}
 			}
 		}
-		clusterVersion, err := kubeClient.GetClusterVersion()
-		if err != nil {
-			log.WithError(err).Error("Failed to get cluster version from k8s client")
-		}
-		for _, condition := range clusterVersion.Status.Conditions {
-			if condition.Type == "Available" && condition.Status == "True" {
-				// cluster install is complete, we can exit
-				log.Info("ClusterVersion Available=True")
-				return
+		if !clusterVersionAvailable {
+			clusterVersion, err := kubeClient.GetClusterVersion()
+			if err != nil {
+				log.WithError(err).Error("Failed to get cluster version from k8s client")
+			} else {
+				for _, condition := range clusterVersion.Status.Conditions {
+					if condition.Type == "Available" && condition.Status == "True" {
+						clusterVersionAvailable = true
+						log.Info("ClusterVersion Available=True")
+						break
+					}
+				}
 			}
 		}
-		log.Info("ClusterVersion Available!=True, sleeping 30s")
-		time.Sleep(30 * time.Second)
+		if clusterVersionAvailable {
+			if expectedNodes <= 0 {
+				return
+			}
+			nodes, err := kubeClient.ListNodesByRole("master")
+			if err != nil {
+				log.WithError(err).Errorf("Failed to list control-plane nodes while waiting for all nodes to join")
+			} else if len(nodes.Items) >= expectedNodes {
+				log.Infof("All expected control-plane nodes have joined the cluster (%d/%d)", len(nodes.Items), expectedNodes)
+				return
+			} else {
+				log.Infof("Waiting for all control-plane nodes to join the cluster (%d/%d)", len(nodes.Items), expectedNodes)
+			}
+		}
+		if !clusterVersionAvailable {
+			log.Infof("ClusterVersion Available!=True, sleeping %s", waitForInstallationInterval)
+		}
+		select {
+		case <-ctx.Done():
+			log.Info("Context cancelled, exiting waitForInstallationAgentBasedInstaller")
+			return
+		case <-ticker.C:
+		}
 	}
 }
 
