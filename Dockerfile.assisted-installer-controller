@@ -19,7 +19,7 @@ RUN git config --global --add safe.directory '*'; \
 # Extract the commit reference from which the image is built
 RUN git rev-parse --short HEAD > /commit-reference.txt
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:850143255ee0d1915f09aaa09f6ed31f24086ba605c323badfbefa95b8c52b0e
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:17fd831ced9434de0a984d60b3fbe61008308261ba98bbc348d6fbdef05fa7c0
 ARG TARGETPLATFORM
 
 RUN microdnf install -y tar gzip rsync which procps-ng findutils && microdnf clean all
