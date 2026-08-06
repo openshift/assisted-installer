@@ -2,6 +2,7 @@ package constants
 
 const Kubeconfig = "kubeconfig"
 const KubeconfigNoIngress = "kubeconfig-noingress"
+const KubeadminPassword = "kubeadmin-password"
 
 // an arbitrary subdomain of *.apps.<cluster-name>.<base-domain> used by DNS
 // validations to verify that *.apps wildcard is configured properly
@@ -19,3 +20,22 @@ const DNSWildcardFalseDomainName = "validateNoWildcardDNS"
 
 // Plain http machine config server port
 const InsecureMCSPort = 22624
+
+// HTTPS-backed machine config server port
+const SecureMCSPort = 22623
+
+// DisconnectedRegistriesConf contains the registry configuration for disconnected images
+const DisconnectedRegistriesConf = `[[registry]]
+  location = "quay.io/openshift-release-dev/ocp-release"
+  prefix = ""
+
+  [[registry.mirror]]
+    location = "registry.appliance.openshift.com:5000/openshift/release-images"
+
+[[registry]]
+  location = "quay.io/openshift-release-dev/ocp-v4.0-art-dev"
+  prefix = ""
+
+  [[registry.mirror]]
+    location = "registry.appliance.openshift.com:5000/openshift/release"
+`

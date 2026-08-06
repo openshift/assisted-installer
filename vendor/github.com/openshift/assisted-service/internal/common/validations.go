@@ -4,6 +4,9 @@
 package common
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/go-openapi/swag"
 	"github.com/openshift/assisted-service/models"
 )
@@ -16,6 +19,7 @@ func IsAgentCompatible(expectedImage, agentImage string) bool {
 var NonIgnorableHostValidations []string = []string{
 	string(models.HostValidationIDConnected),
 	string(models.HostValidationIDHasInventory),
+	string(models.HostValidationIDInventoryNotFullyTruncated),
 	string(models.HostValidationIDMachineCidrDefined),
 	string(models.HostValidationIDHostnameUnique),
 	string(models.HostValidationIDHostnameValid),
@@ -58,4 +62,32 @@ func MayIgnoreValidations(validationIDs []string, nonIgnorables []string) (bool,
 		}
 	}
 	return result, cantBeIgnored
+}
+
+// ParseCommaSeparatedUniqueValues splits a comma-separated string into a deduplicated slice
+// of trimmed values. It returns an error if any item is empty after trimming (e.g. "a,,b").
+// itemDescription is used in error messages to describe what the values represent.
+// Returns (nil, nil) when the input is empty or whitespace-only.
+func ParseCommaSeparatedUniqueValues(value string, itemDescription string) ([]string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, nil
+	}
+
+	result := make([]string, 0)
+	seen := make(map[string]struct{})
+
+	for _, item := range strings.Split(value, ",") {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			return nil, fmt.Errorf("empty %s found in '%s'", itemDescription, value)
+		}
+		if _, exists := seen[item]; exists {
+			continue
+		}
+		seen[item] = struct{}{}
+		result = append(result, item)
+	}
+
+	return result, nil
 }
