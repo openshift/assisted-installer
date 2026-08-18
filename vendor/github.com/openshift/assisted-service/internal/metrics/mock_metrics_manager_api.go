@@ -37,6 +37,30 @@ func (m *MockAPI) EXPECT() *MockAPIMockRecorder {
 	return m.recorder
 }
 
+// BlacklistedClusterInc mocks base method.
+func (m *MockAPI) BlacklistedClusterInc() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "BlacklistedClusterInc")
+}
+
+// BlacklistedClusterInc indicates an expected call of BlacklistedClusterInc.
+func (mr *MockAPIMockRecorder) BlacklistedClusterInc() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BlacklistedClusterInc", reflect.TypeOf((*MockAPI)(nil).BlacklistedClusterInc))
+}
+
+// BlacklistedClustersCurrent mocks base method.
+func (m *MockAPI) BlacklistedClustersCurrent(count int) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "BlacklistedClustersCurrent", count)
+}
+
+// BlacklistedClustersCurrent indicates an expected call of BlacklistedClustersCurrent.
+func (mr *MockAPIMockRecorder) BlacklistedClustersCurrent(count interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BlacklistedClustersCurrent", reflect.TypeOf((*MockAPI)(nil).BlacklistedClustersCurrent), count)
+}
+
 // ClusterInstallationFinished mocks base method.
 func (m *MockAPI) ClusterInstallationFinished(ctx context.Context, result, prevState, clusterVersion string, clusterID strfmt.UUID, emailDomain string, installationStartedTime strfmt.DateTime) {
 	m.ctrl.T.Helper()
@@ -193,28 +217,52 @@ func (mr *MockAPIMockRecorder) InstallerCacheReleaseEvicted(success interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InstallerCacheReleaseEvicted", reflect.TypeOf((*MockAPI)(nil).InstallerCacheReleaseEvicted), success)
 }
 
-// MonitoredClustersDurationMs mocks base method.
-func (m *MockAPI) MonitoredClustersDurationMs(monitoredClustersMillis float64) {
+// MonitoredClustersCycleDurationMs mocks base method.
+func (m *MockAPI) MonitoredClustersCycleDurationMs(ctx context.Context, duration time.Duration, fullScan bool) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "MonitoredClustersDurationMs", monitoredClustersMillis)
+	m.ctrl.Call(m, "MonitoredClustersCycleDurationMs", ctx, duration, fullScan)
+}
+
+// MonitoredClustersCycleDurationMs indicates an expected call of MonitoredClustersCycleDurationMs.
+func (mr *MockAPIMockRecorder) MonitoredClustersCycleDurationMs(ctx, duration, fullScan interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MonitoredClustersCycleDurationMs", reflect.TypeOf((*MockAPI)(nil).MonitoredClustersCycleDurationMs), ctx, duration, fullScan)
+}
+
+// MonitoredClustersDurationMs mocks base method.
+func (m *MockAPI) MonitoredClustersDurationMs(ctx context.Context, clusterID strfmt.UUID, duration time.Duration) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "MonitoredClustersDurationMs", ctx, clusterID, duration)
 }
 
 // MonitoredClustersDurationMs indicates an expected call of MonitoredClustersDurationMs.
-func (mr *MockAPIMockRecorder) MonitoredClustersDurationMs(monitoredClustersMillis interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) MonitoredClustersDurationMs(ctx, clusterID, duration interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MonitoredClustersDurationMs", reflect.TypeOf((*MockAPI)(nil).MonitoredClustersDurationMs), monitoredClustersMillis)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MonitoredClustersDurationMs", reflect.TypeOf((*MockAPI)(nil).MonitoredClustersDurationMs), ctx, clusterID, duration)
+}
+
+// MonitoredHostsCycleDurationMs mocks base method.
+func (m *MockAPI) MonitoredHostsCycleDurationMs(ctx context.Context, duration time.Duration, fullScan bool) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "MonitoredHostsCycleDurationMs", ctx, duration, fullScan)
+}
+
+// MonitoredHostsCycleDurationMs indicates an expected call of MonitoredHostsCycleDurationMs.
+func (mr *MockAPIMockRecorder) MonitoredHostsCycleDurationMs(ctx, duration, fullScan interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MonitoredHostsCycleDurationMs", reflect.TypeOf((*MockAPI)(nil).MonitoredHostsCycleDurationMs), ctx, duration, fullScan)
 }
 
 // MonitoredHostsDurationMs mocks base method.
-func (m *MockAPI) MonitoredHostsDurationMs(monitoredHostsMillis float64) {
+func (m *MockAPI) MonitoredHostsDurationMs(ctx context.Context, hostID strfmt.UUID, clusterID *strfmt.UUID, duration time.Duration) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "MonitoredHostsDurationMs", monitoredHostsMillis)
+	m.ctrl.Call(m, "MonitoredHostsDurationMs", ctx, hostID, clusterID, duration)
 }
 
 // MonitoredHostsDurationMs indicates an expected call of MonitoredHostsDurationMs.
-func (mr *MockAPIMockRecorder) MonitoredHostsDurationMs(monitoredHostsMillis interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) MonitoredHostsDurationMs(ctx, hostID, clusterID, duration interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MonitoredHostsDurationMs", reflect.TypeOf((*MockAPI)(nil).MonitoredHostsDurationMs), monitoredHostsMillis)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MonitoredHostsDurationMs", reflect.TypeOf((*MockAPI)(nil).MonitoredHostsDurationMs), ctx, hostID, clusterID, duration)
 }
 
 // ReportHostInstallationMetrics mocks base method.
