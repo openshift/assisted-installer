@@ -2,7 +2,7 @@ FROM registry.access.redhat.com/ubi9/go-toolset:1.26 AS golang
 
 ENV GOFLAGS=""
 
-ARG GOLANGCI_LINT_VERSION=v2.12.2
+ARG GOLANGCI_LINT_VERSION=v2.13.0
 
 RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/${GOLANGCI_LINT_VERSION}/install.sh | sh -s -- -b $(go env GOPATH)/bin ${GOLANGCI_LINT_VERSION} && \
   go install golang.org/x/tools/cmd/goimports@v0.34.0 && \
