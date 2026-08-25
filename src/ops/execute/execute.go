@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"syscall"
 
@@ -17,7 +18,7 @@ import (
 //go:generate mockgen -source=execute.go -package=execute -destination=mock_execute.go
 type Execute interface {
 	ExecCommand(liveLogger io.Writer, command string, args ...string) (string, error)
-	ExecCommandWithContext(ctx context.Context, liveLogger io.Writer, command string, args ...string) (string, error)
+	ExecCommandWithOptions(liveLogger io.Writer, command string, args []string, opts ...CommandOption) (string, error)
 	Execute(command string, args ...string) (string, error)
 }
 
@@ -25,6 +26,65 @@ type executor struct {
 	cmdEnv          []string
 	log             *logrus.Logger
 	installerConfig *config.Config
+}
+
+// commandConfig holds command configuration that options can modify before
+// exec.Cmd is created. This ensures options never see or mutate the executor.
+type commandConfig struct {
+	command string
+	args    []string
+	env     []string
+	dir     string
+	ctx     context.Context
+}
+
+// CommandOption is a functional option for configuring command execution
+type CommandOption func(*commandConfig)
+
+// WithEnv adds environment variables to the command
+func WithEnv(env []string) CommandOption {
+	return func(c *commandConfig) {
+		c.env = append(c.env, env...)
+	}
+}
+
+// WithDir sets the working directory for the command
+func WithDir(dir string) CommandOption {
+	return func(c *commandConfig) {
+		c.dir = dir
+	}
+}
+
+// WithContext sets a context for the command, enabling cancellation and timeouts.
+func WithContext(ctx context.Context) CommandOption {
+	return func(c *commandConfig) {
+		c.ctx = ctx
+	}
+}
+
+// WithPrivilege wraps the command in nsenter to execute it in the host
+// environment rather than inside the container.
+func WithPrivilege() CommandOption {
+	return func(c *commandConfig) {
+		c.args = append([]string{
+			"--target", "1",
+			// Entering the cgroup namespace is not required for podman on CoreOS (where the
+			// agent typically runs), but it's needed on some Fedora versions and
+			// some other systemd based systems. Those systems are used to run dry-mode
+			// agents for load testing. If this flag is not used, Podman will sometimes
+			// have trouble creating a systemd cgroup slice for new containers.
+			"--cgroup",
+			// The mount namespace is required for podman to access the host's container
+			// storage
+			"--mount",
+			// TODO: Document why we need the IPC namespace
+			"--ipc",
+			"--pid",
+			"--",
+			c.command,
+		}, c.args...)
+		c.command = "nsenter"
+	}
 }
 
 func NewExecutor(installerConfig *config.Config, logger *logrus.Logger, proxySet bool) Execute {
@@ -53,7 +113,7 @@ func (e *executor) execCommand(liveLogger io.Writer, cmd *exec.Cmd) (string, err
 		cmd.Stdout = &stdoutBuf
 		cmd.Stderr = &stdoutBuf
 	}
-	cmd.Env = e.cmdEnv
+	cmd.Env = slices.Concat(e.cmdEnv, cmd.Env)
 	err := cmd.Run()
 	output := strings.TrimSpace(stdoutBuf.String())
 	if err != nil {
@@ -66,12 +126,11 @@ func (e *executor) execCommand(liveLogger io.Writer, cmd *exec.Cmd) (string, err
 		}
 
 		execErr := &ExecCommandError{
-			Command:         cmd.Path,
-			Args:            cmd.Args[1:],
-			Env:             cmd.Env,
-			ExitErr:         err,
-			Output:          output,
-			PullSecretToken: e.installerConfig.PullSecretToken,
+			Command: cmd.Path,
+			Args:    cmd.Args[1:],
+			Env:     cmd.Env,
+			ExitErr: err,
+			Output:  output,
 		}
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
@@ -84,8 +143,8 @@ func (e *executor) execCommand(liveLogger io.Writer, cmd *exec.Cmd) (string, err
 		}
 		return output, execErr
 	}
-	e.log.Debug("Command executed:", " command", cmd.Path, " arguments", removePullSecret(cmd.Args[1:], e.installerConfig.PullSecretToken), "env vars",
-		removePullSecret(cmd.Env, e.installerConfig.PullSecretToken), "output", output)
+	e.log.Debug("Command executed:", " command", cmd.Path, " arguments", cmd.Args[1:], "env vars",
+		redactSensitiveEnv(cmd.Env), "output", output)
 	return output, err
 }
 
@@ -93,18 +152,31 @@ func (e *executor) ExecCommand(liveLogger io.Writer, command string, args ...str
 	return e.execCommand(liveLogger, exec.Command(command, args...))
 }
 
-func (e *executor) ExecCommandWithContext(ctx context.Context, liveLogger io.Writer, command string, args ...string) (string, error) {
-	return e.execCommand(liveLogger, exec.CommandContext(ctx, command, args...))
+func (e *executor) ExecCommandWithOptions(liveLogger io.Writer, command string, args []string, opts ...CommandOption) (string, error) {
+	cfg := &commandConfig{command: command, args: args}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+	cmd := newCmd(cfg.ctx, cfg.command, cfg.args...)
+	cmd.Env = append(cmd.Env, cfg.env...)
+	cmd.Dir = cfg.dir
+	return e.execCommand(liveLogger, cmd)
+}
+
+func newCmd(ctx context.Context, command string, args ...string) *exec.Cmd {
+	if ctx != nil {
+		return exec.CommandContext(ctx, command, args...)
+	}
+	return exec.Command(command, args...)
 }
 
 type ExecCommandError struct {
-	Command         string
-	Args            []string
-	Env             []string
-	ExitErr         error
-	Output          string
-	WaitStatus      int
-	PullSecretToken string
+	Command    string
+	Args       []string
+	Env        []string
+	ExitErr    error
+	Output     string
+	WaitStatus int
 }
 
 func (e *ExecCommandError) Error() string {
@@ -112,45 +184,48 @@ func (e *ExecCommandError) Error() string {
 	if len(e.Output) > 200 {
 		lastOutput = "... " + e.Output[len(e.Output)-200:]
 	}
-	return fmt.Sprintf("failed executing %s %v, Error %s, LastOutput \"%s\"", e.Command, removePullSecret(e.Args, e.PullSecretToken), e.ExitErr, lastOutput)
+	return fmt.Sprintf("failed executing %s %v, Error %s, LastOutput \"%s\"", e.Command, e.Args, e.ExitErr, lastOutput)
 }
 
 func (e *ExecCommandError) DetailedError() string {
-	return fmt.Sprintf("failed executing %s %v, env vars %v, error %s, waitStatus %d, Output \"%s\"", e.Command, removePullSecret(e.Args, e.PullSecretToken), removePullSecret(e.Env, e.PullSecretToken), e.ExitErr, e.WaitStatus, e.Output)
+	return fmt.Sprintf("failed executing %s %v, env vars %v, error %s, waitStatus %d, Output \"%s\"", e.Command, e.Args, redactSensitiveEnv(e.Env), e.ExitErr, e.WaitStatus, e.Output)
 }
 
-func removePullSecret(s []string, pullSecretToken string) []string {
-	if pullSecretToken == "" {
-		return s
+// redactSensitiveEnv redacts environment variables that contain secrets
+func redactSensitiveEnv(env []string) []string {
+	if len(env) == 0 {
+		return env
 	}
 
-	return strings.Split(strings.ReplaceAll(strings.Join(s, " "), pullSecretToken, "<SECRET>"), " ")
+	sensitivePatterns := []string{
+		"TOKEN", "KEY", "SECRET", "PASSWORD", "PASS", "PWD",
+		"AUTH", "CREDENTIAL", "CRED", "CERT", "PRIVATE",
+	}
+
+	redacted := make([]string, len(env))
+	for i, e := range env {
+		if idx := strings.Index(e, "="); idx > 0 {
+			name := strings.ToUpper(e[:idx])
+			isSensitive := false
+			for _, pattern := range sensitivePatterns {
+				if strings.Contains(name, pattern) {
+					isSensitive = true
+					break
+				}
+			}
+			if isSensitive {
+				redacted[i] = e[:idx] + "=<REDACTED>"
+			} else {
+				redacted[i] = e
+			}
+		} else {
+			redacted[i] = e
+		}
+	}
+	return redacted
 }
 
 // Execute execute a command in the host environment via nsenter
 func (e *executor) Execute(command string, args ...string) (string, error) {
-	// nsenter is used here to launch processes inside the container in a way that makes said processes feel
-	// and behave as if they're running on the host directly rather than inside the container
-	commandBase := "nsenter"
-
-	arguments := []string{
-		"--target", "1",
-		// Entering the cgroup namespace is not required for podman on CoreOS (where the
-		// agent typically runs), but it's needed on some Fedora versions and
-		// some other systemd based systems. Those systems are used to run dry-mode
-		// agents for load testing. If this flag is not used, Podman will sometimes
-		// have trouble creating a systemd cgroup slice for new containers.
-		"--cgroup",
-		// The mount namespace is required for podman to access the host's container
-		// storage
-		"--mount",
-		// TODO: Document why we need the IPC namespace
-		"--ipc",
-		"--pid",
-		"--",
-		command,
-	}
-
-	arguments = append(arguments, args...)
-	return e.ExecCommand(e.log.Writer(), commandBase, arguments...)
+	return e.ExecCommandWithOptions(e.log.Writer(), command, args, WithPrivilege())
 }

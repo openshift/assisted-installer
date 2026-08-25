@@ -22,6 +22,7 @@ import (
 	"strings"
 	"text/template"
 	"time"
+	"unicode"
 
 	config_latest "github.com/coreos/ignition/v2/config/v3_2"
 	"github.com/go-openapi/swag"
@@ -47,6 +48,9 @@ const (
 	registryDataDirOnMnt            = "/mnt/agentdata"
 	ostreeDeployPath                = "/mnt/root/ostree/deploy/rhcos"
 )
+
+// Supports: registry.io/repo:tag, registry.io:port/repo:tag, repo@sha256:digest, repo:tag@sha256:digest
+var imageReferencePattern = regexp.MustCompile(`^[a-zA-Z0-9._-]+(:[0-9]+)?(/[a-zA-Z0-9._/-]+)?(:[a-zA-Z0-9._-]+)?(@sha256:[a-fA-F0-9]{64})?$`)
 
 //go:generate mockgen -source=ops.go -package=ops -destination=mock_ops.go
 type Ops interface {
@@ -640,10 +644,9 @@ func (o *ops) GetMCSLogs() (string, error) {
 	return string(logs), nil
 }
 
-// This function actually runs container that imeplements logs_sender command
-// Any change to the assisted-service API that is used by the logs_sender command
-// ( for example UploadLogs), must be reflected here (input parameters, etc'),
-// if needed
+// This function runs a container that implements the logs_sender command.
+// Any change to the assisted-service API used by logs_sender (e.g. UploadLogs)
+// must be reflected here (input parameters, etc.)
 func (o *ops) UploadInstallationLogs(isBootstrap bool) (string, error) {
 	command := "podman"
 
@@ -655,17 +658,21 @@ func (o *ops) UploadInstallationLogs(isBootstrap bool) (string, error) {
 		args = append(args, "-v", fmt.Sprintf("%[1]s:%[1]s", o.installerConfig.CACertPath))
 	}
 
+	args = append(args, "--env", "PULL_SECRET_TOKEN")
+
 	args = append(args, o.installerConfig.AgentImage, "logs_sender",
 		"-cluster-id", o.installerConfig.ClusterID, "-url", o.installerConfig.URL,
 		"-host-id", o.installerConfig.HostID, "-infra-env-id", o.installerConfig.InfraEnvID,
-		"-pull-secret-token", o.installerConfig.PullSecretToken,
 		fmt.Sprintf("-insecure=%s", strconv.FormatBool(o.installerConfig.SkipCertVerification)),
 		fmt.Sprintf("-bootstrap=%s", strconv.FormatBool(isBootstrap)))
 
 	if o.installerConfig.CACertPath != "" {
 		args = append(args, fmt.Sprintf("-cacert=%s", o.installerConfig.CACertPath))
 	}
-	return o.ExecPrivilegeCommand(o.logWriter, command, args...)
+
+	// Pass token via command-specific environment to avoid exposure in /proc/PID/cmdline
+	env := []string{fmt.Sprintf("PULL_SECRET_TOKEN=%s", o.installerConfig.PullSecretToken)}
+	return o.executor.ExecCommandWithOptions(o.logWriter, command, args, execute.WithPrivilege(), execute.WithEnv(env))
 }
 
 // Sometimes we will need to reload container files from host
@@ -727,16 +734,19 @@ func (o *ops) CreateOpenshiftSshManifest(filePath, tmpl, sshPubKeyPath string) e
 }
 
 func (o *ops) GetNumberOfReboots(ctx context.Context, nodeName, kubeconfigPath string) (int, error) {
-	out, err := o.executor.ExecCommandWithContext(ctx, o.logWriter, "oc",
-		"--kubeconfig",
-		kubeconfigPath,
-		"debug",
-		fmt.Sprintf("node/%s", nodeName),
-		"--",
-		"chroot",
-		"/host",
-		"last",
-		"reboot")
+	out, err := o.executor.ExecCommandWithOptions(o.logWriter, "oc",
+		[]string{
+			"--kubeconfig",
+			kubeconfigPath,
+			"debug",
+			fmt.Sprintf("node/%s", nodeName),
+			"--",
+			"chroot",
+			"/host",
+			"last",
+			"reboot",
+		},
+		execute.WithContext(ctx))
 	if err != nil {
 		return 0, err
 	}
@@ -750,15 +760,42 @@ func (o *ops) GetNumberOfReboots(ctx context.Context, nodeName, kubeconfigPath s
 	return numReboots, nil
 }
 
-func (o *ops) GetMustGatherLogs(workDir, kubeconfigPath string, images ...string) (string, error) {
-	//invoke oc adm must-gather command in the working directory
-	var imageOption string = ""
-	for _, img := range images {
-		imageOption = imageOption + fmt.Sprintf(" --image=%s", img)
+// validateImageReference validates image format and rejects shell metacharacters
+func validateImageReference(image string) error {
+	if image == "" {
+		return errors.New("image reference cannot be empty")
 	}
 
-	command := fmt.Sprintf("cd %s && oc --kubeconfig=%s adm must-gather%s", workDir, kubeconfigPath, imageOption)
-	output, err := o.executor.ExecCommand(o.logWriter, "bash", "-c", command)
+	dangerousChars := ";|&$`<>(){}[]'\"\\!\n\r\t"
+	for _, char := range dangerousChars {
+		if strings.ContainsRune(image, char) {
+			return errors.Errorf("image reference contains invalid character: %c", char)
+		}
+	}
+
+	for _, r := range image {
+		if unicode.IsControl(r) {
+			return errors.Errorf("image reference contains control character")
+		}
+	}
+
+	if !imageReferencePattern.MatchString(image) {
+		return errors.Errorf("image reference has invalid format")
+	}
+
+	return nil
+}
+
+func (o *ops) GetMustGatherLogs(workDir, kubeconfigPath string, images ...string) (string, error) {
+	args := []string{"--kubeconfig=" + kubeconfigPath, "adm", "must-gather"}
+	for _, img := range images {
+		if err := validateImageReference(img); err != nil {
+			return "", errors.Wrapf(err, "invalid must-gather image reference: %s", img)
+		}
+		args = append(args, "--image="+img)
+	}
+
+	output, err := o.executor.ExecCommandWithOptions(o.logWriter, "oc", args, execute.WithDir(workDir))
 	if err != nil {
 		return "", err
 	}
@@ -779,20 +816,19 @@ func (o *ops) GetMustGatherLogs(workDir, kubeconfigPath string, images ...string
 	}
 	logsDir := filepath.Base(files[0])
 
-	//tar the log directory and return the path to the tarball
-	command = fmt.Sprintf("cd %s && tar zcf %s %s", workDir, MustGatherFileName, logsDir)
-	_, err = o.executor.ExecCommand(o.logWriter, "bash", "-c", command)
+	tarPath := path.Join(workDir, MustGatherFileName)
+	tarArgs := []string{"-czf", tarPath, "-C", workDir, logsDir}
+	_, err = o.executor.ExecCommand(o.logWriter, "tar", tarArgs...)
 	if err != nil {
 		o.log.WithError(err).Errorf("Failed to tar must-gather logs\n")
 		return "", err
 	}
-	return path.Join(workDir, MustGatherFileName), nil
+	return tarPath, nil
 }
 
 func (o *ops) CreateRandomHostname(hostname string) error {
-	command := fmt.Sprintf("hostnamectl set-hostname %s", hostname)
-	o.log.Infof("applying random hostname with command %s", command)
-	_, err := o.ExecPrivilegeCommand(o.logWriter, "bash", "-c", command)
+	o.log.Infof("Setting hostname to %s", hostname)
+	_, err := o.ExecPrivilegeCommand(o.logWriter, "hostnamectl", "set-hostname", hostname)
 	return err
 }
 
@@ -815,8 +851,7 @@ func (o *ops) CreateManifests(kubeconfig string, content []byte) error {
 	}
 
 	// Run oc command that creates the custom manifest:
-	command := fmt.Sprintf("oc --kubeconfig=%s apply -f %s", kubeconfig, file.Name())
-	output, err := o.executor.ExecCommand(o.logWriter, "bash", "-c", command)
+	output, err := o.executor.ExecCommand(o.logWriter, "oc", "--kubeconfig="+kubeconfig, "apply", "-f", file.Name())
 	if err != nil {
 		return err
 	}
@@ -841,30 +876,7 @@ func (o *ops) FileExists(path string) bool {
 
 // ExecPrivilegeCommand execute a command in the host environment via nsenter
 func (o *ops) ExecPrivilegeCommand(liveLogger io.Writer, command string, args ...string) (string, error) {
-	// nsenter is used here to launch processes inside the container in a way that makes said processes feel
-	// and behave as if they're running on the host directly rather than inside the container
-	commandBase := "nsenter"
-
-	arguments := []string{
-		"--target", "1",
-		// Entering the cgroup namespace is not required for podman on CoreOS (where the
-		// agent typically runs), but it's needed on some Fedora versions and
-		// some other systemd based systems. Those systems are used to run dry-mode
-		// agents for load testing. If this flag is not used, Podman will sometimes
-		// have trouble creating a systemd cgroup slice for new containers.
-		"--cgroup",
-		// The mount namespace is required for podman to access the host's container
-		// storage
-		"--mount",
-		// TODO: Document why we need the IPC namespace
-		"--ipc",
-		"--pid",
-		"--",
-		command,
-	}
-
-	arguments = append(arguments, args...)
-	return o.executor.ExecCommand(liveLogger, commandBase, arguments...)
+	return o.executor.ExecCommandWithOptions(liveLogger, command, args, execute.WithPrivilege())
 }
 
 func (o *ops) ReadFile(filePath string) ([]byte, error) {
