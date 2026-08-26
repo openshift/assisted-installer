@@ -208,3 +208,5 @@ replace (
 )
 
 replace github.com/go-jose/go-jose/v3 => github.com/go-jose/go-jose/v3 v3.0.5
+
+replace github.com/containerd/containerd => github.com/containerd/containerd v1.7.33
