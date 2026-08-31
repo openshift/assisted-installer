@@ -23,6 +23,7 @@ aliases:
     - yoavsc0302
     - cve-automation
     - omer-vishlitzky
+    - bluesort
   emeritus_approvers:
     - empovit
     - celebdor
