@@ -10,7 +10,6 @@
 package execute
 
 import (
-	context "context"
 	io "io"
 	reflect "reflect"
 
@@ -60,24 +59,24 @@ func (mr *MockExecuteMockRecorder) ExecCommand(liveLogger, command any, args ...
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecCommand", reflect.TypeOf((*MockExecute)(nil).ExecCommand), varargs...)
 }
 
-// ExecCommandWithContext mocks base method.
-func (m *MockExecute) ExecCommandWithContext(ctx context.Context, liveLogger io.Writer, command string, args ...string) (string, error) {
+// ExecCommandWithOptions mocks base method.
+func (m *MockExecute) ExecCommandWithOptions(liveLogger io.Writer, command string, args []string, opts ...CommandOption) (string, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, liveLogger, command}
-	for _, a := range args {
+	varargs := []any{liveLogger, command, args}
+	for _, a := range opts {
 		varargs = append(varargs, a)
 	}
-	ret := m.ctrl.Call(m, "ExecCommandWithContext", varargs...)
+	ret := m.ctrl.Call(m, "ExecCommandWithOptions", varargs...)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ExecCommandWithContext indicates an expected call of ExecCommandWithContext.
-func (mr *MockExecuteMockRecorder) ExecCommandWithContext(ctx, liveLogger, command any, args ...any) *gomock.Call {
+// ExecCommandWithOptions indicates an expected call of ExecCommandWithOptions.
+func (mr *MockExecuteMockRecorder) ExecCommandWithOptions(liveLogger, command, args any, opts ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, liveLogger, command}, args...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecCommandWithContext", reflect.TypeOf((*MockExecute)(nil).ExecCommandWithContext), varargs...)
+	varargs := append([]any{liveLogger, command, args}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecCommandWithOptions", reflect.TypeOf((*MockExecute)(nil).ExecCommandWithOptions), varargs...)
 }
 
 // Execute mocks base method.
