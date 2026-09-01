@@ -18,13 +18,6 @@ arches:
     name: bash-completion
     evr: 1:2.11-5.el9
     sourcerpm: bash-completion-2.11-5.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/f/findutils-4.8.0-7.el9.aarch64.rpm
-    repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 564807
-    checksum: sha256:158af4d5ecbd8b87f0da762ea1655bd4c86512071a95d8307eda3e0b3991105d
-    name: findutils
-    evr: 1:4.8.0-7.el9
-    sourcerpm: findutils-4.8.0-7.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/g/gzip-1.12-2.el9_8.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 171305
@@ -106,13 +99,6 @@ arches:
     name: bash-completion
     evr: 1:2.11-5.el9
     sourcerpm: bash-completion-2.11-5.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/f/findutils-4.8.0-7.el9.ppc64le.rpm
-    repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 603076
-    checksum: sha256:d4662cea7b9ae75c86e6afa1c69b3047773acf7d4a6cf8b99e63355cde0e8de8
-    name: findutils
-    evr: 1:4.8.0-7.el9
-    sourcerpm: findutils-4.8.0-7.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/g/gzip-1.12-2.el9_8.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 176201
@@ -194,13 +180,6 @@ arches:
     name: bash-completion
     evr: 1:2.11-5.el9
     sourcerpm: bash-completion-2.11-5.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/f/findutils-4.8.0-7.el9.s390x.rpm
-    repoid: rhel-9-for-s390x-baseos-rpms
-    size: 562344
-    checksum: sha256:58a784cd8f94da5182ab13c9696c7e5410b0452b20c524013040d234517e931e
-    name: findutils
-    evr: 1:4.8.0-7.el9
-    sourcerpm: findutils-4.8.0-7.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/g/gzip-1.12-2.el9_8.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 174286
@@ -282,13 +261,6 @@ arches:
     name: bash-completion
     evr: 1:2.11-5.el9
     sourcerpm: bash-completion-2.11-5.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/f/findutils-4.8.0-7.el9.x86_64.rpm
-    repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 563531
-    checksum: sha256:a6328afea0a11647b7fb5c48436f0af6c795407bac0650676d3196dd47070de6
-    name: findutils
-    evr: 1:4.8.0-7.el9
-    sourcerpm: findutils-4.8.0-7.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/g/gzip-1.12-2.el9_8.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 172571
