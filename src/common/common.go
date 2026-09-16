@@ -344,7 +344,7 @@ func EphemeralAssistedService(kc k8s_client.K8SClient, log logrus.FieldLogger) b
 		invoker = invokerCM.Data[installConfigMapAttribute]
 		log.Infof("%v ConfigMap attribute %v = %v", installConfigMapName, installConfigMapAttribute, invoker)
 	}
-	return invoker == "agent-installer"
+	return strings.HasPrefix(invoker, "agent-installer")
 }
 
 func DownloadKubeconfigNoingress(ctx context.Context, dir string, ic inventory_client.InventoryClient, log logrus.FieldLogger) (string, error) {
