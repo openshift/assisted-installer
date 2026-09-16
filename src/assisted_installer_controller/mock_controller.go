@@ -131,15 +131,15 @@ func (mr *MockControllerMockRecorder) UpdateNodeLabels(ctx, wg any) *gomock.Call
 }
 
 // UploadLogs mocks base method.
-func (m *MockController) UploadLogs(ctx context.Context, wg *sync.WaitGroup, invoker string) {
+func (m *MockController) UploadLogs(ctx context.Context, wg *sync.WaitGroup, ephemeralService bool) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "UploadLogs", ctx, wg, invoker)
+	m.ctrl.Call(m, "UploadLogs", ctx, wg, ephemeralService)
 }
 
 // UploadLogs indicates an expected call of UploadLogs.
-func (mr *MockControllerMockRecorder) UploadLogs(ctx, wg, invoker any) *gomock.Call {
+func (mr *MockControllerMockRecorder) UploadLogs(ctx, wg, ephemeralService any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadLogs", reflect.TypeOf((*MockController)(nil).UploadLogs), ctx, wg, invoker)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadLogs", reflect.TypeOf((*MockController)(nil).UploadLogs), ctx, wg, ephemeralService)
 }
 
 // WaitAndUpdateNodesStatus mocks base method.

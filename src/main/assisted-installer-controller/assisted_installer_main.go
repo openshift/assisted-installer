@@ -146,11 +146,11 @@ func main() {
 		wg.Add(1)
 	}
 
-	invoker := common.GetInvoker(kc, logger)
+	ephemeralService := common.EphemeralAssistedService(kc, logger)
 	var cluster *models.Cluster
 	var platformType models.PlatformType
 	removeUninitializedTaint := false
-	if invoker == common.InvokerAgent {
+	if ephemeralService {
 		if Options.ControllerConfig.ControlPlaneCount == 1 {
 			// When the agent-based installer installs a SNO cluster, assisted-service
 			// will never be reachable because it will not be running after the boostrap
@@ -159,7 +159,7 @@ func main() {
 			//
 			// Using the k8s client to access the cluster can be done once the cluster is
 			// available.
-			logger.Warnf("cluster is SNO and invoker = %v, skipping access to assisted-service API", invoker)
+			logger.Warnf("cluster is SNO and assisted-service ephemeral, skipping access to assisted-service API")
 
 			wg.Add(1)
 			go assistedController.PostInstallConfigsK8sClient(mainContext, &wg, bootstrapKubeconfigForSNO)
@@ -176,7 +176,7 @@ func main() {
 			// and assisted-installer-controller is restarted. In this case, we try
 			// to determine the platform type by looking at the install-config stored
 			// in the cluster-config-v1 ConfigMap.
-			logger.Warnf("SetReadyState timed out fetching cluster from assisted-service, invoker = %v", invoker)
+			logger.Warnf("SetReadyState timed out fetching cluster from ephemeral assisted-service")
 			pt, err := common.GetPlatformTypeFromInstallConfig(kc, logger)
 			if err != nil {
 				logger.Warnf("error determining platform type from install-config: %v", err)
@@ -194,7 +194,7 @@ func main() {
 	if cluster != nil {
 		platformType = *cluster.Platform.Type
 	}
-	removeUninitializedTaint = common.RemoveUninitializedTaint(mainContext, client, kc, logger, platformType, Options.ControllerConfig.OpenshiftVersion, invoker)
+	removeUninitializedTaint = common.RemoveUninitializedTaint(mainContext, client, kc, logger, platformType, Options.ControllerConfig.OpenshiftVersion, ephemeralService)
 	logger.Infof("Remove uninitialized taint: %v", removeUninitializedTaint)
 
 	// While adding new routine don't miss to add wg.add(1)
@@ -210,10 +210,9 @@ func main() {
 
 	go assistedController.WaitAndUpdateNodesStatus(mainContext, &wg, removeUninitializedTaint)
 	wg.Add(1)
-	switch invoker {
-	case common.InvokerAgent:
+	if ephemeralService {
 		go assistedController.PostInstallConfigsK8sClient(mainContext, &wg, "")
-	default:
+	} else {
 		go assistedController.PostInstallConfigs(mainContext, &wg)
 	}
 	wg.Add(1)
@@ -225,17 +224,16 @@ func main() {
 		logger.Infof("Cluster platform is not %s, skipping BMH", models.PlatformTypeBaremetal)
 	}
 
-	go assistedController.UploadLogs(mainContext, &wg, invoker)
+	go assistedController.UploadLogs(mainContext, &wg, ephemeralService)
 	wg.Add(1)
 
 	go assistedController.UpdateNodeLabels(mainContext, &wg)
 	wg.Add(1)
 
 	// monitoring installation by cluster status
-	switch invoker {
-	case common.InvokerAgent:
+	if ephemeralService {
 		waitForInstallationAgentBasedInstaller(mainContext, kc, logger, removeUninitializedTaint, Options.ControllerConfig.ControlPlaneCount)
-	default:
+	} else {
 		waitForInstallation(client, logger, assistedController)
 	}
 }
