@@ -17,7 +17,7 @@ WORKDIR /app
 
 RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags strictfipsruntime -o installer src/main/main.go
 
-FROM registry.redhat.io/ubi9/ubi-minimal-pqc:latest@sha256:3e009398a8aa8eec621393fbf308c5e622f174900e44e8d5fe224c637920924a
+FROM registry.redhat.io/ubi9/ubi-minimal-pqc:latest@sha256:fac0bde5012de6a8475bb5dc18db968cdc90b12d9dc2ffaddb4a4975d0b8a04f
 ARG release=main
 ARG version=latest
 
