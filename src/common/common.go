@@ -36,8 +36,6 @@ const (
 	clusterConfigCMName            = "cluster-config-v1"
 	clusterConfigCMNamespace       = "kube-system"
 	clusterConfigCMAttribute       = "install-config"
-	InvokerAssisted                = "assisted-service"
-	InvokerAgent                   = "agent-installer"
 )
 
 func GetHostsInStatus(hosts map[string]inventory_client.HostData, status []string, isMatch bool) map[string]inventory_client.HostData {
@@ -219,9 +217,9 @@ func HostMatchByNameOrIPAddress(node v1.Node, namesMap, IPAddressMap map[string]
 // This is required for some external platforms (e.g. VSphere, Nutanix) to proceed
 // with the installation using fake credentials.
 func RemoveUninitializedTaint(ctx context.Context, ic inventory_client.InventoryClient, kc k8s_client.K8SClient,
-	log logrus.FieldLogger, platformType models.PlatformType, openshiftVersion, invoker string) bool {
+	log logrus.FieldLogger, platformType models.PlatformType, openshiftVersion string, ephemeralService bool) bool {
 	removeUninitializedTaintForPlatforms := [...]models.PlatformType{models.PlatformTypeNutanix, models.PlatformTypeVsphere}
-	if invoker == InvokerAgent && platformType == models.PlatformTypeVsphere {
+	if ephemeralService && platformType == models.PlatformTypeVsphere {
 		hasValidvSphereCredentials := HasValidvSphereCredentials(ctx, ic, kc, log)
 		if hasValidvSphereCredentials {
 			log.Infof("Has valid vSphere credentials: %v", hasValidvSphereCredentials)
@@ -333,19 +331,20 @@ func getInstallConfigYAML(kc k8s_client.K8SClient, log logrus.FieldLogger) (stri
 	return clusterConfigCM.Data[clusterConfigCMAttribute], nil
 }
 
-func GetInvoker(kc k8s_client.K8SClient, log logrus.FieldLogger) string {
-	invoker := InvokerAssisted
+func EphemeralAssistedService(kc k8s_client.K8SClient, log logrus.FieldLogger) bool {
+	invoker := ""
 	invokerCM, err := kc.GetConfigMap(installConfigMapNS, installConfigMapName)
 	if err != nil {
 		log.Warnf("error retrieving %v ConfigMap, cannot determine invoker: %v", installConfigMapName, err)
 	}
 	if invokerCM == nil {
 		log.Warnf("%v ConfigMap is nil, cannot determine invoker: %v", installConfigMapName, err)
+		return false
 	} else {
 		invoker = invokerCM.Data[installConfigMapAttribute]
 		log.Infof("%v ConfigMap attribute %v = %v", installConfigMapName, installConfigMapAttribute, invoker)
 	}
-	return invoker
+	return strings.HasPrefix(invoker, "agent-installer")
 }
 
 func DownloadKubeconfigNoingress(ctx context.Context, dir string, ic inventory_client.InventoryClient, log logrus.FieldLogger) (string, error) {
