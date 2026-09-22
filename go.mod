@@ -1,6 +1,6 @@
 module github.com/openshift/assisted-installer
 
-go 1.20
+go 1.22
 
 require (
 	github.com/PuerkitoBio/rehttp v1.3.0
@@ -109,6 +109,7 @@ require (
 	github.com/metal3-io/baremetal-operator/pkg/hardwareutils v0.4.0 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.26 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
+	github.com/moby/sys/user v0.3.0 // indirect
 	github.com/moby/term v0.5.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
@@ -117,7 +118,7 @@ require (
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0 // indirect
-	github.com/opencontainers/runc v1.1.5 // indirect
+	github.com/opencontainers/runc v1.2.8 // indirect
 	github.com/openshift-online/ocm-sdk-go v0.1.205 // indirect
 	github.com/openshift/assisted-service/api v0.0.0 // indirect
 	github.com/openshift/hive/apis v0.0.0-20220222213051-def9088fdb5a // indirect
@@ -173,7 +174,7 @@ replace (
 	github.com/jackc/pgx/v4 => github.com/jackc/pgx/v4 v4.18.3
 	github.com/metal3-io/baremetal-operator/apis => github.com/openshift/baremetal-operator/apis v0.0.0-20230531194024-8dde0991ffdd
 	github.com/metal3-io/baremetal-operator/pkg/hardwareutils => github.com/openshift/baremetal-operator/pkg/hardwareutils v0.0.0-20230531194024-8dde0991ffdd
-	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.12
+	github.com/opencontainers/runc => github.com/opencontainers/runc v1.2.8
 	github.com/openshift/assisted-service/api => github.com/openshift/assisted-service/api v0.0.0-20241215111549-58068322e0f1
 	github.com/openshift/assisted-service/client => github.com/openshift/assisted-service/client v0.0.0-20241215111549-58068322e0f1
 	github.com/openshift/assisted-service/models => github.com/openshift/assisted-service/models v0.0.0-20241215111549-58068322e0f1
