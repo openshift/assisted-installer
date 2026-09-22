@@ -200,13 +200,13 @@ var _ = Describe("verify common", func() {
 
 	Context("Verify RemoveUninitializedTaint", func() {
 		It("empty platform string should not remove uninitialized taint", func() {
-			removeUninitializedTaint := RemoveUninitializedTaint(context.TODO(), mockbmclient, mockkcclient, l, "", "", "")
+			removeUninitializedTaint := RemoveUninitializedTaint(context.TODO(), mockbmclient, mockkcclient, l, "", "", false)
 			Expect(removeUninitializedTaint).To(BeFalse())
 		})
 
 		tests := []struct {
 			PlatformType                     models.PlatformType
-			Invoker                          string
+			EphemeralService                 bool
 			VersionOpenshift                 string
 			Cluster                          *models.Cluster
 			ExpectedRemoveUninitializedTaint bool
@@ -230,28 +230,28 @@ var _ = Describe("verify common", func() {
 			},
 			{
 				PlatformType:                     models.PlatformTypeVsphere,
-				Invoker:                          InvokerAgent,
+				EphemeralService:                 true,
 				VersionOpenshift:                 "4.14.0-rc0",
 				Cluster:                          vSphereClusterWithInvalidCredentials,
 				ExpectedRemoveUninitializedTaint: true,
 			},
 			{
 				PlatformType:                     models.PlatformTypeVsphere,
-				Invoker:                          InvokerAgent,
+				EphemeralService:                 true,
 				VersionOpenshift:                 "4.15.0",
 				Cluster:                          vSphereClusterWithInvalidCredentials,
 				ExpectedRemoveUninitializedTaint: true,
 			},
 			{
 				PlatformType:                     models.PlatformTypeVsphere,
-				Invoker:                          InvokerAgent,
+				EphemeralService:                 true,
 				VersionOpenshift:                 "4.14.0",
 				Cluster:                          vSphereClusterWithValidCredentials,
 				ExpectedRemoveUninitializedTaint: true,
 			},
 			{
 				PlatformType:                     models.PlatformTypeVsphere,
-				Invoker:                          InvokerAgent,
+				EphemeralService:                 true,
 				VersionOpenshift:                 "4.15",
 				Cluster:                          vSphereClusterWithValidCredentials,
 				ExpectedRemoveUninitializedTaint: false,
@@ -259,11 +259,11 @@ var _ = Describe("verify common", func() {
 		}
 
 		for _, test := range tests {
-			It(fmt.Sprintf("platform %v, invoker %v, version %v, cluster %v, is expected to remove uninitialized taint = %v", test.PlatformType, test.Invoker, test.VersionOpenshift, test.Cluster, test.ExpectedRemoveUninitializedTaint), func() {
+			It(fmt.Sprintf("platform %v, ephemeral %v, version %v, cluster %v, is expected to remove uninitialized taint = %v", test.PlatformType, test.EphemeralService, test.VersionOpenshift, test.Cluster, test.ExpectedRemoveUninitializedTaint), func() {
 				if test.PlatformType == models.PlatformTypeVsphere {
 					mockbmclient.EXPECT().GetCluster(gomock.Any(), false).Return(test.Cluster, nil).Times(1)
 				}
-				removeUninitializedTaint := RemoveUninitializedTaint(context.TODO(), mockbmclient, mockkcclient, l, test.PlatformType, test.VersionOpenshift, test.Invoker)
+				removeUninitializedTaint := RemoveUninitializedTaint(context.TODO(), mockbmclient, mockkcclient, l, test.PlatformType, test.VersionOpenshift, test.EphemeralService)
 				Expect(removeUninitializedTaint).To(Equal(test.ExpectedRemoveUninitializedTaint))
 			})
 		}

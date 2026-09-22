@@ -233,7 +233,7 @@ func (i *installer) waitForWorkers(ctx context.Context) error {
 		i.log.Error(err)
 		return err
 	}
-	if invoker := common.GetInvoker(kc, i.log); invoker != common.InvokerAgent {
+	if !common.EphemeralAssistedService(kc, i.log) {
 		return nil
 	}
 
@@ -875,12 +875,12 @@ func (i *installer) waitForNodes(ctx context.Context, minNodes int, role string,
 		}
 
 		if len(nodes.Items) > 0 {
-			// GetInvoker reads the openshift-install-manifests in the openshift-config namespace.
+			// EphemeralAssistedService() reads the openshift-install-manifests in the openshift-config namespace.
 			// This configmap exists after nodes start to appear in the cluster.
-			invoker := common.GetInvoker(kc, i.log)
+			ephemeralService := common.EphemeralAssistedService(kc, i.log)
 			removeUninitializedTaint := false
 			if platform != nil {
-				removeUninitializedTaint = common.RemoveUninitializedTaint(ctx, i.inventoryClient, kc, i.log, *platform.Type, i.OpenshiftVersion, invoker)
+				removeUninitializedTaint = common.RemoveUninitializedTaint(ctx, i.inventoryClient, kc, i.log, *platform.Type, i.OpenshiftVersion, ephemeralService)
 			}
 			i.log.Infof("Remove uninitialized taint: %v", removeUninitializedTaint)
 			if removeUninitializedTaint {
