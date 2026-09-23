@@ -114,7 +114,7 @@ type Controller interface {
 	PostInstallConfigsK8sClient(ctx context.Context, wg *sync.WaitGroup, kubeconfigPath string)
 	UpdateNodeLabels(ctx context.Context, wg *sync.WaitGroup)
 	UpdateBMHs(ctx context.Context, wg *sync.WaitGroup)
-	UploadLogs(ctx context.Context, wg *sync.WaitGroup, invoker string)
+	UploadLogs(ctx context.Context, wg *sync.WaitGroup, ephemeralService bool)
 	SetReadyState(waitTimeout time.Duration) *models.Cluster
 	GetStatus() *ControllerStatus
 }
@@ -1534,7 +1534,7 @@ func (c *controller) collectMustGatherLogs(ctx context.Context, images ...string
 // Uploading logs every 5 minutes
 // We will take logs of assisted controller and upload them to assisted-service
 // by creating tar gz of them.
-func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup, invoker string) {
+func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup, ephemeralService bool) {
 	podName := ""
 	ticker := time.NewTicker(LogsUploadPeriod)
 	progressCtx := utils.GenerateRequestContext()
@@ -1547,12 +1547,12 @@ func (c *controller) UploadLogs(ctx context.Context, wg *sync.WaitGroup, invoker
 	for {
 		select {
 		case <-ctx.Done():
-			if invoker == common.InvokerAgent {
+			if ephemeralService {
 				// In the agent installer, assisted-service will not be available after
 				// the bootstrap node reboots. Attempting to upload logs to assisted-service
 				// will fail in a continuous loop. To avoid this situation, we skip the final
 				// log uploads.
-				c.log.Infof("assisted-service is offline in agent installer mode. final log uploads skipped.")
+				c.log.Infof("assisted-service is offline in ephemeral mode. final log uploads skipped.")
 				return
 			}
 			c.log.Infof("Upload final controller and cluster logs before exit")
