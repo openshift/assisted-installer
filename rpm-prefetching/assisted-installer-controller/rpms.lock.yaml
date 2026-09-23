@@ -4,13 +4,13 @@ lockfileVendor: redhat
 arches:
 - arch: aarch64
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel8/aarch64/rhocp/4.17/os/Packages/o/openshift-clients-4.17.0-202507301605.p0.gfd2be5d.assembly.stream.el8.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel8/aarch64/rhocp/4.17/os/Packages/o/openshift-clients-4.17.0-202608201812.p2.g7189593.assembly.stream.el8.aarch64.rpm
     repoid: rhocp-4.17-for-rhel-8-aarch64-rpms
-    size: 55327148
-    checksum: sha256:e71bc00c547ffd513ddc1aaaa68bd47f6b4991ad3dd4a37e561195d27dc66e84
+    size: 55348868
+    checksum: sha256:a32e881f95e0e24dcb5421aec12652614b0c313d02e437da11ed64c2a3f06822
     name: openshift-clients
-    evr: 4.17.0-202507301605.p0.gfd2be5d.assembly.stream.el8
-    sourcerpm: openshift-clients-4.17.0-202507301605.p0.gfd2be5d.assembly.stream.el8.src.rpm
+    evr: 4.17.0-202608201812.p2.g7189593.assembly.stream.el8
+    sourcerpm: openshift-clients-4.17.0-202608201812.p2.g7189593.assembly.stream.el8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/os/Packages/b/bash-completion-2.7-5.el8.noarch.rpm
     repoid: rhel-8-for-aarch64-baseos-rpms
     size: 280152
@@ -46,24 +46,24 @@ arches:
     name: pkgconf-pkg-config
     evr: 1.4.2-1.el8
     sourcerpm: pkgconf-1.4.2-1.el8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/os/Packages/r/rsync-3.1.3-23.el8_10.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/os/Packages/r/rsync-3.1.3-27.el8_10.aarch64.rpm
     repoid: rhel-8-for-aarch64-baseos-rpms
-    size: 412260
-    checksum: sha256:9f0b9250f1c22a3869fe244c88a92ca4df4ebf53da95992408282d3243d1a6a0
+    size: 416968
+    checksum: sha256:9266aec010f2300f9dc8e6532d707a406f029be581d6127b5957350d260db7fb
     name: rsync
-    evr: 3.1.3-23.el8_10
-    sourcerpm: rsync-3.1.3-23.el8_10.src.rpm
+    evr: 3.1.3-27.el8_10
+    sourcerpm: rsync-3.1.3-27.el8_10.src.rpm
   source: []
   module_metadata: []
 - arch: ppc64le
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel8/ppc64le/rhocp/4.17/os/Packages/o/openshift-clients-4.17.0-202507301605.p0.gfd2be5d.assembly.stream.el8.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel8/ppc64le/rhocp/4.17/os/Packages/o/openshift-clients-4.17.0-202608201812.p2.g7189593.assembly.stream.el8.ppc64le.rpm
     repoid: rhocp-4.17-for-rhel-8-ppc64le-rpms
-    size: 52721000
-    checksum: sha256:b212fe62fb5dfc059130b1cf1818fa0cd3cd1dab890499e0ef53b75269a074aa
+    size: 52733348
+    checksum: sha256:1278ef55cf362acbd98b1ec00eb0fb1e29f1184a6186fd8fe8b01405217fc896
     name: openshift-clients
-    evr: 4.17.0-202507301605.p0.gfd2be5d.assembly.stream.el8
-    sourcerpm: openshift-clients-4.17.0-202507301605.p0.gfd2be5d.assembly.stream.el8.src.rpm
+    evr: 4.17.0-202608201812.p2.g7189593.assembly.stream.el8
+    sourcerpm: openshift-clients-4.17.0-202608201812.p2.g7189593.assembly.stream.el8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/os/Packages/b/bash-completion-2.7-5.el8.noarch.rpm
     repoid: rhel-8-for-ppc64le-baseos-rpms
     size: 280152
@@ -99,24 +99,24 @@ arches:
     name: pkgconf-pkg-config
     evr: 1.4.2-1.el8
     sourcerpm: pkgconf-1.4.2-1.el8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/os/Packages/r/rsync-3.1.3-23.el8_10.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/os/Packages/r/rsync-3.1.3-27.el8_10.ppc64le.rpm
     repoid: rhel-8-for-ppc64le-baseos-rpms
-    size: 445088
-    checksum: sha256:c08cc764bf0474035c25b862d67c2a83c92da7b4d93f6a7b739b42bf64a863c9
+    size: 450812
+    checksum: sha256:344f62d8772fc338bce2cd55e2aa544c03811ff69060b506c6efbae022b733b4
     name: rsync
-    evr: 3.1.3-23.el8_10
-    sourcerpm: rsync-3.1.3-23.el8_10.src.rpm
+    evr: 3.1.3-27.el8_10
+    sourcerpm: rsync-3.1.3-27.el8_10.src.rpm
   source: []
   module_metadata: []
 - arch: s390x
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel8/s390x/rhocp/4.17/os/Packages/o/openshift-clients-4.17.0-202507301605.p0.gfd2be5d.assembly.stream.el8.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel8/s390x/rhocp/4.17/os/Packages/o/openshift-clients-4.17.0-202608201812.p2.g7189593.assembly.stream.el8.s390x.rpm
     repoid: rhocp-4.17-for-rhel-8-s390x-rpms
-    size: 54981192
-    checksum: sha256:9b1d7382189d08049fedb83d759a55ddbcd2b5c391b782a4cddb7fd9e21eb976
+    size: 54977940
+    checksum: sha256:cbe50b1164878fbf8f0f6a78de3cf2c83dd3749ab53c7fb144dfddae2debf904
     name: openshift-clients
-    evr: 4.17.0-202507301605.p0.gfd2be5d.assembly.stream.el8
-    sourcerpm: openshift-clients-4.17.0-202507301605.p0.gfd2be5d.assembly.stream.el8.src.rpm
+    evr: 4.17.0-202608201812.p2.g7189593.assembly.stream.el8
+    sourcerpm: openshift-clients-4.17.0-202608201812.p2.g7189593.assembly.stream.el8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/os/Packages/b/bash-completion-2.7-5.el8.noarch.rpm
     repoid: rhel-8-for-s390x-baseos-rpms
     size: 280152
@@ -152,24 +152,24 @@ arches:
     name: pkgconf-pkg-config
     evr: 1.4.2-1.el8
     sourcerpm: pkgconf-1.4.2-1.el8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/os/Packages/r/rsync-3.1.3-23.el8_10.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/os/Packages/r/rsync-3.1.3-27.el8_10.s390x.rpm
     repoid: rhel-8-for-s390x-baseos-rpms
-    size: 415624
-    checksum: sha256:46d31bfa61f4ddf7d214645e101009807aa14d164879780cea4668aaee5f4cee
+    size: 419752
+    checksum: sha256:80e2a6224d170cb7fe2608649f3bad5fe22d658ec0754644227111c8185df8c1
     name: rsync
-    evr: 3.1.3-23.el8_10
-    sourcerpm: rsync-3.1.3-23.el8_10.src.rpm
+    evr: 3.1.3-27.el8_10
+    sourcerpm: rsync-3.1.3-27.el8_10.src.rpm
   source: []
   module_metadata: []
 - arch: x86_64
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel8/x86_64/rhocp/4.17/os/Packages/o/openshift-clients-4.17.0-202507301605.p0.gfd2be5d.assembly.stream.el8.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel8/x86_64/rhocp/4.17/os/Packages/o/openshift-clients-4.17.0-202608201812.p2.g7189593.assembly.stream.el8.x86_64.rpm
     repoid: rhocp-4.17-for-rhel-8-x86_64-rpms
-    size: 57262896
-    checksum: sha256:94c77d87b8b64f1e4aaf018866dd08636f8b2645d435a948f2a04c9776376e6e
+    size: 57288192
+    checksum: sha256:162b71a69c79d352eb8792be05d70f00dac589a73cc6ff25f47231bcabbd3649
     name: openshift-clients
-    evr: 4.17.0-202507301605.p0.gfd2be5d.assembly.stream.el8
-    sourcerpm: openshift-clients-4.17.0-202507301605.p0.gfd2be5d.assembly.stream.el8.src.rpm
+    evr: 4.17.0-202608201812.p2.g7189593.assembly.stream.el8
+    sourcerpm: openshift-clients-4.17.0-202608201812.p2.g7189593.assembly.stream.el8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/os/Packages/b/bash-completion-2.7-5.el8.noarch.rpm
     repoid: rhel-8-for-x86_64-baseos-rpms
     size: 280152
@@ -205,12 +205,12 @@ arches:
     name: pkgconf-pkg-config
     evr: 1.4.2-1.el8
     sourcerpm: pkgconf-1.4.2-1.el8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/os/Packages/r/rsync-3.1.3-23.el8_10.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/os/Packages/r/rsync-3.1.3-27.el8_10.x86_64.rpm
     repoid: rhel-8-for-x86_64-baseos-rpms
-    size: 422216
-    checksum: sha256:3fd7508ce30e4b78b5785bb2dbb5291c3553aa30f4e6023daeb4e9ebb1e51ab8
+    size: 427140
+    checksum: sha256:035fdb2795e3dcebaaf18c89ccdaec6784514e5ad6753afa50d5862ec1a2024a
     name: rsync
-    evr: 3.1.3-23.el8_10
-    sourcerpm: rsync-3.1.3-23.el8_10.src.rpm
+    evr: 3.1.3-27.el8_10
+    sourcerpm: rsync-3.1.3-27.el8_10.src.rpm
   source: []
   module_metadata: []
