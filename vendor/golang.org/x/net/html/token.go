@@ -840,8 +840,22 @@ func (z *Tokenizer) readStartTag() TokenType {
 	if raw {
 		z.rawTag = strings.ToLower(string(z.buf[z.data.start:z.data.end]))
 	}
-	// Look for a self-closing token like "<br/>".
-	if z.err == nil && z.buf[z.raw.end-2] == '/' {
+	// Look for a self-closing token (e.g. <br/>).
+	//
+	// Originally, we did this by just checking that the last character of the
+	// tag (ignoring the closing bracket) was a solidus (/) character, but this
+	// is not always accurate.
+	//
+	// We need to be careful that we don't misinterpret a non-self-closing tag
+	// as self-closing, as can happen if the tag contains unquoted attribute
+	// values (i.e. <p a=/>).
+	//
+	// To avoid this, we check that the last non-bracket character of the tag
+	// (z.raw.end-2) isn't the same character as the last non-quote character of
+	// the last attribute of the tag (z.pendingAttr[1].end-1), if the tag has
+	// attributes.
+	nAttrs := len(z.attr)
+	if z.err == nil && z.buf[z.raw.end-2] == '/' && (nAttrs == 0 || z.raw.end-2 != z.attr[nAttrs-1][1].end-1) {
 		return SelfClosingTagToken
 	}
 	return StartTagToken
@@ -854,9 +868,7 @@ func (z *Tokenizer) readStartTag() TokenType {
 func (z *Tokenizer) readTag(saveAttr bool) {
 	z.attr = z.attr[:0]
 	z.nAttrReturned = 0
-	for k := range z.attrNames {
-		delete(z.attrNames, k)
-	}
+	clear(z.attrNames)
 	// Read the tag name and attribute key/value pairs.
 	z.readTagName()
 	if z.skipWhiteSpace(); z.err != nil {
