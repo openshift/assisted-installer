@@ -14,8 +14,8 @@
         "gomod"
     ],
     "tekton": {
-        "fileMatch": [
-            "^.tekton/*"
+        "managerFilePatterns": [
+            "/^.tekton/*/"
         ]
     },
     "gomod": {
@@ -38,8 +38,8 @@
     "customManagers": [
         {
             "customType": "regex",
-            "fileMatch": [
-                "^Dockerfile.assisted-installer-build$"
+            "managerFilePatterns": [
+                "/^Dockerfile.assisted-installer-build$/"
             ],
             "matchStrings": [
                 "ARG GOLANGCI_LINT_VERSION=(?<currentValue>[^\\s]+)\\n"
@@ -49,14 +49,14 @@
         },
         {
             "customType": "regex",
-            "fileMatch": [
-                "^Dockerfile.assisted-installer$",
-                "^Dockerfile.assisted-installer-build$",
-                "^Dockerfile.assisted-installer-controller$",
-                "^Dockerfile.assisted-installer-controller-downstream$",
-                "^Dockerfile.assisted-installer-controller-mce$",
-                "^Dockerfile.assisted-installer-downstream$",
-                "^Dockerfile.assisted-installer-mce$"
+            "managerFilePatterns": [
+                "/^Dockerfile.assisted-installer$/",
+                "/^Dockerfile.assisted-installer-build$/",
+                "/^Dockerfile.assisted-installer-controller$/",
+                "/^Dockerfile.assisted-installer-controller-downstream$/",
+                "/^Dockerfile.assisted-installer-controller-mce$/",
+                "/^Dockerfile.assisted-installer-downstream$/",
+                "/^Dockerfile.assisted-installer-mce$/"
             ],
             "matchStrings": [
                 "FROM registry.access.redhat.com/ubi9/go-toolset:(?<currentValue>.*?) AS .*\\n",
@@ -67,9 +67,9 @@
         },
         {
             "customType": "regex",
-            "fileMatch": [
-                "^Dockerfile.assisted-installer-controller-mce$",
-                "^Dockerfile.assisted-installer-mce$"
+            "managerFilePatterns": [
+                "/^Dockerfile.assisted-installer-controller-mce$/",
+                "/^Dockerfile.assisted-installer-mce$/"
             ],
             "matchStrings": [
                 "FROM --platform=\\$BUILDPLATFORM registry.access.redhat.com/ubi8/go-toolset:(?<currentValue>.*?) AS builder\\n"
@@ -79,8 +79,8 @@
         },
         {
             "customType": "regex",
-            "fileMatch": [
-                "^Dockerfile\\.assisted-installer.*$"
+            "managerFilePatterns": [
+                "/^Dockerfile\\.assisted-installer.*$/"
             ],
             "matchStrings": [
                 "FROM registry.access.redhat.com/ubi9/ubi-minimal:(?<currentValue>[^@]+)@(?<currentDigest>sha256:[a-f0-9]+)\\n"
@@ -90,11 +90,11 @@
         },
         {
             "customType": "regex",
-            "fileMatch": [
-                "^Dockerfile\\.assisted-installer-mce$",
-                "^Dockerfile\\.assisted-installer-downstream$",
-                "^Dockerfile\\.assisted-installer-controller-mce$",
-                "^Dockerfile\\.assisted-installer-controller-downstream$"
+            "managerFilePatterns": [
+                "/^Dockerfile\\.assisted-installer-mce$/",
+                "/^Dockerfile\\.assisted-installer-downstream$/",
+                "/^Dockerfile\\.assisted-installer-controller-mce$/",
+                "/^Dockerfile\\.assisted-installer-controller-downstream$/"
             ],
             "matchStrings": [
                 "FROM registry.redhat.io/ubi9/ubi-minimal-pqc:(?<currentValue>[^@]+)@(?<currentDigest>sha256:[a-f0-9]+)\\n",
