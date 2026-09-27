@@ -1,0 +1,84 @@
+version: "2"
+run:
+  concurrency: 4
+  issues-exit-code: 1
+  tests: true
+linters:
+  enable:
+    - copyloopvar
+    - gocyclo
+    - gosec
+    - unconvert
+  settings:
+    govet:
+      enable:
+        - shadow
+      settings:
+        printf:
+          funcs:
+            - Infof
+            - Warnf
+            - Errorf
+            - Fatalf
+    staticcheck:
+      checks:
+        - "all"
+        - "-ST1001"
+        - "-ST1003"
+        - "-ST1005"
+        - "-ST1011"
+        - "-ST1016"
+        - "-ST1017"
+        - "-ST1019"
+        - "-ST1023"
+        - "-QF1001"
+        - "-QF1002"
+        - "-QF1003"
+        - "-QF1005"
+        - "-QF1006"
+        - "-QF1007"
+        - "-QF1008"
+        - "-QF1011"
+        - "-QF1012"
+    gosec:
+      excludes:
+        - G107
+        - G108
+        - G115
+        - G402
+        - G602
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules: []
+    paths:
+      - build
+      - client
+      - docs
+      - models
+      - restapi
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  uniq-by-line: true
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - build
+      - client
+      - docs
+      - models
+      - restapi
+      - third_party$
+      - builtin$
+      - examples$

@@ -1,0 +1,13 @@
+registry: quay.io
+build-container-image: assisted-installer-build
+
+volumes:
+    - $HOME/.cache/go-build:/go/pkg/mod
+    - $HOME/.cache/golangci-lint:$HOME/.cache/golangci-lint
+env:
+   INSTALLER: $INSTALLER
+   CONTROLLER: $CONTROLLER
+   CONTROLLER_OCP: $CONTROLLER_OCP
+   FOCOS: $FOCUS
+   CI: $CI
+   GOCACHE: "/go/pkg/mod"

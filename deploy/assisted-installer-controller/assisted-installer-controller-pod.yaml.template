@@ -1,0 +1,124 @@
+apiVersion: batch/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Job
+metadata:
+  name: assisted-installer-controller
+  namespace: assisted-installer
+spec:
+  backoffLimit: 100
+  template:
+    metadata:
+      labels:
+        app: assisted-installer-controller
+    spec:{{if .ServiceIPs}}
+      hostAliases:{{range .ServiceIPs}}
+        - ip: "{{.}}"
+          hostnames:
+            - "assisted-api.local.openshift.io"{{end}}{{end}}
+      containers:
+        - name: assisted-installer-controller
+          image: {{.ControllerImage}}
+          imagePullPolicy: IfNotPresent
+          env:
+            # Define the environment variable
+            - name: CLUSTER_ID
+              valueFrom:
+                configMapKeyRef:
+                  # The ConfigMap containing the value you want to assign to SPECIAL_LEVEL_KEY
+                  name: assisted-installer-controller-config
+                  key: cluster-id
+            - name: INVENTORY_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: assisted-installer-controller-config
+                  key: inventory-url
+            - name: PULL_SECRET_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: assisted-installer-controller-secret
+                  key: pull-secret-token
+            - name: CA_CERT_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: assisted-installer-controller-config
+                  key: ca-cert-path
+                  optional: true
+            - name: SKIP_CERT_VERIFICATION
+              valueFrom:
+                configMapKeyRef:
+                  name: assisted-installer-controller-config
+                  key: skip-cert-verification
+                  optional: true
+            - name: OPENSHIFT_VERSION
+              value: "{{.OpenshiftVersion}}"
+            - name: NOTIFY_NUM_REBOOTS
+              value: "{{.NotifyNumReboots}}"
+            - name: CONTROL_PLANE_COUNT
+              valueFrom:
+                configMapKeyRef:
+                  name: assisted-installer-controller-config
+                  key: control-plane-count
+                  optional: true
+            - name: CHECK_CLUSTER_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: assisted-installer-controller-config
+                  key: check-cluster-version
+                  optional: true
+            - name: MUST_GATHER_IMAGE
+              valueFrom:
+                configMapKeyRef:
+                  name: assisted-installer-controller-config
+                  key: must-gather-image
+                  optional: true
+          volumeMounts:
+            - name: host-ca-bundle
+              mountPath: /etc/pki
+            - name: host-var-run-resolv-conf
+              mountPath: /tmp/var-run-resolv.conf
+            - name: host-resolv-conf
+              mountPath: /tmp/host-resolv.conf
+          {{if .SNO}}
+            - name: sno-bootstrap-files
+              mountPath: /tmp/bootstrap-secrets
+          {{end}}
+          {{if .CACertPath}}
+            - name: service-ca-cert-config
+              mountPath: {{.CACertPath}}
+          {{end}}
+      restartPolicy: OnFailure
+      hostNetwork: true
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      serviceAccountName: assisted-installer-controller
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+        operator: Exists
+      {{if .SNO}}
+      - effect: NoSchedule
+        key: node.kubernetes.io/not-ready
+        operator: Exists
+      - effect: NoSchedule
+        key: node.kubernetes.io/network-unavailable
+        operator: Exists
+      {{end}}
+      volumes:
+        - name: host-ca-bundle
+          hostPath:
+            path: /etc/pki
+        - name: host-var-run-resolv-conf
+          hostPath:
+            path: /var/run/NetworkManager/resolv.conf
+        - name: host-resolv-conf
+          hostPath:
+            path: /etc/resolv.conf
+        {{if .SNO}}
+        - name: sno-bootstrap-files
+          hostPath:
+            path: /etc/kubernetes/bootstrap-secrets
+        {{end}}
+        {{if .CACertPath}}
+        - name: service-ca-cert-config
+          hostPath:
+            path: {{.CACertPath}}
+        {{end}}

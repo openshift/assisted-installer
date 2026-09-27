@@ -1,0 +1,10 @@
+.idea/
+.vscode/
+.venv/
+venv/
+/build
+kubevirtci/
+**/RCS/**
+.*.swp
+
+reports
