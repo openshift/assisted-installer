@@ -1,0 +1,203 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: assisted-installer-controller
+  namespace: assisted-installer
+rules:
+  # "" indicates the core API group
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - configmaps
+      - pods/log
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - get
+      - list
+      - watch
+      - patch
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+    verbs:
+      - patch
+  - apiGroups:
+      - certificates.k8s.io
+    resources:
+      - certificatesigningrequests
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+    verbs:
+      - get
+      - list
+      - delete
+  - apiGroups:
+      - certificates.k8s.io
+    resources:
+      - certificatesigningrequests/approval
+    verbs:
+      - update
+  - apiGroups:
+      - authentication.k8s.io
+    resources:
+      - tokenreviews
+    verbs:
+      - create
+  - apiGroups:
+      - authorization.k8s.io
+    resources:
+      - subjectaccessreviews
+    verbs:
+      - create
+  - apiGroups:
+      - config.openshift.io
+    resources:
+      - clusteroperators
+    verbs:
+      - get
+      - create
+      - list
+      - watch
+  - apiGroups:
+      - config.openshift.io
+    resources:
+      - clusteroperators/status
+    resourceNames:
+      - machine-approver
+    verbs:
+      - update
+  - apiGroups:
+      - config.openshift.io
+    resources:
+      - proxies
+    verbs:
+      - get
+      - list
+  - apiGroups:
+      - certificates.k8s.io
+    resourceNames:
+      - kubernetes.io/kube-apiserver-client-kubelet
+      - kubernetes.io/kubelet-serving
+    resources:
+      - signers
+    verbs:
+      - approve
+  - apiGroups:
+      - operator.openshift.io
+    resources:
+      - etcds
+      - ingresscontrollers
+    verbs:
+      - patch
+  - apiGroups:
+      - metal3.io
+    resources:
+      - baremetalhosts
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - patch
+  - apiGroups:
+      - metal3.io
+    resources:
+      - baremetalhosts/status
+    verbs:
+      - get
+      - patch
+      - update
+  - apiGroups:
+      - machine.openshift.io
+    resources:
+      - machines
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - metal3.io
+    resources:
+      - provisionings
+    verbs:
+      - get
+      - list
+  - apiGroups:
+      - config.openshift.io
+    resources:
+      - clusterversions
+    verbs:
+      - get
+      - list
+  - apiGroups:
+      - operators.coreos.com
+    resources:
+      - clusterserviceversions
+    verbs:
+      - get
+      - list
+  - apiGroups:
+      - operators.coreos.com
+    resources:
+      - subscriptions
+      - installplans
+    verbs:
+      - get
+      - list
+      - update
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - services
+    verbs:
+      - list
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - deletecollection
+  - apiGroups:
+      - "security.openshift.io"
+    resourceNames:
+      - "anyuid"
+      - "nonroot"
+      - "hostmount-anyuid"
+      - "machine-api-termination-handler"
+      - "hostnetwork"
+      - "hostaccess"
+      - "node-exporter"
+    resources:
+      - securitycontextconstraints
+    verbs:
+      - use
+  - apiGroups:
+      - "machineconfiguration.openshift.io"
+    resources:
+      - "*"
+    verbs:
+      - patch
+      - get
