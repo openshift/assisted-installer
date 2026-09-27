@@ -1,0 +1,50 @@
+FROM --platform=$BUILDPLATFORM registry.redhat.io/openshift/golang-builder:golang-builder-v1.25-rhel9 AS builder
+ARG TARGETOS
+ARG TARGETARCH
+
+ENV COMPONENT_NAME=assisted-installer-controller
+ENV COMPONENT_VERSION=1.0.0
+ENV COMPONENT_TAG_EXTENSION=" "
+ENV GOFLAGS="-p=4"
+ENV GOEXPERIMENT=strictfipsruntime
+ENV BUILD_TAGS="strictfipsruntime"
+
+ENV USER_UID=1001 \
+    USER_NAME=assisted-installer
+
+COPY --chown=${USER_UID} . /app
+WORKDIR /app
+
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags strictfipsruntime -o assisted-installer-controller src/main/assisted-installer-controller/assisted_installer_main.go
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:8ebe2ad8fdf3cab3e5a53c1edc69194c98209cfadab24b884f4ad9ebcf7bbbfc
+ARG release=main
+ARG version=latest
+
+# Install tools using rpm-prefetching (configured in rpm-prefetching/assisted-installer-controller/rpms.in.yaml)
+RUN microdnf install -y openshift-clients tar gzip rsync which findutils procps-ng && microdnf clean all
+
+COPY LICENSE /licenses/
+COPY --from=builder /app/assisted-installer-controller /assisted-installer-controller
+
+ENTRYPOINT ["/assisted-installer-controller"]
+
+LABEL com.redhat.component="multicluster-engine-assisted-installer-controller-container" \
+      name="multicluster-engine/assisted-installer-controller-rhel9" \
+      version="${version}" \
+      upstream-ref="${version}" \
+      upstream-url="https://github.com/openshift/assisted-installer" \
+      url="https://github.com/openshift/assisted-installer" \
+      summary="OpenShift Assisted Installer Controller" \
+      io.k8s.display-name="OpenShift Assisted Installer Controller" \
+      maintainer="Liat Gamliel <lgamliel@redhat.com>" \
+      description="OpenShift Assisted Installer Controller" \
+      io.k8s.description="OpenShift Assisted Installer Controller" \
+      distribution-scope="public" \
+      release="${release}" \
+      vendor="Red Hat, Inc." \
+      io.openshift.tags="OpenShift 4" \
+      upstream_commit="${version}" \
+      org.label-schema.vcs-ref="${version}" \
+      org.label-schema.vcs-url="https://github.com/openshift/assisted-installer" \
+      cpe="cpe:/a:redhat:multicluster_engine:2.17::el9"

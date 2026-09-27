@@ -1,0 +1,976 @@
+package common
+
+import (
+	"bytes"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
+	"errors"
+	"fmt"
+	"io"
+	"reflect"
+	"strings"
+
+	"github.com/distribution/reference"
+	"github.com/go-openapi/strfmt"
+	"github.com/go-openapi/swag"
+	yamlpatch "github.com/krishicks/yaml-patch"
+	"github.com/openshift/assisted-service/models"
+	"github.com/thoas/go-funk"
+	"golang.org/x/sys/unix"
+	"gorm.io/gorm"
+	"k8s.io/apimachinery/pkg/util/yaml"
+)
+
+const (
+	EnvConfigPrefix = "myapp"
+
+	HostCACertPath = "/etc/assisted-service/service-ca-cert.crt"
+
+	AdditionalTrustBundlePath = "/etc/pki/ca-trust/source/anchors/assisted-infraenv-additional-trust-bundle.pem"
+
+	consoleUrlPrefix = "https://console-openshift-console.apps"
+
+	SystemCertificateBundle     = "tls-ca-bundle.pem"
+	SystemCertificateBundlePath = "/etc/pki/ca-trust/extracted/pem/" + SystemCertificateBundle
+
+	MirrorRegistriesCertificateFile = "user-registry-ca-bundle.pem"
+	MirrorRegistriesCertificatePath = "/etc/pki/ca-trust/extracted/pem/" + MirrorRegistriesCertificateFile
+	MirrorRegistriesConfigDir       = "/etc/containers"
+	MirrorRegistriesConfigFile      = "registries.conf"
+	MirrorRegistriesConfigPath      = MirrorRegistriesConfigDir + "/" + MirrorRegistriesConfigFile
+	MaximumAllowedTimeDiffMinutes   = 4
+
+	IgnitionTokenKeyInSecret = "ignition-token"
+
+	AMD64CPUArchitecture   = "amd64"
+	X86CPUArchitecture     = "x86_64"
+	DefaultCPUArchitecture = X86CPUArchitecture
+	ARM64CPUArchitecture   = "arm64"
+	// rchos is sending aarch64 and not arm as arm64 arch
+	AARCH64CPUArchitecture = "aarch64"
+	PowerCPUArchitecture   = "ppc64le"
+	S390xCPUArchitecture   = "s390x"
+	MultiCPUArchitecture   = "multi"
+
+	ExternalPlatformNameOci = "oci"
+
+	MaxMasterHostsNeededForInstallationInHaModeOfOCP418OrNewer       = 5
+	MinMasterHostsNeededForInstallationInHaMode                      = 3
+	MinMasterHostsNeededForInstallationInHaArbiterMode               = 2
+	AllowedNumberOfMasterHostsForInstallationInHaModeOfOCP417OrOlder = 3
+	AllowedNumberOfMasterHostsInNoneHaMode                           = 1
+	AllowedNumberOfWorkersInNoneHaMode                               = 0
+	AllowedNumberOfMasterHostsInTwoNodesWithFencing                  = 2
+	MinimumVersionForNonStandardHAOCPControlPlane                    = "4.18"
+	MinimumVersionForArbiterClusters                                 = "4.19"
+	MinimumVersionForTwoNodesWithFencing                             = "4.20"
+	MinimumVersionForArbiterClustersWithNonePlatform                 = "4.22"
+	MinimumNumberOfWorkersForNonSchedulableMastersClusterInHaMode    = 2
+
+	MinimumVersionForUserManagedLoadBalancerFeature = "4.16"
+
+	MinimalVersionForSKipMCOReboot = "4.15"
+
+	MinimalVersionForIPV6PrimaryWithDualStack = "4.12"
+)
+
+type AddressFamily int
+
+const (
+	IPv4 AddressFamily = unix.AF_INET
+	IPv6 AddressFamily = unix.AF_INET6
+)
+
+func (a AddressFamily) String() string {
+	switch a {
+	case IPv4:
+		return "IPv4"
+	case IPv6:
+		return "IPv6"
+	default:
+		return fmt.Sprintf("Unexpected family value %d", a)
+	}
+}
+
+var (
+	UnlimitedEvents *int64 = swag.Int64(-1)
+	NoOffsetEvents  *int64 = swag.Int64(0)
+)
+
+// Configuration to be injected by discovery ignition.  It will cause IPv6 DHCP client identifier to be the same
+// after reboot.  This will cause the DHCP server to provide the same IP address after reboot.
+const Ipv6DuidDiscoveryConf = `
+[connection]
+ipv6.dhcp-iaid=mac
+ipv6.dhcp-duid=ll
+`
+
+// Configuration to be used by MCO manifest to get consistent IPv6 DHCP client identification.
+const Ipv6DuidRuntimeConfPre410 = `
+[connection]
+ipv6.dhcp-iaid=mac
+ipv6.dhcp-duid=ll
+[keyfile]
+path=/etc/NetworkManager/system-connections-merged
+`
+
+// Configuration of consistent IPv6 DHCP without the keyfile path set. This is because starting in
+// RHCOS 4.10 it is breaking the Network Manager configuration.
+const Ipv6DuidRuntimeConf = `
+[connection]
+ipv6.dhcp-iaid=mac
+ipv6.dhcp-duid=ll
+`
+
+// configuration of NM to disable handling of /etc/resolv.conf
+// used for configuration of bootstrap node during bootkube (before reboot)
+// and of masters after reboot
+const UnmanagedResolvConf = `
+[main]
+rc-manager=unmanaged
+`
+
+// NM configuration to be activated (set into discovery ignition) in case we want more logging for NM debugging purposes.
+// This content needs to be set in the /etc/NetworkManager/conf.d/95-nm-debug.conf
+// In addition, the line RateLimitBurst=0 must be uncommented in the /etc/systemd/journald.conf and systemctl restart systemd-journald run.
+const NMDebugModeConf = `
+[logging]
+domains=ALL:DEBUG
+`
+
+const ValidationTypeHost = "host"
+const ValidationTypeCluster = "cluster"
+
+func GetIgnoredValidations(validationsJSON string, clusterID string) ([]string, bool) {
+	ignoredValidations := []string{}
+	if validationsJSON != "" {
+		var err error
+		ignoredValidations, err = DeserializeJSONList(validationsJSON)
+		if err != nil {
+			return nil, false
+		}
+	}
+	return ignoredValidations, true
+}
+
+func IgnoredValidationsAreSet(cluster *Cluster) bool {
+	return cluster.IgnoredClusterValidations != "" || cluster.IgnoredHostValidations != ""
+}
+
+func DeserializeJSONList(jsonString string) ([]string, error) {
+	var list []string
+	if jsonString != "" {
+		err := json.Unmarshal([]byte(jsonString), &list)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return list, nil
+}
+
+func NormalizeCPUArchitecture(arch string) string {
+	switch arch {
+	case AMD64CPUArchitecture:
+		return X86CPUArchitecture
+	case AARCH64CPUArchitecture:
+		return ARM64CPUArchitecture
+	default:
+		return arch
+	}
+}
+
+func AllStrings(vs []string, f func(string) bool) bool {
+	for _, v := range vs {
+		if !f(v) {
+			return false
+		}
+	}
+	return true
+}
+
+// GetBootstrapHost return host that was set as bootstrap
+func GetBootstrapHost(cluster *Cluster) *models.Host {
+	for _, host := range cluster.Hosts {
+		if host.Bootstrap {
+			return host
+		}
+	}
+	return nil
+}
+
+func IsSingleNodeCluster(cluster *Cluster) bool {
+	return cluster.ControlPlaneCount == 1
+}
+
+func IsDay2Cluster(cluster *Cluster) bool {
+	return swag.StringValue(cluster.Kind) == models.ClusterKindAddHostsCluster
+}
+
+func IsImportedCluster(cluster *Cluster) bool {
+	return swag.BoolValue(cluster.Imported)
+}
+
+// AreMastersSchedulable returns whether a given cluster masters will be schedulable
+// It will get correct result only when all hosts roles are assigned.
+func AreMastersSchedulable(cluster *Cluster) bool {
+	return swag.BoolValue(cluster.SchedulableMastersForcedTrue) || swag.BoolValue(cluster.SchedulableMasters)
+}
+
+func GetConsoleUrl(clusterName, baseDomain string) string {
+	return fmt.Sprintf("%s.%s.%s", consoleUrlPrefix, clusterName, baseDomain)
+}
+
+func IsNtpSynced(c *Cluster) (bool, error) {
+	var min int64
+	var max int64
+	for _, h := range c.Hosts {
+		if *h.Status == models.HostStatusDisconnected ||
+			*h.Status == models.HostStatusResettingPendingUserAction ||
+			*h.Status == models.HostStatusDiscovering ||
+			h.Timestamp == 0 {
+			continue
+		}
+		if h.Timestamp < min || min == 0 {
+			min = h.Timestamp
+		}
+		if h.Timestamp > max {
+			max = h.Timestamp
+		}
+	}
+	return (max-min)/60 <= MaximumAllowedTimeDiffMinutes, nil
+}
+
+func GetProxyConfigs(proxy *models.Proxy) (string, string, string) {
+	if proxy == nil {
+		return "", "", ""
+	}
+	return swag.StringValue(proxy.HTTPProxy), swag.StringValue(proxy.HTTPSProxy), swag.StringValue(proxy.NoProxy)
+}
+
+func GetNetworksCidrs(obj interface{}) []*string {
+	addresses := make([]*string, 0)
+
+	addresses = append(addresses, GetNetworkCidrAttr(obj, "ClusterNetworks")...)
+	addresses = append(addresses, GetNetworkCidrAttr(obj, "ServiceNetworks")...)
+	addresses = append(addresses, GetNetworkCidrAttr(obj, "MachineNetworks")...)
+
+	return addresses
+}
+
+func GetNetworkCidrAttr(obj interface{}, fieldName string) []*string {
+	addresses := make([]*string, 0)
+
+	field := funk.Get(obj, fieldName)
+	if field == nil {
+		return addresses
+	}
+
+	funk.ForEach(field, func(elem interface{}) {
+		address := funk.Get(elem, "Cidr")
+		if address != nil {
+			addresses = append(addresses, swag.String(string(address.(models.Subnet))))
+		}
+	})
+
+	return addresses
+}
+
+// IsSliceNonEmpty checks whether the provided slice is non-empty. The slice is assumed to be
+// non-empty if at least one of its elements contains a non-zero value for its respective type.
+// Examples:
+//   - `[]*models.MachineNetwork{{Cidr: "5.5.0.0/24"}, {Cidr: "6.6.0.0/24"}}` - valid, as we are
+//     configuring two machine networks
+//   - `[]*models.ClusterNetwork{}` - valid, as it means we are removing all the cluster networks
+//     that may have been currently configured
+//   - `[]*models.MachineNetwork{{}}` - invalid, as it means that we are trying to configure
+//     a single machine network that is empty; a valid network contains at least a CIDR which is
+//     missing in this case
+//   - `[]*models.MachineNetwork{{Cidr: ""}}` - invalid, as it means we are trying to configure
+//     a single machine network that has empty CIDR; a valid network should contain a non-empty
+//     CIDR
+//   - `[]*models.ClusterNetwork{{HostPrefix: 0}}` - invalid, as it means we are trying to configure
+//     a single cluster network with host prefix with a value 0; this is not a valid subnet lenght
+func IsSliceNonEmpty(arg interface{}) bool {
+	res := false
+	if reflect.ValueOf(arg).Kind() == reflect.Slice {
+		funk.ForEach(arg, func(elem interface{}) {
+			v := reflect.ValueOf(elem)
+			if v.Kind() == reflect.Ptr {
+				v = reflect.Indirect(v.Elem())
+			}
+			for i := 0; i < v.NumField(); i++ {
+				res = res || !v.Field(i).IsZero()
+			}
+		})
+	}
+	return res
+}
+
+func getUnifiedNTPSources(db *gorm.DB, clusterID strfmt.UUID) (string, error) {
+	var sources []string
+	err := db.Raw("select distinct(additional_ntp_sources) as sources from infra_envs where id in (select distinct(infra_env_id) from hosts where cluster_id = ?)", clusterID.String()).Pluck("sources", &sources).Error
+	if err != nil {
+		return "", err
+	}
+	combinedSources := make(map[string]bool)
+	for _, singleSource := range sources {
+		if singleSource != "" {
+			for _, s := range strings.Split(singleSource, ",") {
+				combinedSources[s] = true
+			}
+		}
+	}
+	var ret []string
+	for k := range combinedSources {
+		ret = append(ret, k)
+	}
+	return strings.Join(ret, ","), nil
+}
+
+func GetClusterNTPSources(db *gorm.DB, clusterID strfmt.UUID) (string, error) {
+	cluster, err := GetClusterFromDB(db, clusterID, SkipEagerLoading)
+	if err != nil {
+		return "", err
+	}
+	if cluster.AdditionalNtpSource != "" {
+		return cluster.AdditionalNtpSource, nil
+	} else {
+		return getUnifiedNTPSources(db, clusterID)
+	}
+}
+
+func GetHostNTPSources(db *gorm.DB, host *models.Host) (string, error) {
+	var (
+		infraEnv *InfraEnv
+		err      error
+	)
+	if host.ClusterID != nil {
+		return GetClusterNTPSources(db, *host.ClusterID)
+	}
+	infraEnv, err = GetInfraEnvFromDB(db, host.InfraEnvID)
+	if err != nil {
+		return "", err
+	}
+	return infraEnv.AdditionalNtpSources, nil
+}
+
+// GetHostsByRole returns the list of hosts with the required role.
+func GetHostsByRole(cluster *Cluster, role models.HostRole) []models.Host {
+	var hosts []models.Host
+	if cluster == nil {
+		return hosts
+	}
+	for _, host := range cluster.Hosts {
+		if GetEffectiveRole(host) == role {
+			hosts = append(hosts, *host)
+		}
+	}
+	return hosts
+}
+
+// ParsePemCerts returns a list of certificate objects extracted from a byte array
+// The certificates within the byte array must be PEM encoded
+func ParsePemCerts(pemCerts []byte) ([]x509.Certificate, bool) {
+	var certs []x509.Certificate
+	for len(pemCerts) > 0 {
+		var block *pem.Block
+		block, pemCerts = pem.Decode(pemCerts)
+		if block == nil {
+			return certs, true
+		}
+		if block.Type == "CERTIFICATE" && len(block.Headers) == 0 {
+			cert, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return nil, false
+			}
+			certs = append(certs, *cert)
+		}
+	}
+	return certs, true
+}
+
+// VerifyCaBundle verifies the full CA Chain contained in a byte array.
+// The CA certs within the byte array must be PEM encoded
+// starting with the leaf CA certificate followed by the
+// subsequents intermediate CAs and ending with the root CA
+func VerifyCaBundle(pemCerts []byte) error {
+	var certs []x509.Certificate
+	var ok bool
+	certs, ok = ParsePemCerts(pemCerts)
+	if !ok {
+		return errors.New("unable to parse the CA Bundle")
+	}
+	if len(certs) == 0 {
+		return errors.New("the CA bundle does not contain any PEM certificate")
+	}
+	rootCertPool := x509.NewCertPool()
+	intermediateCertPool := x509.NewCertPool()
+
+	// From all the certificates in the bundle we are building a store of Roots and Intermediaries
+	// that we will be using later for the verification
+	for i := range certs {
+		if certs[i].Issuer.CommonName == certs[i].Subject.CommonName {
+			rootCertPool.AddCert(&certs[i])
+		} else {
+			intermediateCertPool.AddCert(&certs[i])
+		}
+	}
+	verifyOptions := x509.VerifyOptions{
+		Roots:         rootCertPool,
+		Intermediates: intermediateCertPool,
+	}
+
+	// For all the certificates provided we are performing a validation based on the store
+	// that we have built above. In order for the bundle to be correct we need every certificate
+	// to validate against a Root present in the bundle.
+	for i := range certs {
+		if _, err := certs[i].Verify(verifyOptions); err != nil {
+			return errors.New("unable to verify the full CA Chain")
+		}
+	}
+
+	return nil
+}
+
+// RemoveDuplicatesFromCaBundle removes duplicate certificates from a given CA bundle.
+func RemoveDuplicatesFromCaBundle(caBundle string) (string, int, error) {
+	// Parse certificates
+	certs, ok := ParsePemCerts([]byte(caBundle))
+	if !ok {
+		return "", 0, errors.New("failed to remove duplicate certificate")
+	}
+
+	// Remove duplicates by SHA-256 fingerprint of the certificate's raw bytes
+	uniqueCerts := funk.UniqBy(certs, func(cert x509.Certificate) string {
+		fingerprint := sha256.Sum256(cert.Raw)
+		return fmt.Sprintf("%x", fingerprint)
+	})
+
+	// Convert certs back to a string
+	certStrings := funk.Map(uniqueCerts, func(cert x509.Certificate) string {
+		// Encode certificate to PEM format
+		block := &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: cert.Raw,
+		}
+		var sb strings.Builder
+		if err := pem.Encode(&sb, block); err != nil {
+			// Error encoding certificate
+			return ""
+		}
+		return sb.String()
+	})
+
+	numOfCerts := len(certs)
+	numOfUniqueCerts := len(uniqueCerts.([]x509.Certificate))
+	numOfDuplicates := numOfCerts - numOfUniqueCerts
+
+	// Join the PEM-encoded certificates into a single string
+	return strings.Join(certStrings.([]string), "\n"), numOfDuplicates, nil
+}
+
+func CanonizeStrings(slice []string) (ret []string) {
+	if len(slice) == 0 {
+		return
+	}
+	ret = append(ret, slice[0])
+	for i := 1; i != len(slice); i++ {
+		if slice[i] != slice[i-1] {
+			ret = append(ret, slice[i])
+		}
+	}
+	return
+}
+
+func GetHostKey(host *models.Host) string {
+	return host.ID.String() + "@" + host.InfraEnvID.String()
+}
+
+func GetInventoryInterfaces(inventory string) (string, error) {
+	startIndex := strings.Index(inventory, "\"interfaces\":")
+	interfacesLocation := startIndex + len(`"interfaces:"`)
+	if (startIndex) == -1 {
+		return "", errors.New("unable to find interfaces in the inventory")
+	}
+
+	endIndex := strings.Index(inventory[interfacesLocation:], "}],")
+	if (endIndex) == -1 {
+		return "", errors.New("inventory is malformed")
+	}
+
+	endLocation := endIndex + len("}]")
+	return inventory[interfacesLocation : interfacesLocation+endLocation], nil
+}
+
+// GetTagFromImageRef returns the tag of the given container image reference. For example, if the
+// image reference is 'quay.io/my/image:latest' then the result will be 'latest'. If the image
+// reference isn't valid or doesn't contain a tag then the result will be an empty string.
+func GetTagFromImageRef(ref string) string {
+	parsed, err := reference.ParseNamed(ref)
+	if err != nil {
+		return ""
+	}
+	switch typed := parsed.(type) {
+	case reference.Tagged:
+		return typed.Tag()
+	default:
+		return ""
+	}
+}
+
+func GetConvertedClusterAPIVipDNSName(c *Cluster) string {
+	// In case cluster that isn't configured with user-managed-networking
+	// and api vip is set we should set api vip as APIVipDNSName
+
+	apiVip := ""
+	if len(c.APIVips) > 0 {
+		apiVip = string(c.APIVips[0].IP)
+	}
+
+	if !swag.BoolValue(c.Cluster.UserManagedNetworking) && apiVip != "" {
+		return apiVip
+	}
+	return fmt.Sprintf("api.%s.%s", c.Cluster.Name, c.Cluster.BaseDNSDomain)
+}
+
+func GetAPIHostname(c *Cluster) string {
+	// Despite the confusing name of this parameter, in day-2 scenarios where
+	// this function is used it could either be a DNS domain name that points
+	// at the API's IP address (this is the default) or it could also not be a
+	// DNS domain name at all - such as when the user chooses to override this
+	// parameter with an IP address. Such override is commonly done by users in
+	// day-2 SaaS imported clusters where the user never bothered to set up DNS
+	// for their day-1 cluster in the first place and just wants the worker to
+	// connect to the API directly. The UI even has a special dialog to help users
+	// do that.
+	return swag.StringValue(c.APIVipDNSName)
+}
+
+func ApplyYamlPatch(src []byte, ops []byte) ([]byte, error) {
+	patch, err := yamlpatch.DecodePatch(ops)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	patched, err := patch.Apply(src)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return patched, nil
+}
+
+/*Count of events of each severity*/
+type EventSeverityCount map[string]int64
+
+type V2GetEventsParams struct {
+	/*
+	   A comma-separated list of event categories.
+	*/
+	Categories []string
+	/*
+	   The cluster to return events for.
+	   Format: uuid
+	*/
+	ClusterID *strfmt.UUID
+	/*
+	   Cluster level events flag.
+	*/
+	ClusterLevel *bool
+	/*
+	   Deleted hosts flag.
+	*/
+	DeletedHosts *bool
+	/*
+	   Hosts in the specified cluster to return events for.
+	*/
+	HostIds []strfmt.UUID
+	/*
+	   The infra-env to return events for.
+	   Format: uuid
+	*/
+	InfraEnvID *strfmt.UUID
+	/*
+	   The maximum number of records to retrieve.
+	*/
+	Limit *int64
+	/*
+	   Retrieved events message pattern.
+	*/
+	Message *string
+	/*
+	   Number of records to skip before starting to return the records.
+	*/
+	Offset *int64
+
+	/*
+	   Order by event_time of events retrieved.
+	   Default: "ascending"
+	*/
+	Order *string
+	/*
+	   Retrieved events severities.
+	*/
+	Severities []string
+}
+
+type V2GetEventsResponse struct {
+	/*Retrieved events*/
+	Events             []*Event
+	EventSeverityCount *EventSeverityCount
+	EventCount         *int64
+}
+
+func (r V2GetEventsResponse) GetEvents() []*Event {
+	return r.Events
+}
+
+func (r V2GetEventsResponse) GetEventSeverityCount() *EventSeverityCount {
+	return r.EventSeverityCount
+}
+
+func (r V2GetEventsResponse) GetEventCount() *int64 {
+	return r.EventCount
+}
+
+func GetDefaultV2GetEventsParams(clusterID *strfmt.UUID, hostIds []strfmt.UUID, infraEnvID *strfmt.UUID, categories ...string) *V2GetEventsParams {
+	selectedCategories := make([]string, 0)
+	if len(categories) > 0 {
+		selectedCategories = categories[:]
+	}
+	return &V2GetEventsParams{
+		ClusterID:  clusterID,
+		HostIds:    hostIds,
+		InfraEnvID: infraEnvID,
+		Limit:      UnlimitedEvents,
+		Offset:     NoOffsetEvents,
+		Categories: selectedCategories,
+	}
+}
+
+func IsPlatformExternal(platform *models.Platform) bool {
+	if platform == nil || platform.Type == nil {
+		return false
+	}
+	return IsPlatformTypeExternal(*platform.Type)
+}
+
+func IsPlatformTypeExternal(platformType models.PlatformType) bool {
+	return platformType == models.PlatformTypeExternal
+}
+
+func IsExternalIntegrationEnabled(platform *models.Platform, platformName string) bool {
+	if platform == nil ||
+		platform.Type == nil {
+		return false
+	}
+
+	if *platform.Type == models.PlatformTypeExternal &&
+		platform.External != nil &&
+		swag.StringValue(platform.External.PlatformName) == platformName {
+		return true
+	}
+
+	return false
+}
+
+func IsOciExternalIntegrationEnabled(platform *models.Platform) bool {
+	return IsExternalIntegrationEnabled(platform, ExternalPlatformNameOci)
+}
+
+func IsMultiNodeNonePlatformCluster(cluster *Cluster) bool {
+	return !IsSingleNodeCluster(cluster) && swag.BoolValue(cluster.UserManagedNetworking)
+}
+
+func NumberOfWorkers(c *Cluster) int {
+	num := 0
+	for _, host := range c.Hosts {
+		if GetEffectiveRole(host) != models.HostRoleWorker {
+			continue
+		}
+		num += 1
+	}
+	return num
+}
+
+func GetEffectiveRole(host *models.Host) models.HostRole {
+	if host.Role == models.HostRoleAutoAssign && host.SuggestedRole != "" {
+		return host.SuggestedRole
+	}
+	return host.Role
+}
+
+// GetHostsByEachRole returns the 4 slices of hosts by their effective role for a given cluster:
+// 1. bootstrap/master hosts
+// 2. arbiter hosts
+// 3. worker hosts
+// 4. auto-assign hosts
+// Note - The hosts should be preloaded in the cluster
+func GetHostsByEachRole(cluster *models.Cluster, effectiveRoles bool) ([]*models.Host, []*models.Host, []*models.Host, []*models.Host) {
+	masterHosts := make([]*models.Host, 0)
+	arbiterHosts := make([]*models.Host, 0)
+	workerHosts := make([]*models.Host, 0)
+	autoAssignHosts := make([]*models.Host, 0)
+
+	roleFunction := func(host *models.Host) models.HostRole {
+		if effectiveRoles {
+			return GetEffectiveRole(host)
+		}
+
+		return host.Role
+	}
+
+	for _, host := range cluster.Hosts {
+		switch role := roleFunction(host); role {
+		case models.HostRoleMaster, models.HostRoleBootstrap:
+			masterHosts = append(masterHosts, host)
+		case models.HostRoleArbiter:
+			arbiterHosts = append(arbiterHosts, host)
+		case models.HostRoleWorker:
+			workerHosts = append(workerHosts, host)
+		case models.HostRoleAutoAssign:
+			autoAssignHosts = append(autoAssignHosts, host)
+		}
+	}
+
+	return masterHosts, arbiterHosts, workerHosts, autoAssignHosts
+}
+
+func ShouldMastersBeSchedulable(cluster *models.Cluster) bool {
+	if cluster.ControlPlaneCount == 1 {
+		return true
+	}
+
+	_, _, workers, _ := GetHostsByEachRole(cluster, true)
+	return len(workers) < MinimumNumberOfWorkersForNonSchedulableMastersClusterInHaMode
+}
+
+func IsMirrorConfigurationSet(conf *MirrorRegistryConfiguration) bool {
+	if conf == nil {
+		return false
+	}
+
+	if conf.RegistriesConf != "" {
+		return true
+	}
+
+	return false
+}
+
+func GetDefaultHighAvailabilityAndMasterCountParams(highAvailabilityMode *string, controlPlaneCount *int64) (*string, *int64) {
+	// Both not set, multi node by default
+	if highAvailabilityMode == nil && controlPlaneCount == nil {
+		return swag.String(models.ClusterCreateParamsHighAvailabilityModeFull),
+			swag.Int64(MinMasterHostsNeededForInstallationInHaMode)
+	}
+
+	// only highAvailabilityMode set
+	if controlPlaneCount == nil {
+		if *highAvailabilityMode == models.ClusterHighAvailabilityModeNone {
+			return highAvailabilityMode, swag.Int64(AllowedNumberOfMasterHostsInNoneHaMode)
+		}
+
+		return highAvailabilityMode, swag.Int64(MinMasterHostsNeededForInstallationInHaMode)
+	}
+
+	// only controlPlaneCount set
+	if highAvailabilityMode == nil {
+		if *controlPlaneCount == AllowedNumberOfMasterHostsInNoneHaMode {
+			return swag.String(models.ClusterHighAvailabilityModeNone), controlPlaneCount
+		}
+
+		return swag.String(models.ClusterHighAvailabilityModeFull), controlPlaneCount
+	}
+
+	// both are set
+	return highAvailabilityMode, controlPlaneCount
+}
+
+func IsClusterTopologyHighlyAvailableArbiter(cluster *Cluster) bool {
+	return funk.NotEmpty(GetHostsByRole(cluster, models.HostRoleArbiter))
+}
+
+func IsClusterTopologyTwoNodesWithFencing(cluster *Cluster) bool {
+	if cluster == nil {
+		return false
+	}
+	if cluster.ControlPlaneCount != AllowedNumberOfMasterHostsInTwoNodesWithFencing {
+		return false
+	}
+	if IsClusterTopologyHighlyAvailableArbiter(cluster) {
+		return false
+	}
+	masters := GetHostsByRole(cluster, models.HostRoleMaster)
+	if len(masters) != AllowedNumberOfMasterHostsInTwoNodesWithFencing {
+		return false
+	}
+	for _, master := range masters {
+		if master.FencingCredentials == "" {
+			return false
+		}
+	}
+	return true
+}
+
+// GetMultipleYamls decodes multiple YAML documents from contents into values of type T.
+// Useful when a byte stream contains several YAML docs separated by '---'.
+func GetMultipleYamls[T any](contents []byte) ([]T, error) {
+
+	r := bytes.NewReader(contents)
+	dec := yaml.NewYAMLToJSONDecoder(r)
+
+	var outputList []T
+	for {
+		var decodedData T
+		err := dec.Decode(&decodedData)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("error reading multiple YAML documents: %w", err)
+		}
+
+		// Skip empty or null documents
+		v := reflect.ValueOf(decodedData)
+		if v.IsZero() {
+			continue
+		}
+		switch v.Kind() {
+		case reflect.Map, reflect.Slice, reflect.Array:
+			if v.Len() == 0 {
+				continue
+			}
+		}
+		outputList = append(outputList, decodedData)
+	}
+
+	return outputList, nil
+}
+
+// ValidateClusterSupportsArbiterHosts checks if the given cluster is allowed to have arbiter hosts.
+// A day1 cluster can have arbiter hosts if:
+// 1. Its OCP version is at least MinimumVersionForArbiterClusters
+// 2. Its platform is baremetal (for OCP < 4.22) or baremetal/none (for OCP >= 4.22)
+// Day2 clusters can also have arbiter hosts added to them if they were installed as TNA clusters, but we can't check that.
+func ValidateClusterSupportsArbiterHosts(cluster *Cluster) error {
+	if cluster == nil || IsDay2Cluster(cluster) {
+		return nil
+	}
+
+	arbiterClustersSupported, err := BaseVersionGreaterOrEqual(MinimumVersionForArbiterClusters, cluster.OpenshiftVersion)
+	if err != nil {
+		return err
+	}
+	if !arbiterClustersSupported {
+		return fmt.Errorf("cluster's openshift version must be at least %s", MinimumVersionForArbiterClusters)
+	}
+
+	platform := cluster.Platform
+	if platform == nil || platform.Type == nil {
+		return errors.New("cluster's platform must be set")
+	}
+
+	supportsNonePlatform, _ := BaseVersionGreaterOrEqual(MinimumVersionForArbiterClustersWithNonePlatform, cluster.OpenshiftVersion)
+
+	if supportsNonePlatform {
+		if *platform.Type != models.PlatformTypeBaremetal && *platform.Type != models.PlatformTypeNone {
+			return errors.New("cluster's platform must be baremetal or none")
+		}
+	} else {
+		if *platform.Type != models.PlatformTypeBaremetal {
+			return errors.New("cluster's platform must be baremetal")
+		}
+	}
+
+	return nil
+}
+
+// ValidateClusterSupportsFencingCredentials checks if the given cluster is allowed to have hosts with fencing credentials.
+// A day1 cluster can have hosts with fencing credentials if:
+// 1. Its OCP version is at least MinimumVersionForTwoNodesWithFencing
+// 2. Its platform is baremetal or none
+// Fencing credentials have no effect in day2 clusters, but we don't want to throw an error on it.
+func ValidateClusterSupportsFencingCredentials(cluster *Cluster) error {
+	if cluster == nil || IsDay2Cluster(cluster) {
+		return nil
+	}
+
+	fencingClustersSupported, err := BaseVersionGreaterOrEqual(MinimumVersionForTwoNodesWithFencing, cluster.OpenshiftVersion)
+	if err != nil {
+		return err
+	}
+	if !fencingClustersSupported {
+		return fmt.Errorf("cluster's openshift version must be at least %s", MinimumVersionForTwoNodesWithFencing)
+	}
+
+	platform := cluster.Platform
+	if platform == nil || platform.Type == nil || (*platform.Type != models.PlatformTypeBaremetal && *platform.Type != models.PlatformTypeNone) {
+		return errors.New("cluster's platform must be baremetal or none")
+	}
+
+	return nil
+}
+
+func HostsInStatus(c *Cluster, statuses []string) (masters, arbiters, workers int) {
+	for _, host := range c.Hosts {
+		if funk.ContainsString(statuses, swag.StringValue(host.Status)) {
+			switch GetEffectiveRole(host) {
+			case models.HostRoleMaster, models.HostRoleBootstrap:
+				masters++
+			case models.HostRoleArbiter:
+				arbiters++
+			case models.HostRoleWorker:
+				workers++
+			}
+		}
+	}
+	return
+}
+
+// HasEnoughMastersAndWorkers returns whether the number of master and worker nodes in the specified cluster with the given status
+// meets the required criteria. The conditions are as follows:
+//   - For SNO (Single Node OpenShift), there must be exactly one master node and zero worker nodes.
+//   - For High Availability cluster, the number of master nodes should match the user's request, and not less than the minimum. The worker node requirement depends on this request:
+//     If the user requested at least two workers, there must be at least two, indicating non-schedulable masters were intended.
+//     If the user requested fewer than two workers, any number of workers is acceptable.
+//   - For TNA Clusters the same conditions apply as for High Availability Clusters, but we also need to check that at least one arbiter node is in the correct status.
+func HasEnoughMastersAndWorkers(c *Cluster, statuses []string) bool {
+	mastersInStatus, arbitersInStatus, workersInStatus := HostsInStatus(c, statuses)
+
+	if c.ControlPlaneCount == 1 {
+		return mastersInStatus == AllowedNumberOfMasterHostsInNoneHaMode &&
+			workersInStatus == AllowedNumberOfWorkersInNoneHaMode
+	}
+
+	// hosts roles are known at this stage
+	masters, arbiters, workers, _ := GetHostsByEachRole(&c.Cluster, false)
+	numberOfExpectedMasters := len(masters)
+	numberOfExpectedArbiters := len(arbiters)
+
+	minMasterHostsNeeded := MinMasterHostsNeededForInstallationInHaMode
+	if numberOfExpectedArbiters != 0 {
+		minMasterHostsNeeded = MinMasterHostsNeededForInstallationInHaArbiterMode
+		// validate arbiters
+		if arbitersInStatus == 0 {
+			return false
+		}
+	}
+	if IsClusterTopologyTwoNodesWithFencing(c) {
+		minMasterHostsNeeded = AllowedNumberOfMasterHostsInTwoNodesWithFencing
+	}
+
+	// validate masters
+	if numberOfExpectedMasters < minMasterHostsNeeded ||
+		mastersInStatus < numberOfExpectedMasters {
+		return false
+	}
+
+	numberOfExpectedWorkers := len(workers)
+
+	// validate workers
+	return numberOfExpectedWorkers < MinimumNumberOfWorkersForNonSchedulableMastersClusterInHaMode ||
+		numberOfExpectedWorkers >= MinimumNumberOfWorkersForNonSchedulableMastersClusterInHaMode &&
+			workersInStatus >= MinimumNumberOfWorkersForNonSchedulableMastersClusterInHaMode
+}

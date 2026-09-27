@@ -1,0 +1,37 @@
+FROM registry.redhat.io/openshift/golang-builder:golang-builder-v1.25-rhel9 AS builder
+ARG TARGETPLATFORM
+ENV GOFLAGS=-mod=mod
+WORKDIR /go/src/github.com/openshift/assisted-installer
+
+# Workaround for creating build folder
+USER root
+
+# Bring in the go dependencies before anything else so we can take
+# advantage of caching these layers in future builds.
+COPY go.mod go.mod
+COPY go.sum go.sum
+RUN go mod download
+
+COPY . .
+RUN git config --global --add safe.directory '*'; \
+    TARGETPLATFORM=$TARGETPLATFORM make controller
+
+# Extract the commit reference from which the image is built
+RUN git rev-parse --short HEAD > /commit-reference.txt
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:b9b10f42d7eba7ad4a6d5ef26b7d34fdc892b2ffe59b8d0372ec884008569eb6
+ARG TARGETPLATFORM
+
+RUN microdnf install -y tar gzip rsync which procps-ng findutils && microdnf clean all
+
+# openshift clients
+RUN case $TARGETPLATFORM in "") platform=amd64;; *) platform=`echo $TARGETPLATFORM | sed 's#linux/##'` ;; esac ; \
+    curl -k -L -s "https://mirror.openshift.com/pub/openshift-v4/multi/clients/ocp/latest/amd64/openshift-client-linux-${platform}-rhel9.tar.gz" | tar xvz -C /usr/bin; \
+    chmod +x /usr/bin/oc /usr/bin/kubectl
+
+COPY --from=builder /go/src/github.com/openshift/assisted-installer/build/assisted-installer-controller /usr/bin/assisted-installer-controller
+
+# Copy the commit reference from the builder
+COPY --from=builder /commit-reference.txt /commit-reference.txt
+
+ENTRYPOINT ["/usr/bin/assisted-installer-controller"]

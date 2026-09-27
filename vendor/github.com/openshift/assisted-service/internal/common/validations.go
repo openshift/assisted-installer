@@ -1,0 +1,92 @@
+// This file contains functions that simplify the execution of validations from multiple places of
+// the service.
+
+package common
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/go-openapi/swag"
+	"github.com/openshift/assisted-service/models"
+)
+
+// IsAgentCompatible checks if the given agent image is compatible with what the service expects.
+func IsAgentCompatible(expectedImage, agentImage string) bool {
+	return agentImage == expectedImage
+}
+
+var NonIgnorableHostValidations []string = []string{
+	string(models.HostValidationIDConnected),
+	string(models.HostValidationIDHasInventory),
+	string(models.HostValidationIDMachineCidrDefined),
+	string(models.HostValidationIDHostnameUnique),
+	string(models.HostValidationIDHostnameValid),
+}
+var NonIgnorableClusterValidations []string = []string{
+	string(models.ClusterValidationIDAPIVipsDefined),
+	string(models.ClusterValidationIDIngressVipsDefined),
+	string(models.ClusterValidationIDAllHostsAreReadyToInstall),
+	string(models.ClusterValidationIDSufficientMastersCount),
+	string(models.ClusterValidationIDPullSecretSet),
+}
+
+func ShouldIgnoreValidation(ignoredValidations []string, validationId string, nonIgnoribles []string) bool {
+	if !MayIgnoreValidation(validationId, nonIgnoribles) {
+		return false
+	}
+	if swag.ContainsStrings(ignoredValidations, "all") {
+		return true
+	}
+	return swag.ContainsStrings(ignoredValidations, validationId)
+}
+
+func MayIgnoreValidation(validationID string, nonIgnorables []string) bool {
+	if validationID == "all" {
+		return true
+	}
+	return !swag.ContainsStrings(nonIgnorables, validationID)
+}
+
+func MayIgnoreValidations(validationIDs []string, nonIgnorables []string) (bool, []string) {
+	result := true
+	cantBeIgnored := []string{}
+	for _, validation := range validationIDs {
+		if validation == "all" {
+			return true, []string{}
+		}
+		if !MayIgnoreValidation(validation, nonIgnorables) {
+			cantBeIgnored = append(cantBeIgnored, validation)
+			result = false
+		}
+	}
+	return result, cantBeIgnored
+}
+
+// ParseCommaSeparatedUniqueValues splits a comma-separated string into a deduplicated slice
+// of trimmed values. It returns an error if any item is empty after trimming (e.g. "a,,b").
+// itemDescription is used in error messages to describe what the values represent.
+// Returns (nil, nil) when the input is empty or whitespace-only.
+func ParseCommaSeparatedUniqueValues(value string, itemDescription string) ([]string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, nil
+	}
+
+	result := make([]string, 0)
+	seen := make(map[string]struct{})
+
+	for _, item := range strings.Split(value, ",") {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			return nil, fmt.Errorf("empty %s found in '%s'", itemDescription, value)
+		}
+		if _, exists := seen[item]; exists {
+			continue
+		}
+		seen[item] = struct{}{}
+		result = append(result, item)
+	}
+
+	return result, nil
+}
