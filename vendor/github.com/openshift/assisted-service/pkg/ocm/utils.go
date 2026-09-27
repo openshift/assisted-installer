@@ -1,0 +1,126 @@
+package ocm
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"strings"
+
+	sdkClient "github.com/openshift-online/ocm-sdk-go"
+	"github.com/openshift/assisted-service/internal/common"
+	"github.com/openshift/assisted-service/restapi"
+)
+
+const (
+	BareMetalClusterResource        string = "BareMetalCluster"
+	AMSActionCreate                 string = "create"
+	AMSActionUpdate                 string = "update"
+	AMSActionDelete                 string = "delete"
+	BareMetalCapabilityName         string = "bare_metal_installer_admin"
+	SoftTimeoutsCapabilityName      string = "bare_metal_installer_soft_timeouts"
+	AccountCapabilityType           string = "Account"
+	OrganizationCapabilityType      string = "Organization"
+	Subscription                    string = "Subscription"
+	EmailDelimiter                  string = "@"
+	IgnoreValidationsCapabilityName string = "ignore_validations"
+
+	// AdminUsername for disabled auth
+	AdminUsername string = "admin"
+
+	// UnknownEmailDomain for disabled auth or invalid emails
+	UnknownEmailDomain string = "Unknown"
+)
+
+type response interface {
+	Status() int
+}
+
+// errorFromOCMHTTPStatus maps an OCM Accounts Management HTTP error to the Assisted API response.
+// To align with assisted-service conventions, only auth/forbidden responses are InfraError.
+// All other HTTP failures are surfaced as ApiError with the same status code.
+func errorFromOCMHTTPStatus(status int, err error) error {
+	switch {
+	case status == http.StatusUnauthorized || status == http.StatusForbidden:
+		return common.NewInfraError(int32(status), err)
+	case status >= 400:
+		return common.NewApiError(int32(status), err)
+	default:
+		return nil
+	}
+}
+
+func AdminPayload() *AuthPayload {
+	return &AuthPayload{Role: AdminRole, Username: AdminUsername}
+}
+
+// PayloadFromContext returns auth payload from the specified context
+func PayloadFromContext(ctx context.Context) *AuthPayload {
+	payload := ctx.Value(restapi.AuthKey)
+	if payload == nil {
+		// fallback to system-admin
+		return AdminPayload()
+	}
+	authPayload, ok := payload.(*AuthPayload)
+	if !ok {
+		return AdminPayload()
+	}
+	return authPayload
+}
+
+// UserNameFromContext returns username from the specified context
+func UserNameFromContext(ctx context.Context) string {
+	payload := PayloadFromContext(ctx)
+	return payload.Username
+}
+
+// OrgIDFromContext returns org ID from the specified context
+func OrgIDFromContext(ctx context.Context) string {
+	payload := PayloadFromContext(ctx)
+	return payload.Organization
+}
+
+// EmailFromContext returns email from the specified context
+func EmailFromContext(ctx context.Context) string {
+	payload := PayloadFromContext(ctx)
+	return payload.Email
+}
+
+// EmailDomainFromContext returns email Domain from the specified context
+func EmailDomainFromContext(ctx context.Context) string {
+	domain := UnknownEmailDomain
+	email := EmailFromContext(ctx)
+	delimiterIdx := strings.LastIndex(email, EmailDelimiter)
+	if delimiterIdx >= 0 {
+		emailElements := strings.Split(email, EmailDelimiter)
+		domain = emailElements[len(emailElements)-1]
+	}
+	return domain
+}
+
+func HandleOCMResponse(ctx context.Context, log sdkClient.Logger, response response, requestType string, err error) error {
+	if err != nil {
+		log.Error(ctx, "Failed to send %s request. Error: %v", requestType, err)
+		if response != nil {
+			log.Error(ctx, "Failed to send %s request. Response: %v", requestType, response)
+			if mapped := errorFromOCMHTTPStatus(response.Status(), err); mapped != nil {
+				return mapped
+			}
+		}
+		return common.NewApiError(http.StatusServiceUnavailable, err)
+	}
+	// Production safeguard: newer ocm-sdk-go accountsmgmt clients can return err == nil together with an HTTP
+	// error status when the response body is empty — SendContext uses Peek(1); on io.EOF it returns before
+	// unmarshalling an errors.Error (see e.g. accountsmgmt/v1 subscription_client.go SubscriptionUpdateRequest.SendContext).
+	// Callers must treat non-success HTTP status as failure even when err is nil.
+	if response != nil {
+		st := response.Status()
+		if st >= 400 {
+			oerr := fmt.Errorf("%s request failed with HTTP status %d", requestType, st)
+			log.Error(ctx, "OCM %s returned HTTP status %d", requestType, st)
+			if mapped := errorFromOCMHTTPStatus(st, oerr); mapped != nil {
+				return mapped
+			}
+		}
+	}
+	return nil
+}

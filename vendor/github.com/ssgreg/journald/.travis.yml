@@ -1,0 +1,25 @@
+language: shell
+
+sudo: required
+
+services:
+  - docker
+
+env:
+  global:
+    - GOPATH=/go
+    - BUILD_DIR=/go/src/github.com/ssgreg/journald-send
+  matrix:
+    - DOCKER_BASE=ssgreg/centos-go
+
+before_install:
+ - docker pull ${DOCKER_BASE}
+
+install:
+ - docker run -d --privileged -e GOPATH=${GOPATH} -v ${PWD}:${BUILD_DIR} --cidfile=/tmp/cidfile ${DOCKER_BASE} /bin/bash -c "dbus-uuidgen > /etc/machine-id && /usr/lib/systemd/systemd-journald"
+
+script:
+ - docker exec `cat /tmp/cidfile` /bin/bash -c "cd ${BUILD_DIR} && go get -u github.com/stretchr/testify && go vet && go test -cpu=2 -race -v && go test -cpu=2 -covermode=atomic -v"
+
+after_script:
+ - docker kill `cat /tmp/cidfile`
