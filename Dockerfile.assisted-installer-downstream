@@ -1,0 +1,48 @@
+FROM --platform=$BUILDPLATFORM registry.redhat.io/openshift/golang-builder:golang-builder-v1.25-rhel9 AS builder
+ARG TARGETOS
+ARG TARGETARCH
+
+ENV COMPONENT_NAME=installer
+ENV COMPONENT_VERSION=1.0.0
+ENV COMPONENT_TAG_EXTENSION=" "
+ENV GOFLAGS="-p=4"
+
+ENV USER_UID=1001 \
+    USER_NAME=assisted-installer
+
+COPY --chown=${USER_UID} . /app
+WORKDIR /app
+RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o installer src/main/main.go
+
+
+FROM --platform=$BUILDPLATFORM registry.redhat.io/rhel9-4-els/rhel:9.4
+ARG release=main
+ARG version=latest
+
+COPY LICENSE /licenses/
+COPY --from=builder /app/installer /installer
+COPY --from=builder /app/deploy/assisted-installer-controller /assisted-installer-controller/deploy
+
+# base image already includes util-linux
+# RUN dnf install -y util-linux && dnf clean all
+
+ENTRYPOINT ["/installer"]
+
+LABEL com.redhat.component="assisted-installer-container" \
+      name="rhai/assisted-installer-rhel9" \
+      cpe="cpe:/a:redhat:assisted_installer:2.38::el9" \
+      version="${version}" \
+      upstream-ref="${version}" \
+      upstream-url="https://github.com/openshift/assisted-installer" \
+      summary="OpenShift Assisted Installer" \
+      io.k8s.display-name="OpenShift Assisted Installer" \
+      maintainer="Liat Gamliel <lgamliel@redhat.com>" \
+      description="OpenShift Assisted Installer" \
+      io.k8s.description="OpenShift Assisted Installer" \
+      distribution-scope="public" \
+      release="${release}" \
+      vendor="Red Hat, Inc." \
+      io.openshift.tags="OpenShift 4" \
+      upstream_commit="${version}" \
+      org.label-schema.vcs-ref="${version}" \
+      org.label-schema.vcs-url="https://github.com/openshift/assisted-installer"
