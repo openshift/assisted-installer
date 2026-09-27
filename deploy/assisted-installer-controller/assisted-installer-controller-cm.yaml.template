@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: assisted-installer-controller-config
+  namespace: assisted-installer
+  labels:
+    app: assisted-installer-controller
+data:
+  cluster-id: {{.ClusterId}}
+  inventory-url: {{.InventoryUrl}}
+  skip-cert-verification: '{{.SkipCertVerification}}'
+  ca-cert-path: '{{.CACertPath}}'
+  check-cluster-version: '{{.CheckCVO}}'
+  high-availability-mode: {{.HaMode}}
+  must-gather-image: '{{.MustGatherImage}}'
