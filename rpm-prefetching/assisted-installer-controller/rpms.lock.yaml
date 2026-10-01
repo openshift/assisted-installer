@@ -46,13 +46,13 @@ arches:
     name: pkgconf-pkg-config
     evr: 1.4.2-1.el8
     sourcerpm: pkgconf-1.4.2-1.el8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/os/Packages/r/rsync-3.1.3-27.el8_10.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/os/Packages/r/rsync-3.1.3-28.el8_10.aarch64.rpm
     repoid: rhel-8-for-aarch64-baseos-rpms
-    size: 416968
-    checksum: sha256:9266aec010f2300f9dc8e6532d707a406f029be581d6127b5957350d260db7fb
+    size: 452068
+    checksum: sha256:6d9a063aae7fcd3886d0cef3b8f0df00b80c7045edf76588f2ed71384c02784c
     name: rsync
-    evr: 3.1.3-27.el8_10
-    sourcerpm: rsync-3.1.3-27.el8_10.src.rpm
+    evr: 3.1.3-28.el8_10
+    sourcerpm: rsync-3.1.3-28.el8_10.src.rpm
   source: []
   module_metadata: []
 - arch: ppc64le
@@ -99,13 +99,13 @@ arches:
     name: pkgconf-pkg-config
     evr: 1.4.2-1.el8
     sourcerpm: pkgconf-1.4.2-1.el8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/os/Packages/r/rsync-3.1.3-27.el8_10.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/os/Packages/r/rsync-3.1.3-28.el8_10.ppc64le.rpm
     repoid: rhel-8-for-ppc64le-baseos-rpms
-    size: 450812
-    checksum: sha256:344f62d8772fc338bce2cd55e2aa544c03811ff69060b506c6efbae022b733b4
+    size: 490232
+    checksum: sha256:8ab277f1a992c58f0ba62ae32e81d9bf4f4fa075c6f82ea4c70812f85bea041b
     name: rsync
-    evr: 3.1.3-27.el8_10
-    sourcerpm: rsync-3.1.3-27.el8_10.src.rpm
+    evr: 3.1.3-28.el8_10
+    sourcerpm: rsync-3.1.3-28.el8_10.src.rpm
   source: []
   module_metadata: []
 - arch: s390x
@@ -152,13 +152,13 @@ arches:
     name: pkgconf-pkg-config
     evr: 1.4.2-1.el8
     sourcerpm: pkgconf-1.4.2-1.el8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/os/Packages/r/rsync-3.1.3-27.el8_10.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/os/Packages/r/rsync-3.1.3-28.el8_10.s390x.rpm
     repoid: rhel-8-for-s390x-baseos-rpms
-    size: 419752
-    checksum: sha256:80e2a6224d170cb7fe2608649f3bad5fe22d658ec0754644227111c8185df8c1
+    size: 454660
+    checksum: sha256:230697f2c44d1ceb42332ce964923bac9852188250172e6946cca07c8ab7c9f9
     name: rsync
-    evr: 3.1.3-27.el8_10
-    sourcerpm: rsync-3.1.3-27.el8_10.src.rpm
+    evr: 3.1.3-28.el8_10
+    sourcerpm: rsync-3.1.3-28.el8_10.src.rpm
   source: []
   module_metadata: []
 - arch: x86_64
@@ -205,12 +205,12 @@ arches:
     name: pkgconf-pkg-config
     evr: 1.4.2-1.el8
     sourcerpm: pkgconf-1.4.2-1.el8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/os/Packages/r/rsync-3.1.3-27.el8_10.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/os/Packages/r/rsync-3.1.3-28.el8_10.x86_64.rpm
     repoid: rhel-8-for-x86_64-baseos-rpms
-    size: 427140
-    checksum: sha256:035fdb2795e3dcebaaf18c89ccdaec6784514e5ad6753afa50d5862ec1a2024a
+    size: 462516
+    checksum: sha256:849411e4458dbd95b2f374fa027da67ef493b6a5e66adfdc6e3719bc1aac33f3
     name: rsync
-    evr: 3.1.3-27.el8_10
-    sourcerpm: rsync-3.1.3-27.el8_10.src.rpm
+    evr: 3.1.3-28.el8_10
+    sourcerpm: rsync-3.1.3-28.el8_10.src.rpm
   source: []
   module_metadata: []
