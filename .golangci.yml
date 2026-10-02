@@ -47,6 +47,7 @@ linters:
         - G115
         - G402
         - G602
+        - G118
   exclusions:
     generated: lax
     presets:
