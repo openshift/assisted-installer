@@ -2,7 +2,7 @@ module github.com/openshift/assisted-installer
 
 go 1.25.0
 
-toolchain go1.25.5
+toolchain go1.25.14
 
 require (
 	github.com/PuerkitoBio/rehttp v1.4.0
