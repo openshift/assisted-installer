@@ -214,3 +214,5 @@ replace github.com/distribution/distribution/v3 => github.com/distribution/distr
 replace github.com/containerd/containerd => github.com/containerd/containerd v1.7.33
 
 replace github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.13.0
+
+replace github.com/sigstore/fulcio => github.com/sigstore/fulcio v1.8.6
