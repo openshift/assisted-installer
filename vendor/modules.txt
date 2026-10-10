@@ -1235,3 +1235,4 @@ sigs.k8s.io/yaml/goyaml.v2
 # github.com/distribution/distribution/v3 => github.com/distribution/distribution/v3 v3.1.0
 # github.com/containerd/containerd => github.com/containerd/containerd v1.7.33
 # github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.13.0
+# github.com/sigstore/fulcio => github.com/sigstore/fulcio v1.8.6
