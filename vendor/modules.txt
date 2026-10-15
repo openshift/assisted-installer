@@ -797,7 +797,7 @@ golang.org/x/text/width
 golang.org/x/time/rate
 # google.golang.org/grpc v1.79.3
 ## explicit; go 1.24.0
-# google.golang.org/protobuf v1.36.10
+# google.golang.org/protobuf v1.36.12
 ## explicit; go 1.23
 google.golang.org/protobuf/encoding/protodelim
 google.golang.org/protobuf/encoding/prototext
