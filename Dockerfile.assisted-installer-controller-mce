@@ -17,7 +17,7 @@ WORKDIR /app
 
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags strictfipsruntime -o assisted-installer-controller src/main/assisted-installer-controller/assisted_installer_main.go
 
-FROM registry.redhat.io/ubi9/ubi-minimal-pqc:latest@sha256:db10c80537d786068c7c911d7ef6ea103315d0615fa4b39b5946f7976563a8d7
+FROM registry.redhat.io/ubi9/ubi-minimal-pqc:latest@sha256:b3a0b012de0c578082e1bc5b01c8bc27461b4eeb571a0b1a2b21a07dbd845a62
 ARG release=main
 ARG version=latest
 
