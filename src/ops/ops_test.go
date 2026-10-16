@@ -460,6 +460,12 @@ var _ = Describe("overwrite OS image", func() {
 		o = NewOpsWithConfig(conf, l, execMock)
 	})
 
+	// GinkgoT() does not run the controller cleanup, so unmet expectations are only
+	// reported when Finish is called explicitly.
+	AfterEach(func() {
+		ctrl.Finish()
+	})
+
 	mockPrivileged := func(args ...interface{}) {
 		execMock.EXPECT().ExecCommand(nil, "nsenter",
 			append(append([]interface{}{},
@@ -502,7 +508,10 @@ var _ = Describe("overwrite OS image", func() {
 			getPartitionName(deviceName, "3"),
 			getPartitionName(deviceName, "4"))
 	}
-	runTest := func(device, part3, part4 string) {
+	runTest := func(device, part3, part4 string, copyNetwork bool) {
+		if copyNetwork {
+			conf.InstallerArgs = []string{"--copy-network"}
+		}
 		// Mock lsblk calls for partition path discovery (called twice - once for partition 4, once for partition 3)
 		execMock.EXPECT().ExecCommand(nil, "nsenter",
 			append([]interface{}{},
@@ -561,6 +570,11 @@ var _ = Describe("overwrite OS image", func() {
 			"rhcos",
 			"--karg",
 			"abc")
+		if copyNetwork {
+			mockPrivileged("sh", "-c",
+				"test -e /mnt/boot/coreos-firstboot-network || "+
+					"rsync -av /etc/NetworkManager/system-connections/ /mnt/boot/coreos-firstboot-network/")
+		}
 		mockPrivileged("fsfreeze", "--freeze", "/mnt/boot")
 		mockPrivileged("umount", "/mnt/boot")
 		mockPrivileged("fsfreeze", "--freeze", "/mnt")
@@ -569,16 +583,32 @@ var _ = Describe("overwrite OS image", func() {
 		Expect(err).ToNot(HaveOccurred())
 	}
 	It("overwrite OS image - sda", func() {
-		runTest("/dev/sda", "/dev/sda3", "/dev/sda4")
+		runTest("/dev/sda", "/dev/sda3", "/dev/sda4", false)
 	})
 	It("overwrite OS image - nvme", func() {
-		runTest("/dev/nvme0n1", "/dev/nvme0n1p3", "/dev/nvme0n1p4")
+		runTest("/dev/nvme0n1", "/dev/nvme0n1p3", "/dev/nvme0n1p4", false)
 	})
 	It("overwrite OS image - mmcblk", func() {
-		runTest("/dev/mmcblk1", "/dev/mmcblk1P3", "/dev/mmcblk1P4")
+		runTest("/dev/mmcblk1", "/dev/mmcblk1P3", "/dev/mmcblk1P4", false)
 	})
 	It("overwrite OS image - device mapper", func() {
-		runTest("/dev/dm-0", "/dev/dm-3", "/dev/dm-4")
+		runTest("/dev/dm-0", "/dev/dm-3", "/dev/dm-4", false)
+	})
+	It("copies the firstboot network config to the boot partition when --copy-network was used", func() {
+		runTest("/dev/sda", "/dev/sda3", "/dev/sda4", true)
+	})
+	for _, a := range []string{"rd.iscsi.firmware=1", "ip=01-02-03-04-05-06:ibft"} {
+		iscsiKarg := a
+		It(fmt.Sprintf("skips the overwrite entirely for iSCSI installs (%s)", iscsiKarg), func() {
+			conf.InstallerArgs = []string{"--append-karg", iscsiKarg, "--copy-network"}
+			// No commands at all: the function must return before touching the disk.
+			Expect(o.OverwriteOsImage("quay.io/release-image:latest", "/dev/sda",
+				[]string{"--karg", iscsiKarg})).To(Succeed())
+		})
+	}
+	It("still overwrites for iSCSI installs that did not request --copy-network", func() {
+		conf.InstallerArgs = []string{"--append-karg", "rd.iscsi.firmware=1"}
+		runTest("/dev/sda", "/dev/sda3", "/dev/sda4", false)
 	})
 })
 

@@ -46,6 +46,8 @@ const (
 	registryDataDirOnDevice         = "var/lib/iri-registry"
 	registryDataDirOnMnt            = "/mnt/agentdata"
 	ostreeDeployPath                = "/mnt/root/ostree/deploy/rhcos"
+	networkManagerKeyfileDir        = "/etc/NetworkManager/system-connections"
+	firstBootNetworkDirOnBoot       = "/mnt/boot/coreos-firstboot-network"
 )
 
 //go:generate mockgen -source=ops.go -package=ops -destination=mock_ops.go
@@ -1146,7 +1148,38 @@ func (o *ops) calculateFreePercent(device string, requiredSize *int64) (int64, e
 	return 0, nil
 }
 
+// copyNetworkRequested reports whether the installation was asked to propagate the live
+// environment's NetworkManager configuration to the installed system. Note that the args
+// OverwriteOsImage receives have been reduced to kernel arguments, so the original installer args
+// have to be read from the config.
+func (o *ops) copyNetworkRequested() bool {
+	args := o.installerConfig.InstallerArgs
+	return slices.Contains(args, "--copy-network") || slices.Contains(args, "-n")
+}
+
+// iscsiInstall reports whether the installation disk is reached over iSCSI, which
+// assisted-service marks by appending iBFT kernel arguments.
+func (o *ops) iscsiInstall() bool {
+	for _, arg := range o.installerConfig.InstallerArgs {
+		if strings.Contains(arg, "rd.iscsi.firmware") || strings.HasSuffix(arg, ":ibft") {
+			return true
+		}
+	}
+	return false
+}
+
 func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error {
+	// On iSCSI the boot partition lives on the SAN and is unreachable until the network is up,
+	// which is why coreos-rescue-misplaced-network is disabled there and why coreos-installer
+	// 0.27.0 moved the firstboot network config into the initramfs in the first place. Replacing
+	// the deployment would discard that initramfs and leave the node with no way to configure
+	// its network, so skip the optimisation and accept the extra MCO reboot instead.
+	if o.copyNetworkRequested() && o.iscsiInstall() {
+		o.log.Infof("iSCSI installation with --copy-network - skip overwrite image so that the " +
+			"firstboot network configuration embedded in the initramfs is preserved")
+		return nil
+	}
+
 	type cmd struct {
 		command string
 		args    []string
@@ -1206,11 +1239,25 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 				"--stateroot",
 				"rhcos"), extraArgs...)...,
 		),
+	}
+
+	// coreos-installer 0.27.0 and later embed the firstboot network configuration into the
+	// initramfs of the ostree deployment that exists at install time, which the deploy above has
+	// just replaced, so that copy is now gone. Place the keyfiles at the root of the boot
+	// partition instead, which is outside any deployment and is where
+	// coreos-rescue-misplaced-network looks for them on firstboot. Older coreos-installer
+	// versions write that directory themselves, so leave it alone when it already exists.
+	if o.copyNetworkRequested() {
+		cmds = append(cmds, makecmd("sh", "-c", fmt.Sprintf("test -e %s || rsync -av %s/ %s/",
+			firstBootNetworkDirOnBoot, networkManagerKeyfileDir, firstBootNetworkDirOnBoot)))
+	}
+
+	cmds = append(cmds,
 		makecmd("fsfreeze", "--freeze", "/mnt/boot"),
 		makecmd("umount", "/mnt/boot"),
 		makecmd("fsfreeze", "--freeze", "/mnt"),
 		makecmd("umount", "/mnt"),
-	}
+	)
 	for i := range cmds {
 		c := cmds[i]
 		o.log.Infof("Running %s with args %+v", c.command, c.args)
