@@ -597,6 +597,19 @@ var _ = Describe("overwrite OS image", func() {
 	It("copies the firstboot network config to the boot partition when --copy-network was used", func() {
 		runTest("/dev/sda", "/dev/sda3", "/dev/sda4", true)
 	})
+	for _, a := range []string{"rd.iscsi.firmware=1", "ip=01-02-03-04-05-06:ibft"} {
+		iscsiKarg := a
+		It(fmt.Sprintf("skips the overwrite entirely for iSCSI installs (%s)", iscsiKarg), func() {
+			conf.InstallerArgs = []string{"--append-karg", iscsiKarg, "--copy-network"}
+			// No commands at all: the function must return before touching the disk.
+			Expect(o.OverwriteOsImage("quay.io/release-image:latest", "/dev/sda",
+				[]string{"--karg", iscsiKarg})).To(Succeed())
+		})
+	}
+	It("still overwrites for iSCSI installs that did not request --copy-network", func() {
+		conf.InstallerArgs = []string{"--append-karg", "rd.iscsi.firmware=1"}
+		runTest("/dev/sda", "/dev/sda3", "/dev/sda4", false)
+	})
 })
 
 var _ = Describe("get number of reboots", func() {
