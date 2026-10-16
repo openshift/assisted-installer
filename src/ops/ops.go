@@ -47,6 +47,8 @@ const (
 	registryDataDirOnDevice         = "var/lib/iri-registry"
 	registryDataDirOnMnt            = "/mnt/agentdata"
 	ostreeDeployPath                = "/mnt/root/ostree/deploy/rhcos"
+	networkManagerKeyfileDir        = "/etc/NetworkManager/system-connections"
+	firstBootNetworkDirOnBoot       = "/mnt/boot/coreos-firstboot-network"
 )
 
 // Supports: registry.io/repo:tag, registry.io:port/repo:tag, repo@sha256:digest, repo:tag@sha256:digest
@@ -1158,6 +1160,15 @@ func (o *ops) calculateFreePercent(device string, requiredSize *int64) (int64, e
 	return 0, nil
 }
 
+// copyNetworkRequested reports whether the installation was asked to propagate the live
+// environment's NetworkManager configuration to the installed system. Note that the args
+// OverwriteOsImage receives have been reduced to kernel arguments, so the original installer args
+// have to be read from the config.
+func (o *ops) copyNetworkRequested() bool {
+	args := o.installerConfig.InstallerArgs
+	return slices.Contains(args, "--copy-network") || slices.Contains(args, "-n")
+}
+
 func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error {
 	type cmd struct {
 		command string
@@ -1218,11 +1229,25 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 				"--stateroot",
 				"rhcos"), extraArgs...)...,
 		),
+	}
+
+	// coreos-installer 0.27.0 and later embed the firstboot network configuration into the
+	// initramfs of the ostree deployment that exists at install time, which the deploy above has
+	// just replaced, so that copy is now gone. Place the keyfiles at the root of the boot
+	// partition instead, which is outside any deployment and is where
+	// coreos-rescue-misplaced-network looks for them on firstboot. Older coreos-installer
+	// versions write that directory themselves, so leave it alone when it already exists.
+	if o.copyNetworkRequested() {
+		cmds = append(cmds, makecmd("sh", "-c", fmt.Sprintf("test -e %s || rsync -av %s/ %s/",
+			firstBootNetworkDirOnBoot, networkManagerKeyfileDir, firstBootNetworkDirOnBoot)))
+	}
+
+	cmds = append(cmds,
 		makecmd("fsfreeze", "--freeze", "/mnt/boot"),
 		makecmd("umount", "/mnt/boot"),
 		makecmd("fsfreeze", "--freeze", "/mnt"),
 		makecmd("umount", "/mnt"),
-	}
+	)
 	for i := range cmds {
 		c := cmds[i]
 		o.log.Infof("Running %s with args %+v", c.command, c.args)
