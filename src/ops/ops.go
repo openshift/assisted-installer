@@ -1169,7 +1169,29 @@ func (o *ops) copyNetworkRequested() bool {
 	return slices.Contains(args, "--copy-network") || slices.Contains(args, "-n")
 }
 
+// iscsiInstall reports whether the installation disk is reached over iSCSI, which
+// assisted-service marks by appending iBFT kernel arguments.
+func (o *ops) iscsiInstall() bool {
+	for _, arg := range o.installerConfig.InstallerArgs {
+		if strings.Contains(arg, "rd.iscsi.firmware") || strings.HasSuffix(arg, ":ibft") {
+			return true
+		}
+	}
+	return false
+}
+
 func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error {
+	// On iSCSI the boot partition lives on the SAN and is unreachable until the network is up,
+	// which is why coreos-rescue-misplaced-network is disabled there and why coreos-installer
+	// 0.27.0 moved the firstboot network config into the initramfs in the first place. Replacing
+	// the deployment would discard that initramfs and leave the node with no way to configure
+	// its network, so skip the optimisation and accept the extra MCO reboot instead.
+	if o.copyNetworkRequested() && o.iscsiInstall() {
+		o.log.Infof("iSCSI installation with --copy-network - skip overwrite image so that the " +
+			"firstboot network configuration embedded in the initramfs is preserved")
+		return nil
+	}
+
 	type cmd struct {
 		command string
 		args    []string
