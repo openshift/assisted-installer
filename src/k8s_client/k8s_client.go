@@ -56,6 +56,7 @@ type K8SClient interface {
 	ApproveCsr(csr *certificatesv1.CertificateSigningRequest) error
 	ListCsrs() (*certificatesv1.CertificateSigningRequestList, error)
 	GetConfigMap(namespace string, name string) (*v1.ConfigMap, error)
+	CreateOrPatchConfigMapData(namespace string, name string, data map[string]string) error
 	GetPodLogs(namespace string, podName string, sinceSeconds int64) (string, error)
 	GetPodLogsAsBuffer(namespace string, podName string, sinceSeconds int64) (*bytes.Buffer, error)
 	GetPods(namespace string, labelMatch map[string]string, fieldSelector string) ([]v1.Pod, error)
@@ -392,6 +393,29 @@ func (c *k8sClient) GetConfigMap(namespace string, name string) (*v1.ConfigMap, 
 		return nil, err
 	}
 	return cm, nil
+}
+
+func (c *k8sClient) CreateOrPatchConfigMapData(namespace string, name string, data map[string]string) error {
+	payload, err := json.Marshal(map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "ConfigMap",
+		"metadata": map[string]string{
+			"name":      name,
+			"namespace": namespace,
+		},
+		"data": data,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = c.client.CoreV1().ConfigMaps(namespace).Patch(
+		context.TODO(),
+		name,
+		types.ApplyPatchType,
+		payload,
+		metav1.PatchOptions{FieldManager: "assisted-installer-controller"},
+	)
+	return err
 }
 
 func (c *k8sClient) SetProxyEnvVars() error {
