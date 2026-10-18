@@ -120,7 +120,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			models.HostStageDone,
 			models.HostStageDone}
 
-		assistedController = NewController(l, defaultTestControllerConf, mockops, mockbmclient, mockk8sclient)
+		assistedController = newController(l, defaultTestControllerConf, mockops, mockbmclient, mockk8sclient)
 	})
 	AfterEach(func() {
 		ctrl.Finish()
@@ -616,30 +616,34 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			time.Sleep(30 * time.Millisecond)
 		})
 		It("Run ApproveCsrs with csrs list", func() {
-			csr := certificatesv1.CertificateSigningRequest{}
-			csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
-				Type:           certificatesv1.CertificateDenied,
-				Reason:         "dummy",
-				Message:        "dummy",
-				LastUpdateTime: metav1.Now(),
-			})
-			csrApproved := certificatesv1.CertificateSigningRequest{}
-			csrApproved.Status.Conditions = append(csrApproved.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
-				Type:           certificatesv1.CertificateApproved,
-				Reason:         "dummy",
-				Message:        "dummy",
-				LastUpdateTime: metav1.Now(),
-			})
-			testList := certificatesv1.CertificateSigningRequestList{}
-			testList.Items = []certificatesv1.CertificateSigningRequest{csr, csrApproved}
-			mockk8sclient.EXPECT().ListCsrs().Return(&testList, nil).MinTimes(1)
-			mockk8sclient.EXPECT().ApproveCsr(&csr).Return(nil).MinTimes(1)
-			mockk8sclient.EXPECT().ApproveCsr(&csrApproved).Return(nil).Times(0)
-			ctx, cancel := context.WithCancel(context.Background())
-			go assistedController.ApproveCsrs(ctx)
-			time.Sleep(20 * time.Millisecond)
-			cancel()
-		})
+            invalidCSR := certificatesv1.CertificateSigningRequest{}
+            invalidCSR.Status.Conditions = append(invalidCSR.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
+                Type:           certificatesv1.CertificateDenied,
+                Reason:         "dummy",
+                Message:        "dummy",
+                LastUpdateTime: metav1.Now(),
+            })
+            csrApproved := certificatesv1.CertificateSigningRequest{}
+            csrApproved.Status.Conditions = append(csrApproved.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
+                Type:           certificatesv1.CertificateApproved,
+                Reason:         "dummy",
+                Message:        "dummy",
+                LastUpdateTime: metav1.Now(),
+            })
+            validCSR := controllerTestClientCSR()
+            testList := certificatesv1.CertificateSigningRequestList{}
+            testList.Items = []certificatesv1.CertificateSigningRequest{invalidCSR, validCSR, csrApproved}
+            assistedController.csrState.set(controllerTestSnapshot())
+            mockk8sclient.EXPECT().ListCsrs().Return(&testList, nil).MinTimes(1)
+            mockk8sclient.EXPECT().ListNodes().Return(&v1.NodeList{}, nil).MinTimes(1)
+            mockk8sclient.EXPECT().ApproveCsr(&invalidCSR).Return(nil).Times(0)
+            mockk8sclient.EXPECT().ApproveCsr(&validCSR).Return(nil).MinTimes(1)
+            mockk8sclient.EXPECT().ApproveCsr(&csrApproved).Return(nil).Times(0)
+            ctx, cancel := context.WithCancel(context.Background())
+            go assistedController.ApproveCsrs(ctx)
+            time.Sleep(20 * time.Millisecond)
+            cancel()
+        })
 	})
 
 	Context("validating AddRouterCAToClusterCA", func() {
@@ -1560,7 +1564,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	Context("must-gather image set parsing", func() {
 		var ac *controller
 		BeforeEach(func() {
-			ac = NewController(l, defaultTestControllerConf, mockops, mockbmclient, mockk8sclient)
+			ac = newController(l, defaultTestControllerConf, mockops, mockbmclient, mockk8sclient)
 		})
 
 		It("MustGatherImage is empty", func() {
