@@ -689,8 +689,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			time.Sleep(30 * time.Millisecond)
 		})
 		It("Run ApproveCsrs with csrs list", func() {
-			csr := certificatesv1.CertificateSigningRequest{}
-			csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
+			invalidCSR := certificatesv1.CertificateSigningRequest{}
+			invalidCSR.Status.Conditions = append(invalidCSR.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
 				Type:           certificatesv1.CertificateDenied,
 				Reason:         "dummy",
 				Message:        "dummy",
@@ -703,10 +703,14 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				Message:        "dummy",
 				LastUpdateTime: metav1.Now(),
 			})
+			validCSR := controllerTestClientCSR()
 			testList := certificatesv1.CertificateSigningRequestList{}
-			testList.Items = []certificatesv1.CertificateSigningRequest{csr, csrApproved}
+			testList.Items = []certificatesv1.CertificateSigningRequest{invalidCSR, validCSR, csrApproved}
+			assistedController.csrState.set(controllerTestSnapshot())
 			mockk8sclient.EXPECT().ListCsrs().Return(&testList, nil).MinTimes(1)
-			mockk8sclient.EXPECT().ApproveCsr(&csr).Return(nil).MinTimes(1)
+			mockk8sclient.EXPECT().ListNodes().Return(&v1.NodeList{}, nil).MinTimes(1)
+			mockk8sclient.EXPECT().ApproveCsr(&invalidCSR).Return(nil).Times(0)
+			mockk8sclient.EXPECT().ApproveCsr(&validCSR).Return(nil).MinTimes(1)
 			mockk8sclient.EXPECT().ApproveCsr(&csrApproved).Return(nil).Times(0)
 			ctx, cancel := context.WithCancel(context.Background())
 			go assistedController.ApproveCsrs(ctx)
