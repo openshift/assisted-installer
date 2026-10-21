@@ -543,7 +543,7 @@ var _ = Describe("overwrite OS image", func() {
 			"--karg",
 			"abc")
 		if copyNetwork {
-			mockPrivileged("rsync", "-av",
+			mockPrivileged("rsync", "-avL", "--exclude=*/",
 				"/etc/NetworkManager/system-connections/", "/mnt/boot/coreos-firstboot-network/")
 			mockPrivileged("touch", "/mnt/boot/coreos-firstboot-network.deliberate")
 		}
