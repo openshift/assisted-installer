@@ -49,6 +49,7 @@ const (
 	networkManagerKeyfileDir        = "/etc/NetworkManager/system-connections"
 	firstBootNetworkDirOnBoot       = "/mnt/boot/coreos-firstboot-network"
 	firstBootNetworkSentinelOnBoot  = "/mnt/boot/coreos-firstboot-network.deliberate"
+	networkDirArg                   = "--network-dir"
 )
 
 //go:generate mockgen -source=ops.go -package=ops -destination=mock_ops.go
@@ -1158,6 +1159,21 @@ func (o *ops) copyNetworkRequested() bool {
 	return slices.Contains(args, "--copy-network") || slices.Contains(args, "-n")
 }
 
+// networkKeyfileDir returns the directory coreos-installer was told to copy NetworkManager
+// keyfiles from, so that we copy the same files it did. --network-dir overrides the default.
+func (o *ops) networkKeyfileDir() string {
+	args := o.installerConfig.InstallerArgs
+	for i, arg := range args {
+		if arg == networkDirArg && i+1 < len(args) {
+			return args[i+1]
+		}
+		if dir, found := strings.CutPrefix(arg, networkDirArg+"="); found {
+			return dir
+		}
+	}
+	return networkManagerKeyfileDir
+}
+
 // iscsiInstall reports whether the installation disk is reached over iSCSI, which
 // assisted-service marks by appending iBFT kernel arguments.
 func (o *ops) iscsiInstall() bool {
@@ -1247,7 +1263,9 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 	// just replaced, so that copy is now gone. Place the keyfiles at the root of the boot
 	// partition instead, which is outside any deployment and is where
 	// coreos-rescue-misplaced-network looks for them on firstboot. Older coreos-installer
-	// versions write that directory themselves, so leave it alone when it already exists.
+	// versions populate that directory themselves from the same source, so the copy is a no-op
+	// there rather than being skipped: rsync is idempotent, which keeps it correct if an earlier
+	// attempt failed partway and is retried.
 	//
 	// Mark the configuration as deliberately placed. coreos-rescue-misplaced-network otherwise
 	// assumes anything in that directory was left by an outdated coreos-installer and raises a
@@ -1258,8 +1276,7 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 	// directory itself, since the advice is equally unhelpful in that case.
 	if o.copyNetworkRequested() {
 		cmds = append(cmds,
-			makecmd("sh", "-c", fmt.Sprintf("test -e %s || rsync -av %s/ %s/",
-				firstBootNetworkDirOnBoot, networkManagerKeyfileDir, firstBootNetworkDirOnBoot)),
+			makecmd("rsync", "-av", o.networkKeyfileDir()+"/", firstBootNetworkDirOnBoot+"/"),
 			makecmd("touch", firstBootNetworkSentinelOnBoot),
 		)
 	}

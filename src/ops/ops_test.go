@@ -572,9 +572,8 @@ var _ = Describe("overwrite OS image", func() {
 			"--karg",
 			"abc")
 		if copyNetwork {
-			mockPrivileged("sh", "-c",
-				"test -e /mnt/boot/coreos-firstboot-network || "+
-					"rsync -av /etc/NetworkManager/system-connections/ /mnt/boot/coreos-firstboot-network/")
+			mockPrivileged("rsync", "-av",
+				"/etc/NetworkManager/system-connections/", "/mnt/boot/coreos-firstboot-network/")
 			mockPrivileged("touch", "/mnt/boot/coreos-firstboot-network.deliberate")
 		}
 		mockPrivileged("fsfreeze", "--freeze", "/mnt/boot")
@@ -582,7 +581,7 @@ var _ = Describe("overwrite OS image", func() {
 		mockPrivileged("fsfreeze", "--freeze", "/mnt")
 		mockPrivileged("umount", "/mnt")
 		err := o.OverwriteOsImage(osImage, device, extraArgs)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred(), "overwrite should succeed for device %s (copyNetwork=%t)", device, copyNetwork)
 	}
 	It("overwrite OS image - sda", func() {
 		runTest("/dev/sda", "/dev/sda3", "/dev/sda4", false)
@@ -599,15 +598,20 @@ var _ = Describe("overwrite OS image", func() {
 	It("copies the firstboot network config to the boot partition when --copy-network was used", func() {
 		runTest("/dev/sda", "/dev/sda3", "/dev/sda4", true)
 	})
-	for _, a := range []string{"rd.iscsi.firmware=1", "ip=01-02-03-04-05-06:ibft"} {
-		iscsiKarg := a
-		It(fmt.Sprintf("skips the overwrite entirely for iSCSI installs (%s)", iscsiKarg), func() {
-			conf.InstallerArgs = []string{"--append-karg", iscsiKarg, "--copy-network"}
-			// No commands at all: the function must return before touching the disk.
-			Expect(o.OverwriteOsImage("quay.io/release-image:latest", "/dev/sda",
-				[]string{"--karg", iscsiKarg})).To(Succeed())
-		})
-	}
+	// No commands are mocked in these two: the overwrite must return before it touches
+	// the disk, so any command at all would fail the expectations.
+	It("skips the overwrite for firmware iSCSI installs", func() {
+		conf.InstallerArgs = []string{"--append-karg", "rd.iscsi.firmware=1", "--copy-network"}
+		Expect(o.OverwriteOsImage("quay.io/release-image:latest", "/dev/sda",
+			[]string{"--karg", "rd.iscsi.firmware=1"})).
+			To(Succeed(), "rd.iscsi.firmware install should skip the overwrite before running any command")
+	})
+	It("skips the overwrite for iBFT iSCSI installs", func() {
+		conf.InstallerArgs = []string{"--append-karg", "ip=01-02-03-04-05-06:ibft", "--copy-network"}
+		Expect(o.OverwriteOsImage("quay.io/release-image:latest", "/dev/sda",
+			[]string{"--karg", "ip=01-02-03-04-05-06:ibft"})).
+			To(Succeed(), "iBFT install should skip the overwrite before running any command")
+	})
 	It("still overwrites for iSCSI installs that did not request --copy-network", func() {
 		conf.InstallerArgs = []string{"--append-karg", "rd.iscsi.firmware=1"}
 		runTest("/dev/sda", "/dev/sda3", "/dev/sda4", false)
@@ -1350,5 +1354,32 @@ var _ = Describe("Copy registry data", func() {
 	})
 	It("Copy registry data - device mapper", func() {
 		runTest("/dev/dm-0", "/dev/dm-4")
+	})
+})
+
+var _ = Describe("networkKeyfileDir", func() {
+	withArgs := func(args ...string) *ops {
+		return NewOpsWithConfig(&config.Config{InstallerArgs: args}, logrus.New(), nil).(*ops)
+	}
+
+	It("defaults to the NetworkManager keyfile directory", func() {
+		Expect(withArgs("--copy-network").networkKeyfileDir()).
+			To(Equal("/etc/NetworkManager/system-connections"),
+				"without --network-dir the default coreos-installer source must be used")
+	})
+	It("honours --network-dir given as a separate argument", func() {
+		Expect(withArgs("--copy-network", "--network-dir", "/var/custom-keyfiles").networkKeyfileDir()).
+			To(Equal("/var/custom-keyfiles"),
+				"must copy from the same directory coreos-installer was told to read")
+	})
+	It("honours --network-dir given with an equals sign", func() {
+		Expect(withArgs("--copy-network", "--network-dir=/var/custom-keyfiles").networkKeyfileDir()).
+			To(Equal("/var/custom-keyfiles"),
+				"must copy from the same directory coreos-installer was told to read")
+	})
+	It("ignores a trailing --network-dir with no value", func() {
+		Expect(withArgs("--copy-network", "--network-dir").networkKeyfileDir()).
+			To(Equal("/etc/NetworkManager/system-connections"),
+				"a malformed argument must fall back to the default rather than panic")
 	})
 })
