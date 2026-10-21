@@ -575,6 +575,7 @@ var _ = Describe("overwrite OS image", func() {
 			mockPrivileged("sh", "-c",
 				"test -e /mnt/boot/coreos-firstboot-network || "+
 					"rsync -av /etc/NetworkManager/system-connections/ /mnt/boot/coreos-firstboot-network/")
+			mockPrivileged("touch", "/mnt/boot/coreos-firstboot-network.deliberate")
 		}
 		mockPrivileged("fsfreeze", "--freeze", "/mnt/boot")
 		mockPrivileged("umount", "/mnt/boot")

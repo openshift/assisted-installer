@@ -48,6 +48,7 @@ const (
 	ostreeDeployPath                = "/mnt/root/ostree/deploy/rhcos"
 	networkManagerKeyfileDir        = "/etc/NetworkManager/system-connections"
 	firstBootNetworkDirOnBoot       = "/mnt/boot/coreos-firstboot-network"
+	firstBootNetworkSentinelOnBoot  = "/mnt/boot/coreos-firstboot-network.deliberate"
 )
 
 //go:generate mockgen -source=ops.go -package=ops -destination=mock_ops.go
@@ -1247,9 +1248,20 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 	// partition instead, which is outside any deployment and is where
 	// coreos-rescue-misplaced-network looks for them on firstboot. Older coreos-installer
 	// versions write that directory themselves, so leave it alone when it already exists.
+	//
+	// Mark the configuration as deliberately placed. coreos-rescue-misplaced-network otherwise
+	// assumes anything in that directory was left by an outdated coreos-installer and raises a
+	// motd telling the operator to reinstall, which would not help here. The marker is a sibling
+	// of the directory rather than a file inside it, so that it is not copied into
+	// /run/NetworkManager/system-connections along with the keyfiles. It is written whenever
+	// --copy-network was requested, including when an older coreos-installer populated the
+	// directory itself, since the advice is equally unhelpful in that case.
 	if o.copyNetworkRequested() {
-		cmds = append(cmds, makecmd("sh", "-c", fmt.Sprintf("test -e %s || rsync -av %s/ %s/",
-			firstBootNetworkDirOnBoot, networkManagerKeyfileDir, firstBootNetworkDirOnBoot)))
+		cmds = append(cmds,
+			makecmd("sh", "-c", fmt.Sprintf("test -e %s || rsync -av %s/ %s/",
+				firstBootNetworkDirOnBoot, networkManagerKeyfileDir, firstBootNetworkDirOnBoot)),
+			makecmd("touch", firstBootNetworkSentinelOnBoot),
+		)
 	}
 
 	cmds = append(cmds,
