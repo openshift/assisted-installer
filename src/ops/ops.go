@@ -1265,7 +1265,10 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 	// coreos-rescue-misplaced-network looks for them on firstboot. Older coreos-installer
 	// versions populate that directory themselves from the same source, so the copy is a no-op
 	// there rather than being skipped: rsync is idempotent, which keeps it correct if an earlier
-	// attempt failed partway and is retried.
+	// attempt failed partway and is retried. Symlinks are dereferenced and subdirectories
+	// skipped, so that the same set of files coreos-installer would have embedded ends up on
+	// the boot partition, and so that nothing resolvable only in the live environment is left
+	// behind as a dangling link for the rescue service to trip over.
 	//
 	// Mark the configuration as deliberately placed. coreos-rescue-misplaced-network otherwise
 	// assumes anything in that directory was left by an outdated coreos-installer and raises a
@@ -1276,7 +1279,8 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 	// directory itself, since the advice is equally unhelpful in that case.
 	if o.copyNetworkRequested() {
 		cmds = append(cmds,
-			makecmd("rsync", "-av", o.networkKeyfileDir()+"/", firstBootNetworkDirOnBoot+"/"),
+			makecmd("rsync", "-avL", "--exclude=*/",
+				o.networkKeyfileDir()+"/", firstBootNetworkDirOnBoot+"/"),
 			makecmd("touch", firstBootNetworkSentinelOnBoot),
 		)
 	}
