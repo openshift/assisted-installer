@@ -420,6 +420,10 @@ func (i *installer) skipMcoReboot(ignitionPath string) {
 	}
 	if err = i.overwriteOsImage(mc.Spec.OSImageURL, mc.Spec.KernelArguments); err != nil {
 		i.log.WithError(err).Warning("failed overwriting OS image.  Continuing installation without skipping MCO reboot")
+		return
+	}
+	if err = i.ops.AppendStaticNetworkToInitramfs(i.Device, i.Config.InstallerArgs); err != nil {
+		i.log.WithError(err).Warning("failed to append static network configuration to initramfs")
 	}
 }
 

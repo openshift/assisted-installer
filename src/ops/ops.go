@@ -79,6 +79,7 @@ type Ops interface {
 	ReadFile(filePath string) ([]byte, error)
 	GetEncapsulatedMC(ignitionPath string) (*mcfgv1.MachineConfig, error)
 	OverwriteOsImage(osImage, device string, extraArgs []string) error
+	AppendStaticNetworkToInitramfs(device string, installerArgs []string) error
 	CopyRegistryData(liveLogger io.Writer, device string) error
 }
 
@@ -1234,6 +1235,150 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 		}
 	}
 	return nil
+}
+
+// AppendStaticNetworkToInitramfs works around a compatibility issue with
+// coreos-installer >= 0.27.0 and OverwriteOsImage.
+//
+// Starting with 0.27.0, coreos-installer embeds static network configuration
+// (from --copy-network) as a CPIO archive appended to the initramfs, rather
+// than placing files on the boot partition. When OverwriteOsImage deploys a
+// new ostree image, it generates a fresh initramfs that does not include this
+// appended archive, causing the node to lose static networking on first boot.
+//
+// This method reconstructs the network CPIO archive from the live environment's
+// NetworkManager connections and appends it to the new deployment's initramfs,
+// restoring the expected first-boot network configuration.
+//
+// The whole approach will be reviewed once https://redhat.atlassian.net/browse/OCPSTRAT-3772
+// will be available.
+func (o *ops) AppendStaticNetworkToInitramfs(device string, installerArgs []string) error {
+	if !slices.Contains(installerArgs, "--copy-network") && !slices.Contains(installerArgs, "-n") {
+		return nil
+	}
+
+	versionOutput, err := o.ExecPrivilegeCommand(nil, coreosInstallerExecutable, "--version")
+	if err != nil {
+		return errors.Wrap(err, "failed to get coreos-installer version")
+	}
+	needsInitramfsNetworking, err := coreosInstallerVersionAtLeast(versionOutput, 0, 27, 0)
+	if err != nil {
+		return err
+	}
+	if !needsInitramfsNetworking {
+		return nil
+	}
+
+	nmConnDir := "/etc/NetworkManager/system-connections"
+	output, err := o.ExecPrivilegeCommand(nil, "ls", nmConnDir)
+	if err != nil || strings.TrimSpace(output) == "" {
+		o.log.Info("No network configuration files found, skipping initramfs network append")
+		return nil
+	}
+
+	o.log.Info("Appending static network configuration to new deployment initramfs")
+
+	partition3, err := o.getPartitionPathFromLsblk(device, "3")
+	if err != nil {
+		return errors.Wrap(err, "failed to find boot partition")
+	}
+
+	bootMnt := "/mnt/boot"
+	if _, err := o.ExecPrivilegeCommand(nil, "mkdir", "-p", bootMnt); err != nil {
+		return errors.Wrapf(err, "failed to create mount point %s", bootMnt)
+	}
+	if _, err := o.ExecPrivilegeCommand(nil, "mount", partition3, bootMnt); err != nil {
+		return errors.Wrapf(err, "failed to mount boot partition %s", partition3)
+	}
+	defer func() {
+		_, _ = o.ExecPrivilegeCommand(nil, "fsfreeze", "--freeze", bootMnt)
+		_, _ = o.ExecPrivilegeCommand(nil, "umount", bootMnt)
+	}()
+
+	newInitramfs, err := o.findNewInitramfsFromBLS(bootMnt)
+	if err != nil {
+		return err
+	}
+	o.log.Infof("Target initramfs: %s", newInitramfs)
+
+	cpioDir := "/tmp/static-network-cpio"
+	cpioNetDir := filepath.Join(cpioDir, "etc", "coreos-firstboot-network")
+	cpioFile := "/tmp/static-network.cpio"
+
+	if _, err := o.ExecPrivilegeCommand(nil, "mkdir", "-p", cpioNetDir); err != nil {
+		return errors.Wrap(err, "failed to create CPIO staging directory")
+	}
+	defer func() {
+		_, _ = o.ExecPrivilegeCommand(nil, "rm", "-rf", cpioDir)
+		_, _ = o.ExecPrivilegeCommand(nil, "rm", "-f", cpioFile)
+	}()
+
+	if _, err := o.ExecPrivilegeCommand(nil, "sh", "-c",
+		fmt.Sprintf("cp %s/* %s/", nmConnDir, cpioNetDir)); err != nil {
+		return errors.Wrap(err, "failed to copy network config files")
+	}
+
+	if _, err := o.ExecPrivilegeCommand(nil, "sh", "-c",
+		fmt.Sprintf("cd %s && find etc | cpio -o -H newc --quiet > %s", cpioDir, cpioFile)); err != nil {
+		return errors.Wrap(err, "failed to create network config CPIO archive")
+	}
+
+	if _, err := o.ExecPrivilegeCommand(nil, "sh", "-c",
+		fmt.Sprintf("cat %s >> %s", cpioFile, newInitramfs)); err != nil {
+		return errors.Wrap(err, "failed to append network config CPIO to initramfs")
+	}
+
+	o.log.Info("Successfully appended static network configuration to new initramfs")
+	return nil
+}
+
+// findNewInitramfsFromBLS parses BLS entries on the boot partition and returns
+// the initramfs path of the newest deployment (highest version number).
+func (o *ops) findNewInitramfsFromBLS(bootMnt string) (string, error) {
+	entriesDir := filepath.Join(bootMnt, "loader", "entries")
+	blsOutput, err := o.ExecPrivilegeCommand(nil, "sh", "-c",
+		fmt.Sprintf(`for f in %s/ostree-*.conf; do version=$(grep '^version ' "$f" | awk '{print $2}'); initrd=$(grep '^initrd ' "$f" | awk '{print $2}'); echo "$version $initrd"; done | sort -rn | head -1`, entriesDir))
+	if err != nil {
+		return "", errors.Wrap(err, "failed to parse BLS entries")
+	}
+
+	parts := strings.SplitN(strings.TrimSpace(blsOutput), " ", 2)
+	if len(parts) < 2 || parts[1] == "" {
+		return "", errors.New("no valid BLS entry found")
+	}
+
+	return filepath.Join(bootMnt, strings.TrimPrefix(parts[1], "/boot")), nil
+}
+
+func coreosInstallerVersionAtLeast(versionOutput string, minMajor, minMinor, minPatch int) (bool, error) {
+	fields := strings.Fields(strings.TrimSpace(versionOutput))
+	if len(fields) < 2 {
+		return false, errors.Errorf("unexpected coreos-installer version format: %s", versionOutput)
+	}
+	version := fields[len(fields)-1]
+
+	versionParts := strings.SplitN(version, ".", 3)
+	if len(versionParts) < 2 {
+		return false, errors.Errorf("invalid version format: %s", version)
+	}
+
+	nums := make([]int, 3)
+	for i := 0; i < len(versionParts) && i < 3; i++ {
+		numStr := strings.SplitN(versionParts[i], "-", 2)[0]
+		n, err := strconv.Atoi(numStr)
+		if err != nil {
+			return false, errors.Wrapf(err, "invalid version component in %s", version)
+		}
+		nums[i] = n
+	}
+
+	if nums[0] != minMajor {
+		return nums[0] > minMajor, nil
+	}
+	if nums[1] != minMinor {
+		return nums[1] > minMinor, nil
+	}
+	return nums[2] >= minPatch, nil
 }
 
 func (o *ops) getRegistryDataSize(dataPath string) (int64, error) {

@@ -554,6 +554,161 @@ var _ = Describe("overwrite OS image", func() {
 	})
 })
 
+var _ = Describe("coreosInstallerVersionAtLeast", func() {
+	It("detects version >= 0.27.0", func() {
+		result, err := coreosInstallerVersionAtLeast("coreos-installer 0.27.0", 0, 27, 0)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(BeTrue())
+	})
+
+	It("detects version > 0.27.0", func() {
+		result, err := coreosInstallerVersionAtLeast("coreos-installer 0.28.1", 0, 27, 0)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(BeTrue())
+	})
+
+	It("detects version < 0.27.0", func() {
+		result, err := coreosInstallerVersionAtLeast("coreos-installer 0.26.0", 0, 27, 0)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(BeFalse())
+	})
+
+	It("handles major version bump", func() {
+		result, err := coreosInstallerVersionAtLeast("coreos-installer 1.0.0", 0, 27, 0)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(BeTrue())
+	})
+
+	It("handles pre-release suffix", func() {
+		result, err := coreosInstallerVersionAtLeast("coreos-installer 0.27.0-rc1", 0, 27, 0)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(BeTrue())
+	})
+
+	It("returns error for invalid format", func() {
+		_, err := coreosInstallerVersionAtLeast("bad", 0, 27, 0)
+		Expect(err).To(HaveOccurred())
+	})
+})
+
+var _ = Describe("append static network to initramfs", func() {
+	const lsblkResultFormat = `{
+   "blockdevices": [
+		{
+         "name": "sda",
+         "size": 100000000000,
+         "type": "disk",
+         "children": [
+            {"name": "sda1", "size": 1048576, "type": "part"},
+            {"name": "sda2", "size": 133169152, "type": "part"},
+            {"name": "sda3", "size": 402653184, "type": "part"},
+            {"name": "sda4", "size": 3272588800, "type": "part"}
+         ]
+      }
+   ]
+}`
+	const blsNewest = "2 /boot/ostree/rhcos-bbb/initramfs-5.15.0.img\n"
+	var (
+		l        = logrus.New()
+		ctrl     *gomock.Controller
+		execMock *execute.MockExecute
+		o        Ops
+		device   = "/dev/sda"
+	)
+
+	BeforeEach(func() {
+		ctrl = gomock.NewController(GinkgoT())
+		execMock = execute.NewMockExecute(ctrl)
+		o = NewOpsWithConfig(&config.Config{}, l, execMock)
+	})
+
+	mockPrivileged := func(ret string, err error, command string, args ...string) *gomock.Call {
+		return execMock.EXPECT().ExecCommandWithOptions(nil, command, args, gomock.Any()).Return(ret, err)
+	}
+	mockShell := func(ret string, err error) *gomock.Call {
+		return execMock.EXPECT().ExecCommandWithOptions(nil, "sh", gomock.Any(), gomock.Any()).Return(ret, err)
+	}
+
+	It("skips when --copy-network is not in args", func() {
+		err := o.AppendStaticNetworkToInitramfs(device, []string{"--append-karg", "foo"})
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("skips when coreos-installer version < 0.27.0", func() {
+		mockPrivileged("coreos-installer 0.26.0", nil, "coreos-installer", "--version")
+		err := o.AppendStaticNetworkToInitramfs(device, []string{"--copy-network"})
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("skips when no network config files exist", func() {
+		mockPrivileged("coreos-installer 0.27.0", nil, "coreos-installer", "--version")
+		mockPrivileged("", nil, "ls", "/etc/NetworkManager/system-connections")
+		err := o.AppendStaticNetworkToInitramfs(device, []string{"--copy-network"})
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("appends static network cpio with --copy-network", func() {
+		gomock.InOrder(
+			mockPrivileged("coreos-installer 0.27.0", nil, "coreos-installer", "--version"),
+			mockPrivileged("conn1.nmconnection", nil, "ls", "/etc/NetworkManager/system-connections"),
+			mockPrivileged(lsblkResultFormat, nil, "lsblk", "--bytes", "--json", device),
+			mockPrivileged("", nil, "mkdir", "-p", "/mnt/boot"),
+			mockPrivileged("", nil, "mount", "/dev/sda3", "/mnt/boot"),
+			mockShell(blsNewest, nil),
+			mockPrivileged("", nil, "mkdir", "-p", "/tmp/static-network-cpio/etc/coreos-firstboot-network"),
+			mockShell("", nil), // cp
+			mockShell("", nil), // cpio
+			mockShell("", nil), // cat >> initramfs
+		)
+		mockPrivileged("", nil, "rm", "-rf", "/tmp/static-network-cpio")
+		mockPrivileged("", nil, "rm", "-f", "/tmp/static-network.cpio")
+		mockPrivileged("", nil, "fsfreeze", "--freeze", "/mnt/boot")
+		mockPrivileged("", nil, "umount", "/mnt/boot")
+
+		err := o.AppendStaticNetworkToInitramfs(device, []string{"--copy-network"})
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("appends static network cpio with -n flag", func() {
+		gomock.InOrder(
+			mockPrivileged("coreos-installer 0.28.1", nil, "coreos-installer", "--version"),
+			mockPrivileged("conn1.nmconnection", nil, "ls", "/etc/NetworkManager/system-connections"),
+			mockPrivileged(lsblkResultFormat, nil, "lsblk", "--bytes", "--json", device),
+			mockPrivileged("", nil, "mkdir", "-p", "/mnt/boot"),
+			mockPrivileged("", nil, "mount", "/dev/sda3", "/mnt/boot"),
+			mockShell(blsNewest, nil),
+			mockPrivileged("", nil, "mkdir", "-p", "/tmp/static-network-cpio/etc/coreos-firstboot-network"),
+			mockShell("", nil),
+			mockShell("", nil),
+			mockShell("", nil),
+		)
+		mockPrivileged("", nil, "rm", "-rf", "/tmp/static-network-cpio")
+		mockPrivileged("", nil, "rm", "-f", "/tmp/static-network.cpio")
+		mockPrivileged("", nil, "fsfreeze", "--freeze", "/mnt/boot")
+		mockPrivileged("", nil, "umount", "/mnt/boot")
+
+		err := o.AppendStaticNetworkToInitramfs(device, []string{"-n"})
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("returns error when BLS parsing fails", func() {
+		gomock.InOrder(
+			mockPrivileged("coreos-installer 0.27.0", nil, "coreos-installer", "--version"),
+			mockPrivileged("conn1.nmconnection", nil, "ls", "/etc/NetworkManager/system-connections"),
+			mockPrivileged(lsblkResultFormat, nil, "lsblk", "--bytes", "--json", device),
+			mockPrivileged("", nil, "mkdir", "-p", "/mnt/boot"),
+			mockPrivileged("", nil, "mount", "/dev/sda3", "/mnt/boot"),
+			mockShell("", fmt.Errorf("no entries")),
+		)
+		mockPrivileged("", nil, "fsfreeze", "--freeze", "/mnt/boot")
+		mockPrivileged("", nil, "umount", "/mnt/boot")
+
+		err := o.AppendStaticNetworkToInitramfs(device, []string{"--copy-network"})
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("failed to parse BLS entries"))
+	})
+})
+
 var _ = Describe("get number of reboots", func() {
 	const (
 		kubeconfigPath = "/kubeconfig"

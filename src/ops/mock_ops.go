@@ -41,6 +41,20 @@ func (m *MockOps) EXPECT() *MockOpsMockRecorder {
 	return m.recorder
 }
 
+// AppendStaticNetworkToInitramfs mocks base method.
+func (m *MockOps) AppendStaticNetworkToInitramfs(device string, installerArgs []string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AppendStaticNetworkToInitramfs", device, installerArgs)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AppendStaticNetworkToInitramfs indicates an expected call of AppendStaticNetworkToInitramfs.
+func (mr *MockOpsMockRecorder) AppendStaticNetworkToInitramfs(device, installerArgs any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppendStaticNetworkToInitramfs", reflect.TypeOf((*MockOps)(nil).AppendStaticNetworkToInitramfs), device, installerArgs)
+}
+
 // CopyRegistryData mocks base method.
 func (m *MockOps) CopyRegistryData(liveLogger io.Writer, device string) error {
 	m.ctrl.T.Helper()
