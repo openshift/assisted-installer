@@ -231,6 +231,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							Fail(fmt.Sprintf("No matching arg sequence found: %+v", expectedArgs))
 						})
 					}
+					mockops.EXPECT().AppendStaticNetworkToInitramfs(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 				}
 			}
 			checkAgentRegistryDir := func(exists bool) {
