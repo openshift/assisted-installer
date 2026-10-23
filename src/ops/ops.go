@@ -47,6 +47,10 @@ const (
 	registryDataDirOnDevice         = "var/lib/iri-registry"
 	registryDataDirOnMnt            = "/mnt/agentdata"
 	ostreeDeployPath                = "/mnt/root/ostree/deploy/rhcos"
+	networkManagerKeyfileDir        = "/etc/NetworkManager/system-connections"
+	firstBootNetworkDirOnBoot       = "/mnt/boot/coreos-firstboot-network"
+	firstBootNetworkSentinelOnBoot  = "/mnt/boot/coreos-firstboot-network.deliberate"
+	networkDirArg                   = "--network-dir"
 )
 
 // Supports: registry.io/repo:tag, registry.io:port/repo:tag, repo@sha256:digest, repo:tag@sha256:digest
@@ -1158,7 +1162,53 @@ func (o *ops) calculateFreePercent(device string, requiredSize *int64) (int64, e
 	return 0, nil
 }
 
+// copyNetworkRequested reports whether the installation was asked to propagate the live
+// environment's NetworkManager configuration to the installed system. Note that the args
+// OverwriteOsImage receives have been reduced to kernel arguments, so the original installer args
+// have to be read from the config.
+func (o *ops) copyNetworkRequested() bool {
+	args := o.installerConfig.InstallerArgs
+	return slices.Contains(args, "--copy-network") || slices.Contains(args, "-n")
+}
+
+// networkKeyfileDir returns the directory coreos-installer was told to copy NetworkManager
+// keyfiles from, so that we copy the same files it did. --network-dir overrides the default.
+func (o *ops) networkKeyfileDir() string {
+	args := o.installerConfig.InstallerArgs
+	for i, arg := range args {
+		if arg == networkDirArg && i+1 < len(args) {
+			return args[i+1]
+		}
+		if dir, found := strings.CutPrefix(arg, networkDirArg+"="); found {
+			return dir
+		}
+	}
+	return networkManagerKeyfileDir
+}
+
+// iscsiInstall reports whether the installation disk is reached over iSCSI, which
+// assisted-service marks by appending iBFT kernel arguments.
+func (o *ops) iscsiInstall() bool {
+	for _, arg := range o.installerConfig.InstallerArgs {
+		if strings.Contains(arg, "rd.iscsi.firmware") || strings.HasSuffix(arg, ":ibft") {
+			return true
+		}
+	}
+	return false
+}
+
 func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error {
+	// On iSCSI the boot partition lives on the SAN and is unreachable until the network is up,
+	// which is why coreos-rescue-misplaced-network is disabled there and why coreos-installer
+	// 0.27.0 moved the firstboot network config into the initramfs in the first place. Replacing
+	// the deployment would discard that initramfs and leave the node with no way to configure
+	// its network, so skip the optimisation and accept the extra MCO reboot instead.
+	if o.copyNetworkRequested() && o.iscsiInstall() {
+		o.log.Infof("iSCSI installation with --copy-network - skip overwrite image so that the " +
+			"firstboot network configuration embedded in the initramfs is preserved")
+		return nil
+	}
+
 	type cmd struct {
 		command string
 		args    []string
@@ -1218,11 +1268,41 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 				"--stateroot",
 				"rhcos"), extraArgs...)...,
 		),
+	}
+
+	// coreos-installer 0.27.0 and later embed the firstboot network configuration into the
+	// initramfs of the ostree deployment that exists at install time, which the deploy above has
+	// just replaced, so that copy is now gone. Place the keyfiles at the root of the boot
+	// partition instead, which is outside any deployment and is where
+	// coreos-rescue-misplaced-network looks for them on firstboot. Older coreos-installer
+	// versions populate that directory themselves from the same source, so the copy is a no-op
+	// there rather than being skipped: rsync is idempotent, which keeps it correct if an earlier
+	// attempt failed partway and is retried. Symlinks are dereferenced and subdirectories
+	// skipped, so that the same set of files coreos-installer would have embedded ends up on
+	// the boot partition, and so that nothing resolvable only in the live environment is left
+	// behind as a dangling link for the rescue service to trip over.
+	//
+	// Mark the configuration as deliberately placed. coreos-rescue-misplaced-network otherwise
+	// assumes anything in that directory was left by an outdated coreos-installer and raises a
+	// motd telling the operator to reinstall, which would not help here. The marker is a sibling
+	// of the directory rather than a file inside it, so that it is not copied into
+	// /run/NetworkManager/system-connections along with the keyfiles. It is written whenever
+	// --copy-network was requested, including when an older coreos-installer populated the
+	// directory itself, since the advice is equally unhelpful in that case.
+	if o.copyNetworkRequested() {
+		cmds = append(cmds,
+			makecmd("rsync", "-avL", "--exclude=*/",
+				o.networkKeyfileDir()+"/", firstBootNetworkDirOnBoot+"/"),
+			makecmd("touch", firstBootNetworkSentinelOnBoot),
+		)
+	}
+
+	cmds = append(cmds,
 		makecmd("fsfreeze", "--freeze", "/mnt/boot"),
 		makecmd("umount", "/mnt/boot"),
 		makecmd("fsfreeze", "--freeze", "/mnt"),
 		makecmd("umount", "/mnt"),
-	}
+	)
 	for i := range cmds {
 		c := cmds[i]
 		o.log.Infof("Running %s with args %+v", c.command, c.args)
