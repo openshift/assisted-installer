@@ -14,7 +14,7 @@ COPY --chown=${USER_UID} . /app
 WORKDIR /app
 RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o installer src/main/main.go
 
-FROM registry.redhat.io/ubi9/ubi-minimal-pqc:latest@sha256:3e009398a8aa8eec621393fbf308c5e622f174900e44e8d5fe224c637920924a
+FROM registry.redhat.io/ubi9/ubi-minimal-pqc:latest@sha256:d0fdfb1401ee754872f60c2527563671c16112080e5254139133908178700911
 ARG release=main
 ARG version=latest
 
