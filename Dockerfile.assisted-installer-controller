@@ -19,7 +19,7 @@ RUN git config --global --add safe.directory '*'; \
 # Extract the commit reference from which the image is built
 RUN git rev-parse --short HEAD > /commit-reference.txt
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:6fc28bcb6776e387d7a35a2056d9d2b985dc4e26031e98a2bd35a7137cd6fd71
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:bba2b4bbf0ed15cfe7dd72a1e17ae7d2015a141f306b304e1a2785c41400e39c
 ARG TARGETPLATFORM
 
 RUN microdnf install -y --disablerepo="*" --enablerepo="ubi-9-*" crypto-policies-scripts && update-crypto-policies --set DEFAULT:PQ && microdnf clean all
