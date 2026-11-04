@@ -142,6 +142,15 @@ func (i *installer) InstallNode() error {
 
 	}
 
+	// Prepare IRI registry mount unit in ignition BEFORE writing image to disk
+	// This allows coreos-installer to embed the modified ignition with the mount unit
+	// Must be called before writeImageToDisk() but after ignition is downloaded
+	if i.Config.CoreosImage == "" {
+		if err = i.ops.PrepareIRIRegistryIgnition(ignitionPath); err != nil {
+			return err
+		}
+	}
+
 	if err = i.writeImageToDisk(ignitionPath); err != nil {
 		return err
 	}
@@ -165,23 +174,15 @@ func (i *installer) InstallNode() error {
 			//return err
 		}
 
-		// Write registry data to device only in the disconnected ABI flow.
-		// I.e. the openshift appliance ensures that the registry data is mounted,
-		// and the installer only needs to copy the registry data to the devices
-		// of the control plane nodes (for the post-bootstrap step).
-		// Note: this flow is relevant only when using the appliance live-iso,
-		// hence, ensuring the registry data exists on the media.
-		if i.ops.FileExists(registryDataDirOnMedia) && i.Config.Role == string(models.HostRoleMaster) {
-			i.log.Info("Start copying registry data to disk")
-			hostStage := models.HostStageCopyingRegistryDataToDisk
-			liveLogger := rsync_logger.NewRsyncInstallerLogWriter(
-				i.log, i.inventoryClient, i.Config.InfraEnvID, i.Config.HostID, &hostStage)
+		// Create IRI registry partition and copy data (if needed for disconnected ABI flow)
+		// This is called AFTER writeImageToDisk because coreos-installer creates partitions 1-4,
+		// and we create partition 5 at the end of the disk
+		hostStage := models.HostStageCopyingRegistryDataToDisk
+		liveLogger := rsync_logger.NewRsyncInstallerLogWriter(
+			i.log, i.inventoryClient, i.Config.InfraEnvID, i.Config.HostID, &hostStage)
 
-			i.UpdateHostInstallProgress(hostStage, "")
-			if err = i.ops.CopyRegistryData(liveLogger, i.Device); err != nil {
-				return err
-			}
-			i.log.Info("Done copying registry data to disk")
+		if err = i.ops.SetupIRIRegistryPartition(i.Device, liveLogger, i.UpdateHostInstallProgress); err != nil {
+			return err
 		}
 	}
 
