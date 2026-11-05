@@ -1705,8 +1705,13 @@ func (o *ops) copyRegistryDataToPartition(liveLogger io.Writer, device string) e
 // Phase 3: Remove this function from AI
 func (o *ops) PrepareIRIRegistryIgnition(ignitionPath string) error {
 	// Check if IRI registry setup is applicable
-	if !o.FileExists("/run/media/iso/registry") || o.installerConfig.Role != string(models.HostRoleMaster) {
-		o.log.Info("Skipping IRI registry ignition preparation (not applicable)")
+	// Bootstrap nodes become masters after bootstrap completes, arbiter nodes are control plane members
+	isControlPlaneNode := o.installerConfig.Role == string(models.HostRoleMaster) ||
+		o.installerConfig.Role == string(models.HostRoleBootstrap) ||
+		o.installerConfig.Role == string(models.HostRoleArbiter)
+
+	if !o.FileExists("/run/media/iso/registry") || !isControlPlaneNode {
+		o.log.Infof("Skipping IRI registry ignition preparation (role=%s)", o.installerConfig.Role)
 		return nil
 	}
 
@@ -1734,8 +1739,13 @@ func (o *ops) PrepareIRIRegistryIgnition(ignitionPath string) error {
 // 4. Copies registry data from /run/media/iso/registry to partition 5
 func (o *ops) SetupIRIRegistryPartition(device string, liveLogger io.Writer, updateProgress func(models.HostStage, string)) error {
 	// Check if IRI registry setup is applicable
-	if !o.FileExists("/run/media/iso/registry") || o.installerConfig.Role != string(models.HostRoleMaster) {
-		o.log.Info("Skipping IRI registry partition setup (not applicable)")
+	// Bootstrap nodes become masters after bootstrap completes, arbiter nodes are control plane members
+	isControlPlaneNode := o.installerConfig.Role == string(models.HostRoleMaster) ||
+		o.installerConfig.Role == string(models.HostRoleBootstrap) ||
+		o.installerConfig.Role == string(models.HostRoleArbiter)
+
+	if !o.FileExists("/run/media/iso/registry") || !isControlPlaneNode {
+		o.log.Infof("Skipping IRI registry partition setup (role=%s)", o.installerConfig.Role)
 		return nil
 	}
 
