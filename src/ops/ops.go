@@ -1532,10 +1532,11 @@ func (o *ops) createIRIRegistryPartition(device string) error {
 		return errors.Wrapf(err, "failed to dump partition table for %s", device)
 	}
 
-	// Step 2: Extract last-lba from dump
+	// Step 2: Extract last-lba and sector-size from dump
 	// GPT reserves sectors at end for backup partition table, so we must use last-lba
 	// instead of total disk size to avoid "sector beyond last-lba" errors
 	var lastLBA int64
+	var sectorSize int64 = 512 // default fallback
 	for _, line := range strings.Split(dump, "\n") {
 		if strings.HasPrefix(line, "last-lba:") {
 			fields := strings.Fields(line)
@@ -1544,7 +1545,14 @@ func (o *ops) createIRIRegistryPartition(device string) error {
 				if err != nil {
 					return errors.Wrap(err, "failed to parse last-lba")
 				}
-				break
+			}
+		} else if strings.HasPrefix(line, "sector-size:") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				sectorSize, err = strconv.ParseInt(fields[1], 10, 64)
+				if err != nil {
+					return errors.Wrap(err, "failed to parse sector-size")
+				}
 			}
 		}
 	}
@@ -1557,7 +1565,6 @@ func (o *ops) createIRIRegistryPartition(device string) error {
 	partConfig := defaultIRIPartitionConfig
 
 	partitionSizeBytes := int64(partConfig.sizeGB) * 1024 * 1024 * 1024
-	sectorSize := int64(512)
 	partitionSizeSectors := partitionSizeBytes / sectorSize
 
 	// Calculate reserved space (space to leave unallocated after partition)

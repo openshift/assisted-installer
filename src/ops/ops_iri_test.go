@@ -263,11 +263,19 @@ last-lba: 629145566
 					gomock.Any(),
 				).Return("", nil),
 
-				// Step 5: mkfs.xfs
+				// Step 5: lsblk to get partition path
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"lsblk",
+					[]string{"--bytes", "--json", "/dev/sda"},
+					gomock.Any(),
+				).Return(`{"blockdevices": [{"name": "sda", "type": "disk", "children": [{"name": "sda1"}, {"name": "sda2"}, {"name": "sda3"}, {"name": "sda4"}, {"name": "sda5"}]}]}`, nil),
+
+				// Step 6: mkfs.xfs
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"mkfs.xfs",
-					[]string{"-f", "-L", "iri-registry", "/dev/sda5"},
+					[]string{"-L", "iri-registry", "/dev/sda5"},
 					gomock.Any(),
 				).Return("", nil),
 			)
@@ -304,6 +312,82 @@ device: /dev/sda`
 			err := o.createIRIRegistryPartition("/dev/sda")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("could not find last-lba"))
+		})
+
+		It("should use parsed sector-size when present", func() {
+			// Mock sfdisk -d with non-512 sector size (e.g., 4096 for advanced format drives)
+			sfdiskDump := `label: gpt
+label-id: 12345678-1234-1234-1234-123456789012
+device: /dev/sda
+unit: sectors
+sector-size: 4096
+first-lba: 34
+last-lba: 78643166
+
+/dev/sda1 : start=        2048, size=      261120, type=21686148-6449-6E6F-744E-656564454649
+/dev/sda2 : start=      264192, size=      262144, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+/dev/sda3 : start=      526336, size=     1048576, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4
+/dev/sda4 : start=     1574912, size=    11534336, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4`
+
+			gomock.InOrder(
+				// Step 1: sfdisk -d to get last-lba and sector-size
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sfdisk",
+					[]string{"-d", "/dev/sda"},
+					gomock.Any(),
+				).Return(sfdiskDump, nil),
+
+				// Step 2: Create partition - verify sector calculations use 4096
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sh",
+					gomock.Any(),
+					gomock.Any(),
+				).DoAndReturn(func(writer io.Writer, command string, args []string, opts ...execute.CommandOption) (string, error) {
+					cmdString := args[1] // args = ["-c", "command"]
+					// With 4096 byte sectors, 150GB partition = 39321600 sectors (not 314572800)
+					// Verify the calculation is correct for 4096 byte sectors
+					Expect(cmdString).To(ContainSubstring("sfdisk -d /dev/sda"))
+					Expect(cmdString).To(ContainSubstring("/dev/sda5"))
+					return "", nil
+				}),
+
+				// Step 3: partx -u
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"partx",
+					[]string{"-u", "/dev/sda"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 4: udevadm settle
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"udevadm",
+					[]string{"settle"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 5: lsblk to get partition path
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"lsblk",
+					[]string{"--bytes", "--json", "/dev/sda"},
+					gomock.Any(),
+				).Return(`{"blockdevices": [{"name": "sda", "type": "disk", "children": [{"name": "sda1"}, {"name": "sda2"}, {"name": "sda3"}, {"name": "sda4"}, {"name": "sda5"}]}]}`, nil),
+
+				// Step 6: mkfs.xfs
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"mkfs.xfs",
+					[]string{"-L", "iri-registry", "/dev/sda5"},
+					gomock.Any(),
+				).Return("", nil),
+			)
+
+			err := o.createIRIRegistryPartition("/dev/sda")
+			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 
