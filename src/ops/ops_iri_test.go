@@ -16,6 +16,31 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
+var _ = Describe("makePartitionDevicePath", func() {
+	It("should handle traditional SCSI/SATA devices", func() {
+		Expect(makePartitionDevicePath("/dev/sda", 1)).To(Equal("/dev/sda1"))
+		Expect(makePartitionDevicePath("/dev/sda", 5)).To(Equal("/dev/sda5"))
+		Expect(makePartitionDevicePath("/dev/vda", 1)).To(Equal("/dev/vda1"))
+		Expect(makePartitionDevicePath("/dev/xvda", 5)).To(Equal("/dev/xvda5"))
+	})
+
+	It("should handle NVMe devices with p separator", func() {
+		Expect(makePartitionDevicePath("/dev/nvme0n1", 1)).To(Equal("/dev/nvme0n1p1"))
+		Expect(makePartitionDevicePath("/dev/nvme0n1", 5)).To(Equal("/dev/nvme0n1p5"))
+		Expect(makePartitionDevicePath("/dev/nvme1n1", 5)).To(Equal("/dev/nvme1n1p5"))
+	})
+
+	It("should handle MMC devices with p separator", func() {
+		Expect(makePartitionDevicePath("/dev/mmcblk0", 1)).To(Equal("/dev/mmcblk0p1"))
+		Expect(makePartitionDevicePath("/dev/mmcblk0", 5)).To(Equal("/dev/mmcblk0p5"))
+	})
+
+	It("should handle loop devices with p separator", func() {
+		Expect(makePartitionDevicePath("/dev/loop0", 1)).To(Equal("/dev/loop0p1"))
+		Expect(makePartitionDevicePath("/dev/loop0", 5)).To(Equal("/dev/loop0p5"))
+	})
+})
+
 var _ = Describe("IRI Registry Setup", func() {
 	var (
 		ctrl     *gomock.Controller
@@ -387,6 +412,82 @@ last-lba: 78643166
 			)
 
 			err := o.createIRIRegistryPartition("/dev/sda")
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should handle NVMe devices with correct partition path", func() {
+			// Mock sfdisk -d for NVMe device
+			sfdiskDump := `label: gpt
+label-id: 12345678-1234-1234-1234-123456789012
+device: /dev/nvme0n1
+unit: sectors
+sector-size: 512
+first-lba: 34
+last-lba: 629145566
+
+/dev/nvme0n1p1 : start=        2048, size=      261120, type=21686148-6449-6E6F-744E-656564454649
+/dev/nvme0n1p2 : start=      264192, size=      262144, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+/dev/nvme0n1p3 : start=      526336, size=     1048576, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4
+/dev/nvme0n1p4 : start=     1574912, size=    11534336, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4`
+
+			gomock.InOrder(
+				// Step 1: sfdisk -d to get last-lba and sector-size
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sfdisk",
+					[]string{"-d", "/dev/nvme0n1"},
+					gomock.Any(),
+				).Return(sfdiskDump, nil),
+
+				// Step 2: Create partition - verify NVMe partition path format (/dev/nvme0n1p5)
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sh",
+					gomock.Any(),
+					gomock.Any(),
+				).DoAndReturn(func(writer io.Writer, command string, args []string, opts ...execute.CommandOption) (string, error) {
+					cmdString := args[1] // args = ["-c", "command"]
+					// Verify the partition path uses "p5" not just "5"
+					Expect(cmdString).To(ContainSubstring("/dev/nvme0n1p5"))
+					Expect(cmdString).NotTo(ContainSubstring("/dev/nvme0n15"))
+					Expect(cmdString).To(ContainSubstring("sfdisk -d /dev/nvme0n1"))
+					return "", nil
+				}),
+
+				// Step 3: partx -u
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"partx",
+					[]string{"-u", "/dev/nvme0n1"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 4: udevadm settle
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"udevadm",
+					[]string{"settle"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 5: lsblk to get partition path
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"lsblk",
+					[]string{"--bytes", "--json", "/dev/nvme0n1"},
+					gomock.Any(),
+				).Return(`{"blockdevices": [{"name": "nvme0n1", "type": "disk", "children": [{"name": "nvme0n1p1"}, {"name": "nvme0n1p2"}, {"name": "nvme0n1p3"}, {"name": "nvme0n1p4"}, {"name": "nvme0n1p5"}]}]}`, nil),
+
+				// Step 6: mkfs.xfs
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"mkfs.xfs",
+					[]string{"-L", "iri-registry", "/dev/nvme0n1p5"},
+					gomock.Any(),
+				).Return("", nil),
+			)
+
+			err := o.createIRIRegistryPartition("/dev/nvme0n1")
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})

@@ -1089,6 +1089,22 @@ func stripDev(device string) string {
 	return strings.Replace(device, "/dev/", "", 1)
 }
 
+// makePartitionDevicePath constructs the partition device path for use in sfdisk scripts.
+// Handles different device naming conventions:
+// - /dev/sda + partition 5 = /dev/sda5 (traditional SCSI/SATA)
+// - /dev/nvme0n1 + partition 5 = /dev/nvme0n1p5 (NVMe - ends with digit, needs 'p')
+// - /dev/mmcblk0 + partition 5 = /dev/mmcblk0p5 (MMC - ends with digit, needs 'p')
+func makePartitionDevicePath(device string, partitionNumber int) string {
+	// Check if device name ends with a digit
+	// For such devices (nvme0n1, mmcblk0, loop0), we need a 'p' separator
+	deviceName := device
+	if len(deviceName) > 0 && deviceName[len(deviceName)-1] >= '0' && deviceName[len(deviceName)-1] <= '9' {
+		return fmt.Sprintf("%sp%d", device, partitionNumber)
+	}
+	// For traditional devices (sda, vda, xvda), just append the number
+	return fmt.Sprintf("%s%d", device, partitionNumber)
+}
+
 // getPartitionPathFromLsblk uses lsblk to find the actual partition device path
 // for a given device and partition number. This handles all device types including
 // device mapper devices correctly.
@@ -1587,8 +1603,10 @@ func (o *ops) createIRIRegistryPartition(device string) error {
 	// Command: (sfdisk -d /dev/sda; echo "/dev/sda5 : start=X, size=Y, type=GUID, name=LABEL") | sfdisk --no-reread /dev/sda
 	// GPT type GUID: 0FC63DAF-8483-4772-8E79-3D69D8477DE4 = Linux filesystem
 	// name sets the partition label (creates /dev/disk/by-partlabel/iri-registry symlink)
-	newPartLine := fmt.Sprintf("%s5 : start=%d, size=%d, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, name=\"%s\"",
-		device, startSector, partitionSizeSectors, iriRegistryPartitionLabel)
+	// Use makePartitionDevicePath to handle different device types (nvme0n1p5, sda5, etc.)
+	partitionDevicePath := makePartitionDevicePath(device, 5)
+	newPartLine := fmt.Sprintf("%s : start=%d, size=%d, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, name=\"%s\"",
+		partitionDevicePath, startSector, partitionSizeSectors, iriRegistryPartitionLabel)
 	sfdiskCmd := fmt.Sprintf("(sfdisk -d %s; echo '%s') | sfdisk --no-reread %s", device, newPartLine, device)
 
 	o.log.Infof("Running: %s", sfdiskCmd)
