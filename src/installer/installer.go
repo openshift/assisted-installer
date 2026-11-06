@@ -145,7 +145,8 @@ func (i *installer) InstallNode() error {
 	// Prepare IRI registry mount unit in ignition BEFORE writing image to disk
 	// This allows coreos-installer to embed the modified ignition with the mount unit
 	// Must be called before writeImageToDisk() but after ignition is downloaded
-	if i.Config.CoreosImage == "" {
+	if i.Config.CoreosImage == "" && i.shouldSetupIRIRegistry() {
+		i.log.Info("Preparing IRI registry ignition configuration")
 		if err = i.ops.PrepareIRIRegistryIgnition(ignitionPath); err != nil {
 			return err
 		}
@@ -177,12 +178,16 @@ func (i *installer) InstallNode() error {
 		// Create IRI registry partition and copy data (if needed for disconnected ABI flow)
 		// This is called AFTER writeImageToDisk because coreos-installer creates partitions 1-4,
 		// and we create partition 5 at the end of the disk
-		hostStage := models.HostStageCopyingRegistryDataToDisk
-		liveLogger := rsync_logger.NewRsyncInstallerLogWriter(
-			i.log, i.inventoryClient, i.Config.InfraEnvID, i.Config.HostID, &hostStage)
+		if i.shouldSetupIRIRegistry() {
+			i.log.Info("Setting up IRI registry partition")
+			i.UpdateHostInstallProgress(models.HostStageCopyingRegistryDataToDisk, "Start copying registry data to disk")
+			hostStage := models.HostStageCopyingRegistryDataToDisk
+			liveLogger := rsync_logger.NewRsyncInstallerLogWriter(
+				i.log, i.inventoryClient, i.Config.InfraEnvID, i.Config.HostID, &hostStage)
 
-		if err = i.ops.SetupIRIRegistryPartition(i.Device, liveLogger, i.UpdateHostInstallProgress); err != nil {
-			return err
+			if err = i.ops.SetupIRIRegistryPartition(i.Device, liveLogger); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1139,6 +1144,22 @@ func (i *installer) checkHostname() error {
 		return err
 	}
 	return nil
+}
+
+// shouldSetupIRIRegistry checks if IRI registry setup should be applied
+// Returns true if registry data exists and node is a control plane node
+func (i *installer) shouldSetupIRIRegistry() bool {
+	// Bootstrap nodes become masters after bootstrap completes, arbiter nodes are control plane members
+	isControlPlaneNode := i.Config.Role == string(models.HostRoleMaster) ||
+		i.Config.Role == string(models.HostRoleBootstrap) ||
+		i.Config.Role == string(models.HostRoleArbiter)
+
+	if !isControlPlaneNode {
+		return false
+	}
+
+	// Check if registry data exists
+	return i.ops.FileExists(registryDataDirOnMedia)
 }
 
 func RunInstaller(installerConfig *config.Config, logger *logrus.Logger) error {

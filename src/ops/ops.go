@@ -32,7 +32,6 @@ import (
 	"github.com/openshift/assisted-installer/src/ignition"
 	"github.com/openshift/assisted-installer/src/ops/execute"
 	"github.com/openshift/assisted-installer/src/utils"
-	"github.com/openshift/assisted-service/models"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -109,7 +108,7 @@ type Ops interface {
 	GetEncapsulatedMC(ignitionPath string) (*mcfgv1.MachineConfig, error)
 	OverwriteOsImage(osImage, device string, extraArgs []string) error
 	PrepareIRIRegistryIgnition(ignitionPath string) error
-	SetupIRIRegistryPartition(device string, liveLogger io.Writer, updateProgress func(models.HostStage, string)) error
+	SetupIRIRegistryPartition(device string, liveLogger io.Writer) error
 }
 
 const (
@@ -1704,17 +1703,6 @@ func (o *ops) copyRegistryDataToPartition(liveLogger io.Writer, device string) e
 // Phase 2: MCO adds mount unit (AI detects and skips)
 // Phase 3: Remove this function from AI
 func (o *ops) PrepareIRIRegistryIgnition(ignitionPath string) error {
-	// Check if IRI registry setup is applicable
-	// Bootstrap nodes become masters after bootstrap completes, arbiter nodes are control plane members
-	isControlPlaneNode := o.installerConfig.Role == string(models.HostRoleMaster) ||
-		o.installerConfig.Role == string(models.HostRoleBootstrap) ||
-		o.installerConfig.Role == string(models.HostRoleArbiter)
-
-	if !o.FileExists("/run/media/iso/registry") || !isControlPlaneNode {
-		o.log.Infof("Skipping IRI registry ignition preparation (role=%s)", o.installerConfig.Role)
-		return nil
-	}
-
 	o.log.Info("Preparing IRI registry mount unit in ignition")
 
 	// Add systemd mount unit to ignition
@@ -1737,22 +1725,8 @@ func (o *ops) PrepareIRIRegistryIgnition(ignitionPath string) error {
 // 2. Creates partition 5 at the END of the disk (preserves root auto-expansion)
 // 3. Formats partition 5 with XFS filesystem
 // 4. Copies registry data from /run/media/iso/registry to partition 5
-func (o *ops) SetupIRIRegistryPartition(device string, liveLogger io.Writer, updateProgress func(models.HostStage, string)) error {
-	// Check if IRI registry setup is applicable
-	// Bootstrap nodes become masters after bootstrap completes, arbiter nodes are control plane members
-	isControlPlaneNode := o.installerConfig.Role == string(models.HostRoleMaster) ||
-		o.installerConfig.Role == string(models.HostRoleBootstrap) ||
-		o.installerConfig.Role == string(models.HostRoleArbiter)
-
-	if !o.FileExists("/run/media/iso/registry") || !isControlPlaneNode {
-		o.log.Infof("Skipping IRI registry partition setup (role=%s)", o.installerConfig.Role)
-		return nil
-	}
-
+func (o *ops) SetupIRIRegistryPartition(device string, liveLogger io.Writer) error {
 	o.log.Info("Starting IRI registry partition setup")
-
-	// Step 1: Verify disk space and create partition 5
-	updateProgress(models.HostStageCopyingRegistryDataToDisk, "Creating IRI registry partition")
 	o.log.Infof("Verifying disk space and creating partition 5 on %s", device)
 
 	if err := o.verifyDiskSpaceForIRI(device); err != nil {
@@ -1763,10 +1737,7 @@ func (o *ops) SetupIRIRegistryPartition(device string, liveLogger io.Writer, upd
 		return err
 	}
 
-	// Step 2: Copy registry data to partition 5
-	updateProgress(models.HostStageCopyingRegistryDataToDisk, "Copying registry data to partition")
 	o.log.Info("Copying registry data to partition 5")
-
 	if err := o.copyRegistryDataToPartition(liveLogger, device); err != nil {
 		return err
 	}

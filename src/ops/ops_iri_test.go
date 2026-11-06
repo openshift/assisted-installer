@@ -66,12 +66,10 @@ var _ = Describe("IRI Registry Setup", func() {
 	Describe("PrepareIRIRegistryIgnition", func() {
 		var (
 			ignitionPath string
-			registryPath string
 		)
 
 		BeforeEach(func() {
 			ignitionPath = filepath.Join(tmpDir, "test.ign")
-			registryPath = filepath.Join(tmpDir, "registry")
 
 			// Create minimal ignition file
 			ignitionContent := `{
@@ -87,55 +85,11 @@ var _ = Describe("IRI Registry Setup", func() {
 			o = NewOpsWithConfig(testConfig, logrus.New(), mockExec).(*ops)
 		})
 
-		It("should skip if registry data does not exist", func() {
-			// Mock stat call for FileExists check
-			mockExec.EXPECT().ExecCommandWithOptions(
-				gomock.Any(),
-				"stat",
-				[]string{"/run/media/iso/registry"},
-				gomock.Any(),
-			).Return("", fmt.Errorf("file not found"))
-
-			err := o.PrepareIRIRegistryIgnition(ignitionPath)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		It("should skip if role is worker", func() {
-			testConfig := &config.Config{
-				Role: string(models.HostRoleWorker),
-			}
-			o = NewOpsWithConfig(testConfig, logrus.New(), mockExec).(*ops)
-
-			// Mock stat call for FileExists check
-			// Even though we create registry in tmpDir, code checks /run/media/iso/registry
-			mockExec.EXPECT().ExecCommandWithOptions(
-				gomock.Any(),
-				"stat",
-				[]string{"/run/media/iso/registry"},
-				gomock.Any(),
-			).Return("", fmt.Errorf("file not found"))
-
-			// Create registry directory
-			err := os.Mkdir(registryPath, 0755)
-			Expect(err).ToNot(HaveOccurred())
-
-			err = o.PrepareIRIRegistryIgnition(ignitionPath)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
 		It("should add mount unit for bootstrap role", func() {
 			testConfig := &config.Config{
 				Role: string(models.HostRoleBootstrap),
 			}
 			o = NewOpsWithConfig(testConfig, logrus.New(), mockExec).(*ops)
-
-			// Mock stat call for FileExists check - registry exists
-			mockExec.EXPECT().ExecCommandWithOptions(
-				gomock.Any(),
-				"stat",
-				[]string{"/run/media/iso/registry"},
-				gomock.Any(),
-			).Return("", nil)
 
 			err := o.PrepareIRIRegistryIgnition(ignitionPath)
 			Expect(err).ToNot(HaveOccurred())
@@ -154,14 +108,6 @@ var _ = Describe("IRI Registry Setup", func() {
 			}
 			o = NewOpsWithConfig(testConfig, logrus.New(), mockExec).(*ops)
 
-			// Mock stat call for FileExists check - registry exists
-			mockExec.EXPECT().ExecCommandWithOptions(
-				gomock.Any(),
-				"stat",
-				[]string{"/run/media/iso/registry"},
-				gomock.Any(),
-			).Return("", nil)
-
 			err := o.PrepareIRIRegistryIgnition(ignitionPath)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -174,14 +120,6 @@ var _ = Describe("IRI Registry Setup", func() {
 		})
 
 		It("should add mount unit to ignition for master with registry data", func() {
-			// Mock stat call for FileExists check - registry exists
-			mockExec.EXPECT().ExecCommandWithOptions(
-				gomock.Any(),
-				"stat",
-				[]string{"/run/media/iso/registry"},
-				gomock.Any(),
-			).Return("", nil)
-
 			err := o.PrepareIRIRegistryIgnition(ignitionPath)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -213,14 +151,6 @@ var _ = Describe("IRI Registry Setup", func() {
 			}`
 			err := os.WriteFile(ignitionPath, []byte(ignitionWithMount), 0600)
 			Expect(err).ToNot(HaveOccurred())
-
-			// Mock stat call for FileExists check - registry exists
-			mockExec.EXPECT().ExecCommandWithOptions(
-				gomock.Any(),
-				"stat",
-				[]string{"/run/media/iso/registry"},
-				gomock.Any(),
-			).Return("", nil)
 
 			// Call PrepareIRIRegistryIgnition - should skip without error
 			err = o.PrepareIRIRegistryIgnition(ignitionPath)
@@ -559,55 +489,11 @@ last-lba: 629145566
 	})
 
 	Describe("SetupIRIRegistryPartition", func() {
-		var (
-			updateProgressCalled bool
-			lastStage            models.HostStage
-		)
-
 		BeforeEach(func() {
-			updateProgressCalled = false
 			testConfig := &config.Config{
 				Role: string(models.HostRoleMaster),
 			}
 			o = NewOpsWithConfig(testConfig, logrus.New(), mockExec).(*ops)
-		})
-
-		mockUpdateProgress := func(stage models.HostStage, message string) {
-			updateProgressCalled = true
-			lastStage = stage
-		}
-
-		It("should skip if registry data does not exist", func() {
-			// Mock stat call for FileExists check
-			mockExec.EXPECT().ExecCommandWithOptions(
-				gomock.Any(),
-				"stat",
-				[]string{"/run/media/iso/registry"},
-				gomock.Any(),
-			).Return("", fmt.Errorf("file not found"))
-
-			err := o.SetupIRIRegistryPartition("/dev/sda", nil, mockUpdateProgress)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(updateProgressCalled).To(BeFalse())
-		})
-
-		It("should skip if role is worker", func() {
-			testConfig := &config.Config{
-				Role: string(models.HostRoleWorker),
-			}
-			o = NewOpsWithConfig(testConfig, logrus.New(), mockExec).(*ops)
-
-			// Mock stat call for FileExists check
-			mockExec.EXPECT().ExecCommandWithOptions(
-				gomock.Any(),
-				"stat",
-				[]string{"/run/media/iso/registry"},
-				gomock.Any(),
-			).Return("", fmt.Errorf("file not found"))
-
-			err := o.SetupIRIRegistryPartition("/dev/sda", nil, mockUpdateProgress)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(updateProgressCalled).To(BeFalse())
 		})
 
 		It("should process bootstrap role", func() {
@@ -622,8 +508,6 @@ last-lba: 629145566
 last-lba: 629145566`
 
 			gomock.InOrder(
-				// Mock stat call for FileExists check - registry exists
-				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "stat", []string{"/run/media/iso/registry"}, gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(lsblkOutput, nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sfdisk", gomock.Any(), gomock.Any()).Return(sfdiskDump, nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sh", gomock.Any(), gomock.Any()).Return("", nil),
@@ -638,9 +522,8 @@ last-lba: 629145566`
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "umount", gomock.Any(), gomock.Any()).Return("", nil),
 			)
 
-			err := o.SetupIRIRegistryPartition("/dev/sda", nil, mockUpdateProgress)
+			err := o.SetupIRIRegistryPartition("/dev/sda", nil)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(updateProgressCalled).To(BeTrue())
 		})
 
 		It("should process arbiter role", func() {
@@ -655,8 +538,6 @@ last-lba: 629145566`
 last-lba: 629145566`
 
 			gomock.InOrder(
-				// Mock stat call for FileExists check - registry exists
-				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "stat", []string{"/run/media/iso/registry"}, gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(lsblkOutput, nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sfdisk", gomock.Any(), gomock.Any()).Return(sfdiskDump, nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sh", gomock.Any(), gomock.Any()).Return("", nil),
@@ -671,19 +552,16 @@ last-lba: 629145566`
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "umount", gomock.Any(), gomock.Any()).Return("", nil),
 			)
 
-			err := o.SetupIRIRegistryPartition("/dev/sda", nil, mockUpdateProgress)
+			err := o.SetupIRIRegistryPartition("/dev/sda", nil)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(updateProgressCalled).To(BeTrue())
 		})
 
-		It("should call updateProgress during setup", func() {
+		It("should complete setup successfully", func() {
 			// Mock all commands for successful setup
 			lsblkOutput := `{"blockdevices": [{"name": "sda", "size": 322122547200}]}`
 			sfdiskDump := `last-lba: 629145566`
 
 			gomock.InOrder(
-				// Mock stat call for FileExists check - registry exists
-				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "stat", []string{"/run/media/iso/registry"}, gomock.Any()).Return("", nil),
 				// verifyDiskSpaceForIRI
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(lsblkOutput, nil),
 
@@ -703,10 +581,8 @@ last-lba: 629145566`
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "umount", gomock.Any(), gomock.Any()).Return("", nil),
 			)
 
-			err := o.SetupIRIRegistryPartition("/dev/sda", nil, mockUpdateProgress)
+			err := o.SetupIRIRegistryPartition("/dev/sda", nil)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(updateProgressCalled).To(BeTrue())
-			Expect(lastStage).To(Equal(models.HostStageCopyingRegistryDataToDisk))
 		})
 	})
 })

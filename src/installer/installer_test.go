@@ -234,10 +234,18 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				}
 			}
 			checkAgentRegistryDir := func(exists bool) {
-				mockops.EXPECT().FileExists(registryDataDirOnMedia).Return(exists).Times(1)
-			}
-			copyRegistryDataSuccess := func() {
-				mockops.EXPECT().CopyRegistryData(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+				if exists {
+					// FileExists viene chiamato 2 volte da shouldSetupIRIRegistry()
+					mockops.EXPECT().FileExists(registryDataDirOnMedia).Return(true).Times(2)
+					// PrepareIRIRegistryIgnition viene chiamato 1 volta
+					mockops.EXPECT().PrepareIRIRegistryIgnition(gomock.Any()).Return(nil).Times(1)
+					// SetupIRIRegistryPartition viene chiamato 1 volta (senza updateProgress parameter)
+					mockops.EXPECT().SetupIRIRegistryPartition(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+				} else {
+					// FileExists viene chiamato 2 volte da shouldSetupIRIRegistry()
+					mockops.EXPECT().FileExists(registryDataDirOnMedia).Return(false).Times(2)
+					// PrepareIRIRegistryIgnition e SetupIRIRegistryPartition NON vengono chiamati
+				}
 			}
 			BeforeEach(func() {
 				ctrl = gomock.NewController(GinkgoT())
@@ -770,7 +778,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 								{string(models.HostStageWaitingForControlPlane), waitingForMastersStatusInfo},
 								{string(models.HostStageInstalling), string(models.HostRoleMaster)},
 								{string(models.HostStageWritingImageToDisk)},
-								{string(models.HostStageCopyingRegistryDataToDisk)},
+								{string(models.HostStageCopyingRegistryDataToDisk), "Start copying registry data to disk"},
 								{string(models.HostStageRebooting)},
 							})
 							bootstrapSetup("agent-installer")
@@ -804,7 +812,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							getEncapsulatedMcSuccess(nil)
 							overwriteImageSuccess()
 							checkAgentRegistryDir(true)
-							copyRegistryDataSuccess()
 							ret := installerObj.InstallNode()
 							Expect(ret).Should(BeNil())
 						})
@@ -812,7 +819,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							updateProgressSuccess([][]string{{string(models.HostStageStartingInstallation), conf.Role},
 								{string(models.HostStageInstalling), string(models.HostRoleMaster)},
 								{string(models.HostStageWritingImageToDisk)},
-								{string(models.HostStageCopyingRegistryDataToDisk)},
+								{string(models.HostStageCopyingRegistryDataToDisk), "Start copying registry data to disk"},
 							})
 							bootstrapSetup("agent-installer")
 							checkLocalHostname("notlocalhost", nil)
@@ -828,9 +835,13 @@ var _ = Describe("installer HostRoleMaster role", func() {
 							setBootOrderSuccess()
 							getEncapsulatedMcSuccess(nil)
 							overwriteImageSuccess()
-							checkAgentRegistryDir(true)
+							// FileExists chiamato 2 volte e ritorna true
+							mockops.EXPECT().FileExists(registryDataDirOnMedia).Return(true).Times(2)
+							// PrepareIRIRegistryIgnition chiamato e ritorna nil
+							mockops.EXPECT().PrepareIRIRegistryIgnition(gomock.Any()).Return(nil).Times(1)
+							// SetupIRIRegistryPartition chiamato e ritorna errore
 							err := errors.New("copy registry data failed")
-							mockops.EXPECT().CopyRegistryData(gomock.Any(), gomock.Any()).Return(err).Times(1)
+							mockops.EXPECT().SetupIRIRegistryPartition(gomock.Any(), gomock.Any()).Return(err).Times(1)
 							ret := installerObj.InstallNode()
 							Expect(ret).To(HaveOccurred())
 						})
@@ -1317,6 +1328,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					cleanInstallDevice()
 					mkdirSuccess(InstallDir)
 					downloadHostIgnitionSuccess(infraEnvId, hostId, "master-host-id.ign")
+					// shouldSetupIRIRegistry() called once before PrepareIRIRegistryIgnition (before writeImageToDisk fails)
+					mockops.EXPECT().FileExists(registryDataDirOnMedia).Return(false).Times(1)
 					err := fmt.Errorf("failed writing image to disk")
 					mockops.EXPECT().WriteImageToDisk(gomock.Any(), filepath.Join(InstallDir, "master-host-id.ign"), device, installerArgs).Return(err).Times(3)
 					ret := installerObj.InstallNode()
@@ -1396,7 +1409,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					rebootSuccess()
 					getEncapsulatedMcSuccess(nil)
 					overwriteImageSuccess()
-					checkAgentRegistryDir(false)
 					ret := installerObj.InstallNode()
 					Expect(ret).Should(BeNil())
 				})
@@ -1440,7 +1452,6 @@ var _ = Describe("installer HostRoleMaster role", func() {
 					rebootSuccess()
 					getEncapsulatedMcSuccess(nil)
 					overwriteImageSuccess()
-					checkAgentRegistryDir(false)
 					ret := installerObj.InstallNode()
 					Expect(ret).Should(BeNil())
 				})

@@ -1129,7 +1129,6 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 	})
 })
 
-
 var _ = Describe("Security: validateImageReference", func() {
 	It("should accept valid image references", func() {
 		validImages := []string{
