@@ -175,10 +175,21 @@ var _ = Describe("IRI Registry Setup", func() {
 		})
 
 		It("should succeed if disk has sufficient space", func() {
-			// Mock lsblk to return 300GB disk
+			// Mock lsblk to return 300GB disk with existing partitions
+			// Used: ~51GB, Free: ~249GB
+			// Required: 150GB IRI partition < 249GB → should succeed
 			lsblkOutput := `{
 				"blockdevices": [
-					{"name": "sda", "size": 322122547200}
+					{
+						"name": "sda",
+						"size": 322122547200,
+						"children": [
+							{"name": "sda1", "size": 134217728},
+							{"name": "sda2", "size": 134217728},
+							{"name": "sda3", "size": 734003200},
+							{"name": "sda4", "size": 53687091200}
+						]
+					}
 				]
 			}`
 			mockExec.EXPECT().ExecCommandWithOptions(
@@ -193,10 +204,21 @@ var _ = Describe("IRI Registry Setup", func() {
 		})
 
 		It("should fail if disk is too small", func() {
-			// Mock lsblk to return 100GB disk (too small)
+			// Mock lsblk to return 100GB disk with existing partitions (~50GB used)
+			// Free space: 100GB - 50GB = 50GB
+			// Required: 150GB IRI partition > 50GB → should fail
 			lsblkOutput := `{
 				"blockdevices": [
-					{"name": "sda", "size": 107374182400}
+					{
+						"name": "sda",
+						"size": 107374182400,
+						"children": [
+							{"name": "sda1", "size": 1048576},
+							{"name": "sda2", "size": 268435456},
+							{"name": "sda3", "size": 536870912},
+							{"name": "sda4", "size": 53687091200}
+						]
+					}
 				]
 			}`
 			mockExec.EXPECT().ExecCommandWithOptions(
@@ -208,7 +230,7 @@ var _ = Describe("IRI Registry Setup", func() {
 
 			err := o.verifyDiskSpaceForIRI("/dev/sda")
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("too small"))
+			Expect(err.Error()).To(ContainSubstring("not enough free space"))
 		})
 
 		It("should fail if lsblk command fails", func() {
@@ -303,6 +325,44 @@ last-lba: 629145566
 
 			err := o.createIRIRegistryPartition("/dev/sda")
 			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should fail if partition would start before 25000 MiB threshold", func() {
+			// Mock sfdisk with a disk that's too small: ~160GB
+			// With 150GB IRI partition, it would start at ~20 GiB (20480 MiB), before 25000 MiB threshold
+			sfdiskDump := `label: gpt
+label-id: 12345678-1234-1234-1234-123456789012
+device: /dev/sdsmall
+unit: sectors
+sector-size: 512
+first-lba: 34
+last-lba: 335544320
+
+/dev/sdsmall1 : start=        2048, size=      261120, type=21686148-6449-6E6F-744E-656564454649
+/dev/sdsmall2 : start=      264192, size=      262144, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+/dev/sdsmall3 : start=      526336, size=     1048576, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4
+/dev/sdsmall4 : start=     1574912, size=    11534336, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4`
+
+			// Step 1: sfdisk -d to get last-lba
+			mockExec.EXPECT().ExecCommandWithOptions(
+				gomock.Any(),
+				"sfdisk",
+				[]string{"-d", "/dev/sdsmall"},
+				gomock.Any(),
+			).Return(sfdiskDump, nil)
+
+			// Step 2: du -sb to get registry data size (fails, use default 150GB)
+			// Error happens before this call, so mock it to be safe
+			mockExec.EXPECT().ExecCommandWithOptions(
+				gomock.Any(),
+				"du",
+				[]string{"-sb", "/mnt/agentdata"},
+				gomock.Any(),
+			).Return("", fmt.Errorf("directory not found")).AnyTimes()
+
+			err := o.createIRIRegistryPartition("/dev/sdsmall")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("before recommended 25000 MiB threshold"))
 		})
 
 		It("should fail if sfdisk dump fails", func() {

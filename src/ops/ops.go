@@ -1460,8 +1460,9 @@ WantedBy=local-fs.target
 // verifyDiskSpaceForIRI checks if the device has enough free space for the IRI partition
 func (o *ops) verifyDiskSpaceForIRI(device string) error {
 	type node struct {
-		Name string `json:"name"`
-		Size int64  `json:"size"`
+		Name     string  `json:"name"`
+		Size     int64   `json:"size"`
+		Children []*node `json:"children,omitempty"`
 	}
 	var disks struct {
 		Blockdevices []*node `json:"blockdevices"`
@@ -1479,27 +1480,28 @@ func (o *ops) verifyDiskSpaceForIRI(device string) error {
 		return errors.Errorf("no block device information returned for %s", device)
 	}
 
-	totalDiskSize := disks.Blockdevices[0].Size
+	disk := disks.Blockdevices[0]
+	totalDiskSize := disk.Size
 
-	// Use default partition config
+	// Calculate actually used space by summing existing partitions
+	var usedSpace int64
+	for _, partition := range disk.Children {
+		usedSpace += partition.Size
+	}
+	freeSpace := totalDiskSize - usedSpace
+
+	// Use partition config (may be dynamically calculated from registry data size)
 	partConfig := defaultIRIPartitionConfig
-
-	// Calculate required size (partition + reserved space)
 	requiredSize := int64(partConfig.sizeGB) * 1024 * 1024 * 1024
 	requiredSize += int64(partConfig.reservedGB) * 1024 * 1024 * 1024
 
-	// We need space for existing partitions + IRI partition + reserved space
-	// A rough check: total disk should be significantly larger
-	// to account for partitions 1-4 and some free space
-	minDiskSize := requiredSize + (20 * 1024 * 1024 * 1024) // IRI + reserved + 20GB for other partitions
-
-	if totalDiskSize < minDiskSize {
-		return errors.Errorf("device %s is too small for IRI registry partition (total: %d bytes, requires at least %d bytes for %dGB IRI partition + %dGB reserved + existing partitions)",
-			device, totalDiskSize, minDiskSize, partConfig.sizeGB, partConfig.reservedGB)
+	if freeSpace < requiredSize {
+		return errors.Errorf("not enough free space on %s: free=%d bytes, required=%d bytes (%dGB IRI partition + %dGB reserved)",
+			device, freeSpace, requiredSize, partConfig.sizeGB, partConfig.reservedGB)
 	}
 
-	o.log.Infof("Disk %s has sufficient space: %d bytes (required: %d bytes for %dGB partition + %dGB reserved)",
-		device, totalDiskSize, minDiskSize, partConfig.sizeGB, partConfig.reservedGB)
+	o.log.Infof("Disk %s has sufficient free space: %d bytes (required: %d bytes for %dGB IRI partition + %dGB reserved)",
+		device, freeSpace, requiredSize, partConfig.sizeGB, partConfig.reservedGB)
 	return nil
 }
 
@@ -1595,8 +1597,22 @@ func (o *ops) createIRIRegistryPartition(device string) error {
 	// This ensures partition ends at (last-lba - gpt_margin), leaving space for GPT backup
 	startSector := lastLBA - partitionSizeSectors - reservedSpaceSectors - gptBackupMargin + 1
 
-	o.log.Infof("Creating %dGB partition (last-lba: %d, start: %d, size: %d sectors, reserved: %dGB)",
-		partConfig.sizeGB, lastLBA, startSector, partitionSizeSectors, partConfig.reservedGB)
+	// Verify partition starts after the 25000 MiB threshold recommended by Red Hat.
+	// See: https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/postinstallation_configuration/post-install-node-tasks
+	// This ensures proper alignment and leaves sufficient space for root partition expansion.
+	// CoreOS also requires root >= 8 GiB to boot successfully:
+	// See: https://github.com/coreos/fedora-coreos-docs/blob/main/modules/ROOT/pages/storage.adoc
+	startBytes := startSector * sectorSize
+	startMiB := startBytes / (1024 * 1024)
+	const minStartMiB = 25000
+
+	if startMiB < minStartMiB {
+		return errors.Errorf("IRI partition would start at %d MiB, before recommended %d MiB threshold (disk too small or partitions too large)",
+			startMiB, minStartMiB)
+	}
+
+	o.log.Infof("Creating %dGB partition (last-lba: %d, start: %d, size: %d sectors, start offset: %d MiB, reserved: %dGB)",
+		partConfig.sizeGB, lastLBA, startSector, partitionSizeSectors, startMiB, partConfig.reservedGB)
 
 	// Step 4: Create partition using sfdisk dump + append approach
 	// Command: (sfdisk -d /dev/sda; echo "/dev/sda5 : start=X, size=Y, type=GUID, name=LABEL") | sfdisk --no-reread /dev/sda
