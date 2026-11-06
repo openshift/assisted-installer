@@ -129,15 +129,15 @@ var _ = Describe("IRI Registry Setup", func() {
 			}
 			o = NewOpsWithConfig(testConfig, logrus.New(), mockExec).(*ops)
 
-			// Create registry directory
-			isoRegistryPath := "/run/media/iso/registry"
-			err := os.MkdirAll(isoRegistryPath, 0755)
-			if err != nil {
-				Skip("Cannot create /run/media/iso/registry - requires root or proper permissions")
-			}
-			defer os.RemoveAll("/run/media")
+			// Mock stat call for FileExists check - registry exists
+			mockExec.EXPECT().ExecCommandWithOptions(
+				gomock.Any(),
+				"stat",
+				[]string{"/run/media/iso/registry"},
+				gomock.Any(),
+			).Return("", nil)
 
-			err = o.PrepareIRIRegistryIgnition(ignitionPath)
+			err := o.PrepareIRIRegistryIgnition(ignitionPath)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Read modified ignition
@@ -145,7 +145,7 @@ var _ = Describe("IRI Registry Setup", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			content := string(data)
-			Expect(content).To(ContainSubstring("var-lib-iri\\x2dregistry.mount"))
+			Expect(content).To(ContainSubstring("var-lib-iri\\\\x2dregistry.mount"))
 		})
 
 		It("should add mount unit for arbiter role", func() {
@@ -154,15 +154,15 @@ var _ = Describe("IRI Registry Setup", func() {
 			}
 			o = NewOpsWithConfig(testConfig, logrus.New(), mockExec).(*ops)
 
-			// Create registry directory
-			isoRegistryPath := "/run/media/iso/registry"
-			err := os.MkdirAll(isoRegistryPath, 0755)
-			if err != nil {
-				Skip("Cannot create /run/media/iso/registry - requires root or proper permissions")
-			}
-			defer os.RemoveAll("/run/media")
+			// Mock stat call for FileExists check - registry exists
+			mockExec.EXPECT().ExecCommandWithOptions(
+				gomock.Any(),
+				"stat",
+				[]string{"/run/media/iso/registry"},
+				gomock.Any(),
+			).Return("", nil)
 
-			err = o.PrepareIRIRegistryIgnition(ignitionPath)
+			err := o.PrepareIRIRegistryIgnition(ignitionPath)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Read modified ignition
@@ -170,20 +170,19 @@ var _ = Describe("IRI Registry Setup", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			content := string(data)
-			Expect(content).To(ContainSubstring("var-lib-iri\\x2dregistry.mount"))
+			Expect(content).To(ContainSubstring("var-lib-iri\\\\x2dregistry.mount"))
 		})
 
 		It("should add mount unit to ignition for master with registry data", func() {
-			// Create registry directory at the expected path
-			isoRegistryPath := "/run/media/iso/registry"
-			err := os.MkdirAll(isoRegistryPath, 0755)
-			if err != nil {
-				// If we can't create the path (permission denied), skip this test
-				Skip("Cannot create /run/media/iso/registry - requires root or proper permissions")
-			}
-			defer os.RemoveAll("/run/media")
+			// Mock stat call for FileExists check - registry exists
+			mockExec.EXPECT().ExecCommandWithOptions(
+				gomock.Any(),
+				"stat",
+				[]string{"/run/media/iso/registry"},
+				gomock.Any(),
+			).Return("", nil)
 
-			err = o.PrepareIRIRegistryIgnition(ignitionPath)
+			err := o.PrepareIRIRegistryIgnition(ignitionPath)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Read modified ignition
@@ -191,7 +190,7 @@ var _ = Describe("IRI Registry Setup", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			content := string(data)
-			Expect(content).To(ContainSubstring("var-lib-iri\\x2dregistry.mount"))
+			Expect(content).To(ContainSubstring("var-lib-iri\\\\x2dregistry.mount"))
 			Expect(content).To(ContainSubstring("Mount IRI Registry Partition"))
 			Expect(content).To(ContainSubstring("/dev/disk/by-partlabel/iri-registry"))
 			Expect(content).To(ContainSubstring("/var/lib/iri-registry"))
@@ -205,7 +204,7 @@ var _ = Describe("IRI Registry Setup", func() {
 				"systemd": {
 					"units": [
 						{
-							"name": "var-lib-iri\\x2dregistry.mount",
+							"name": "var-lib-iri\\\\x2dregistry.mount",
 							"enabled": true,
 							"contents": "[Unit]\nDescription=Mount IRI Registry Partition\n"
 						}
@@ -215,13 +214,13 @@ var _ = Describe("IRI Registry Setup", func() {
 			err := os.WriteFile(ignitionPath, []byte(ignitionWithMount), 0600)
 			Expect(err).ToNot(HaveOccurred())
 
-			// Create registry directory
-			isoRegistryPath := "/run/media/iso/registry"
-			err = os.MkdirAll(isoRegistryPath, 0755)
-			if err != nil {
-				Skip("Cannot create /run/media/iso/registry - requires root or proper permissions")
-			}
-			defer os.RemoveAll("/run/media")
+			// Mock stat call for FileExists check - registry exists
+			mockExec.EXPECT().ExecCommandWithOptions(
+				gomock.Any(),
+				"stat",
+				[]string{"/run/media/iso/registry"},
+				gomock.Any(),
+			).Return("", nil)
 
 			// Call PrepareIRIRegistryIgnition - should skip without error
 			err = o.PrepareIRIRegistryIgnition(ignitionPath)
@@ -233,9 +232,9 @@ var _ = Describe("IRI Registry Setup", func() {
 
 			content := string(data)
 			// Verify mount unit exists (was not removed)
-			Expect(content).To(ContainSubstring("var-lib-iri\\x2dregistry.mount"))
+			Expect(content).To(ContainSubstring("var-lib-iri\\\\x2dregistry.mount"))
 			// Verify it wasn't duplicated (count occurrences - simple check)
-			Expect(strings.Count(content, "var-lib-iri\\x2dregistry.mount")).To(Equal(1))
+			Expect(strings.Count(content, "var-lib-iri\\\\x2dregistry.mount")).To(Equal(1))
 		})
 	})
 
@@ -606,14 +605,7 @@ last-lba: 629145566
 				gomock.Any(),
 			).Return("", fmt.Errorf("file not found"))
 
-			// Create registry directory
-			isoRegistryPath := "/run/media/iso/registry"
-			err := os.MkdirAll(isoRegistryPath, 0755)
-			if err == nil {
-				defer os.RemoveAll("/run/media")
-			}
-
-			err = o.SetupIRIRegistryPartition("/dev/sda", nil, mockUpdateProgress)
+			err := o.SetupIRIRegistryPartition("/dev/sda", nil, mockUpdateProgress)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(updateProgressCalled).To(BeFalse())
 		})
@@ -624,20 +616,14 @@ last-lba: 629145566
 			}
 			o = NewOpsWithConfig(testConfig, logrus.New(), mockExec).(*ops)
 
-			// Create registry directory
-			isoRegistryPath := "/run/media/iso/registry"
-			err := os.MkdirAll(isoRegistryPath, 0755)
-			if err != nil {
-				Skip("Cannot create /run/media/iso/registry - requires root or proper permissions")
-			}
-			defer os.RemoveAll("/run/media")
-
 			// Mock minimal commands to verify it's not skipped
 			lsblkOutput := `{"blockdevices": [{"name": "sda", "size": 322122547200}]}`
 			sfdiskDump := `sector-size: 512
 last-lba: 629145566`
 
 			gomock.InOrder(
+				// Mock stat call for FileExists check - registry exists
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "stat", []string{"/run/media/iso/registry"}, gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(lsblkOutput, nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sfdisk", gomock.Any(), gomock.Any()).Return(sfdiskDump, nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sh", gomock.Any(), gomock.Any()).Return("", nil),
@@ -645,13 +631,14 @@ last-lba: 629145566`
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "udevadm", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "type": "disk", "children": [{"name": "sda1"}, {"name": "sda2"}, {"name": "sda3"}, {"name": "sda4"}, {"name": "sda5"}]}]}`, nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mkfs.xfs", gomock.Any(), gomock.Any()).Return("", nil),
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "type": "disk", "children": [{"name": "sda1"}, {"name": "sda2"}, {"name": "sda3"}, {"name": "sda4"}, {"name": "sda5"}]}]}`, nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mkdir", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mount", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sh", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "umount", gomock.Any(), gomock.Any()).Return("", nil),
 			)
 
-			err = o.SetupIRIRegistryPartition("/dev/sda", nil, mockUpdateProgress)
+			err := o.SetupIRIRegistryPartition("/dev/sda", nil, mockUpdateProgress)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(updateProgressCalled).To(BeTrue())
 		})
@@ -662,20 +649,14 @@ last-lba: 629145566`
 			}
 			o = NewOpsWithConfig(testConfig, logrus.New(), mockExec).(*ops)
 
-			// Create registry directory
-			isoRegistryPath := "/run/media/iso/registry"
-			err := os.MkdirAll(isoRegistryPath, 0755)
-			if err != nil {
-				Skip("Cannot create /run/media/iso/registry - requires root or proper permissions")
-			}
-			defer os.RemoveAll("/run/media")
-
 			// Mock minimal commands to verify it's not skipped
 			lsblkOutput := `{"blockdevices": [{"name": "sda", "size": 322122547200}]}`
 			sfdiskDump := `sector-size: 512
 last-lba: 629145566`
 
 			gomock.InOrder(
+				// Mock stat call for FileExists check - registry exists
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "stat", []string{"/run/media/iso/registry"}, gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(lsblkOutput, nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sfdisk", gomock.Any(), gomock.Any()).Return(sfdiskDump, nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sh", gomock.Any(), gomock.Any()).Return("", nil),
@@ -683,31 +664,26 @@ last-lba: 629145566`
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "udevadm", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "type": "disk", "children": [{"name": "sda1"}, {"name": "sda2"}, {"name": "sda3"}, {"name": "sda4"}, {"name": "sda5"}]}]}`, nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mkfs.xfs", gomock.Any(), gomock.Any()).Return("", nil),
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "type": "disk", "children": [{"name": "sda1"}, {"name": "sda2"}, {"name": "sda3"}, {"name": "sda4"}, {"name": "sda5"}]}]}`, nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mkdir", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mount", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sh", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "umount", gomock.Any(), gomock.Any()).Return("", nil),
 			)
 
-			err = o.SetupIRIRegistryPartition("/dev/sda", nil, mockUpdateProgress)
+			err := o.SetupIRIRegistryPartition("/dev/sda", nil, mockUpdateProgress)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(updateProgressCalled).To(BeTrue())
 		})
 
 		It("should call updateProgress during setup", func() {
-			// Create registry directory
-			isoRegistryPath := "/run/media/iso/registry"
-			err := os.MkdirAll(isoRegistryPath, 0755)
-			if err != nil {
-				Skip("Cannot create /run/media/iso/registry - requires root or proper permissions")
-			}
-			defer os.RemoveAll("/run/media")
-
 			// Mock all commands for successful setup
 			lsblkOutput := `{"blockdevices": [{"name": "sda", "size": 322122547200}]}`
 			sfdiskDump := `last-lba: 629145566`
 
 			gomock.InOrder(
+				// Mock stat call for FileExists check - registry exists
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "stat", []string{"/run/media/iso/registry"}, gomock.Any()).Return("", nil),
 				// verifyDiskSpaceForIRI
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(lsblkOutput, nil),
 
@@ -716,16 +692,18 @@ last-lba: 629145566`
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sh", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "partx", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "udevadm", gomock.Any(), gomock.Any()).Return("", nil),
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "type": "disk", "children": [{"name": "sda1"}, {"name": "sda2"}, {"name": "sda3"}, {"name": "sda4"}, {"name": "sda5"}]}]}`, nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mkfs.xfs", gomock.Any(), gomock.Any()).Return("", nil),
 
 				// copyRegistryDataToPartition
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "type": "disk", "children": [{"name": "sda1"}, {"name": "sda2"}, {"name": "sda3"}, {"name": "sda4"}, {"name": "sda5"}]}]}`, nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mkdir", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mount", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sh", gomock.Any(), gomock.Any()).Return("", nil), // rsync
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "umount", gomock.Any(), gomock.Any()).Return("", nil),
 			)
 
-			err = o.SetupIRIRegistryPartition("/dev/sda", nil, mockUpdateProgress)
+			err := o.SetupIRIRegistryPartition("/dev/sda", nil, mockUpdateProgress)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(updateProgressCalled).To(BeTrue())
 			Expect(lastStage).To(Equal(models.HostStageCopyingRegistryDataToDisk))
