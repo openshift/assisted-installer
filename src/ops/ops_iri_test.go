@@ -368,9 +368,11 @@ last-lba: 78643166
 				).DoAndReturn(func(writer io.Writer, command string, args []string, opts ...execute.CommandOption) (string, error) {
 					cmdString := args[1] // args = ["-c", "command"]
 					// With 4096 byte sectors, 150GB partition = 39321600 sectors (not 314572800)
-					// Verify the calculation is correct for 4096 byte sectors
+					// start = last-lba - size - 2048 + 1 = 78643166 - 39321600 - 2048 + 1 = 39319519
 					Expect(cmdString).To(ContainSubstring("sfdisk -d /dev/sda"))
 					Expect(cmdString).To(ContainSubstring("/dev/sda5"))
+					Expect(cmdString).To(ContainSubstring("start=39319519"))
+					Expect(cmdString).To(ContainSubstring("size=39321600"))
 					return "", nil
 				}),
 
