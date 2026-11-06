@@ -1659,7 +1659,7 @@ func (o *ops) copyRegistryDataToPartition(liveLogger io.Writer, device string) e
 	}
 
 	// Create temporary mount point
-	if err := o.Mkdir(iriRegistryTempMount); err != nil {
+	if err = o.Mkdir(iriRegistryTempMount); err != nil {
 		return errors.Wrapf(err, "failed to create temporary mount point %s", iriRegistryTempMount)
 	}
 
