@@ -25,8 +25,11 @@ import (
 	"unicode"
 
 	config_latest "github.com/coreos/ignition/v2/config/v3_2"
+	"github.com/coreos/ignition/v2/config/v3_2/types"
+	"github.com/coreos/ignition/v2/config/validate"
 	"github.com/go-openapi/swag"
 	"github.com/openshift/assisted-installer/src/config"
+	"github.com/openshift/assisted-installer/src/ignition"
 	"github.com/openshift/assisted-installer/src/ops/execute"
 	"github.com/openshift/assisted-installer/src/utils"
 	mcfgv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
@@ -51,7 +54,28 @@ const (
 	firstBootNetworkDirOnBoot       = "/mnt/boot/coreos-firstboot-network"
 	firstBootNetworkSentinelOnBoot  = "/mnt/boot/coreos-firstboot-network.deliberate"
 	networkDirArg                   = "--network-dir"
+
+	iriRegistryPartitionLabel = "iri-registry"
+	iriRegistryMountPoint     = "/var/lib/iri-registry"
+	iriRegistryTempMount      = "/mnt/iri-registry"
 )
+
+// iriPartitionConfig holds IRI partition geometry configuration.
+// Currently hardcoded with defaults. In the future, these values may come
+// from Assisted Service via installer Config, but for now we keep them
+// internal to ops package.
+type iriPartitionConfig struct {
+	sizeGB     int // Partition size in GB
+	reservedGB int // Reserved space after partition in GB (for future expansion)
+}
+
+// defaultIRIPartitionConfig defines default IRI partition configuration.
+// sizeGB: 150GB partition size
+// reservedGB: 0 = no reserved space (partition at end of disk)
+var defaultIRIPartitionConfig = iriPartitionConfig{
+	sizeGB:     150,
+	reservedGB: 0,
+}
 
 // Supports: registry.io/repo:tag, registry.io:port/repo:tag, repo@sha256:digest, repo:tag@sha256:digest
 var imageReferencePattern = regexp.MustCompile(`^[a-zA-Z0-9._-]+(:[0-9]+)?(/[a-zA-Z0-9._/-]+)?(:[a-zA-Z0-9._-]+)?(@sha256:[a-fA-F0-9]{64})?$`)
@@ -83,7 +107,8 @@ type Ops interface {
 	ReadFile(filePath string) ([]byte, error)
 	GetEncapsulatedMC(ignitionPath string) (*mcfgv1.MachineConfig, error)
 	OverwriteOsImage(osImage, device string, extraArgs []string) error
-	CopyRegistryData(liveLogger io.Writer, device string) error
+	PrepareIRIRegistryIgnition(ignitionPath string) error
+	SetupIRIRegistryPartition(device string, liveLogger io.Writer) error
 }
 
 const (
@@ -1063,6 +1088,22 @@ func stripDev(device string) string {
 	return strings.Replace(device, "/dev/", "", 1)
 }
 
+// makePartitionDevicePath constructs the partition device path for use in sfdisk scripts.
+// Handles different device naming conventions:
+// - /dev/sda + partition 5 = /dev/sda5 (traditional SCSI/SATA)
+// - /dev/nvme0n1 + partition 5 = /dev/nvme0n1p5 (NVMe - ends with digit, needs 'p')
+// - /dev/mmcblk0 + partition 5 = /dev/mmcblk0p5 (MMC - ends with digit, needs 'p')
+func makePartitionDevicePath(device string, partitionNumber int) string {
+	// Check if device name ends with a digit
+	// For such devices (nvme0n1, mmcblk0, loop0), we need a 'p' separator
+	deviceName := device
+	if len(deviceName) > 0 && deviceName[len(deviceName)-1] >= '0' && deviceName[len(deviceName)-1] <= '9' {
+		return fmt.Sprintf("%sp%d", device, partitionNumber)
+	}
+	// For traditional devices (sda, vda, xvda), just append the number
+	return fmt.Sprintf("%s%d", device, partitionNumber)
+}
+
 // getPartitionPathFromLsblk uses lsblk to find the actual partition device path
 // for a given device and partition number. This handles all device types including
 // device mapper devices correctly.
@@ -1338,106 +1379,385 @@ func (o *ops) getRegistryDataSize(dataPath string) (int64, error) {
 	return size, nil
 }
 
-func (o *ops) CopyRegistryData(liveLogger io.Writer, device string) error {
-	type cmd struct {
-		liveLogger io.Writer
-		command    string
-		args       []string
-	}
-
-	makecmd := func(liveLogger io.Writer, commad string, args ...string) *cmd {
-		return &cmd{liveLogger: liveLogger, command: commad, args: args}
-	}
-
-	// Get the size of the registry data
-	registryDataSize, err := o.getRegistryDataSize(registryDataDirOnMnt)
+// TEMPORARY: This function should be REMOVED once MCO provides the IRI registry
+// mount unit in the master machineconfig.
+//
+// Migration path (3 phases):
+// Phase 1 (now): AI adds mount unit to ignition (this code)
+// Phase 2: MCO adds mount unit to master machineconfig (AI detects and skips)
+// Phase 3: Remove this function from AI (MCO is authoritative source)
+//
+// This function is idempotent: if the mount unit already exists (e.g., from MCO),
+// it skips adding it again.
+func (o *ops) addRegistryMountUnitToIgnitionTemporary(ignitionPath string) error {
+	// Parse existing ignition config
+	ign := ignition.NewIgnition()
+	config, err := ign.ParseIgnitionFile(ignitionPath)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to parse ignition file %s", ignitionPath)
 	}
 
-	// Calculate the target free percent of the device. Reserve at least 2.5 times
-	// the current data registry size.
-	requestedSize := registryDataSize * 5 / 2
-	freePercent, err := o.calculateFreePercent(device, &requestedSize)
-	if err != nil {
-		return err
-	}
-	o.log.Infof("Requesting at least %d bytes for the root partition on device %s (current registry size: %d bytes)", requestedSize, device, registryDataSize)
-	// Ensure to have at least some minimum free space available otherwise coreos-gpt-setup.service may fail on the next reboot,
-	// since it requires at least some free blocks at the end of the disk.
-	minAllowedFreePercent := int64(1)
-	if freePercent < minAllowedFreePercent {
-		return errors.Errorf("device %s is not large enough to fit the registry data (%d bytes)", device, requestedSize)
-	}
-
-	// Generate command for growing root partition to fit the requested size
-	partIndex := "4"
-	growPartCmd := makecmd(nil, "growpart", fmt.Sprintf("--free-percent=%d", freePercent), device, partIndex)
-
-	// Get root partition path
-	partition4, err := o.getPartitionPathFromLsblk(device, partIndex)
-	if err != nil {
-		return errors.Wrapf(err, "failed to find partition %s for device %s", partIndex, device)
-	}
-
-	// Generate the path to the registry data directory on the mounted root partitio
-	registryDataDirOnRoot := filepath.Join(ostreeDeployPath, registryDataDirOnDevice)
-
-	// Generate the command for copying the registry data directory to the device
-	copyCmd := makecmd(liveLogger, "sh", "-c", fmt.Sprintf("rsync -ah --info=progress2 %s/ %s/", registryDataDirOnMnt, registryDataDirOnRoot))
-
-	// Generate the command for unfreezing the root partition (frozen by OverwriteOsImage func)
-	// Ignoring errors if the partition is already unfrozen
-	mntTmpPath := "/mnt/root"
-	fsUnfreezeCmd := makecmd(nil, "sh", "-c", fmt.Sprintf("fsfreeze --unfreeze %s || true", mntTmpPath))
-	fsFreezeCmd := makecmd(nil, "fsfreeze", "--freeze", mntTmpPath)
-	mountCmd := makecmd(nil, "mount", partition4, mntTmpPath)
-	unmountCmd := makecmd(nil, "umount", mntTmpPath)
-
-	ignTransposeScript := "/usr/lib/dracut/modules.d/40ignition-ostree/ignition-ostree-transposefs.sh"
-	// The transposefs script does not have a way to apply unconditionally the autosave-xfs command
-	xfsForceAutosaveCmd := makecmd(nil, "bash", "-c", fmt.Sprintf(`sed 's/threshold=[0-9]*/threshold=0/' %s | bash -s autosave-xfs`, ignTransposeScript))
-	xfsRestoreCommand := makecmd(nil, "bash", "-c", fmt.Sprintf("%s restore", ignTransposeScript))
-	xfsCleanupCommand := makecmd(nil, "bash", "-c", fmt.Sprintf("%s cleanup", ignTransposeScript))
-
-	cmds := []*cmd{
-		makecmd(nil, "mkdir", "-p", mntTmpPath),
-
-		// Unfreeze
-		mountCmd,
-		fsUnfreezeCmd,
-		unmountCmd, // This is required before invoking the autosave-xfs
-
-		// Extend the root partition to allow the autosave-xfs command to recalculate the new AG size
-		// before copying the InternalReleaseImage registry data.
-		// See https://github.com/coreos/fedora-coreos-tracker/issues/1183 for more details.
-		growPartCmd,
-		xfsForceAutosaveCmd,
-		xfsRestoreCommand,
-		xfsCleanupCommand,
-
-		// Copy registry data
-		mountCmd, // Re-mount before copying data
-		makecmd(nil, "xfs_growfs", mntTmpPath),
-		makecmd(nil, "mkdir", "-p", registryDataDirOnRoot),
-		copyCmd,
-
-		// Freeze
-		fsFreezeCmd,
-		unmountCmd,
-	}
-	for i := range cmds {
-		c := cmds[i]
-		o.log.Infof("Running %s with args %+v", c.command, c.args)
-		if err := utils.Retry(3, 5*time.Second, o.log, func() (ret error) {
-			_, ret = o.ExecPrivilegeCommand(c.liveLogger, c.command, c.args...)
-			if ret != nil {
-				o.log.Warnf("Retrying command %s with args %+v (returned error %v)", c.command, c.args, ret)
-			}
-			return
-		}); err != nil {
-			return errors.Wrapf(err, "failed to run %s with args %+v", c.command, c.args)
+	// Check if mount unit already exists (idempotency check)
+	// This allows smooth migration: MCO can add the mount unit and AI will skip it
+	mountUnitName := "var-lib-iri\\x2dregistry.mount"
+	for _, unit := range config.Systemd.Units {
+		if unit.Name == mountUnitName {
+			o.log.Infof("IRI registry mount unit '%s' already present in ignition, skipping (likely from MCO)", mountUnitName)
+			return nil
 		}
 	}
+
+	o.log.Info("Adding IRI registry mount unit to ignition (temporary workaround until MCO provides it)")
+
+	// Create systemd mount unit content
+	// Note: The mount unit name MUST match the Where= path with systemd escaping rules:
+	// - '/' becomes '-'
+	// - '-' in the original path becomes '\x2d'
+	// Path /var/lib/iri-registry -> var-lib-iri\x2dregistry.mount
+	mountUnitContent := `[Unit]
+Description=Mount IRI Registry Partition
+DefaultDependencies=no
+Conflicts=umount.target
+Before=local-fs.target umount.target iri-registry.service
+
+[Mount]
+What=/dev/disk/by-partlabel/iri-registry
+Where=/var/lib/iri-registry
+Type=xfs
+Options=defaults
+
+[Install]
+WantedBy=local-fs.target
+`
+
+	// Create the mount unit
+	// Name uses \\x2d (double backslash in Go string) -> becomes \x2d in ignition
+	enabled := true
+	mountUnit := types.Unit{
+		Name:     "var-lib-iri\\x2dregistry.mount",
+		Enabled:  &enabled,
+		Contents: &mountUnitContent,
+	}
+
+	// Add mount unit to systemd units
+	config.Systemd.Units = append(config.Systemd.Units, mountUnit)
+
+	// Validate the modified config
+	report := validate.ValidateWithContext(*config, nil)
+	if report.IsFatal() {
+		return errors.Errorf("modified ignition config is invalid: %s", report.String())
+	}
+
+	// Write the modified ignition back
+	if err := ign.WriteIgnitionFile(ignitionPath, config); err != nil {
+		return errors.Wrapf(err, "failed to write modified ignition file %s", ignitionPath)
+	}
+
+	o.log.Info("Successfully added IRI registry mount unit to ignition")
+	return nil
+}
+
+// verifyDiskSpaceForIRI checks if the device has enough free space for the IRI partition
+func (o *ops) verifyDiskSpaceForIRI(device string) error {
+	type node struct {
+		Name     string  `json:"name"`
+		Size     int64   `json:"size"`
+		Children []*node `json:"children,omitempty"`
+	}
+	var disks struct {
+		Blockdevices []*node `json:"blockdevices"`
+	}
+
+	ret, err := o.ExecPrivilegeCommand(nil, "lsblk", "--bytes", "--json", device)
+	if err != nil {
+		return errors.Wrap(err, "failed to run lsblk command")
+	}
+	if err = json.Unmarshal([]byte(ret), &disks); err != nil {
+		return errors.Wrap(err, "failed to unmarshal lsblk output")
+	}
+
+	if len(disks.Blockdevices) == 0 {
+		return errors.Errorf("no block device information returned for %s", device)
+	}
+
+	disk := disks.Blockdevices[0]
+	totalDiskSize := disk.Size
+
+	// Calculate actually used space by summing existing partitions
+	var usedSpace int64
+	for _, partition := range disk.Children {
+		usedSpace += partition.Size
+	}
+	freeSpace := totalDiskSize - usedSpace
+
+	// Use partition config (may be dynamically calculated from registry data size)
+	partConfig := defaultIRIPartitionConfig
+	requiredSize := int64(partConfig.sizeGB) * 1024 * 1024 * 1024
+	requiredSize += int64(partConfig.reservedGB) * 1024 * 1024 * 1024
+
+	if freeSpace < requiredSize {
+		return errors.Errorf("not enough free space on %s: free=%d bytes, required=%d bytes (%dGB IRI partition + %dGB reserved)",
+			device, freeSpace, requiredSize, partConfig.sizeGB, partConfig.reservedGB)
+	}
+
+	o.log.Infof("Disk %s has sufficient free space: %d bytes (required: %d bytes for %dGB IRI partition + %dGB reserved)",
+		device, freeSpace, requiredSize, partConfig.sizeGB, partConfig.reservedGB)
+	return nil
+}
+
+// createIRIRegistryPartition creates partition 5 at the end of the disk for IRI registry.
+//
+// This function executes the following commands:
+//
+//  1. sfdisk -d /dev/sda
+//     Dumps the current partition table to get the GPT last-lba (last usable sector).
+//     GPT reserves sectors at the end of the disk for the backup partition table,
+//     so we can't use the full disk size.
+//
+// 2. Calculate partition geometry:
+//
+//   - Partition size: 150GB = 314572800 sectors (512 bytes/sector)
+//
+//   - Start sector: last-lba - partition_size + 1
+//     This places the partition at the very end of the usable disk space.
+//
+//     3. (sfdisk -d /dev/sda; echo "/dev/sda5 : start=X, size=Y, type=GUID") | sfdisk --no-reread /dev/sda
+//     Creates partition 5 by:
+//
+//   - Dumping existing partition table
+//
+//   - Appending new partition 5 definition
+//
+//   - Writing combined table back to disk
+//     Uses --no-reread because disk is in use during installation (partitions 1-4 mounted).
+//     GPT type GUID: 0FC63DAF-8483-4772-8E79-3D69D8477DE4 = Linux filesystem
+//
+//     4. partx -u /dev/sda
+//     Updates the kernel's in-memory partition table to recognize the new partition 5.
+//     Used instead of partprobe because the disk is actively in use.
+//
+//     5. udevadm settle
+//     Waits for udev to finish processing device events, ensuring /dev/sda5 and
+//     /dev/disk/by-partlabel/iri-registry device nodes are created before we proceed.
+func (o *ops) createIRIRegistryPartition(device string) error {
+	o.log.Infof("Creating IRI registry partition on device %s", device)
+
+	// Step 1: Get partition table dump to extract last-lba
+	// Command: sfdisk -d /dev/sda
+	dump, err := o.ExecPrivilegeCommand(nil, "sfdisk", "-d", device)
+	if err != nil {
+		return errors.Wrapf(err, "failed to dump partition table for %s", device)
+	}
+
+	// Step 2: Extract last-lba and sector-size from dump
+	// GPT reserves sectors at end for backup partition table, so we must use last-lba
+	// instead of total disk size to avoid "sector beyond last-lba" errors
+	var lastLBA int64
+	var sectorSize int64 = 512 // default fallback
+	for _, line := range strings.Split(dump, "\n") {
+		if strings.HasPrefix(line, "last-lba:") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				lastLBA, err = strconv.ParseInt(fields[1], 10, 64)
+				if err != nil {
+					return errors.Wrap(err, "failed to parse last-lba")
+				}
+			}
+		} else if strings.HasPrefix(line, "sector-size:") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				sectorSize, err = strconv.ParseInt(fields[1], 10, 64)
+				if err != nil {
+					return errors.Wrap(err, "failed to parse sector-size")
+				}
+			}
+		}
+	}
+	if lastLBA == 0 {
+		return errors.Errorf("could not find last-lba in partition table for %s", device)
+	}
+
+	// Step 3: Calculate partition geometry in sectors
+	// Use default partition config (future: may come from installer config)
+	partConfig := defaultIRIPartitionConfig
+
+	partitionSizeBytes := int64(partConfig.sizeGB) * 1024 * 1024 * 1024
+	partitionSizeSectors := partitionSizeBytes / sectorSize
+
+	// Calculate reserved space (space to leave unallocated after partition)
+	reservedSpaceBytes := int64(partConfig.reservedGB) * 1024 * 1024 * 1024
+	reservedSpaceSectors := reservedSpaceBytes / sectorSize
+
+	// Leave margin for GPT backup table (2048 sectors = 1MB)
+	// This prevents "Secondary partition table overlaps" error from coreos-gpt-setup
+	// The GPT backup table needs space at the end of disk, we leave 1MB before last-lba
+	gptBackupMargin := int64(2048)
+
+	// Calculate start sector: last-lba - partition_size - reserved_space - gpt_margin + 1
+	// This ensures partition ends at (last-lba - gpt_margin), leaving space for GPT backup
+	startSector := lastLBA - partitionSizeSectors - reservedSpaceSectors - gptBackupMargin + 1
+
+	// Verify partition starts after the 25000 MiB threshold recommended by Red Hat.
+	// See: https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/postinstallation_configuration/post-install-node-tasks
+	// This ensures proper alignment and leaves sufficient space for root partition expansion.
+	// CoreOS also requires root >= 8 GiB to boot successfully:
+	// See: https://github.com/coreos/fedora-coreos-docs/blob/main/modules/ROOT/pages/storage.adoc
+	startBytes := startSector * sectorSize
+	startMiB := startBytes / (1024 * 1024)
+	const minStartMiB = 25000
+
+	if startMiB < minStartMiB {
+		return errors.Errorf("IRI partition would start at %d MiB, before recommended %d MiB threshold (disk too small or partitions too large)",
+			startMiB, minStartMiB)
+	}
+
+	o.log.Infof("Creating %dGB partition (last-lba: %d, start: %d, size: %d sectors, start offset: %d MiB, reserved: %dGB)",
+		partConfig.sizeGB, lastLBA, startSector, partitionSizeSectors, startMiB, partConfig.reservedGB)
+
+	// Step 4: Create partition using sfdisk dump + append approach
+	// Command: (sfdisk -d /dev/sda; echo "/dev/sda5 : start=X, size=Y, type=GUID, name=LABEL") | sfdisk --no-reread /dev/sda
+	// GPT type GUID: 0FC63DAF-8483-4772-8E79-3D69D8477DE4 = Linux filesystem
+	// name sets the partition label (creates /dev/disk/by-partlabel/iri-registry symlink)
+	// Use makePartitionDevicePath to handle different device types (nvme0n1p5, sda5, etc.)
+	partitionDevicePath := makePartitionDevicePath(device, 5)
+	newPartLine := fmt.Sprintf("%s : start=%d, size=%d, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, name=\"%s\"",
+		partitionDevicePath, startSector, partitionSizeSectors, iriRegistryPartitionLabel)
+	sfdiskCmd := fmt.Sprintf("(sfdisk -d %s; echo '%s') | sfdisk --no-reread %s", device, newPartLine, device)
+
+	o.log.Infof("Running: %s", sfdiskCmd)
+	_, err = o.ExecPrivilegeCommand(o.logWriter, "sh", "-c", sfdiskCmd)
+	if err != nil {
+		return errors.Wrapf(err, "failed to create partition 5 on device %s", device)
+	}
+
+	// Step 5: Update kernel partition table
+	// Command: partx -u /dev/sda
+	// Disk is in use (partitions 1-4 mounted), so we use partx instead of partprobe
+	o.log.Infof("Updating kernel partition table with partx")
+	_, err = o.ExecPrivilegeCommand(o.logWriter, "partx", "-u", device)
+	if err != nil {
+		return errors.Wrapf(err, "failed to update kernel partition table for %s", device)
+	}
+
+	// Wait for udev to finish processing device events
+	o.log.Info("Waiting for udev to settle")
+	_, err = o.ExecPrivilegeCommand(o.logWriter, "udevadm", "settle")
+	if err != nil {
+		return errors.Wrapf(err, "failed to wait for udev to settle after creating partition on %s", device)
+	}
+
+	// Get the partition 5 device path
+	partition5, err := o.getPartitionPathFromLsblk(device, "5")
+	if err != nil {
+		return errors.Wrapf(err, "failed to find partition 5 on device %s after creation", device)
+	}
+
+	o.log.Infof("Partition 5 created at %s, formatting with XFS", partition5)
+
+	// Format partition 5 with XFS (-f forces overwrite on reinstall)
+	_, err = o.ExecPrivilegeCommand(o.logWriter, "mkfs.xfs", "-f", "-L", iriRegistryPartitionLabel, partition5)
+	if err != nil {
+		return errors.Wrapf(err, "failed to format partition %s with XFS", partition5)
+	}
+
+	o.log.Infof("Successfully created and formatted IRI registry partition at %s", partition5)
+	return nil
+}
+
+// copyRegistryDataToPartition mounts partition 5 and copies registry data to it
+func (o *ops) copyRegistryDataToPartition(liveLogger io.Writer, device string) error {
+	o.log.Info("Copying registry data to IRI partition")
+
+	// Get partition 5 path
+	partition5, err := o.getPartitionPathFromLsblk(device, "5")
+	if err != nil {
+		return errors.Wrapf(err, "failed to find partition 5 on device %s", device)
+	}
+
+	// Create temporary mount point
+	if err = o.Mkdir(iriRegistryTempMount); err != nil {
+		return errors.Wrapf(err, "failed to create temporary mount point %s", iriRegistryTempMount)
+	}
+
+	// Mount partition 5
+	o.log.Infof("Mounting %s to %s", partition5, iriRegistryTempMount)
+	_, err = o.ExecPrivilegeCommand(o.logWriter, "mount", partition5, iriRegistryTempMount)
+	if err != nil {
+		return errors.Wrapf(err, "failed to mount %s to %s", partition5, iriRegistryTempMount)
+	}
+
+	// Ensure unmount on exit
+	defer func() {
+		o.log.Infof("Unmounting %s", iriRegistryTempMount)
+		if _, unmountErr := o.ExecPrivilegeCommand(o.logWriter, "umount", iriRegistryTempMount); unmountErr != nil {
+			o.log.WithError(unmountErr).Warnf("Failed to unmount %s", iriRegistryTempMount)
+		}
+	}()
+
+	// Copy registry data using rsync with progress reporting
+	// Source: /mnt/agentdata/  (registryDataDirOnMnt)
+	// Destination: /mnt/iri-registry/
+	rsyncCmd := fmt.Sprintf("rsync -ah --info=progress2 %s/ %s/", registryDataDirOnMnt, iriRegistryTempMount)
+
+	o.log.Infof("Running rsync to copy registry data")
+	_, err = o.ExecPrivilegeCommand(liveLogger, "sh", "-c", rsyncCmd)
+	if err != nil {
+		return errors.Wrapf(err, "failed to copy registry data from %s to %s", registryDataDirOnMnt, iriRegistryTempMount)
+	}
+
+	o.log.Info("Successfully copied registry data to IRI partition")
+	return nil
+}
+
+// PrepareIRIRegistryIgnition adds the IRI registry mount unit to ignition if not already present.
+// This must be called BEFORE writeImageToDisk() so that coreos-installer
+// embeds the modified ignition with the mount unit into the disk image.
+//
+// TEMPORARY: This function is idempotent and will be removed once MCO provides
+// the mount unit in the master machineconfig (3-phase migration):
+// Phase 1 (now): AI adds mount unit
+// Phase 2: MCO adds mount unit (AI detects and skips)
+// Phase 3: Remove this function from AI
+func (o *ops) PrepareIRIRegistryIgnition(ignitionPath string) error {
+	o.log.Info("Preparing IRI registry mount unit in ignition")
+
+	// Add systemd mount unit to ignition
+	// This must happen BEFORE coreos-installer writes the image to disk
+	if err := o.addRegistryMountUnitToIgnitionTemporary(ignitionPath); err != nil {
+		return err
+	}
+
+	o.log.Info("Successfully prepared IRI registry ignition")
+	return nil
+}
+
+// SetupIRIRegistryPartition creates partition 5 and copies IRI registry data.
+// This must be called AFTER writeImageToDisk() because:
+// 1. coreos-installer creates partitions 1-4 during writeImageToDisk
+// 2. We create partition 5 at the end of the disk after partitions 1-4 exist
+//
+// The function performs the following steps:
+// 1. Verifies disk has sufficient space (150GB minimum + 20GB overhead)
+// 2. Creates partition 5 at the END of the disk (preserves root auto-expansion)
+// 3. Formats partition 5 with XFS filesystem
+// 4. Copies registry data from /run/media/iso/registry to partition 5
+func (o *ops) SetupIRIRegistryPartition(device string, liveLogger io.Writer) error {
+	o.log.Info("Starting IRI registry partition setup")
+	o.log.Infof("Verifying disk space and creating partition 5 on %s", device)
+
+	if err := o.verifyDiskSpaceForIRI(device); err != nil {
+		return err
+	}
+
+	if err := o.createIRIRegistryPartition(device); err != nil {
+		return err
+	}
+
+	o.log.Info("Copying registry data to partition 5")
+	if err := o.copyRegistryDataToPartition(liveLogger, device); err != nil {
+		return err
+	}
+
+	o.log.Info("IRI registry partition setup completed successfully")
 	return nil
 }
