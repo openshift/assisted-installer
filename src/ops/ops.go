@@ -1638,8 +1638,8 @@ func (o *ops) createIRIRegistryPartition(device string) error {
 
 	o.log.Infof("Partition 5 created at %s, formatting with XFS", partition5)
 
-	// Format partition 5 with XFS
-	_, err = o.ExecPrivilegeCommand(o.logWriter, "mkfs.xfs", "-L", iriRegistryPartitionLabel, partition5)
+	// Format partition 5 with XFS (-f forces overwrite on reinstall)
+	_, err = o.ExecPrivilegeCommand(o.logWriter, "mkfs.xfs", "-f", "-L", iriRegistryPartitionLabel, partition5)
 	if err != nil {
 		return errors.Wrapf(err, "failed to format partition %s with XFS", partition5)
 	}

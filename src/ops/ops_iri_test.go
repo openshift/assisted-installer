@@ -296,7 +296,7 @@ last-lba: 629145566
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"mkfs.xfs",
-					[]string{"-L", "iri-registry", "/dev/sda5"},
+					[]string{"-f", "-L", "iri-registry", "/dev/sda5"},
 					gomock.Any(),
 				).Return("", nil),
 			)
@@ -402,7 +402,7 @@ last-lba: 78643166
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"mkfs.xfs",
-					[]string{"-L", "iri-registry", "/dev/sda5"},
+					[]string{"-f", "-L", "iri-registry", "/dev/sda5"},
 					gomock.Any(),
 				).Return("", nil),
 			)
@@ -478,7 +478,7 @@ last-lba: 629145566
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"mkfs.xfs",
-					[]string{"-L", "iri-registry", "/dev/nvme0n1p5"},
+					[]string{"-f", "-L", "iri-registry", "/dev/nvme0n1p5"},
 					gomock.Any(),
 				).Return("", nil),
 			)
