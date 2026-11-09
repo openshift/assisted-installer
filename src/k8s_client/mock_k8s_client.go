@@ -31,6 +31,7 @@ import (
 type MockK8SClient struct {
 	ctrl     *gomock.Controller
 	recorder *MockK8SClientMockRecorder
+	isgomock struct{}
 }
 
 // MockK8SClientMockRecorder is the mock recorder for MockK8SClient.
