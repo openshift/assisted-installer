@@ -1,0 +1,22 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: assisted-installer-controller-csr-approval
+  namespace: assisted-installer
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - create
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    resourceNames:
+      - assisted-installer-csr-approval
+    verbs:
+      - get
+      - update
+      - patch
