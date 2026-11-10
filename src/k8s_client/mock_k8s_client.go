@@ -77,6 +77,20 @@ func (mr *MockK8SClientMockRecorder) CreateEvent(namespace, name, message, compo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEvent", reflect.TypeOf((*MockK8SClient)(nil).CreateEvent), namespace, name, message, component)
 }
 
+// CreateOrPatchConfigMapData mocks base method.
+func (m *MockK8SClient) CreateOrPatchConfigMapData(namespace, name string, data map[string]string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateOrPatchConfigMapData", namespace, name, data)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateOrPatchConfigMapData indicates an expected call of CreateOrPatchConfigMapData.
+func (mr *MockK8SClientMockRecorder) CreateOrPatchConfigMapData(namespace, name, data any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOrPatchConfigMapData", reflect.TypeOf((*MockK8SClient)(nil).CreateOrPatchConfigMapData), namespace, name, data)
+}
+
 // DeleteInstallPlan mocks base method.
 func (m *MockK8SClient) DeleteInstallPlan(installPlan types.NamespacedName) error {
 	m.ctrl.T.Helper()
