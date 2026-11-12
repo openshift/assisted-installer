@@ -25,13 +25,13 @@ arches:
     name: gzip
     evr: 1.12-2.el9_8
     sourcerpm: gzip-1.12-2.el9_8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libblkid-2.37.4-28.el9_9.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libblkid-2.37.4-28.el9_9.1.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 113471
-    checksum: sha256:243fe6d80f73d66e476425f1798e16ef316ffab936ecfcb80e0502e4596da7ae
+    size: 113696
+    checksum: sha256:e2307632f494302b1884047003c99ec0c9590e77439d1512f61459bb8286ba93
     name: libblkid
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libdb-5.3.28-57.el9_6.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 727417
@@ -46,20 +46,20 @@ arches:
     name: libeconf
     evr: 0.4.1-7.el9_8
     sourcerpm: libeconf-0.4.1-7.el9_8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libfdisk-2.37.4-28.el9_9.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libfdisk-2.37.4-28.el9_9.1.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 156258
-    checksum: sha256:28e7fefcc9bc620addb0130045638602d6e81ca322f54d931c705a0a9ff39a42
+    size: 156383
+    checksum: sha256:8cf7c8a401f993e6a1abce07d2f82d728323be7b9cf39bcdaf10a5c2e8804042
     name: libfdisk
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libmount-2.37.4-28.el9_9.aarch64.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libmount-2.37.4-28.el9_9.1.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 140768
-    checksum: sha256:9b5500aa7db7704a1b8394b422617009b8672cd62220e1fc4050c4a84a1514b8
+    size: 140796
+    checksum: sha256:946737fb38165fb190c85a74a1523e56ca488da3f2c2adfce68b5c3eaa11d1af
     name: libmount
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libpwquality-1.4.4-8.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 125712
@@ -67,13 +67,13 @@ arches:
     name: libpwquality
     evr: 1.4.4-8.el9
     sourcerpm: libpwquality-1.4.4-8.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libsmartcols-2.37.4-28.el9_9.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libsmartcols-2.37.4-28.el9_9.1.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 66993
-    checksum: sha256:2b7096e67b9d2868ce26da2882f8e86ec4d52d7696664fd469f92d683e0ab563
+    size: 67106
+    checksum: sha256:f1480925e1a0ed0f7096899f8382e200b80c1367d77ed8474e43098a9f85fdcc
     name: libsmartcols
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libutempter-1.2.1-6.el9.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 30505
@@ -81,13 +81,13 @@ arches:
     name: libutempter
     evr: 1.2.1-6.el9
     sourcerpm: libutempter-1.2.1-6.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libuuid-2.37.4-28.el9_9.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/l/libuuid-2.37.4-28.el9_9.1.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 32105
-    checksum: sha256:b20acc449006a4cd6269e91aae1e052ef44138698a7dd6e5199befe696ae1468
+    size: 32321
+    checksum: sha256:abb35d21c3b2c791b8c369443f6df1336c4568d8d10de402dce5cb9bd8979e14
     name: libuuid
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/o/openssl-3.5.8-1.el9_8.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
     size: 1546056
@@ -102,20 +102,20 @@ arches:
     name: pam
     evr: 1.5.1-29.el9
     sourcerpm: pam-1.5.1-29.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/u/util-linux-2.37.4-28.el9_9.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/u/util-linux-2.37.4-28.el9_9.1.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 2388537
-    checksum: sha256:f55b2bccb77823ea4feea59048fce1827d946a23115c9e6f63378c68689d21e2
+    size: 2390954
+    checksum: sha256:b26bac9516fe072f13fdbaefbc9aa2ae5366028697c9497f66dd32161ee174d0
     name: util-linux
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/u/util-linux-core-2.37.4-28.el9_9.aarch64.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/aarch64/baseos/os/Packages/u/util-linux-core-2.37.4-28.el9_9.1.aarch64.rpm
     repoid: rhel-9-for-aarch64-baseos-rpms
-    size: 475127
-    checksum: sha256:7ab7b7e218db6a1805e49364413a3081d3c8b58b064d6f39e4927f4b24e383f3
+    size: 473956
+    checksum: sha256:e0bcb388ee9193876ae577301f3125112311050ad19bfe2599f7a66dbed951da
     name: util-linux-core
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
   source: []
   module_metadata: []
 - arch: ppc64le
@@ -141,13 +141,13 @@ arches:
     name: gzip
     evr: 1.12-2.el9_8
     sourcerpm: gzip-1.12-2.el9_8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libblkid-2.37.4-28.el9_9.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libblkid-2.37.4-28.el9_9.1.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 130075
-    checksum: sha256:9557d0b052f021d3646531add643fed04f49b45bbdb0240ea6ecea3f85aecf2b
+    size: 130688
+    checksum: sha256:d4a2dc69f50ea92a785e85f2767ff956708f6b7b75202e5d1ce3c4c8ac12b6f5
     name: libblkid
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libdb-5.3.28-57.el9_6.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 837087
@@ -162,20 +162,20 @@ arches:
     name: libeconf
     evr: 0.4.1-7.el9_8
     sourcerpm: libeconf-0.4.1-7.el9_8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libfdisk-2.37.4-28.el9_9.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libfdisk-2.37.4-28.el9_9.1.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 176260
-    checksum: sha256:1f9121c830d013d37771dfb90015893971dc6bb2edfaa21b49e068796e753df0
+    size: 176379
+    checksum: sha256:5a389c9becea483b7c9240a1ba17eb4bd921b0e9183e93949487ba3f0fbfbdf6
     name: libfdisk
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libmount-2.37.4-28.el9_9.ppc64le.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libmount-2.37.4-28.el9_9.1.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 161403
-    checksum: sha256:e4d39e974ff7aa522c6381c56bc8d6ba1ad5d861fc1254605e024d6a98064b9f
+    size: 161143
+    checksum: sha256:8c2e8b97cb66978e7c55be1d0f63addc63cdd884bfc580fd0f5a668adfc5e046
     name: libmount
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libpwquality-1.4.4-8.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 128350
@@ -190,13 +190,13 @@ arches:
     name: librtas
     evr: 2.0.6-3.el9
     sourcerpm: librtas-2.0.6-3.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libsmartcols-2.37.4-28.el9_9.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libsmartcols-2.37.4-28.el9_9.1.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 73754
-    checksum: sha256:d8ecb0ed40b3b77ad8c96cab3d3325f509da1d09d04e2f1983aa3ddce7e52e92
+    size: 74091
+    checksum: sha256:1c24912e95dfdce0bb6d90170de372ced85096340aa5fb6872dff155e9933f58
     name: libsmartcols
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libutempter-1.2.1-6.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 30656
@@ -204,13 +204,13 @@ arches:
     name: libutempter
     evr: 1.2.1-6.el9
     sourcerpm: libutempter-1.2.1-6.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libuuid-2.37.4-28.el9_9.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libuuid-2.37.4-28.el9_9.1.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 34279
-    checksum: sha256:305919ef46957fec5f4a75fb623306db7073bb7dd98481673f6a36c68eb8ab7e
+    size: 34441
+    checksum: sha256:4bcd60c9f53a1e011cd67337b9b0b8d1a1081178ff353a5b8076e87ed1d3c202
     name: libuuid
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/o/openssl-3.5.8-1.el9_8.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 1571362
@@ -225,20 +225,20 @@ arches:
     name: pam
     evr: 1.5.1-29.el9
     sourcerpm: pam-1.5.1-29.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/u/util-linux-2.37.4-28.el9_9.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/u/util-linux-2.37.4-28.el9_9.1.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 2426800
-    checksum: sha256:904bea744f21579fe7ffcc6524810c6d7e5959b39ac41cfa26baa1e213d7331c
+    size: 2420484
+    checksum: sha256:05e86be5b070220adb93e1f9e70c4e6b71f9464f208b3b04502cd4e9d42b5a80
     name: util-linux
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/u/util-linux-core-2.37.4-28.el9_9.ppc64le.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/u/util-linux-core-2.37.4-28.el9_9.1.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 496417
-    checksum: sha256:76e3680b192fe44d49440a30af5029ce57edf9a46deb0a4a47bb0e5249226351
+    size: 497537
+    checksum: sha256:d3e607e069d93e69307f1d02feb2cf957ab5bcdc4b6124b1f500be498ce9807d
     name: util-linux-core
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
   source: []
   module_metadata: []
 - arch: s390x
@@ -264,13 +264,13 @@ arches:
     name: gzip
     evr: 1.12-2.el9_8
     sourcerpm: gzip-1.12-2.el9_8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libblkid-2.37.4-28.el9_9.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libblkid-2.37.4-28.el9_9.1.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 110906
-    checksum: sha256:70c29e1572326761a7ff518bbf451cbd285b423f802c63b43b8be352e5a87587
+    size: 111184
+    checksum: sha256:948c17b08da0966688ee50c0a559a8e852cee54f9d7f7aa68495164cbbf4f43d
     name: libblkid
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libdb-5.3.28-57.el9_6.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 721041
@@ -285,20 +285,20 @@ arches:
     name: libeconf
     evr: 0.4.1-7.el9_8
     sourcerpm: libeconf-0.4.1-7.el9_8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libfdisk-2.37.4-28.el9_9.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libfdisk-2.37.4-28.el9_9.1.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 155782
-    checksum: sha256:fbef08b991410c1686e5dd1959cc09f4e15e5c23ee7739db4f71a7a9ca91313b
+    size: 155732
+    checksum: sha256:6316738b1caacfa9253ddb8836ddbb123be4263df155c24c401983fcd5691f20
     name: libfdisk
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libmount-2.37.4-28.el9_9.s390x.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libmount-2.37.4-28.el9_9.1.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 140373
-    checksum: sha256:9ad32ff24c3d4864df1f7b74ec5c9d366b75a5a709d39481e5d9e85e3cf54a1c
+    size: 140510
+    checksum: sha256:853344a9780354a4c2bd0cad2452eba5857d59deec67bbd454424b6cffd7ed69
     name: libmount
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libpwquality-1.4.4-8.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 125703
@@ -306,13 +306,13 @@ arches:
     name: libpwquality
     evr: 1.4.4-8.el9
     sourcerpm: libpwquality-1.4.4-8.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libsmartcols-2.37.4-28.el9_9.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libsmartcols-2.37.4-28.el9_9.1.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 67470
-    checksum: sha256:6d3e404c74a3c4f392444264daa4b1580c91b7caedba86f3c4c2da8ab07a677e
+    size: 67823
+    checksum: sha256:532f107302cb44892a3128dd254c90ba89ec1c20fd2e5b3384a34071a73635e3
     name: libsmartcols
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libutempter-1.2.1-6.el9.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 30191
@@ -320,13 +320,13 @@ arches:
     name: libutempter
     evr: 1.2.1-6.el9
     sourcerpm: libutempter-1.2.1-6.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libuuid-2.37.4-28.el9_9.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/l/libuuid-2.37.4-28.el9_9.1.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 32321
-    checksum: sha256:5729414f359cf94555cd0db4c7d21192712149edc699602d55ff0dd1318273ed
+    size: 32350
+    checksum: sha256:0bda66d1e83880042570258b7ad4ebccd3133b8c91159553993ee875cf4bc293
     name: libuuid
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/o/openssl-3.5.8-1.el9_8.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
     size: 1554467
@@ -341,20 +341,20 @@ arches:
     name: pam
     evr: 1.5.1-29.el9
     sourcerpm: pam-1.5.1-29.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/u/util-linux-2.37.4-28.el9_9.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/u/util-linux-2.37.4-28.el9_9.1.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 2327169
-    checksum: sha256:4f5e819c8f9b8cf69720569d4f2c92b783e2b4e7bfc7614cb5d26623bed445a4
+    size: 2327175
+    checksum: sha256:a90bf4ee9e0607580e01378fd36c0eab0877ed7c65b9c49b5a50a8646d8b968a
     name: util-linux
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/u/util-linux-core-2.37.4-28.el9_9.s390x.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/s390x/baseos/os/Packages/u/util-linux-core-2.37.4-28.el9_9.1.s390x.rpm
     repoid: rhel-9-for-s390x-baseos-rpms
-    size: 468209
-    checksum: sha256:d5339b40841334e34893e1c6d29c6d20fda362c4f2bafb4853b65e8611a0fdb9
+    size: 469241
+    checksum: sha256:d04e88111ccffcb76021e8117c8ff5d40ad52702bd8150aa002ecf1440b93008
     name: util-linux-core
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
   source: []
   module_metadata: []
 - arch: x86_64
@@ -380,13 +380,13 @@ arches:
     name: gzip
     evr: 1.12-2.el9_8
     sourcerpm: gzip-1.12-2.el9_8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libblkid-2.37.4-28.el9_9.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libblkid-2.37.4-28.el9_9.1.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 113844
-    checksum: sha256:865124ccf6a560dcccaef35e880f99fb9b55a1fa340d37d7594dc0b9a635e6f2
+    size: 114092
+    checksum: sha256:0f72a28d6152ee8f36ad95dd9b7f607defdf324f84be93b976d958efd58011db
     name: libblkid
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libdb-5.3.28-57.el9_6.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 755192
@@ -401,20 +401,20 @@ arches:
     name: libeconf
     evr: 0.4.1-7.el9_8
     sourcerpm: libeconf-0.4.1-7.el9_8.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libfdisk-2.37.4-28.el9_9.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libfdisk-2.37.4-28.el9_9.1.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 161464
-    checksum: sha256:3cbab65aaee01adf416e078b0795c6e8afbccf21013846a4e128c13eedd883e1
+    size: 161372
+    checksum: sha256:2f707c5aa53ed98931bab34f9747c5593f068c2229a6212b6354e10a254ed565
     name: libfdisk
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libmount-2.37.4-28.el9_9.x86_64.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libmount-2.37.4-28.el9_9.1.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 142938
-    checksum: sha256:9d51b9b8a44dc7ea271fafb483f2fc0a73bb3932e6cbbef7d80cd7fb284d103d
+    size: 144006
+    checksum: sha256:2404bd69db482d528e8e59d4426b4fb817cb66b9fd31c4a0542334cc02491fb4
     name: libmount
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libpwquality-1.4.4-8.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 126104
@@ -422,13 +422,13 @@ arches:
     name: libpwquality
     evr: 1.4.4-8.el9
     sourcerpm: libpwquality-1.4.4-8.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libsmartcols-2.37.4-28.el9_9.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libsmartcols-2.37.4-28.el9_9.1.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 68297
-    checksum: sha256:743e000961cb1bfd40c8e51bfe833396ec9cee156c50f47ff6d35034dfe8c13e
+    size: 68386
+    checksum: sha256:ce3cf13d649ad273be43eb267505a6b6c83ae8637c940da926755b27264169b2
     name: libsmartcols
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libutempter-1.2.1-6.el9.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 30354
@@ -436,13 +436,13 @@ arches:
     name: libutempter
     evr: 1.2.1-6.el9
     sourcerpm: libutempter-1.2.1-6.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libuuid-2.37.4-28.el9_9.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/l/libuuid-2.37.4-28.el9_9.1.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 32495
-    checksum: sha256:2dca70252232276b1e6ca933422f56d27a487665e7e11808920e93306ac4ce0e
+    size: 32439
+    checksum: sha256:b59dbb311df5b4b9c36b758a82ee1dc264837a3ba0bba111996dcf59766f249d
     name: libuuid
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/o/openssl-3.5.8-1.el9_8.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
     size: 1569041
@@ -457,19 +457,19 @@ arches:
     name: pam
     evr: 1.5.1-29.el9
     sourcerpm: pam-1.5.1-29.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/u/util-linux-2.37.4-28.el9_9.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/u/util-linux-2.37.4-28.el9_9.1.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 2383474
-    checksum: sha256:cd9128f8e0aeee739fd565157ee9e6e6219451a286eecadaaf223bbb17390633
+    size: 2384390
+    checksum: sha256:af4d4f837a40d11e160d911dc6f2f741c88aca997dfdfdf914d775a45528e8d4
     name: util-linux
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/u/util-linux-core-2.37.4-28.el9_9.x86_64.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os/Packages/u/util-linux-core-2.37.4-28.el9_9.1.x86_64.rpm
     repoid: rhel-9-for-x86_64-baseos-rpms
-    size: 476367
-    checksum: sha256:7446c5a57dfcce9116c1be56afa3ffdd9d4a0d1a1e078054afaa24661277e9a8
+    size: 478038
+    checksum: sha256:80d4f161c38f51b8d313b39f16cc5d3d625e6b77de7c68b0da8ded0d57a86295
     name: util-linux-core
-    evr: 2.37.4-28.el9_9
-    sourcerpm: util-linux-2.37.4-28.el9_9.src.rpm
+    evr: 2.37.4-28.el9_9.1
+    sourcerpm: util-linux-2.37.4-28.el9_9.1.src.rpm
   source: []
   module_metadata: []
