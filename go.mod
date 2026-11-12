@@ -202,7 +202,7 @@ replace (
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.7.29
 	github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.13.0
-	github.com/sigstore/fulcio => github.com/sigstore/fulcio v1.8.3
+	github.com/sigstore/fulcio => github.com/sigstore/fulcio v1.8.6
 )
 
 replace github.com/go-jose/go-jose/v3 => github.com/go-jose/go-jose/v3 v3.0.5
