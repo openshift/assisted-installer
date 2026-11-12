@@ -331,7 +331,7 @@ github.com/magiconair/properties
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
-# github.com/metal3-io/baremetal-operator/apis v0.5.1 => github.com/openshift/baremetal-operator/apis v0.0.0-20260123083846-066225b39a39
+# github.com/metal3-io/baremetal-operator/apis v0.8.1 => github.com/openshift/baremetal-operator/apis v0.0.0-20260123083846-066225b39a39
 ## explicit; go 1.24.0
 github.com/metal3-io/baremetal-operator/apis/metal3.io/v1alpha1
 # github.com/microcosm-cc/bluemonday v1.0.26
