@@ -15,7 +15,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-version v1.6.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/metal3-io/baremetal-operator/apis v0.2.0
+	github.com/metal3-io/baremetal-operator/apis v0.8.1
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.35.1
 	github.com/openshift/api v0.0.0-20251117165054-348370f055bf
