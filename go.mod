@@ -187,7 +187,7 @@ replace (
 	github.com/metal3-io/baremetal-operator => github.com/openshift/baremetal-operator v0.0.0-20230531194024-8dde0991ffdd
 	github.com/metal3-io/baremetal-operator/apis => github.com/openshift/baremetal-operator/apis v0.0.0-20230531194024-8dde0991ffdd
 	github.com/metal3-io/baremetal-operator/pkg/hardwareutils => github.com/openshift/baremetal-operator/pkg/hardwareutils v0.0.0-20230531194024-8dde0991ffdd
-	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.12
+	github.com/opencontainers/runc => github.com/opencontainers/runc v1.3.6
 	github.com/openshift-online/ocm-api-model/clientapi => github.com/openshift-online/ocm-api-model/clientapi v0.0.453
 	github.com/openshift-online/ocm-api-model/model => github.com/openshift-online/ocm-api-model/model v0.0.453
 	github.com/openshift/assisted-service => github.com/openshift/assisted-service v1.0.10-0.20260725012639-e1813a5b6827
