@@ -207,4 +207,4 @@ replace github.com/sigstore/fulcio => github.com/sigstore/fulcio v1.8.3
 
 replace github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.13.0
 
-replace github.com/go-jose/go-jose/v3 => github.com/go-jose/go-jose/v3 v3.0.5
+replace github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v3 v4.0.0
