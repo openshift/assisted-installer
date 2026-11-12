@@ -200,7 +200,7 @@ replace (
 )
 
 replace (
-	github.com/containerd/containerd => github.com/containerd/containerd v1.7.33
+	github.com/containerd/containerd => github.com/containerd/containerd v1.7.36
 	github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.13.0
 	github.com/openshift-online/ocm-api-model/model => github.com/openshift-online/ocm-api-model/model v0.0.453
 	github.com/sigstore/fulcio => github.com/sigstore/fulcio v1.8.3
