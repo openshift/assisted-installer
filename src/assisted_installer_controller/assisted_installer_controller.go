@@ -132,25 +132,23 @@ type manifest struct {
 	// content of the manifest of the opreator
 	Content string
 }
-
-func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inventory_client.InventoryClient, kc k8s_client.K8SClient, rebootsNotifier RebootsNotifier) *controller {
-	return &controller{
-		log:              log,
-		ControllerConfig: cfg,
-		ops:              ops,
-		ic:               ic,
-		kc:               kc,
-		Status:           NewControllerStatus(),
-		rebootsNotifier:  rebootsNotifier,
-		csrState:         &csrApprovalState{},
-		csrStore:         &k8sCSRApprovalStore{kc: kc, namespace: cfg.Namespace, clusterID: cfg.ClusterID},
-	}
+func newController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inventory_client.InventoryClient, kc k8s_client.K8SClient, rebootsNotifier RebootsNotifier) *controller {
+    return &controller{
+        log:              log,
+        ControllerConfig: cfg,
+        ops:              ops,
+        ic:               ic,
+        kc:               kc,
+        Status:           NewControllerStatus(),
+        rebootsNotifier:  rebootsNotifier,
+        csrState:         &csrApprovalState{},
+    }
 }
 
-func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inventory_client.InventoryClient, kc k8s_client.K8SClient, rebootsNotifier RebootsNotifier) Controller {
-	controller := newController(log, cfg, ops, ic, kc, rebootsNotifier)
-	controller.csrStore = &k8sCSRApprovalStore{kc: kc, namespace: cfg.Namespace, clusterID: cfg.ClusterID}
-	return controller
+func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inventory_client.InventoryClient, kc k8s_client.K8SClient, rebootsNotifier RebootsNotifier) *controller {
+    c := newController(log, cfg, ops, ic, kc, rebootsNotifier)
+    c.csrStore = &k8sCSRApprovalStore{kc: kc, namespace: cfg.Namespace, clusterID: cfg.ClusterID}
+    return c
 }
 
 func NewControllerStatus() *ControllerStatus {

@@ -122,7 +122,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 			models.HostStageDone,
 			models.HostStageDone}
 
-		assistedController = NewController(l, defaultTestControllerConf, mockops, mockbmclient, mockk8sclient, mockRebootsNotifier)
+		assistedController = newController(l, defaultTestControllerConf, mockops, mockbmclient, mockk8sclient, mockRebootsNotifier)
 	})
 	AfterEach(func() {
 		ctrl.Finish()
@@ -1591,7 +1591,7 @@ var _ = Describe("installer HostRoleMaster role", func() {
 	Context("must-gather image set parsing", func() {
 		var ac *controller
 		BeforeEach(func() {
-			ac = NewController(l, defaultTestControllerConf, mockops, mockbmclient, mockk8sclient, mockRebootsNotifier)
+			ac = newController(l, defaultTestControllerConf, mockops, mockbmclient, mockk8sclient, mockRebootsNotifier)
 		})
 
 		It("MustGatherImage is empty", func() {
