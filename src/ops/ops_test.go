@@ -145,18 +145,19 @@ var _ = Describe("Set Boot Order", func() {
 				"blockdevices": [
 					{
 						"name": "sda",
-						"size": 100000000000,
+						"path": "/dev/sda",
 						"type": "disk",
+						"partn": null,
 						"children": [
-							{"name": "sda1", "size": 1048576, "type": "part"},
-							{"name": "sda2", "size": 133169152, "type": "part"},
-							{"name": "sda3", "size": 402653184, "type": "part"},
-							{"name": "sda4", "size": 3272588800,"type": "part"}
+							{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1},
+							{"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2},
+							{"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3},
+							{"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}
 						]
 					}
 				]
 			}`
-			mLsblk := MatcherContainsStringElements{[]string{"--bytes", "--json", "/dev/sda"}, true}
+			mLsblk := MatcherContainsStringElements{[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", "/dev/sda"}, true}
 			execMock.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", mLsblk, gomock.Any()).Times(1).Return(lsblkOutput, nil)
 			m3 := MatcherContainsStringElements{[]string{"/dev/sda", "Red Hat Enterprise Linux"}, true}
 			execMock.EXPECT().ExecCommandWithOptions(gomock.Any(), "efibootmgr", m3, gomock.Any()).Times(1).Return("", nil)
@@ -393,50 +394,60 @@ var _ = Describe("overwrite OS image", func() {
    "blockdevices": [
 		{
          "name": "%s",
+         "path": "%s",
          "size": 100000000000,
          "ro": false,
          "type": "disk",
+         "partn": null,
          "mountpoints": [
              null
          ],
          "children": [
             {
                "name": "%s",
+               "path": "%s",
                "maj:min": "8:1",
                "rm": false,
                "size": 1048576,
                "ro": false,
                "type": "part",
+               "partn": 1,
                "mountpoints": [
                    null
                ]
             },{
                "name": "%s",
+               "path": "%s",
                "maj:min": "8:2",
                "rm": false,
                "size": 133169152,
                "ro": false,
                "type": "part",
+               "partn": 2,
                "mountpoints": [
                    null
                ]
             },{
                "name": "%s",
+               "path": "%s",
                "maj:min": "8:3",
                "rm": false,
                "size": 402653184,
                "ro": false,
                "type": "part",
+               "partn": 3,
                "mountpoints": [
                    null
                ]
             },{
                "name": "%s",
+               "path": "%s",
                "maj:min": "8:4",
                "rm": false,
                "size": 3272588800,
                "ro": false,
                "type": "part",
+               "partn": 4,
                "mountpoints": [
                    null
                ]
@@ -492,23 +503,35 @@ var _ = Describe("overwrite OS image", func() {
 			return fmt.Sprintf("%s%s", deviceName, partNum)
 		}
 	}
+	// Helper function to generate full device path
+	getDevicePath := func(deviceName string) string {
+		if strings.HasPrefix(deviceName, "dm-") {
+			return fmt.Sprintf("/dev/mapper/%s", deviceName)
+		}
+		return fmt.Sprintf("/dev/%s", deviceName)
+	}
 	formatResult := func(device string) string {
 		deviceName := stripDev(device)
-		return fmt.Sprintf(lsblkResultFormat, deviceName,
-			getPartitionName(deviceName, "1"),
-			getPartitionName(deviceName, "2"),
-			getPartitionName(deviceName, "3"),
-			getPartitionName(deviceName, "4"))
+		part1 := getPartitionName(deviceName, "1")
+		part2 := getPartitionName(deviceName, "2")
+		part3 := getPartitionName(deviceName, "3")
+		part4 := getPartitionName(deviceName, "4")
+		return fmt.Sprintf(lsblkResultFormat, deviceName, getDevicePath(deviceName),
+			part1, getDevicePath(part1),
+			part2, getDevicePath(part2),
+			part3, getDevicePath(part3),
+			part4, getDevicePath(part4))
 	}
 	runTest := func(device, part3, part4 string, copyNetwork bool) {
 		if copyNetwork {
 			conf.InstallerArgs = []string{"--copy-network"}
 		}
 		// Mock lsblk calls for partition path discovery (called twice - once for partition 4, once for partition 3)
+		// getPartitionPathFromLsblk now uses --output flag
 		execMock.EXPECT().ExecCommandWithOptions(nil, "lsblk",
-			[]string{"--bytes", "--json", device},
+			[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", device},
 			gomock.Any()).Return(formatResult(device), nil).Times(2)
-		// Mock lsblk call for calculateFreePercent function
+		// Mock lsblk call for calculateFreePercent function (still uses old format without --output)
 		execMock.EXPECT().ExecCommandWithOptions(nil, "lsblk",
 			[]string{"--bytes", "--json", device},
 			gomock.Any()).Return(formatResult(device), nil)
@@ -564,7 +587,7 @@ var _ = Describe("overwrite OS image", func() {
 		runTest("/dev/mmcblk1", "/dev/mmcblk1P3", "/dev/mmcblk1P4", false)
 	})
 	It("overwrite OS image - device mapper", func() {
-		runTest("/dev/dm-0", "/dev/dm-3", "/dev/dm-4", false)
+		runTest("/dev/dm-0", "/dev/mapper/dm-3", "/dev/mapper/dm-4", false)
 	})
 	It("copies the firstboot network config to the boot partition when --copy-network was used", func() {
 		runTest("/dev/sda", "/dev/sda3", "/dev/sda4", true)
@@ -807,7 +830,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 
 	mockLsblkCommand := func(device, output string, err error) {
 		execMock.EXPECT().ExecCommandWithOptions(nil, "lsblk",
-			[]string{"--bytes", "--json", device}, gomock.Any()).Return(output, err)
+			[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", device}, gomock.Any()).Return(output, err)
 	}
 
 	Context("Standard SATA devices", func() {
@@ -816,13 +839,14 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 				"blockdevices": [
 					{
 						"name": "sda",
-						"size": 100000000000,
+						"path": "/dev/sda",
 						"type": "disk",
+						"partn": null,
 						"children": [
-							{"name": "sda1", "type": "part", "size": 1048576},
-							{"name": "sda2", "type": "part", "size": 133169152},
-							{"name": "sda3", "type": "part", "size": 402653184},
-							{"name": "sda4", "type": "part", "size": 3272588800}
+							{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1},
+							{"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2},
+							{"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3},
+							{"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}
 						]
 					}
 				]
@@ -839,13 +863,62 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 				"blockdevices": [
 					{
 						"name": "sda",
-						"size": 100000000000,
+						"path": "/dev/sda",
 						"type": "disk",
+						"partn": null,
 						"children": [
-							{"name": "sda1", "type": "part", "size": 1048576},
-							{"name": "sda2", "type": "part", "size": 133169152},
-							{"name": "sda3", "type": "part", "size": 402653184},
-							{"name": "sda4", "type": "part", "size": 3272588800}
+							{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1},
+							{"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2},
+							{"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3},
+							{"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}
+						]
+					}
+				]
+			}`
+			mockLsblkCommand("/dev/sda", lsblkOutput, nil)
+
+			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "4")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(path).To(Equal("/dev/sda4"))
+		})
+
+		It("should find partition 5 with missing intermediate partition (1,3,4,5)", func() {
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "sda",
+						"path": "/dev/sda",
+						"type": "disk",
+						"partn": null,
+						"children": [
+							{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1},
+							{"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3},
+							{"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4},
+							{"name": "sda5", "path": "/dev/sda5", "type": "part", "partn": 5}
+						]
+					}
+				]
+			}`
+			mockLsblkCommand("/dev/sda", lsblkOutput, nil)
+
+			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "5")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(path).To(Equal("/dev/sda5"))
+		})
+
+		It("should find partition 4 when partitions are out of order", func() {
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "sda",
+						"path": "/dev/sda",
+						"type": "disk",
+						"partn": null,
+						"children": [
+							{"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3},
+							{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1},
+							{"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4},
+							{"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}
 						]
 					}
 				]
@@ -864,13 +937,14 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 				"blockdevices": [
 					{
 						"name": "nvme0n1",
-						"size": 100000000000,
+						"path": "/dev/nvme0n1",
 						"type": "disk",
+						"partn": null,
 						"children": [
-							{"name": "nvme0n1p1", "type": "part", "size": 1048576},
-							{"name": "nvme0n1p2", "type": "part", "size": 133169152},
-							{"name": "nvme0n1p3", "type": "part", "size": 402653184},
-							{"name": "nvme0n1p4", "type": "part", "size": 3272588800}
+							{"name": "nvme0n1p1", "path": "/dev/nvme0n1p1", "type": "part", "partn": 1},
+							{"name": "nvme0n1p2", "path": "/dev/nvme0n1p2", "type": "part", "partn": 2},
+							{"name": "nvme0n1p3", "path": "/dev/nvme0n1p3", "type": "part", "partn": 3},
+							{"name": "nvme0n1p4", "path": "/dev/nvme0n1p4", "type": "part", "partn": 4}
 						]
 					}
 				]
@@ -889,13 +963,14 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 				"blockdevices": [
 					{
 						"name": "mmcblk1",
-						"size": 100000000000,
+						"path": "/dev/mmcblk1",
 						"type": "disk",
+						"partn": null,
 						"children": [
-							{"name": "mmcblk1P1", "type": "part", "size": 1048576},
-							{"name": "mmcblk1P2", "type": "part", "size": 133169152},
-							{"name": "mmcblk1P3", "type": "part", "size": 402653184},
-							{"name": "mmcblk1P4", "type": "part", "size": 3272588800}
+							{"name": "mmcblk1P1", "path": "/dev/mmcblk1P1", "type": "part", "partn": 1},
+							{"name": "mmcblk1P2", "path": "/dev/mmcblk1P2", "type": "part", "partn": 2},
+							{"name": "mmcblk1P3", "path": "/dev/mmcblk1P3", "type": "part", "partn": 3},
+							{"name": "mmcblk1P4", "path": "/dev/mmcblk1P4", "type": "part", "partn": 4}
 						]
 					}
 				]
@@ -914,13 +989,14 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 				"blockdevices": [
 					{
 						"name": "dm-0",
-						"size": 100000000000,
+						"path": "/dev/dm-0",
 						"type": "mpath",
+						"partn": null,
 						"children": [
-							{"name": "dm-1", "type": "part", "size": 1048576},
-							{"name": "dm-2", "type": "part", "size": 133169152},
-							{"name": "dm-3", "type": "part", "size": 402653184},
-							{"name": "dm-4", "type": "part", "size": 3272588800}
+							{"name": "dm-1", "path": "/dev/mapper/dm-1", "type": "part", "partn": 1},
+							{"name": "dm-2", "path": "/dev/mapper/dm-2", "type": "part", "partn": 2},
+							{"name": "dm-3", "path": "/dev/mapper/dm-3", "type": "part", "partn": 3},
+							{"name": "dm-4", "path": "/dev/mapper/dm-4", "type": "part", "partn": 4}
 						]
 					}
 				]
@@ -937,13 +1013,14 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 				"blockdevices": [
 					{
 						"name": "dm-0",
-						"size": 100000000000,
+						"path": "/dev/dm-0",
 						"type": "mpath",
+						"partn": null,
 						"children": [
-							{"name": "dm-1", "type": "part", "size": 1048576},
-							{"name": "dm-2", "type": "part", "size": 133169152},
-							{"name": "dm-3", "type": "part", "size": 402653184},
-							{"name": "dm-4", "type": "part", "size": 3272588800}
+							{"name": "dm-1", "path": "/dev/mapper/dm-1", "type": "part", "partn": 1},
+							{"name": "dm-2", "path": "/dev/mapper/dm-2", "type": "part", "partn": 2},
+							{"name": "dm-3", "path": "/dev/mapper/dm-3", "type": "part", "partn": 3},
+							{"name": "dm-4", "path": "/dev/mapper/dm-4", "type": "part", "partn": 4}
 						]
 					}
 				]
@@ -960,13 +1037,14 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 				"blockdevices": [
 					{
 						"name": "dm-127",
-						"size": 100000000000,
+						"path": "/dev/dm-127",
 						"type": "mpath",
+						"partn": null,
 						"children": [
-							{"name": "dm-128", "type": "part", "size": 1048576},
-							{"name": "dm-129", "type": "part", "size": 133169152},
-							{"name": "dm-130", "type": "part", "size": 402653184},
-							{"name": "dm-131", "type": "part", "size": 3272588800}
+							{"name": "dm-128", "path": "/dev/mapper/dm-128", "type": "part", "partn": 1},
+							{"name": "dm-129", "path": "/dev/mapper/dm-129", "type": "part", "partn": 2},
+							{"name": "dm-130", "path": "/dev/mapper/dm-130", "type": "part", "partn": 3},
+							{"name": "dm-131", "path": "/dev/mapper/dm-131", "type": "part", "partn": 4}
 						]
 					}
 				]
@@ -977,6 +1055,31 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(path).To(Equal("/dev/mapper/dm-130"))
 		})
+
+		It("should find partition for multipath device with friendly name", func() {
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "mpatha",
+						"path": "/dev/mapper/mpatha",
+						"type": "mpath",
+						"partn": null,
+						"children": [
+							{"name": "mpatha1", "path": "/dev/mapper/mpatha1", "type": "part", "partn": 1},
+							{"name": "mpatha2", "path": "/dev/mapper/mpatha2", "type": "part", "partn": 2},
+							{"name": "mpatha3", "path": "/dev/mapper/mpatha3", "type": "part", "partn": 3},
+							{"name": "mpatha4", "path": "/dev/mapper/mpatha4", "type": "part", "partn": 4},
+							{"name": "mpatha5", "path": "/dev/mapper/mpatha5", "type": "part", "partn": 5}
+						]
+					}
+				]
+			}`
+			mockLsblkCommand("/dev/mapper/mpatha", lsblkOutput, nil)
+
+			path, err := o.(*ops).getPartitionPathFromLsblk("/dev/mapper/mpatha", "5")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(path).To(Equal("/dev/mapper/mpatha5"))
+		})
 	})
 
 	Context("Error cases", func() {
@@ -986,6 +1089,8 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "3")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to run lsblk command"))
+			// Command failures should NOT be the sentinel error
+			Expect(errors.Is(err, errPartitionNotFound)).To(BeFalse(), "command failure should not be errPartitionNotFound")
 		})
 
 		It("should return error when lsblk output is invalid JSON", func() {
@@ -994,6 +1099,8 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "3")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to unmarshal lsblk output"))
+			// JSON parsing errors should NOT be the sentinel error
+			Expect(errors.Is(err, errPartitionNotFound)).To(BeFalse(), "JSON parsing error should not be errPartitionNotFound")
 		})
 
 		It("should return error when device is not found", func() {
@@ -1003,9 +1110,11 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sdb", "1")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("no block device information returned for /dev/sdb"))
+			// Missing device should NOT be the sentinel error
+			Expect(errors.Is(err, errPartitionNotFound)).To(BeFalse(), "missing device should not be errPartitionNotFound")
 		})
 
-		It("should return error when device has no partitions", func() {
+		It("should return errPartitionNotFound when device has no partitions", func() {
 			lsblkOutput := `{
 				"blockdevices": [
 					{
@@ -1020,16 +1129,17 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 
 			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "1")
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("device /dev/sda has no partitions"))
+			Expect(errors.Is(err, errPartitionNotFound)).To(BeTrue())
 		})
 
-		It("should return error when device has null children", func() {
+		It("should return errPartitionNotFound when device has null children", func() {
 			lsblkOutput := `{
 				"blockdevices": [
 					{
 						"name": "sda",
-						"size": 100000000000,
+						"path": "/dev/sda",
 						"type": "disk",
+						"partn": null,
 						"children": null
 					}
 				]
@@ -1038,7 +1148,7 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 
 			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "1")
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("device /dev/sda has no partitions"))
+			Expect(errors.Is(err, errPartitionNotFound)).To(BeTrue())
 		})
 
 		It("should return error for invalid partition number", func() {
@@ -1046,10 +1156,11 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 				"blockdevices": [
 					{
 						"name": "sda",
-						"size": 100000000000,
+						"path": "/dev/sda",
 						"type": "disk",
+						"partn": null,
 						"children": [
-							{"name": "sda1", "type": "part", "size": 1048576}
+							{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}
 						]
 					}
 				]
@@ -1066,10 +1177,11 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 				"blockdevices": [
 					{
 						"name": "sda",
-						"size": 100000000000,
+						"path": "/dev/sda",
 						"type": "disk",
+						"partn": null,
 						"children": [
-							{"name": "sda1", "type": "part", "size": 1048576}
+							{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}
 						]
 					}
 				]
@@ -1086,11 +1198,12 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 				"blockdevices": [
 					{
 						"name": "sda",
+						"path": "/dev/sda",
 						"type": "disk",
-						"size": 100000000000,
+						"partn": null,
 						"children": [
-							{"name": "sda1", "type": "part", "size": 1048576},
-							{"name": "sda2", "type": "part", "size": 133169152}
+							{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1},
+							{"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}
 						]
 					}
 				]
@@ -1100,6 +1213,75 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "5")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("partition 5 not found on device /dev/sda"))
+			// Verify it's the sentinel error for partition not found
+			Expect(errors.Is(err, errPartitionNotFound)).To(BeTrue(), "error should be errPartitionNotFound")
+		})
+
+		It("should return error when partition has null PARTN", func() {
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "sda",
+						"path": "/dev/sda",
+						"type": "disk",
+						"partn": null,
+						"children": [
+							{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": null}
+						]
+					}
+				]
+			}`
+			mockLsblkCommand("/dev/sda", lsblkOutput, nil)
+
+			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "1")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("partition 1 not found on device /dev/sda"))
+		})
+
+		It("should return error when partition has empty PATH", func() {
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "sda",
+						"path": "/dev/sda",
+						"type": "disk",
+						"partn": null,
+						"children": [
+							{"name": "sda1", "path": "", "type": "part", "partn": 1}
+						]
+					}
+				]
+			}`
+			mockLsblkCommand("/dev/sda", lsblkOutput, nil)
+
+			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "1")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("partition 1 found but PATH is empty"))
+			// Malformed partition (empty PATH) should NOT be the sentinel error
+			Expect(errors.Is(err, errPartitionNotFound)).To(BeFalse(), "empty PATH should not be errPartitionNotFound")
+		})
+
+		It("should return error when partition has wrong TYPE", func() {
+			lsblkOutput := `{
+				"blockdevices": [
+					{
+						"name": "sda",
+						"path": "/dev/sda",
+						"type": "disk",
+						"partn": null,
+						"children": [
+							{"name": "sda1", "path": "/dev/sda1", "type": "disk", "partn": 1}
+						]
+					}
+				]
+			}`
+			mockLsblkCommand("/dev/sda", lsblkOutput, nil)
+
+			_, err := o.(*ops).getPartitionPathFromLsblk("/dev/sda", "1")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("found device with PARTN=1 but TYPE=disk"))
+			// Malformed partition (wrong TYPE) should NOT be the sentinel error
+			Expect(errors.Is(err, errPartitionNotFound)).To(BeFalse(), "wrong TYPE should not be errPartitionNotFound")
 		})
 	})
 
@@ -1109,13 +1291,14 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 				"blockdevices": [
 					{
 						"name": "dm-0",
-						"size": 100000000000,
+						"path": "/dev/dm-0",
 						"type": "mpath",
+						"partn": null,
 						"children": [
-							{"name": "dm-1", "type": "part", "size": 1048576},
-							{"name": "dm-2", "type": "part", "size": 133169152},
-							{"name": "dm-3", "type": "part", "size": 402653184},
-							{"name": "dm-4", "type": "part", "size": 3272588800}
+							{"name": "dm-1", "path": "/dev/mapper/dm-1", "type": "part", "partn": 1},
+							{"name": "dm-2", "path": "/dev/mapper/dm-2", "type": "part", "partn": 2},
+							{"name": "dm-3", "path": "/dev/mapper/dm-3", "type": "part", "partn": 3},
+							{"name": "dm-4", "path": "/dev/mapper/dm-4", "type": "part", "partn": 4}
 						]
 					}
 				]
@@ -1126,165 +1309,6 @@ var _ = Describe("getPartitionPathFromLsblk", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(path).To(Equal("/dev/mapper/dm-3"))
 		})
-	})
-})
-
-var _ = Describe("Copy registry data", func() {
-	const lsblkResultFormat = `{
-   "blockdevices": [
-		{
-         "name": "%s",
-         "size": 100000000000,
-         "ro": false,
-         "type": "disk",
-         "mountpoints": [
-             null
-         ],
-         "children": [
-            {
-               "name": "%s",
-               "maj:min": "8:1",
-               "rm": false,
-               "size": 1048576,
-               "ro": false,
-               "type": "part",
-               "mountpoints": [
-                   null
-               ]
-            },{
-               "name": "%s",
-               "maj:min": "8:2",
-               "rm": false,
-               "size": 133169152,
-               "ro": false,
-               "type": "part",
-               "mountpoints": [
-                   null
-               ]
-            },{
-               "name": "%s",
-               "maj:min": "8:3",
-               "rm": false,
-               "size": 402653184,
-               "ro": false,
-               "type": "part",
-               "mountpoints": [
-                   null
-               ]
-            },{
-               "name": "%s",
-               "maj:min": "8:4",
-               "rm": false,
-               "size": 3272588800,
-               "ro": false,
-               "type": "part",
-               "mountpoints": [
-                   null
-               ]
-            }
-         ]
-      }
-   ]
-}`
-	var (
-		l        = logrus.New()
-		ctrl     *gomock.Controller
-		execMock *execute.MockExecute
-		conf     *config.Config
-		o        Ops
-	)
-
-	BeforeEach(func() {
-		ctrl = gomock.NewController(GinkgoT())
-		execMock = execute.NewMockExecute(ctrl)
-		conf = &config.Config{}
-		o = NewOpsWithConfig(conf, l, execMock)
-	})
-
-	mockPrivileged := func(command string, args ...string) {
-		execMock.EXPECT().ExecCommandWithOptions(nil, command, args, gomock.Any()).Times(1)
-	}
-	// Helper function to generate correct partition names for all device types
-	getPartitionName := func(deviceName, partNum string) string {
-		switch {
-		case strings.HasPrefix(deviceName, "nvme"):
-			return fmt.Sprintf("%sp%s", deviceName, partNum)
-		case strings.HasPrefix(deviceName, "mmcblk"):
-			return fmt.Sprintf("%sP%s", deviceName, partNum)
-		case strings.HasPrefix(deviceName, "dm-"):
-			// Device mapper devices use a different numbering scheme
-			// For dm-0, partitions are dm-1, dm-2, dm-3, dm-4
-			baseNum, err := strconv.Atoi(deviceName[3:]) // Extract number after "dm-"
-			if err != nil {
-				return deviceName + partNum // fallback
-			}
-			partNumInt, err := strconv.Atoi(partNum)
-			if err != nil {
-				return deviceName + partNum // fallback
-			}
-			return fmt.Sprintf("dm-%d", baseNum+partNumInt)
-		default:
-			return fmt.Sprintf("%s%s", deviceName, partNum)
-		}
-	}
-	formatResult := func(device string) string {
-		deviceName := stripDev(device)
-		return fmt.Sprintf(lsblkResultFormat, deviceName,
-			getPartitionName(deviceName, "1"),
-			getPartitionName(deviceName, "2"),
-			getPartitionName(deviceName, "3"),
-			getPartitionName(deviceName, "4"))
-	}
-	runTest := func(device, part4 string) {
-		dataDir := "/mnt/agentdata"
-		registryDataSize := 20 * 1024 * 1024 * 1024 // 20GB
-		registryDataDirOnRoot := filepath.Join("/mnt/root/ostree/deploy/rhcos", registryDataDirOnDevice)
-
-		// Mock du calls for getting registry data size
-		execMock.EXPECT().ExecCommandWithOptions(nil, "du",
-			[]string{"-sb", dataDir},
-			gomock.Any()).Return(strconv.FormatInt(int64(registryDataSize), 10), nil).Times(1)
-		// Mock lsblk calls for partition path discovery / calculateFreePercent function
-		execMock.EXPECT().ExecCommandWithOptions(nil, "lsblk",
-			[]string{"--bytes", "--json", device},
-			gomock.Any()).Return(formatResult(device), nil).Times(2)
-
-		mockPrivileged("mkdir", "-p", "/mnt/root")
-		mockPrivileged("mount", part4, "/mnt/root")
-		mockPrivileged("sh", "-c", "fsfreeze --unfreeze /mnt/root || true")
-		mockPrivileged("umount", "/mnt/root")
-
-		mockPrivileged("growpart", "--free-percent=42", device, "4")
-		mockPrivileged("bash", "-c", "sed 's/threshold=[0-9]*/threshold=0/' /usr/lib/dracut/modules.d/40ignition-ostree/ignition-ostree-transposefs.sh | bash -s autosave-xfs")
-		mockPrivileged("bash", "-c", "/usr/lib/dracut/modules.d/40ignition-ostree/ignition-ostree-transposefs.sh restore")
-		mockPrivileged("bash", "-c", "/usr/lib/dracut/modules.d/40ignition-ostree/ignition-ostree-transposefs.sh cleanup")
-
-		mockPrivileged("mount", part4, "/mnt/root")
-		mockPrivileged("xfs_growfs", "/mnt/root")
-		mockPrivileged("mkdir", "-p", registryDataDirOnRoot)
-
-		// Mock rsync call
-		execMock.EXPECT().ExecCommandWithOptions(io.Discard, "sh",
-			[]string{"-c", fmt.Sprintf("rsync -ah --info=progress2 %s/ %s/", dataDir, registryDataDirOnRoot)},
-			gomock.Any()).Return("", nil).Times(1)
-
-		mockPrivileged("fsfreeze", "--freeze", "/mnt/root")
-		mockPrivileged("umount", "/mnt/root")
-
-		err := o.CopyRegistryData(io.Discard, device)
-		Expect(err).ToNot(HaveOccurred())
-	}
-	It("Copy registry data - sda", func() {
-		runTest("/dev/sda", "/dev/sda4")
-	})
-	It("Copy registry data - nvme", func() {
-		runTest("/dev/nvme0n1", "/dev/nvme0n1p4")
-	})
-	It("Copy registry data - mmcblk", func() {
-		runTest("/dev/mmcblk1", "/dev/mmcblk1P4")
-	})
-	It("Copy registry data - device mapper", func() {
-		runTest("/dev/dm-0", "/dev/dm-4")
 	})
 })
 

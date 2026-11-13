@@ -44,14 +44,17 @@ const (
 	defaultIgnitionPlatformId       = "ignition.platform.id=metal"
 	ignitionContent                 = "application/vnd.coreos.ignition+json; version=3.4.0"
 	schemeHTTPS                     = "https"
-	registryDataDirOnDevice         = "var/lib/iri-registry"
-	registryDataDirOnMnt            = "/mnt/agentdata"
 	ostreeDeployPath                = "/mnt/root/ostree/deploy/rhcos"
 	networkManagerKeyfileDir        = "/etc/NetworkManager/system-connections"
 	firstBootNetworkDirOnBoot       = "/mnt/boot/coreos-firstboot-network"
 	firstBootNetworkSentinelOnBoot  = "/mnt/boot/coreos-firstboot-network.deliberate"
 	networkDirArg                   = "--network-dir"
 )
+
+// errPartitionNotFound is a sentinel error indicating that the requested partition
+// is not present on the device. This is distinct from command failures, parsing errors,
+// or malformed device structures, which should propagate as different errors.
+var errPartitionNotFound = errors.New("partition not found")
 
 // Supports: registry.io/repo:tag, registry.io:port/repo:tag, repo@sha256:digest, repo:tag@sha256:digest
 var imageReferencePattern = regexp.MustCompile(`^[a-zA-Z0-9._-]+(:[0-9]+)?(/[a-zA-Z0-9._/-]+)?(:[a-zA-Z0-9._-]+)?(@sha256:[a-fA-F0-9]{64})?$`)
@@ -83,7 +86,8 @@ type Ops interface {
 	ReadFile(filePath string) ([]byte, error)
 	GetEncapsulatedMC(ignitionPath string) (*mcfgv1.MachineConfig, error)
 	OverwriteOsImage(osImage, device string, extraArgs []string) error
-	CopyRegistryData(liveLogger io.Writer, device string) error
+	PrepareIRIRegistryIgnition(ignitionPath string) error
+	SetupIRIRegistryPartition(device string, liveLogger io.Writer) error
 }
 
 const (
@@ -107,6 +111,7 @@ type ops struct {
 	logWriter       *utils.LogWriter
 	installerConfig *config.Config
 	executor        execute.Execute
+	iriPartition    *iriRegistryPartition
 }
 
 func NewOps(logger *logrus.Logger, executor execute.Execute) Ops {
@@ -115,11 +120,13 @@ func NewOps(logger *logrus.Logger, executor execute.Execute) Ops {
 
 // NewOps return a new ops interface
 func NewOpsWithConfig(installerConfig *config.Config, logger logrus.FieldLogger, executor execute.Execute) Ops {
+	logWriter := utils.NewLogWriter(logger)
 	return &ops{
 		log:             logger,
-		logWriter:       utils.NewLogWriter(logger),
+		logWriter:       logWriter,
 		installerConfig: installerConfig,
 		executor:        executor,
+		iriPartition:    newIRIRegistryPartition(executor, logger, logWriter),
 	}
 }
 
@@ -1063,59 +1070,9 @@ func stripDev(device string) string {
 	return strings.Replace(device, "/dev/", "", 1)
 }
 
-// getPartitionPathFromLsblk uses lsblk to find the actual partition device path
-// for a given device and partition number. This handles all device types including
-// device mapper devices correctly.
+// getPartitionPathFromLsblk wrapper that delegates to the standalone function.
 func (o *ops) getPartitionPathFromLsblk(device, partitionNumber string) (string, error) {
-	type node struct {
-		Name     string  `json:"name"`
-		Size     int64   `json:"size"`
-		Type     string  `json:"type"`
-		Children []*node `json:"children"`
-	}
-	var disks struct {
-		Blockdevices []*node `json:"blockdevices"`
-	}
-
-	ret, err := o.ExecPrivilegeCommand(nil, "lsblk", "--bytes", "--json", device)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to run lsblk command")
-	}
-	if err = json.Unmarshal([]byte(ret), &disks); err != nil {
-		return "", errors.Wrap(err, "failed to unmarshal lsblk output")
-	}
-
-	if len(disks.Blockdevices) == 0 {
-		return "", errors.Errorf("no block device information returned for %s", device)
-	}
-	diskNode := disks.Blockdevices[0] // lsblk with device filter returns only that device
-	diskType := diskNode.Type
-
-	if len(diskNode.Children) == 0 {
-		return "", errors.Errorf("device %s has no partitions", device)
-	}
-
-	// Convert partition number to integer for indexing
-	partNum, err := strconv.Atoi(partitionNumber)
-	if err != nil {
-		return "", errors.Errorf("invalid partition number %s", partitionNumber)
-	}
-
-	// Partition numbers are 1-based, but array indices are 0-based
-	if partNum < 1 || partNum > len(diskNode.Children) {
-		return "", errors.Errorf("partition %s not found on device %s", partitionNumber, device)
-	}
-
-	partitionName := diskNode.Children[partNum-1].Name
-	var devicePath string
-	switch diskType {
-	case "mpath":
-		devicePath = "/dev/mapper/" + partitionName
-	default:
-		devicePath = "/dev/" + partitionName
-
-	}
-	return devicePath, nil
+	return getPartitionPathFromLsblk(o.executor, device, partitionNumber)
 }
 
 func (o *ops) calculateFreePercent(device string, requiredSize *int64) (int64, error) {
@@ -1316,128 +1273,23 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 	return nil
 }
 
-func (o *ops) getRegistryDataSize(dataPath string) (int64, error) {
-	// Get size of dataPath directory using du command
-	// du -sb outputs: "size_bytes path"
-	out, err := o.ExecPrivilegeCommand(nil, "du", "-sb", dataPath)
-	if err != nil {
-		return 0, errors.Wrapf(err, "failed to get size of %s", dataPath)
-	}
-
-	// Parse the output: "size_bytes path" -> extract just the number
-	fields := strings.Fields(out)
-	if len(fields) == 0 {
-		return 0, errors.Errorf("invalid du output for %s: %s", dataPath, out)
-	}
-
-	size, err := strconv.ParseInt(fields[0], 10, 64)
-	if err != nil {
-		return 0, errors.Wrapf(err, "failed to parse size from du output: %s", out)
-	}
-
-	return size, nil
+// PrepareIRIRegistryIgnition adds the IRI registry mount unit to ignition if not already present.
+// Delegates to iriRegistryPartition type.
+func (o *ops) PrepareIRIRegistryIgnition(ignitionPath string) error {
+	return o.iriPartition.PrepareIgnition(ignitionPath)
 }
 
-func (o *ops) CopyRegistryData(liveLogger io.Writer, device string) error {
-	type cmd struct {
-		liveLogger io.Writer
-		command    string
-		args       []string
-	}
+// SetupIRIRegistryPartition creates partition 5 and copies IRI registry data.
+// Delegates to iriRegistryPartition type.
+func (o *ops) SetupIRIRegistryPartition(device string, liveLogger io.Writer) error {
+	return o.iriPartition.Setup(device, liveLogger)
+}
 
-	makecmd := func(liveLogger io.Writer, commad string, args ...string) *cmd {
-		return &cmd{liveLogger: liveLogger, command: commad, args: args}
-	}
+// Internal wrappers for testing (delegate to iriRegistryPartition)
+func (o *ops) verifyDiskSpaceForIRI(device string, partConfig iriPartitionConfig) error {
+	return o.iriPartition.verifyDiskSpaceForIRI(device, partConfig)
+}
 
-	// Get the size of the registry data
-	registryDataSize, err := o.getRegistryDataSize(registryDataDirOnMnt)
-	if err != nil {
-		return err
-	}
-
-	// Calculate the target free percent of the device. Reserve at least 2.5 times
-	// the current data registry size.
-	requestedSize := registryDataSize * 5 / 2
-	freePercent, err := o.calculateFreePercent(device, &requestedSize)
-	if err != nil {
-		return err
-	}
-	o.log.Infof("Requesting at least %d bytes for the root partition on device %s (current registry size: %d bytes)", requestedSize, device, registryDataSize)
-	// Ensure to have at least some minimum free space available otherwise coreos-gpt-setup.service may fail on the next reboot,
-	// since it requires at least some free blocks at the end of the disk.
-	minAllowedFreePercent := int64(1)
-	if freePercent < minAllowedFreePercent {
-		return errors.Errorf("device %s is not large enough to fit the registry data (%d bytes)", device, requestedSize)
-	}
-
-	// Generate command for growing root partition to fit the requested size
-	partIndex := "4"
-	growPartCmd := makecmd(nil, "growpart", fmt.Sprintf("--free-percent=%d", freePercent), device, partIndex)
-
-	// Get root partition path
-	partition4, err := o.getPartitionPathFromLsblk(device, partIndex)
-	if err != nil {
-		return errors.Wrapf(err, "failed to find partition %s for device %s", partIndex, device)
-	}
-
-	// Generate the path to the registry data directory on the mounted root partitio
-	registryDataDirOnRoot := filepath.Join(ostreeDeployPath, registryDataDirOnDevice)
-
-	// Generate the command for copying the registry data directory to the device
-	copyCmd := makecmd(liveLogger, "sh", "-c", fmt.Sprintf("rsync -ah --info=progress2 %s/ %s/", registryDataDirOnMnt, registryDataDirOnRoot))
-
-	// Generate the command for unfreezing the root partition (frozen by OverwriteOsImage func)
-	// Ignoring errors if the partition is already unfrozen
-	mntTmpPath := "/mnt/root"
-	fsUnfreezeCmd := makecmd(nil, "sh", "-c", fmt.Sprintf("fsfreeze --unfreeze %s || true", mntTmpPath))
-	fsFreezeCmd := makecmd(nil, "fsfreeze", "--freeze", mntTmpPath)
-	mountCmd := makecmd(nil, "mount", partition4, mntTmpPath)
-	unmountCmd := makecmd(nil, "umount", mntTmpPath)
-
-	ignTransposeScript := "/usr/lib/dracut/modules.d/40ignition-ostree/ignition-ostree-transposefs.sh"
-	// The transposefs script does not have a way to apply unconditionally the autosave-xfs command
-	xfsForceAutosaveCmd := makecmd(nil, "bash", "-c", fmt.Sprintf(`sed 's/threshold=[0-9]*/threshold=0/' %s | bash -s autosave-xfs`, ignTransposeScript))
-	xfsRestoreCommand := makecmd(nil, "bash", "-c", fmt.Sprintf("%s restore", ignTransposeScript))
-	xfsCleanupCommand := makecmd(nil, "bash", "-c", fmt.Sprintf("%s cleanup", ignTransposeScript))
-
-	cmds := []*cmd{
-		makecmd(nil, "mkdir", "-p", mntTmpPath),
-
-		// Unfreeze
-		mountCmd,
-		fsUnfreezeCmd,
-		unmountCmd, // This is required before invoking the autosave-xfs
-
-		// Extend the root partition to allow the autosave-xfs command to recalculate the new AG size
-		// before copying the InternalReleaseImage registry data.
-		// See https://github.com/coreos/fedora-coreos-tracker/issues/1183 for more details.
-		growPartCmd,
-		xfsForceAutosaveCmd,
-		xfsRestoreCommand,
-		xfsCleanupCommand,
-
-		// Copy registry data
-		mountCmd, // Re-mount before copying data
-		makecmd(nil, "xfs_growfs", mntTmpPath),
-		makecmd(nil, "mkdir", "-p", registryDataDirOnRoot),
-		copyCmd,
-
-		// Freeze
-		fsFreezeCmd,
-		unmountCmd,
-	}
-	for i := range cmds {
-		c := cmds[i]
-		o.log.Infof("Running %s with args %+v", c.command, c.args)
-		if err := utils.Retry(3, 5*time.Second, o.log, func() (ret error) {
-			_, ret = o.ExecPrivilegeCommand(c.liveLogger, c.command, c.args...)
-			if ret != nil {
-				o.log.Warnf("Retrying command %s with args %+v (returned error %v)", c.command, c.args, ret)
-			}
-			return
-		}); err != nil {
-			return errors.Wrapf(err, "failed to run %s with args %+v", c.command, c.args)
-		}
-	}
-	return nil
+func (o *ops) createIRIRegistryPartition(device string, partConfig iriPartitionConfig) error {
+	return o.iriPartition.create(device, partConfig)
 }
