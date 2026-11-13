@@ -239,7 +239,85 @@ var _ = Describe("IRI Registry Setup", func() {
 			o = NewOpsWithConfig(testConfig, logrus.New(), mockExec).(*ops)
 		})
 
-		It("should create partition with correct geometry", func() {
+		It("should create partition with auto-discovery (regular disk)", func() {
+			// Mock sfdisk -d to return partition table with last-lba
+			sfdiskDump := `label: gpt
+label-id: 12345678-1234-1234-1234-123456789012
+device: /dev/sda
+unit: sectors
+first-lba: 34
+last-lba: 629145566
+
+/dev/sda1 : start=        2048, size=      261120, type=21686148-6449-6E6F-744E-656564454649
+/dev/sda2 : start=      264192, size=      262144, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+/dev/sda3 : start=      526336, size=     1048576, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4
+/dev/sda4 : start=     1574912, size=    11534336, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4`
+
+			gomock.InOrder(
+				// Step 0: sfdisk --relocate gpt-bak-std to relocate backup GPT
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sfdisk",
+					[]string{"--no-reread", "--no-tell-kernel", "--relocate", "gpt-bak-std", "/dev/sda"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 1: sfdisk -d to get last-lba
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sfdisk",
+					[]string{"-d", "/dev/sda"},
+					gomock.Any(),
+				).Return(sfdiskDump, nil),
+
+				// Step 2: Create partition with sfdisk -N 5
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sh",
+					gomock.Any(),
+					gomock.Any(),
+				).DoAndReturn(func(writer io.Writer, command string, args []string, opts ...execute.CommandOption) (string, error) {
+					Expect(args[1]).To(ContainSubstring("sfdisk --no-reread --no-tell-kernel -N 5"))
+					Expect(args[3]).To(ContainSubstring("type=0FC63DAF-8483-4772-8E79-3D69D8477DE4"))
+					Expect(args[3]).To(ContainSubstring("name=\"iri-registry\""))
+					Expect(args[4]).To(Equal("/dev/sda"))
+					return "", nil
+				}),
+
+				// Step 3: udevadm settle after sfdisk
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"udevadm",
+					[]string{"settle"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 4: lsblk to check if partition exists (auto-discovered)
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"lsblk",
+					[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", "/dev/sda"},
+					gomock.Any(),
+				).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda5", "path": "/dev/sda5", "type": "part", "partn": 5}]}]}`, nil),
+
+				// Step 5: mkfs.xfs (no partx/kpartx needed since partition was auto-discovered)
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"mkfs.xfs",
+					[]string{"-f", "-L", "iri-registry", "/dev/sda5"},
+					gomock.Any(),
+				).Return("", nil),
+			)
+
+			partConfig := iriPartitionConfig{
+				sizeGB:     150,
+				reservedGB: 0,
+			}
+			err := o.createIRIRegistryPartition("/dev/sda", partConfig)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should use partx for regular disk when partition not auto-discovered", func() {
 			// Mock sfdisk -d to return partition table with last-lba
 			sfdiskDump := `label: gpt
 label-id: 12345678-1234-1234-1234-123456789012
@@ -291,15 +369,7 @@ last-lba: 629145566
 					return "", nil
 				}),
 
-				// Step 3: partx --add --nr 5 to add partition to kernel partition table
-				mockExec.EXPECT().ExecCommandWithOptions(
-					gomock.Any(),
-					"partx",
-					[]string{"--add", "--nr", "5", "/dev/sda"},
-					gomock.Any(),
-				).Return("", nil),
-
-				// Step 4: udevadm settle
+				// Step 3: udevadm settle after sfdisk
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"udevadm",
@@ -307,15 +377,47 @@ last-lba: 629145566
 					gomock.Any(),
 				).Return("", nil),
 
-				// Step 5: lsblk to get partition path
+				// Step 4: lsblk to check if partition exists (not found - only 4 partitions)
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"lsblk",
+					[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", "/dev/sda"},
+					gomock.Any(),
+				).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}]}]}`, nil),
+
+				// Step 5: lsblk to get device type (getDeviceType uses plain lsblk without --output)
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"lsblk",
 					[]string{"--bytes", "--json", "/dev/sda"},
 					gomock.Any(),
-				).Return(`{"blockdevices": [{"name": "sda", "type": "disk", "children": [{"name": "sda1"}, {"name": "sda2"}, {"name": "sda3"}, {"name": "sda4"}, {"name": "sda5"}]}]}`, nil),
+				).Return(`{"blockdevices": [{"name": "sda", "type": "disk"}]}`, nil),
 
-				// Step 6: mkfs.xfs
+				// Step 6: partx --add --nr 5 (regular disk)
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"partx",
+					[]string{"--add", "--nr", "5", "/dev/sda"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 7: udevadm settle after partx
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"udevadm",
+					[]string{"settle"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 8: lsblk to verify partition exists after partx
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"lsblk",
+					[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", "/dev/sda"},
+					gomock.Any(),
+				).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda5", "path": "/dev/sda5", "type": "part", "partn": 5}]}]}`, nil),
+
+				// Step 9: mkfs.xfs
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"mkfs.xfs",
@@ -490,15 +592,7 @@ last-lba: 78643166
 					return "", nil
 				}),
 
-				// Step 3: partx --add --nr 5
-				mockExec.EXPECT().ExecCommandWithOptions(
-					gomock.Any(),
-					"partx",
-					[]string{"--add", "--nr", "5", "/dev/sda"},
-					gomock.Any(),
-				).Return("", nil),
-
-				// Step 4: udevadm settle
+				// Step 3: udevadm settle after sfdisk
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"udevadm",
@@ -506,15 +600,15 @@ last-lba: 78643166
 					gomock.Any(),
 				).Return("", nil),
 
-				// Step 5: lsblk to get partition path
+				// Step 4: lsblk to check if partition exists (auto-discovered)
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"lsblk",
-					[]string{"--bytes", "--json", "/dev/sda"},
+					[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", "/dev/sda"},
 					gomock.Any(),
-				).Return(`{"blockdevices": [{"name": "sda", "type": "disk", "children": [{"name": "sda1"}, {"name": "sda2"}, {"name": "sda3"}, {"name": "sda4"}, {"name": "sda5"}]}]}`, nil),
+				).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda5", "path": "/dev/sda5", "type": "part", "partn": 5}]}]}`, nil),
 
-				// Step 6: mkfs.xfs
+				// Step 5: mkfs.xfs (no partx needed, auto-discovered)
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"mkfs.xfs",
@@ -531,7 +625,395 @@ last-lba: 78643166
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("should handle NVMe devices with correct partition path", func() {
+		It("should use kpartx for multipath device when partition not auto-discovered", func() {
+			// Mock sfdisk -d for multipath device
+			sfdiskDump := `label: gpt
+label-id: 12345678-1234-1234-1234-123456789012
+device: /dev/mapper/mpatha
+unit: sectors
+sector-size: 512
+first-lba: 34
+last-lba: 629145566
+
+/dev/mapper/mpatha1 : start=        2048, size=      261120, type=21686148-6449-6E6F-744E-656564454649
+/dev/mapper/mpatha2 : start=      264192, size=      262144, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+/dev/mapper/mpatha3 : start=      526336, size=     1048576, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4
+/dev/mapper/mpatha4 : start=     1574912, size=    11534336, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4`
+
+			gomock.InOrder(
+				// Step 0: sfdisk --relocate gpt-bak-std
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sfdisk",
+					[]string{"--no-reread", "--no-tell-kernel", "--relocate", "gpt-bak-std", "/dev/mapper/mpatha"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 1: sfdisk -d to get last-lba
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sfdisk",
+					[]string{"-d", "/dev/mapper/mpatha"},
+					gomock.Any(),
+				).Return(sfdiskDump, nil),
+
+				// Step 2: Create partition with sfdisk -N 5
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sh",
+					gomock.Any(),
+					gomock.Any(),
+				).DoAndReturn(func(writer io.Writer, command string, args []string, opts ...execute.CommandOption) (string, error) {
+					Expect(args[1]).To(ContainSubstring("sfdisk --no-reread --no-tell-kernel -N 5"))
+					Expect(args[4]).To(Equal("/dev/mapper/mpatha"))
+					return "", nil
+				}),
+
+				// Step 3: udevadm settle after sfdisk
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"udevadm",
+					[]string{"settle"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 4: lsblk to check if partition exists (not found)
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"lsblk",
+					[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", "/dev/mapper/mpatha"},
+					gomock.Any(),
+				).Return(`{"blockdevices": [{"name": "mpatha", "path": "/dev/mapper/mpatha", "type": "mpath", "partn": null, "children": [{"name": "mpatha1", "path": "/dev/mapper/mpatha1", "type": "part", "partn": 1}, {"name": "mpatha2", "path": "/dev/mapper/mpatha2", "type": "part", "partn": 2}, {"name": "mpatha3", "path": "/dev/mapper/mpatha3", "type": "part", "partn": 3}, {"name": "mpatha4", "path": "/dev/mapper/mpatha4", "type": "part", "partn": 4}]}]}`, nil),
+
+				// Step 5: lsblk to get device type (getDeviceType uses plain lsblk without --output)
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"lsblk",
+					[]string{"--bytes", "--json", "/dev/mapper/mpatha"},
+					gomock.Any(),
+				).Return(`{"blockdevices": [{"name": "mpatha", "type": "mpath"}]}`, nil),
+
+				// Step 6: kpartx -u for multipath device
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"kpartx",
+					[]string{"-u", "/dev/mapper/mpatha"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 7: udevadm settle after kpartx
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"udevadm",
+					[]string{"settle"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 8: lsblk to verify partition exists after kpartx
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"lsblk",
+					[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", "/dev/mapper/mpatha"},
+					gomock.Any(),
+				).Return(`{"blockdevices": [{"name": "mpatha", "path": "/dev/mapper/mpatha", "type": "mpath", "partn": null, "children": [{"name": "mpatha1", "path": "/dev/mapper/mpatha1", "type": "part", "partn": 1}, {"name": "mpatha2", "path": "/dev/mapper/mpatha2", "type": "part", "partn": 2}, {"name": "mpatha3", "path": "/dev/mapper/mpatha3", "type": "part", "partn": 3}, {"name": "mpatha4", "path": "/dev/mapper/mpatha4", "type": "part", "partn": 4}, {"name": "mpatha5", "path": "/dev/mapper/mpatha5", "type": "part", "partn": 5}]}]}`, nil),
+
+				// Step 9: mkfs.xfs on multipath partition
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"mkfs.xfs",
+					[]string{"-f", "-L", "iri-registry", "/dev/mapper/mpatha5"},
+					gomock.Any(),
+				).Return("", nil),
+			)
+
+			partConfig := iriPartitionConfig{
+				sizeGB:     150,
+				reservedGB: 0,
+			}
+			err := o.createIRIRegistryPartition("/dev/mapper/mpatha", partConfig)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should skip registration for multipath device with auto-discovered partition", func() {
+			// Mock sfdisk -d for multipath device
+			sfdiskDump := `label: gpt
+label-id: 12345678-1234-1234-1234-123456789012
+device: /dev/mapper/mpatha
+unit: sectors
+sector-size: 512
+first-lba: 34
+last-lba: 629145566
+
+/dev/mapper/mpatha1 : start=        2048, size=      261120, type=21686148-6449-6E6F-744E-656564454649
+/dev/mapper/mpatha2 : start=      264192, size=      262144, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+/dev/mapper/mpatha3 : start=      526336, size=     1048576, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4
+/dev/mapper/mpatha4 : start=     1574912, size=    11534336, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4`
+
+			gomock.InOrder(
+				// Step 0: sfdisk --relocate gpt-bak-std
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sfdisk",
+					[]string{"--no-reread", "--no-tell-kernel", "--relocate", "gpt-bak-std", "/dev/mapper/mpatha"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 1: sfdisk -d to get last-lba
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sfdisk",
+					[]string{"-d", "/dev/mapper/mpatha"},
+					gomock.Any(),
+				).Return(sfdiskDump, nil),
+
+				// Step 2: Create partition with sfdisk -N 5
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sh",
+					gomock.Any(),
+					gomock.Any(),
+				).DoAndReturn(func(writer io.Writer, command string, args []string, opts ...execute.CommandOption) (string, error) {
+					Expect(args[4]).To(Equal("/dev/mapper/mpatha"))
+					return "", nil
+				}),
+
+				// Step 3: udevadm settle after sfdisk
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"udevadm",
+					[]string{"settle"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 4: lsblk to check if partition exists (auto-discovered - partition 5 present)
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"lsblk",
+					[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", "/dev/mapper/mpatha"},
+					gomock.Any(),
+				).Return(`{"blockdevices": [{"name": "mpatha", "path": "/dev/mapper/mpatha", "type": "mpath", "partn": null, "children": [{"name": "mpatha1", "path": "/dev/mapper/mpatha1", "type": "part", "partn": 1}, {"name": "mpatha2", "path": "/dev/mapper/mpatha2", "type": "part", "partn": 2}, {"name": "mpatha3", "path": "/dev/mapper/mpatha3", "type": "part", "partn": 3}, {"name": "mpatha4", "path": "/dev/mapper/mpatha4", "type": "part", "partn": 4}, {"name": "mpatha5", "path": "/dev/mapper/mpatha5", "type": "part", "partn": 5}]}]}`, nil),
+
+				// Step 5: mkfs.xfs (no kpartx needed since partition was auto-discovered)
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"mkfs.xfs",
+					[]string{"-f", "-L", "iri-registry", "/dev/mapper/mpatha5"},
+					gomock.Any(),
+				).Return("", nil),
+			)
+
+			partConfig := iriPartitionConfig{
+				sizeGB:     150,
+				reservedGB: 0,
+			}
+			err := o.createIRIRegistryPartition("/dev/mapper/mpatha", partConfig)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should fail if partition not found after explicit registration", func() {
+			sfdiskDump := `label: gpt
+sector-size: 512
+last-lba: 629145566`
+
+			gomock.InOrder(
+				// Step 0: sfdisk --relocate gpt-bak-std
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sfdisk",
+					[]string{"--no-reread", "--no-tell-kernel", "--relocate", "gpt-bak-std", "/dev/sda"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 1: sfdisk -d
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sfdisk",
+					[]string{"-d", "/dev/sda"},
+					gomock.Any(),
+				).Return(sfdiskDump, nil),
+
+				// Step 2: Create partition with sfdisk -N 5
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sh",
+					gomock.Any(),
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 3: udevadm settle after sfdisk
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"udevadm",
+					[]string{"settle"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 4: lsblk to check if partition exists (not found)
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"lsblk",
+					[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", "/dev/sda"},
+					gomock.Any(),
+				).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}]}]}`, nil),
+
+				// Step 5: lsblk to get device type (getDeviceType uses plain lsblk without --output)
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"lsblk",
+					[]string{"--bytes", "--json", "/dev/sda"},
+					gomock.Any(),
+				).Return(`{"blockdevices": [{"name": "sda", "type": "disk"}]}`, nil),
+
+				// Step 6: partx --add (succeeds but partition still not visible)
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"partx",
+					[]string{"--add", "--nr", "5", "/dev/sda"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 7: udevadm settle after partx
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"udevadm",
+					[]string{"settle"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 8: lsblk to verify partition - still not found (failure scenario)
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"lsblk",
+					[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", "/dev/sda"},
+					gomock.Any(),
+				).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}]}]}`, nil),
+			)
+
+			partConfig := iriPartitionConfig{
+				sizeGB:     150,
+				reservedGB: 0,
+			}
+			err := o.createIRIRegistryPartition("/dev/sda", partConfig)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("partition 5 still not found"))
+			Expect(err.Error()).To(ContainSubstring("after explicit registration"))
+		})
+
+		It("should propagate lsblk command failure without attempting registration", func() {
+			sfdiskDump := `label: gpt
+sector-size: 512
+last-lba: 629145566`
+
+			gomock.InOrder(
+				// Step 0: sfdisk --relocate gpt-bak-std
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sfdisk",
+					[]string{"--no-reread", "--no-tell-kernel", "--relocate", "gpt-bak-std", "/dev/sda"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 1: sfdisk -d
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sfdisk",
+					[]string{"-d", "/dev/sda"},
+					gomock.Any(),
+				).Return(sfdiskDump, nil),
+
+				// Step 2: Create partition with sfdisk -N 5
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sh",
+					gomock.Any(),
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 3: udevadm settle after sfdisk
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"udevadm",
+					[]string{"settle"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 4: lsblk command fails
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"lsblk",
+					[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", "/dev/sda"},
+					gomock.Any(),
+				).Return("", fmt.Errorf("lsblk command failed")),
+			)
+
+			partConfig := iriPartitionConfig{
+				sizeGB:     150,
+				reservedGB: 0,
+			}
+			err := o.createIRIRegistryPartition("/dev/sda", partConfig)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to check for partition 5"))
+			Expect(err.Error()).To(ContainSubstring("failed to run lsblk command"))
+		})
+
+		It("should propagate invalid JSON without attempting registration", func() {
+			sfdiskDump := `label: gpt
+sector-size: 512
+last-lba: 629145566`
+
+			gomock.InOrder(
+				// Step 0: sfdisk --relocate gpt-bak-std
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sfdisk",
+					[]string{"--no-reread", "--no-tell-kernel", "--relocate", "gpt-bak-std", "/dev/sda"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 1: sfdisk -d
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sfdisk",
+					[]string{"-d", "/dev/sda"},
+					gomock.Any(),
+				).Return(sfdiskDump, nil),
+
+				// Step 2: Create partition with sfdisk -N 5
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"sh",
+					gomock.Any(),
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 3: udevadm settle after sfdisk
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"udevadm",
+					[]string{"settle"},
+					gomock.Any(),
+				).Return("", nil),
+
+				// Step 4: lsblk returns invalid JSON
+				mockExec.EXPECT().ExecCommandWithOptions(
+					gomock.Any(),
+					"lsblk",
+					[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", "/dev/sda"},
+					gomock.Any(),
+				).Return("invalid json {{{", nil),
+			)
+
+			partConfig := iriPartitionConfig{
+				sizeGB:     150,
+				reservedGB: 0,
+			}
+			err := o.createIRIRegistryPartition("/dev/sda", partConfig)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to check for partition 5"))
+			Expect(err.Error()).To(ContainSubstring("failed to unmarshal lsblk output"))
+		})
+
+		It("should handle NVMe devices with auto-discovery", func() {
 			// Mock sfdisk -d for NVMe device
 			sfdiskDump := `label: gpt
 label-id: 12345678-1234-1234-1234-123456789012
@@ -581,15 +1063,7 @@ last-lba: 629145566
 					return "", nil
 				}),
 
-				// Step 3: partx --add --nr 5
-				mockExec.EXPECT().ExecCommandWithOptions(
-					gomock.Any(),
-					"partx",
-					[]string{"--add", "--nr", "5", "/dev/nvme0n1"},
-					gomock.Any(),
-				).Return("", nil),
-
-				// Step 4: udevadm settle
+				// Step 3: udevadm settle after sfdisk
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"udevadm",
@@ -597,15 +1071,15 @@ last-lba: 629145566
 					gomock.Any(),
 				).Return("", nil),
 
-				// Step 5: lsblk to get partition path
+				// Step 4: lsblk to check if partition exists (auto-discovered)
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"lsblk",
-					[]string{"--bytes", "--json", "/dev/nvme0n1"},
+					[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", "/dev/nvme0n1"},
 					gomock.Any(),
-				).Return(`{"blockdevices": [{"name": "nvme0n1", "type": "disk", "children": [{"name": "nvme0n1p1"}, {"name": "nvme0n1p2"}, {"name": "nvme0n1p3"}, {"name": "nvme0n1p4"}, {"name": "nvme0n1p5"}]}]}`, nil),
+				).Return(`{"blockdevices": [{"name": "nvme0n1", "path": "/dev/nvme0n1", "type": "disk", "partn": null, "children": [{"name": "nvme0n1p1", "path": "/dev/nvme0n1p1", "type": "part", "partn": 1}, {"name": "nvme0n1p2", "path": "/dev/nvme0n1p2", "type": "part", "partn": 2}, {"name": "nvme0n1p3", "path": "/dev/nvme0n1p3", "type": "part", "partn": 3}, {"name": "nvme0n1p4", "path": "/dev/nvme0n1p4", "type": "part", "partn": 4}, {"name": "nvme0n1p5", "path": "/dev/nvme0n1p5", "type": "part", "partn": 5}]}]}`, nil),
 
-				// Step 6: mkfs.xfs
+				// Step 5: mkfs.xfs (no partx needed, auto-discovered)
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"mkfs.xfs",
@@ -652,13 +1126,24 @@ last-lba: 629145566`
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sfdisk", []string{"--no-reread", "--no-tell-kernel", "--relocate", "gpt-bak-std", "/dev/sda"}, gomock.Any()).Return("", nil),
 				// Step 3.1: sfdisk -d
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sfdisk", []string{"-d", "/dev/sda"}, gomock.Any()).Return(sfdiskDump, nil),
+				// Step 3.2: sfdisk -N 5 (create partition)
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sh", gomock.Any(), gomock.Any()).Return("", nil),
-				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "partx", gomock.Any(), gomock.Any()).Return("", nil),
+				// Step 3.3: udevadm settle (after sfdisk)
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "udevadm", gomock.Any(), gomock.Any()).Return("", nil),
-				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "type": "disk", "children": [{"name": "sda1"}, {"name": "sda2"}, {"name": "sda3"}, {"name": "sda4"}, {"name": "sda5"}]}]}`, nil),
+				// Step 3.4: lsblk to check if partition exists (not found - returns only 4 partitions)
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}]}]}`, nil),
+				// Step 3.5: lsblk to get device type
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null}]}`, nil),
+				// Step 3.6: partx to register partition
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "partx", gomock.Any(), gomock.Any()).Return("", nil),
+				// Step 3.7: udevadm settle (after partx)
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "udevadm", gomock.Any(), gomock.Any()).Return("", nil),
+				// Step 3.8: lsblk to verify partition exists
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda5", "path": "/dev/sda5", "type": "part", "partn": 5}]}]}`, nil),
+				// Step 3.9: mkfs.xfs
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mkfs.xfs", gomock.Any(), gomock.Any()).Return("", nil),
 				// Step 4: copyRegistryDataToPartition
-				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "type": "disk", "children": [{"name": "sda1"}, {"name": "sda2"}, {"name": "sda3"}, {"name": "sda4"}, {"name": "sda5"}]}]}`, nil),
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda5", "path": "/dev/sda5", "type": "part", "partn": 5}]}]}`, nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mkdir", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mount", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sh", gomock.Any(), gomock.Any()).Return("", nil),
@@ -690,13 +1175,24 @@ last-lba: 629145566`
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sfdisk", []string{"--no-reread", "--no-tell-kernel", "--relocate", "gpt-bak-std", "/dev/sda"}, gomock.Any()).Return("", nil),
 				// Step 3.1: sfdisk -d
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sfdisk", []string{"-d", "/dev/sda"}, gomock.Any()).Return(sfdiskDump, nil),
+				// Step 3.2: sfdisk -N 5 (create partition)
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sh", gomock.Any(), gomock.Any()).Return("", nil),
-				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "partx", gomock.Any(), gomock.Any()).Return("", nil),
+				// Step 3.3: udevadm settle (after sfdisk)
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "udevadm", gomock.Any(), gomock.Any()).Return("", nil),
-				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "type": "disk", "children": [{"name": "sda1"}, {"name": "sda2"}, {"name": "sda3"}, {"name": "sda4"}, {"name": "sda5"}]}]}`, nil),
+				// Step 3.4: lsblk to check if partition exists (not found - returns only 4 partitions)
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}]}]}`, nil),
+				// Step 3.5: lsblk to get device type
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null}]}`, nil),
+				// Step 3.6: partx to register partition
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "partx", gomock.Any(), gomock.Any()).Return("", nil),
+				// Step 3.7: udevadm settle (after partx)
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "udevadm", gomock.Any(), gomock.Any()).Return("", nil),
+				// Step 3.8: lsblk to verify partition exists
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda5", "path": "/dev/sda5", "type": "part", "partn": 5}]}]}`, nil),
+				// Step 3.9: mkfs.xfs
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mkfs.xfs", gomock.Any(), gomock.Any()).Return("", nil),
 				// Step 4: copyRegistryDataToPartition
-				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "type": "disk", "children": [{"name": "sda1"}, {"name": "sda2"}, {"name": "sda3"}, {"name": "sda4"}, {"name": "sda5"}]}]}`, nil),
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda5", "path": "/dev/sda5", "type": "part", "partn": 5}]}]}`, nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mkdir", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mount", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sh", gomock.Any(), gomock.Any()).Return("", nil),
@@ -724,14 +1220,25 @@ last-lba: 629145566`
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sfdisk", []string{"--no-reread", "--no-tell-kernel", "--relocate", "gpt-bak-std", "/dev/sda"}, gomock.Any()).Return("", nil),
 				// Step 3.1: sfdisk -d
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sfdisk", []string{"-d", "/dev/sda"}, gomock.Any()).Return(sfdiskDump, nil),
+				// Step 3.2: sfdisk -N 5 (create partition)
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sh", gomock.Any(), gomock.Any()).Return("", nil),
-				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "partx", gomock.Any(), gomock.Any()).Return("", nil),
+				// Step 3.3: udevadm settle (after sfdisk)
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "udevadm", gomock.Any(), gomock.Any()).Return("", nil),
-				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "type": "disk", "children": [{"name": "sda1"}, {"name": "sda2"}, {"name": "sda3"}, {"name": "sda4"}, {"name": "sda5"}]}]}`, nil),
+				// Step 3.4: lsblk to check if partition exists (not found - returns only 4 partitions)
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}]}]}`, nil),
+				// Step 3.5: lsblk to get device type
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null}]}`, nil),
+				// Step 3.6: partx to register partition
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "partx", gomock.Any(), gomock.Any()).Return("", nil),
+				// Step 3.7: udevadm settle (after partx)
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "udevadm", gomock.Any(), gomock.Any()).Return("", nil),
+				// Step 3.8: lsblk to verify partition exists
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda5", "path": "/dev/sda5", "type": "part", "partn": 5}]}]}`, nil),
+				// Step 3.9: mkfs.xfs
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mkfs.xfs", gomock.Any(), gomock.Any()).Return("", nil),
 
 				// Step 4: copyRegistryDataToPartition
-				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "type": "disk", "children": [{"name": "sda1"}, {"name": "sda2"}, {"name": "sda3"}, {"name": "sda4"}, {"name": "sda5"}]}]}`, nil),
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda5", "path": "/dev/sda5", "type": "part", "partn": 5}]}]}`, nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mkdir", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mount", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sh", gomock.Any(), gomock.Any()).Return("", nil), // rsync

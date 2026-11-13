@@ -58,6 +58,11 @@ const (
 	iriRegistryTempMount      = "/mnt/iri-registry"
 )
 
+// errPartitionNotFound is a sentinel error indicating that the requested partition
+// is not present on the device. This is distinct from command failures, parsing errors,
+// or malformed device structures, which should propagate as different errors.
+var errPartitionNotFound = errors.New("partition not found")
+
 // iriPartitionConfig holds IRI partition geometry configuration.
 // The partition size is dynamically calculated based on registry data size * 2.5.
 type iriPartitionConfig struct {
@@ -1076,15 +1081,11 @@ func stripDev(device string) string {
 	return strings.Replace(device, "/dev/", "", 1)
 }
 
-// getPartitionPathFromLsblk uses lsblk to find the actual partition device path
-// for a given device and partition number. This handles all device types including
-// device mapper devices correctly.
-func (o *ops) getPartitionPathFromLsblk(device, partitionNumber string) (string, error) {
+// getDeviceType returns the device type (disk, mpath, etc.) from lsblk.
+func (o *ops) getDeviceType(device string) (string, error) {
 	type node struct {
-		Name     string  `json:"name"`
-		Size     int64   `json:"size"`
-		Type     string  `json:"type"`
-		Children []*node `json:"children"`
+		Name string `json:"name"`
+		Type string `json:"type"`
 	}
 	var disks struct {
 		Blockdevices []*node `json:"blockdevices"`
@@ -1101,34 +1102,73 @@ func (o *ops) getPartitionPathFromLsblk(device, partitionNumber string) (string,
 	if len(disks.Blockdevices) == 0 {
 		return "", errors.Errorf("no block device information returned for %s", device)
 	}
-	diskNode := disks.Blockdevices[0] // lsblk with device filter returns only that device
-	diskType := diskNode.Type
 
-	if len(diskNode.Children) == 0 {
-		return "", errors.Errorf("device %s has no partitions", device)
+	return disks.Blockdevices[0].Type, nil
+}
+
+// getPartitionPathFromLsblk uses lsblk to find the actual partition device path
+// for a given device and partition number. This handles all device types including
+// device mapper devices correctly.
+//
+// The function queries lsblk with NAME,PATH,TYPE,PARTN fields and iterates through
+// the children to find the partition by its PARTN number (not array position),
+// ensuring correct identification even if partitions are missing or out of order.
+func (o *ops) getPartitionPathFromLsblk(device, partitionNumber string) (string, error) {
+	type node struct {
+		Name     string  `json:"name"`
+		Path     string  `json:"path"`
+		Type     string  `json:"type"`
+		PartN    *int    `json:"partn"` // Nullable: null for parent device, number for partitions
+		Children []*node `json:"children,omitempty"`
+	}
+	var disks struct {
+		Blockdevices []*node `json:"blockdevices"`
 	}
 
-	// Convert partition number to integer for indexing
+	// Query lsblk with explicit fields including PARTN for partition number matching
+	ret, err := o.ExecPrivilegeCommand(nil, "lsblk", "--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", device)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to run lsblk command")
+	}
+	if err = json.Unmarshal([]byte(ret), &disks); err != nil {
+		return "", errors.Wrap(err, "failed to unmarshal lsblk output")
+	}
+
+	if len(disks.Blockdevices) == 0 {
+		return "", errors.Errorf("no block device information returned for %s", device)
+	}
+	diskNode := disks.Blockdevices[0] // lsblk with device filter returns only that device
+
+	// Convert partition number to integer for matching
 	partNum, err := strconv.Atoi(partitionNumber)
 	if err != nil {
 		return "", errors.Errorf("invalid partition number %s", partitionNumber)
 	}
 
-	// Partition numbers are 1-based, but array indices are 0-based
-	if partNum < 1 || partNum > len(diskNode.Children) {
-		return "", errors.Errorf("partition %s not found on device %s", partitionNumber, device)
+	// Find partition by PARTN field, not by array position
+	// This correctly handles missing partitions and out-of-order results
+	for _, child := range diskNode.Children {
+		// Skip if PARTN is null or doesn't match requested partition
+		if child.PartN == nil || *child.PartN != partNum {
+			continue
+		}
+
+		// Validate partition type
+		if child.Type != "part" {
+			return "", errors.Errorf("found device with PARTN=%d but TYPE=%s (expected TYPE=part)", partNum, child.Type)
+		}
+
+		// Validate path is non-empty
+		if child.Path == "" {
+			return "", errors.Errorf("partition %d found but PATH is empty", partNum)
+		}
+
+		// Return the PATH field directly (works for both regular disks and multipath)
+		return child.Path, nil
 	}
 
-	partitionName := diskNode.Children[partNum-1].Name
-	var devicePath string
-	switch diskType {
-	case "mpath":
-		devicePath = "/dev/mapper/" + partitionName
-	default:
-		devicePath = "/dev/" + partitionName
-
-	}
-	return devicePath, nil
+	// Partition genuinely not found - return sentinel error
+	return "", errors.Wrapf(errPartitionNotFound, "partition %s not found on device %s", partitionNumber, device)
 }
 
 func (o *ops) calculateFreePercent(device string, requiredSize *int64) (int64, error) {
@@ -1504,13 +1544,18 @@ func (o *ops) verifyDiskSpaceForIRI(device string, partConfig iriPartitionConfig
 //     Uses --no-reread --no-tell-kernel because disk is in use (partitions 1-4 mounted).
 //     GPT type GUID: 0FC63DAF-8483-4772-8E79-3D69D8477DE4 = Linux filesystem
 //
-//     4. partx --add --nr 5 /dev/sda
-//     Adds partition 5 to the kernel's in-memory partition table.
-//     Used instead of partprobe because the disk is actively in use.
+//     4. udevadm settle
+//     Waits for udev to finish processing partition table events before checking if the
+//     partition was auto-discovered.
 //
-//     5. udevadm settle
-//     Waits for udev to finish processing device events, ensuring /dev/sda5 and
-//     /dev/disk/by-partlabel/iri-registry device nodes are created before we proceed.
+//     5. Check if partition 5 exists using getPartitionPathFromLsblk()
+//     If partition was auto-discovered (common on multipath devices), skip explicit registration.
+//     If not found, determine device type and use appropriate registration command:
+//     - Regular disks: partx --add --nr 5 /dev/sda
+//     - Multipath devices: kpartx -u /dev/mapper/mpatha
+//
+//     6. udevadm settle (again, after explicit registration if needed)
+//     Ensures device nodes are created before formatting.
 func (o *ops) createIRIRegistryPartition(device string, partConfig iriPartitionConfig) error {
 	o.log.Infof("Creating IRI registry partition on device %s", device)
 
@@ -1619,30 +1664,68 @@ func (o *ops) createIRIRegistryPartition(device string, partConfig iriPartitionC
 		return errors.Wrapf(err, "failed to create partition 5 on device %s", device)
 	}
 
-	// Step 5: Add partition 5 to kernel partition table
-	// Command: partx --add --nr 5 /dev/sda
-	// Use --add --nr 5 instead of -u to specifically add only partition 5
-	// Disk is in use (partitions 1-4 mounted), so we use partx instead of partprobe
-	o.log.Infof("Adding partition 5 to kernel partition table with partx")
-	_, err = o.ExecPrivilegeCommand(o.logWriter, "partx", "--add", "--nr", "5", device)
-	if err != nil {
-		return errors.Wrapf(err, "failed to add partition 5 to kernel partition table for %s", device)
-	}
-
-	// Wait for udev to finish processing device events
-	o.log.Info("Waiting for udev to settle")
+	// Step 5: Wait for udev to process partition table update
+	o.log.Info("Waiting for udev to settle after partition creation")
 	_, err = o.ExecPrivilegeCommand(o.logWriter, "udevadm", "settle")
 	if err != nil {
 		return errors.Wrapf(err, "failed to wait for udev to settle after creating partition on %s", device)
 	}
 
-	// Get the partition 5 device path
+	// Step 6: Check if partition 5 is already available (auto-discovered by udev)
 	partition5, err := o.getPartitionPathFromLsblk(device, "5")
-	if err != nil {
-		return errors.Wrapf(err, "failed to find partition 5 on device %s after creation", device)
+
+	// Propagate errors other than "partition not found" immediately
+	if err != nil && !errors.Is(err, errPartitionNotFound) {
+		return errors.Wrapf(err, "failed to check for partition 5 on %s", device)
 	}
 
-	o.log.Infof("Partition 5 created at %s, formatting with XFS", partition5)
+	// If partition already available, skip registration
+	if err == nil {
+		o.log.Infof("Partition 5 auto-discovered at %s, skipping explicit registration", partition5)
+		// Continue to formatting below
+	} else {
+		// Partition not found - perform explicit registration
+		o.log.Info("Partition 5 not auto-discovered, performing explicit registration")
+
+		// Determine device type for appropriate registration command
+		deviceType, typeErr := o.getDeviceType(device)
+		if typeErr != nil {
+			return errors.Wrapf(typeErr, "failed to determine device type for %s", device)
+		}
+
+		// Register partition based on device type
+		if deviceType == "mpath" {
+			// Multipath device - use kpartx
+			o.log.Infof("Using kpartx for multipath device %s", device)
+			_, err = o.ExecPrivilegeCommand(o.logWriter, "kpartx", "-u", device)
+			if err != nil {
+				return errors.Wrapf(err, "failed to register partitions with kpartx on multipath device %s", device)
+			}
+		} else {
+			// Regular disk - use partx
+			o.log.Infof("Using partx for regular disk %s (type: %s)", device, deviceType)
+			_, err = o.ExecPrivilegeCommand(o.logWriter, "partx", "--add", "--nr", "5", device)
+			if err != nil {
+				return errors.Wrapf(err, "failed to add partition 5 to kernel partition table for %s", device)
+			}
+		}
+
+		// Wait for udev to settle after explicit registration
+		o.log.Info("Waiting for udev to settle after explicit registration")
+		_, err = o.ExecPrivilegeCommand(o.logWriter, "udevadm", "settle")
+		if err != nil {
+			return errors.Wrapf(err, "failed to wait for udev to settle after partition registration on %s", device)
+		}
+
+		// Verify partition is now available
+		partition5, err = o.getPartitionPathFromLsblk(device, "5")
+		if err != nil {
+			return errors.Wrapf(err, "partition 5 still not found on %s after explicit registration", device)
+		}
+		o.log.Infof("Partition 5 successfully registered at %s", partition5)
+	}
+
+	o.log.Infof("Partition 5 available at %s, formatting with XFS", partition5)
 
 	// Format partition 5 with XFS (-f forces overwrite on reinstall)
 	_, err = o.ExecPrivilegeCommand(o.logWriter, "mkfs.xfs", "-f", "-L", iriRegistryPartitionLabel, partition5)
