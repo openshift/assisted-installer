@@ -180,7 +180,7 @@ require (
 
 replace (
 	github.com/google/gnostic-models => github.com/google/gnostic-models v0.6.8
-	github.com/jackc/pgx/v4 => github.com/jackc/pgx/v4 v4.18.3
+	github.com/jackc/pgx/v5 => github.com/jackc/pgx/v4 v5.0.0
 	github.com/metal3-io/baremetal-operator => github.com/openshift/baremetal-operator v0.0.0-20230531194024-8dde0991ffdd
 	github.com/metal3-io/baremetal-operator/apis => github.com/openshift/baremetal-operator/apis v0.0.0-20230531194024-8dde0991ffdd
 	github.com/metal3-io/baremetal-operator/pkg/hardwareutils => github.com/openshift/baremetal-operator/pkg/hardwareutils v0.0.0-20230531194024-8dde0991ffdd
