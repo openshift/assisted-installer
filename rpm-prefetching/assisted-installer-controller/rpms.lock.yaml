@@ -4,13 +4,13 @@ lockfileVendor: redhat
 arches:
 - arch: aarch64
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel8/aarch64/rhocp/4.17/os/Packages/o/openshift-clients-4.17.0-202609081428.p2.g7189593.assembly.stream.el8.aarch64.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel8/aarch64/rhocp/4.17/os/Packages/o/openshift-clients-4.17.0-202610221631.p2.g28d0040.assembly.stream.el8.aarch64.rpm
     repoid: rhocp-4.17-for-rhel-8-aarch64-rpms
-    size: 55356000
-    checksum: sha256:3f0e703a24da88ffd552ba217e2eb25a42d21e189bca86f0bbfba7f6a66f6d50
+    size: 55345212
+    checksum: sha256:1186520f01a2aa152c091574c0eaa101b20b3becb26ad8bb3a15a2ebca396b71
     name: openshift-clients
-    evr: 4.17.0-202609081428.p2.g7189593.assembly.stream.el8
-    sourcerpm: openshift-clients-4.17.0-202609081428.p2.g7189593.assembly.stream.el8.src.rpm
+    evr: 4.17.0-202610221631.p2.g28d0040.assembly.stream.el8
+    sourcerpm: openshift-clients-4.17.0-202610221631.p2.g28d0040.assembly.stream.el8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/aarch64/baseos/os/Packages/b/bash-completion-2.7-5.el8.noarch.rpm
     repoid: rhel-8-for-aarch64-baseos-rpms
     size: 280152
@@ -57,13 +57,13 @@ arches:
   module_metadata: []
 - arch: ppc64le
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel8/ppc64le/rhocp/4.17/os/Packages/o/openshift-clients-4.17.0-202609081428.p2.g7189593.assembly.stream.el8.ppc64le.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel8/ppc64le/rhocp/4.17/os/Packages/o/openshift-clients-4.17.0-202610221631.p2.g28d0040.assembly.stream.el8.ppc64le.rpm
     repoid: rhocp-4.17-for-rhel-8-ppc64le-rpms
-    size: 52729452
-    checksum: sha256:4fa4f52be31ed4f35be8296d3629f98c9d700dd3dbedfe03b5227ba62e36e2b6
+    size: 52722092
+    checksum: sha256:c895f70df5e7c9e84767c4168f553720a0911587ab117dd2f95374d0aeff4176
     name: openshift-clients
-    evr: 4.17.0-202609081428.p2.g7189593.assembly.stream.el8
-    sourcerpm: openshift-clients-4.17.0-202609081428.p2.g7189593.assembly.stream.el8.src.rpm
+    evr: 4.17.0-202610221631.p2.g28d0040.assembly.stream.el8
+    sourcerpm: openshift-clients-4.17.0-202610221631.p2.g28d0040.assembly.stream.el8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/ppc64le/baseos/os/Packages/b/bash-completion-2.7-5.el8.noarch.rpm
     repoid: rhel-8-for-ppc64le-baseos-rpms
     size: 280152
@@ -110,13 +110,13 @@ arches:
   module_metadata: []
 - arch: s390x
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel8/s390x/rhocp/4.17/os/Packages/o/openshift-clients-4.17.0-202609081428.p2.g7189593.assembly.stream.el8.s390x.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel8/s390x/rhocp/4.17/os/Packages/o/openshift-clients-4.17.0-202610221631.p2.g28d0040.assembly.stream.el8.s390x.rpm
     repoid: rhocp-4.17-for-rhel-8-s390x-rpms
-    size: 54983216
-    checksum: sha256:b8b6f1632e76caf372afe2448dd6d233366920df0d32bb191978978190ef2ac4
+    size: 54996816
+    checksum: sha256:9d3b5a377ca47bc7ec1cc46e5e0169bfb16a6b33627605b1fdd159e03bd2b9f5
     name: openshift-clients
-    evr: 4.17.0-202609081428.p2.g7189593.assembly.stream.el8
-    sourcerpm: openshift-clients-4.17.0-202609081428.p2.g7189593.assembly.stream.el8.src.rpm
+    evr: 4.17.0-202610221631.p2.g28d0040.assembly.stream.el8
+    sourcerpm: openshift-clients-4.17.0-202610221631.p2.g28d0040.assembly.stream.el8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/s390x/baseos/os/Packages/b/bash-completion-2.7-5.el8.noarch.rpm
     repoid: rhel-8-for-s390x-baseos-rpms
     size: 280152
@@ -163,13 +163,13 @@ arches:
   module_metadata: []
 - arch: x86_64
   packages:
-  - url: https://cdn.redhat.com/content/dist/layered/rhel8/x86_64/rhocp/4.17/os/Packages/o/openshift-clients-4.17.0-202609081428.p2.g7189593.assembly.stream.el8.x86_64.rpm
+  - url: https://cdn.redhat.com/content/dist/layered/rhel8/x86_64/rhocp/4.17/os/Packages/o/openshift-clients-4.17.0-202610221631.p2.g28d0040.assembly.stream.el8.x86_64.rpm
     repoid: rhocp-4.17-for-rhel-8-x86_64-rpms
-    size: 57297228
-    checksum: sha256:f13b00ce1650dc33a1e6a0ec210da4d6299bd1ccdb8b8c96a351ab1a3d854770
+    size: 57286616
+    checksum: sha256:5c2669aaf29bae68653e19dd323851f48d053745c0eecd586da2cfa23d0da3b7
     name: openshift-clients
-    evr: 4.17.0-202609081428.p2.g7189593.assembly.stream.el8
-    sourcerpm: openshift-clients-4.17.0-202609081428.p2.g7189593.assembly.stream.el8.src.rpm
+    evr: 4.17.0-202610221631.p2.g28d0040.assembly.stream.el8
+    sourcerpm: openshift-clients-4.17.0-202610221631.p2.g28d0040.assembly.stream.el8.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel8/8/x86_64/baseos/os/Packages/b/bash-completion-2.7-5.el8.noarch.rpm
     repoid: rhel-8-for-x86_64-baseos-rpms
     size: 280152
