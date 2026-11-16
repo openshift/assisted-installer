@@ -50,6 +50,7 @@ const (
 	networkManagerKeyfileDir        = "/etc/NetworkManager/system-connections"
 	firstBootNetworkDirOnBoot       = "/mnt/boot/coreos-firstboot-network"
 	firstBootNetworkSentinelOnBoot  = "/mnt/boot/coreos-firstboot-network.deliberate"
+	firstBootNetworkSentinel        = "/boot/coreos-firstboot-network.deliberate"
 	networkDirArg                   = "--network-dir"
 )
 
@@ -235,20 +236,40 @@ func (o *ops) applyInstallKargs(liveLogger io.Writer, installerArgs []string) er
 	return nil
 }
 
+func networkKeyfileDirFromArgs(args []string) string {
+	for i, arg := range args {
+		if arg == networkDirArg && i+1 < len(args) {
+			return args[i+1]
+		}
+		if dir, found := strings.CutPrefix(arg, networkDirArg+"="); found {
+			return dir
+		}
+	}
+	return networkManagerKeyfileDir
+}
+
 func (o *ops) configureFirstBootNetworking(liveLogger io.Writer, installerArgs []string) error {
 	if !slices.Contains(installerArgs, "--copy-network") && !slices.Contains(installerArgs, "-n") {
 		return nil
 	}
 
-	o.log.Info("copying network files from /etc/NetworkManager/system-connections to /boot/coreos-firstboot-network")
+	keyfileDir := networkKeyfileDirFromArgs(installerArgs)
+	o.log.Infof("copying network files from %s to /boot/coreos-firstboot-network", keyfileDir)
 	out, err := o.ExecPrivilegeCommand(liveLogger, "mkdir", "/boot/coreos-firstboot-network")
 	if err != nil {
 		return errors.Wrapf(err, "failed to create firstboot network directory: %s", out)
 	}
 
-	out, err = o.ExecPrivilegeCommand(liveLogger, "rsync", "-av", "/etc/NetworkManager/system-connections/", "/boot/coreos-firstboot-network/")
+	out, err = o.ExecPrivilegeCommand(liveLogger, "rsync", "-avL", "--exclude=*/",
+		keyfileDir+"/", "/boot/coreos-firstboot-network/")
 	if err != nil {
 		return errors.Wrapf(err, "failed to copy network files to firstboot network directory: %s", out)
+	}
+
+	// Mark deliberate placement so coreos-rescue-misplaced-network does not show the MOTD.
+	out, err = o.ExecPrivilegeCommand(liveLogger, "touch", firstBootNetworkSentinel)
+	if err != nil {
+		return errors.Wrapf(err, "failed to mark deliberate firstboot network placement: %s", out)
 	}
 
 	return nil
@@ -1174,16 +1195,7 @@ func (o *ops) copyNetworkRequested() bool {
 // networkKeyfileDir returns the directory coreos-installer was told to copy NetworkManager
 // keyfiles from, so that we copy the same files it did. --network-dir overrides the default.
 func (o *ops) networkKeyfileDir() string {
-	args := o.installerConfig.InstallerArgs
-	for i, arg := range args {
-		if arg == networkDirArg && i+1 < len(args) {
-			return args[i+1]
-		}
-		if dir, found := strings.CutPrefix(arg, networkDirArg+"="); found {
-			return dir
-		}
-	}
-	return networkManagerKeyfileDir
+	return networkKeyfileDirFromArgs(o.installerConfig.InstallerArgs)
 }
 
 // iscsiInstall reports whether the installation disk is reached over iSCSI, which
