@@ -18,9 +18,10 @@ import (
 )
 
 const (
-	registryDataDirOnMnt      = "/mnt/agentdata"
-	iriRegistryPartitionLabel = "iri-registry"
-	iriRegistryTempMount      = "/mnt/iri-registry"
+	registryDataDirOnMnt       = "/mnt/agentdata"
+	iriRegistryPartitionLabel  = "iri-registry"
+	iriRegistryTempMount       = "/mnt/iri-registry"
+	iriRegistryPartitionNumber = "64"
 )
 
 // iriRegistryPartition handles IRI registry partition creation and management.
@@ -53,17 +54,17 @@ type partitionGeometry struct {
 	sectorSize  int64
 }
 
-// Setup creates partition 5 and copies IRI registry data.
+// Setup creates partition 64 and copies IRI registry data.
 // This must be called AFTER writeImageToDisk() because:
 // 1. coreos-installer creates partitions 1-4 during writeImageToDisk
-// 2. We create partition 5 at the end of the disk after partitions 1-4 exist
+// 2. We create partition 64 at the end of the disk after partitions 1-4 exist
 //
 // The function performs the following steps:
 // 1. Calculates partition size based on registry data size * 2.5
 // 2. Verifies disk has sufficient space
-// 3. Creates partition 5 at the END of the disk (preserves root auto-expansion)
-// 4. Formats partition 5 with XFS filesystem
-// 5. Copies registry data from /run/media/iso/registry to partition 5
+// 3. Creates partition 64 at the END of the disk (preserves root auto-expansion)
+// 4. Formats partition 64 with XFS filesystem
+// 5. Copies registry data from /run/media/iso/registry to partition 64
 func (irp *iriRegistryPartition) Setup(device string, liveLogger io.Writer) error {
 	irp.log.Info("Starting IRI registry partition setup")
 
@@ -75,7 +76,7 @@ func (irp *iriRegistryPartition) Setup(device string, liveLogger io.Writer) erro
 
 	partConfig := irp.calculatePartitionConfig(registryDataSize)
 
-	irp.log.Infof("Verifying disk space and creating partition 5 on %s", device)
+	irp.log.Infof("Verifying disk space and creating partition 64 on %s", device)
 
 	if err := irp.verifyDiskSpaceForIRI(device, partConfig); err != nil {
 		return err
@@ -85,7 +86,7 @@ func (irp *iriRegistryPartition) Setup(device string, liveLogger io.Writer) erro
 		return err
 	}
 
-	irp.log.Info("Copying registry data to partition 5")
+	irp.log.Info("Copying registry data to partition 64")
 	if err := irp.copyRegistryDataToPartition(liveLogger, device); err != nil {
 		return err
 	}
@@ -194,7 +195,7 @@ func (irp *iriRegistryPartition) verifyDiskSpaceForIRI(device string, partConfig
 // relocateBackupGPT moves the backup GPT table to the end of disk (idempotent).
 // This is necessary because OverwriteOsImage() might not be invoked (it calls growpart which
 // automatically fixes secondary GPT). If not invoked, we must ensure backup GPT is correctly
-// positioned before creating partition 5 at the end of disk.
+// positioned before creating partition 64 at the end of disk.
 func (irp *iriRegistryPartition) relocateBackupGPT(device string) error {
 	_, err := irp.execPrivileged(irp.logWriter, "sfdisk",
 		"--no-reread", "--no-tell-kernel",
@@ -301,23 +302,50 @@ func (irp *iriRegistryPartition) calculatePartitionGeometry(device string, partC
 	return irp.computeAlignedPartitionBoundaries(lastLBA, sectorSize, partConfig)
 }
 
-// createPartitionEntry creates partition 5 entry in GPT using sfdisk -N.
-// This is safer than the dump+append approach because:
+// buildPartitionDeviceName constructs the partition device name from base device and partition number.
+// Different device types use different naming conventions:
+// - SCSI/SATA: /dev/sda + 64 -> /dev/sda64
+// - NVMe: /dev/nvme0n1 + 64 -> /dev/nvme0n1p64 (needs 'p' separator)
+// - Multipath: /dev/mapper/mpatha + 64 -> /dev/mapper/mpatha64
+func buildPartitionDeviceName(device, partitionNumber string) string {
+	// NVMe devices need 'p' separator before partition number
+	if strings.Contains(device, "nvme") {
+		return fmt.Sprintf("%sp%s", device, partitionNumber)
+	}
+	// Other devices: direct append
+	return fmt.Sprintf("%s%s", device, partitionNumber)
+}
+
+// createPartitionEntry creates partition 64 entry in GPT using sfdisk script format with --append.
+// The device name format (/dev/sda64 :) allows sfdisk to extract the partition number
+// and create sparse partition numbering (partition 64 when only 1-4 exist).
+// The --append flag preserves existing partitions (1-4 created by coreos-installer).
+//
+// This approach is safer than the dump+append approach because:
 // - No need to rebuild entire GPT table
-// - No risk of shell pipe failure (echo executing if sfdisk -d fails)
-// - Atomic modification of partition 5 only
+// - No risk of shell pipe failure
+// - Atomic creation of partition 64 only
+//
 // GPT type GUID: 0FC63DAF-8483-4772-8E79-3D69D8477DE4 = Linux filesystem
 // name sets the partition label (creates /dev/disk/by-partlabel/iri-registry symlink)
 // Use positional arguments ($1, $2) to avoid shell injection from device path
 func (irp *iriRegistryPartition) createPartitionEntry(device string, geometry *partitionGeometry) error {
-	partSpec := fmt.Sprintf("start=%d, size=%d, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, name=\"%s\"",
-		geometry.startSector, geometry.sizeSectors, iriRegistryPartitionLabel)
-	sfdiskCmd := `printf '%s\n' "$1" | sfdisk --no-reread --no-tell-kernel -N 5 "$2"`
+	// Build device name with partition number for sfdisk script format
+	deviceWithPartNum := buildPartitionDeviceName(device, iriRegistryPartitionNumber)
 
-	irp.log.Infof("Creating partition 5 with sfdisk -N: %s", partSpec)
+	// Use sfdisk script format: "/dev/sda64 : start=X, size=Y, type=GUID, name=LABEL"
+	// This allows sfdisk to extract partition number from device name
+	partSpec := fmt.Sprintf("%s : start=%d, size=%d, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, name=\"%s\"",
+		deviceWithPartNum, geometry.startSector, geometry.sizeSectors, iriRegistryPartitionLabel)
+
+	// Use --append to preserve existing partitions (1-4 created by coreos-installer)
+	// sfdisk extracts partition number from device name in script
+	sfdiskCmd := `printf '%s\n' "$1" | sfdisk --append --no-reread --no-tell-kernel "$2"`
+
+	irp.log.Infof("Creating partition %s using sfdisk script format: %s", iriRegistryPartitionNumber, partSpec)
 	_, err := irp.execPrivileged(irp.logWriter, "sh", "-c", sfdiskCmd, "sh", partSpec, device)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create partition 5 on device %s", device)
+		return errors.Wrapf(err, "failed to create partition %s on device %s", iriRegistryPartitionNumber, device)
 	}
 	return nil
 }
@@ -447,61 +475,92 @@ func (irp *iriRegistryPartition) formatPartitionXFS(partitionPath string) error 
 	return nil
 }
 
-// createIRIRegistryPartition creates partition 5 at the end of the disk for IRI registry.
+// createIRIRegistryPartition creates partition 64 at the end of the disk for IRI registry.
 //
 // This function executes the following commands:
 //
-//  0. sfdisk --no-reread --no-tell-kernel --relocate gpt-bak-std /dev/sda
-//     Relocates the backup GPT to the end of disk (idempotent).
-//     Necessary because OverwriteOsImage() might not be invoked (which calls growpart that
-//     automatically fixes secondary GPT). Ensures backup GPT is correctly positioned.
+// Step 0: Relocate GPT backup header
 //
-//  1. sfdisk -d /dev/sda
-//     Dumps the current partition table to get the GPT last-lba (last usable sector)
-//     and sector-size. GPT reserves sectors at the end of the disk for the backup
-//     partition table, so we can't use the full disk size.
+//	sfdisk --no-reread --no-tell-kernel --relocate gpt-bak-std /dev/sda
 //
-// 2. Calculate partition geometry with 1 MiB alignment:
+//	Why: Ensures backup GPT is at the end of disk (might not be if disk was cloned/resized).
+//	     OverwriteOsImage() might not be invoked (which calls growpart that fixes secondary GPT).
+//	     This operation is idempotent and safe to run multiple times.
+//
+// Step 1: Dump partition table metadata
+//
+//	sfdisk -d /dev/sda
+//
+//	Why: Get GPT last-lba (last usable sector) and sector-size for geometry calculations.
+//	     GPT reserves sectors at end of disk for backup partition table, so we can't use full disk size.
+//
+// Step 2: Calculate partition geometry with 1 MiB alignment
 //
 //   - Partition size: dynamically calculated based on registry data size * 2.5
-//
 //   - Align partition end to 1 MiB: alignedEnd = (usableEnd / sectorsPerMiB) * sectorsPerMiB
-//
 //   - Start sector: alignedEnd - partitionSizeSectors (MiB-aligned, since partition size is whole GiB)
+//   - Validate start position is after 25000 MiB threshold (preserves root partition expansion space)
 //
-//     3. printf 'start=X, size=Y, type=GUID, name="LABEL"\n' | sfdisk --no-reread --no-tell-kernel -N 5 /dev/sda
-//     Creates partition 5 by modifying partition table entry 5 directly.
-//     This is safer than dump+append because it avoids shell pipe failure modes.
-//     Uses --no-reread --no-tell-kernel because disk is in use (partitions 1-4 mounted).
-//     GPT type GUID: 0FC63DAF-8483-4772-8E79-3D69D8477DE4 = Linux filesystem
+// Step 3: Create partition 64 in GPT
 //
-//     4. udevadm settle
-//     Waits for udev to finish processing partition table events before checking if the
-//     partition was auto-discovered.
+//	printf '/dev/sda64 : start=X, size=Y, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, name="iri-registry"\n' | \
+//	    sfdisk --append --no-reread --no-tell-kernel /dev/sda
 //
-//     5. Check if partition 5 exists using getPartitionPathFromLsblk()
-//     If partition was auto-discovered (common on multipath devices), skip explicit registration.
-//     If not found, determine device type and use appropriate registration command:
+//	Why: Use script format with device name (/dev/sda64) so sfdisk extracts partition number "64".
+//	     --append preserves existing partitions 1-4 (created by coreos-installer).
+//	     --no-reread --no-tell-kernel because disk is in use (partitions 1-4 are mounted).
+//	     Creates sparse partition numbering: partition 64 without needing partitions 5-63.
+//	     For NVMe devices, use /dev/nvme0n1p64 (note 'p' separator).
 //
-//   - Regular disks: partx --add --nr 5 /dev/sda
+// Step 4: Wait for udev to process partition table changes
 //
-//   - Multipath devices: kpartx -u /dev/mapper/mpatha
+//	udevadm settle
 //
-//     6. udevadm settle (again, after explicit registration if needed)
-//     Ensures device nodes are created before formatting.
+//	Why: Gives udev time to process partition table events and auto-discover new partition.
+//	     Some systems (especially multipath) auto-discover partitions without explicit registration.
 //
-// create creates partition 5 at the end of the disk for IRI registry storage.
+// Step 5: Register partition with kernel (if not auto-discovered)
+//
+//	lsblk --bytes --json --output NAME,PATH,TYPE,PARTN /dev/sda
+//
+//	Why: Check if partition 64 was auto-discovered by kernel.
+//	     If found: skip explicit registration (common on multipath devices).
+//	     If not found: use device-type-specific registration command:
+//
+//	Regular disks:
+//	    partx --add --nr 64 /dev/sda
+//	    Why: Tells kernel to re-read partition 64 from partition table.
+//
+//	Multipath devices:
+//	    kpartx -u /dev/mapper/mpatha
+//	    Why: Updates device-mapper partition mappings for multipath devices.
+//
+// Step 6: Wait for device nodes to be created
+//
+//	udevadm settle
+//
+//	Why: Ensures /dev/sda64 (or /dev/mapper/mpatha64) device node exists before formatting.
+//	     Required after explicit registration (partx/kpartx).
+//
+// Step 7: Format partition with XFS
+//
+//	mkfs.xfs -f -L iri-registry /dev/sda64
+//
+//	Why: Create XFS filesystem with label "iri-registry" for systemd mount by-partlabel.
+//	     -f forces creation even if partition had previous filesystem.
+//
+// create creates partition 64 at the end of the disk for IRI registry storage.
 //
 // Workflow:
 //  1. Relocate GPT backup header (sfdisk --relocate gpt-bak-std)
 //  2. Parse partition table metadata (sfdisk -d → extract last-lba, sector-size)
 //  3. Calculate geometry with 1 MiB alignment (validates 25000 MiB start threshold)
-//  4. Create partition entry in GPT (sfdisk -N 5)
+//  4. Create partition entry in GPT (sfdisk --append with device name in script)
 //  5. Register partition with kernel (udev settle + auto-discovery or partx/kpartx)
 //  6. Format with XFS filesystem (mkfs.xfs -f -L iri-registry)
 //
 // The partition is created at the disk end to preserve root partition auto-expansion.
-// Uses --no-reread --no-tell-kernel because disk is in use during installation.
+// Uses --append to preserve existing partitions, --no-reread --no-tell-kernel because disk is in use.
 func (irp *iriRegistryPartition) create(device string, partConfig iriPartitionConfig) error {
 	irp.log.Infof("Creating IRI registry partition on device %s", device)
 
@@ -523,7 +582,7 @@ func (irp *iriRegistryPartition) create(device string, partConfig iriPartitionCo
 	}
 
 	// Steps 5-6: Ensure kernel recognizes partition (udev + registration)
-	partitionPath, err := irp.ensurePartitionRegistered(device, "5")
+	partitionPath, err := irp.ensurePartitionRegistered(device, iriRegistryPartitionNumber)
 	if err != nil {
 		return err
 	}
@@ -537,14 +596,14 @@ func (irp *iriRegistryPartition) create(device string, partConfig iriPartitionCo
 	return nil
 }
 
-// copyRegistryDataToPartition mounts partition 5 and copies registry data to it
+// copyRegistryDataToPartition mounts partition 64 and copies registry data to it
 func (irp *iriRegistryPartition) copyRegistryDataToPartition(liveLogger io.Writer, device string) error {
 	irp.log.Info("Copying registry data to IRI partition")
 
-	// Get partition 5 path
-	partition5, err := getPartitionPathFromLsblk(irp.executor, device, "5")
+	// Get partition 64 path
+	partition64, err := getPartitionPathFromLsblk(irp.executor, device, iriRegistryPartitionNumber)
 	if err != nil {
-		return errors.Wrapf(err, "failed to find partition 5 on device %s", device)
+		return errors.Wrapf(err, "failed to find partition 64 on device %s", device)
 	}
 
 	// Create temporary mount point
@@ -552,13 +611,13 @@ func (irp *iriRegistryPartition) copyRegistryDataToPartition(liveLogger io.Write
 		return errors.Wrapf(err, "failed to create temporary mount point %s", iriRegistryTempMount)
 	}
 
-	// Mount partition 5 with retry (device might not be ready immediately after udevadm settle)
-	irp.log.Infof("Mounting %s to %s", partition5, iriRegistryTempMount)
+	// Mount partition 64 with retry (device might not be ready immediately after udevadm settle)
+	irp.log.Infof("Mounting %s to %s", partition64, iriRegistryTempMount)
 	if err = utils.Retry(3, 5*time.Second, irp.log, func() (err error) {
-		_, err = irp.execPrivileged(irp.logWriter, "mount", partition5, iriRegistryTempMount)
+		_, err = irp.execPrivileged(irp.logWriter, "mount", partition64, iriRegistryTempMount)
 		return
 	}); err != nil {
-		return errors.Wrapf(err, "failed to mount %s to %s", partition5, iriRegistryTempMount)
+		return errors.Wrapf(err, "failed to mount %s to %s", partition64, iriRegistryTempMount)
 	}
 
 	// Ensure unmount on exit

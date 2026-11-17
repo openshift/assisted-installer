@@ -270,14 +270,16 @@ last-lba: 629145566
 					gomock.Any(),
 				).Return(sfdiskDump, nil),
 
-				// Step 2: Create partition with sfdisk -N 5
+				// Step 2: Create partition with sfdisk script format (device name includes partition number)
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"sh",
 					gomock.Any(),
 					gomock.Any(),
 				).DoAndReturn(func(writer io.Writer, command string, args []string, opts ...execute.CommandOption) (string, error) {
-					Expect(args[1]).To(ContainSubstring("sfdisk --no-reread --no-tell-kernel -N 5"))
+					// Verify sfdisk uses script format with --append to preserve partitions 1-4
+					Expect(args[1]).To(ContainSubstring("sfdisk --append --no-reread --no-tell-kernel"))
+					Expect(args[3]).To(ContainSubstring("/dev/sda64 :"))
 					Expect(args[3]).To(ContainSubstring("type=0FC63DAF-8483-4772-8E79-3D69D8477DE4"))
 					Expect(args[3]).To(ContainSubstring("name=\"iri-registry\""))
 					Expect(args[4]).To(Equal("/dev/sda"))
@@ -298,13 +300,13 @@ last-lba: 629145566
 					"lsblk",
 					[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", "/dev/sda"},
 					gomock.Any(),
-				).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda5", "path": "/dev/sda5", "type": "part", "partn": 5}]}]}`, nil),
+				).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda64", "path": "/dev/sda64", "type": "part", "partn": 64}]}]}`, nil),
 
 				// Step 5: mkfs.xfs (no partx/kpartx needed since partition was auto-discovered)
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"mkfs.xfs",
-					[]string{"-f", "-L", "iri-registry", "/dev/sda5"},
+					[]string{"-f", "-L", "iri-registry", "/dev/sda64"},
 					gomock.Any(),
 				).Return("", nil),
 			)
@@ -348,7 +350,7 @@ last-lba: 629145566
 					gomock.Any(),
 				).Return(sfdiskDump, nil),
 
-				// Step 2: Create partition with sfdisk -N 5
+				// Step 2: Create partition with sfdisk script format
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"sh",
@@ -357,14 +359,13 @@ last-lba: 629145566
 				).DoAndReturn(func(writer io.Writer, command string, args []string, opts ...execute.CommandOption) (string, error) {
 					// args = ["-c", "command", "sh", partSpec, device]
 					cmdString := args[1]
-					Expect(cmdString).To(ContainSubstring("sfdisk --no-reread --no-tell-kernel -N 5"))
+					Expect(cmdString).To(ContainSubstring("sfdisk --append --no-reread --no-tell-kernel"))
 					Expect(cmdString).To(ContainSubstring("printf"))
 					Expect(cmdString).To(ContainSubstring("$1")) // partSpec as positional arg
 					Expect(cmdString).To(ContainSubstring("$2")) // device as positional arg
-					// Verify partSpec contains partition definition
+					Expect(args[3]).To(ContainSubstring("/dev/sda64 :"))
 					Expect(args[3]).To(ContainSubstring("type=0FC63DAF-8483-4772-8E79-3D69D8477DE4"))
 					Expect(args[3]).To(ContainSubstring("name=\"iri-registry\""))
-					// Verify device is passed correctly
 					Expect(args[4]).To(Equal("/dev/sda"))
 					return "", nil
 				}),
@@ -397,7 +398,7 @@ last-lba: 629145566
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"partx",
-					[]string{"--add", "--nr", "5", "/dev/sda"},
+					[]string{"--add", "--nr", "64", "/dev/sda"},
 					gomock.Any(),
 				).Return("", nil),
 
@@ -415,13 +416,13 @@ last-lba: 629145566
 					"lsblk",
 					[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", "/dev/sda"},
 					gomock.Any(),
-				).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda5", "path": "/dev/sda5", "type": "part", "partn": 5}]}]}`, nil),
+				).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda64", "path": "/dev/sda64", "type": "part", "partn": 64}]}]}`, nil),
 
 				// Step 9: mkfs.xfs
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"mkfs.xfs",
-					[]string{"-f", "-L", "iri-registry", "/dev/sda5"},
+					[]string{"-f", "-L", "iri-registry", "/dev/sda64"},
 					gomock.Any(),
 				).Return("", nil),
 			)
@@ -584,8 +585,8 @@ last-lba: 78643166
 					// usableEnd = 78643166 + 1 - 0 = 78643167
 					// alignedEnd = (78643167 / 256) * 256 = 307199 * 256 = 78642944
 					// start = 78642944 - 39321600 = 39321344
-					Expect(cmdString).To(ContainSubstring("sfdisk --no-reread --no-tell-kernel -N 5"))
-					// Verify partSpec contains correct geometry
+					Expect(cmdString).To(ContainSubstring("sfdisk --append --no-reread --no-tell-kernel"))
+					Expect(args[3]).To(ContainSubstring("/dev/sda64 :"))
 					Expect(args[3]).To(ContainSubstring("start=39321344"))
 					Expect(args[3]).To(ContainSubstring("size=39321600"))
 					Expect(args[4]).To(Equal("/dev/sda"))
@@ -606,13 +607,13 @@ last-lba: 78643166
 					"lsblk",
 					[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", "/dev/sda"},
 					gomock.Any(),
-				).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda5", "path": "/dev/sda5", "type": "part", "partn": 5}]}]}`, nil),
+				).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda64", "path": "/dev/sda64", "type": "part", "partn": 64}]}]}`, nil),
 
 				// Step 5: mkfs.xfs (no partx needed, auto-discovered)
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"mkfs.xfs",
-					[]string{"-f", "-L", "iri-registry", "/dev/sda5"},
+					[]string{"-f", "-L", "iri-registry", "/dev/sda64"},
 					gomock.Any(),
 				).Return("", nil),
 			)
@@ -657,14 +658,15 @@ last-lba: 629145566
 					gomock.Any(),
 				).Return(sfdiskDump, nil),
 
-				// Step 2: Create partition with sfdisk -N 5
+				// Step 2: Create partition with sfdisk script format
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"sh",
 					gomock.Any(),
 					gomock.Any(),
 				).DoAndReturn(func(writer io.Writer, command string, args []string, opts ...execute.CommandOption) (string, error) {
-					Expect(args[1]).To(ContainSubstring("sfdisk --no-reread --no-tell-kernel -N 5"))
+					Expect(args[1]).To(ContainSubstring("sfdisk --append --no-reread --no-tell-kernel"))
+					Expect(args[3]).To(ContainSubstring("/dev/mapper/mpatha64 :"))
 					Expect(args[4]).To(Equal("/dev/mapper/mpatha"))
 					return "", nil
 				}),
@@ -715,13 +717,13 @@ last-lba: 629145566
 					"lsblk",
 					[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", "/dev/mapper/mpatha"},
 					gomock.Any(),
-				).Return(`{"blockdevices": [{"name": "mpatha", "path": "/dev/mapper/mpatha", "type": "mpath", "partn": null, "children": [{"name": "mpatha1", "path": "/dev/mapper/mpatha1", "type": "part", "partn": 1}, {"name": "mpatha2", "path": "/dev/mapper/mpatha2", "type": "part", "partn": 2}, {"name": "mpatha3", "path": "/dev/mapper/mpatha3", "type": "part", "partn": 3}, {"name": "mpatha4", "path": "/dev/mapper/mpatha4", "type": "part", "partn": 4}, {"name": "mpatha5", "path": "/dev/mapper/mpatha5", "type": "part", "partn": 5}]}]}`, nil),
+				).Return(`{"blockdevices": [{"name": "mpatha", "path": "/dev/mapper/mpatha", "type": "mpath", "partn": null, "children": [{"name": "mpatha1", "path": "/dev/mapper/mpatha1", "type": "part", "partn": 1}, {"name": "mpatha2", "path": "/dev/mapper/mpatha2", "type": "part", "partn": 2}, {"name": "mpatha3", "path": "/dev/mapper/mpatha3", "type": "part", "partn": 3}, {"name": "mpatha4", "path": "/dev/mapper/mpatha4", "type": "part", "partn": 4}, {"name": "mpatha64", "path": "/dev/mapper/mpatha64", "type": "part", "partn": 64}]}]}`, nil),
 
 				// Step 9: mkfs.xfs on multipath partition
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"mkfs.xfs",
-					[]string{"-f", "-L", "iri-registry", "/dev/mapper/mpatha5"},
+					[]string{"-f", "-L", "iri-registry", "/dev/mapper/mpatha64"},
 					gomock.Any(),
 				).Return("", nil),
 			)
@@ -766,7 +768,7 @@ last-lba: 629145566
 					gomock.Any(),
 				).Return(sfdiskDump, nil),
 
-				// Step 2: Create partition with sfdisk -N 5
+				// Step 2: Create partition with sfdisk -N 64
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"sh",
@@ -785,19 +787,19 @@ last-lba: 629145566
 					gomock.Any(),
 				).Return("", nil),
 
-				// Step 4: lsblk to check if partition exists (auto-discovered - partition 5 present)
+				// Step 4: lsblk to check if partition exists (auto-discovered - partition 64 present)
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"lsblk",
 					[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", "/dev/mapper/mpatha"},
 					gomock.Any(),
-				).Return(`{"blockdevices": [{"name": "mpatha", "path": "/dev/mapper/mpatha", "type": "mpath", "partn": null, "children": [{"name": "mpatha1", "path": "/dev/mapper/mpatha1", "type": "part", "partn": 1}, {"name": "mpatha2", "path": "/dev/mapper/mpatha2", "type": "part", "partn": 2}, {"name": "mpatha3", "path": "/dev/mapper/mpatha3", "type": "part", "partn": 3}, {"name": "mpatha4", "path": "/dev/mapper/mpatha4", "type": "part", "partn": 4}, {"name": "mpatha5", "path": "/dev/mapper/mpatha5", "type": "part", "partn": 5}]}]}`, nil),
+				).Return(`{"blockdevices": [{"name": "mpatha", "path": "/dev/mapper/mpatha", "type": "mpath", "partn": null, "children": [{"name": "mpatha1", "path": "/dev/mapper/mpatha1", "type": "part", "partn": 1}, {"name": "mpatha2", "path": "/dev/mapper/mpatha2", "type": "part", "partn": 2}, {"name": "mpatha3", "path": "/dev/mapper/mpatha3", "type": "part", "partn": 3}, {"name": "mpatha4", "path": "/dev/mapper/mpatha4", "type": "part", "partn": 4}, {"name": "mpatha64", "path": "/dev/mapper/mpatha64", "type": "part", "partn": 64}]}]}`, nil),
 
 				// Step 5: mkfs.xfs (no kpartx needed since partition was auto-discovered)
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"mkfs.xfs",
-					[]string{"-f", "-L", "iri-registry", "/dev/mapper/mpatha5"},
+					[]string{"-f", "-L", "iri-registry", "/dev/mapper/mpatha64"},
 					gomock.Any(),
 				).Return("", nil),
 			)
@@ -832,7 +834,7 @@ last-lba: 629145566`
 					gomock.Any(),
 				).Return(sfdiskDump, nil),
 
-				// Step 2: Create partition with sfdisk -N 5
+				// Step 2: Create partition with sfdisk -N 64
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"sh",
@@ -868,7 +870,7 @@ last-lba: 629145566`
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"partx",
-					[]string{"--add", "--nr", "5", "/dev/sda"},
+					[]string{"--add", "--nr", "64", "/dev/sda"},
 					gomock.Any(),
 				).Return("", nil),
 
@@ -895,7 +897,7 @@ last-lba: 629145566`
 			}
 			err := o.createIRIRegistryPartition("/dev/sda", partConfig)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("partition 5 still not found"))
+			Expect(err.Error()).To(ContainSubstring("partition 64 still not found"))
 			Expect(err.Error()).To(ContainSubstring("after explicit registration"))
 		})
 
@@ -921,7 +923,7 @@ last-lba: 629145566`
 					gomock.Any(),
 				).Return(sfdiskDump, nil),
 
-				// Step 2: Create partition with sfdisk -N 5
+				// Step 2: Create partition with sfdisk -N 64
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"sh",
@@ -952,7 +954,7 @@ last-lba: 629145566`
 			}
 			err := o.createIRIRegistryPartition("/dev/sda", partConfig)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("failed to check for partition 5"))
+			Expect(err.Error()).To(ContainSubstring("failed to check for partition 64"))
 			Expect(err.Error()).To(ContainSubstring("failed to run lsblk command"))
 		})
 
@@ -978,7 +980,7 @@ last-lba: 629145566`
 					gomock.Any(),
 				).Return(sfdiskDump, nil),
 
-				// Step 2: Create partition with sfdisk -N 5
+				// Step 2: Create partition with sfdisk -N 64
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"sh",
@@ -1009,7 +1011,7 @@ last-lba: 629145566`
 			}
 			err := o.createIRIRegistryPartition("/dev/sda", partConfig)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("failed to check for partition 5"))
+			Expect(err.Error()).To(ContainSubstring("failed to check for partition 64"))
 			Expect(err.Error()).To(ContainSubstring("failed to unmarshal lsblk output"))
 		})
 
@@ -1045,7 +1047,7 @@ last-lba: 629145566
 					gomock.Any(),
 				).Return(sfdiskDump, nil),
 
-				// Step 2: Create partition with sfdisk -N 5 (device-agnostic)
+				// Step 2: Create partition with sfdisk script format (NVMe uses 'p' separator)
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"sh",
@@ -1054,11 +1056,11 @@ last-lba: 629145566
 				).DoAndReturn(func(writer io.Writer, command string, args []string, opts ...execute.CommandOption) (string, error) {
 					// args = ["-c", "command", "sh", partSpec, device]
 					cmdString := args[1]
-					// sfdisk -N 5 handles device naming automatically (works for NVMe, SATA, etc.)
-					Expect(cmdString).To(ContainSubstring("sfdisk --no-reread --no-tell-kernel -N 5"))
+					Expect(cmdString).To(ContainSubstring("sfdisk --append --no-reread --no-tell-kernel"))
 					Expect(cmdString).To(ContainSubstring("printf"))
 					Expect(cmdString).To(ContainSubstring("$2")) // device as positional arg
-					// Verify device is NVMe
+					// Verify NVMe device name with 'p' separator for partition 64
+					Expect(args[3]).To(ContainSubstring("/dev/nvme0n1p64 :"))
 					Expect(args[4]).To(Equal("/dev/nvme0n1"))
 					return "", nil
 				}),
@@ -1077,13 +1079,13 @@ last-lba: 629145566
 					"lsblk",
 					[]string{"--bytes", "--json", "--output", "NAME,PATH,TYPE,PARTN", "/dev/nvme0n1"},
 					gomock.Any(),
-				).Return(`{"blockdevices": [{"name": "nvme0n1", "path": "/dev/nvme0n1", "type": "disk", "partn": null, "children": [{"name": "nvme0n1p1", "path": "/dev/nvme0n1p1", "type": "part", "partn": 1}, {"name": "nvme0n1p2", "path": "/dev/nvme0n1p2", "type": "part", "partn": 2}, {"name": "nvme0n1p3", "path": "/dev/nvme0n1p3", "type": "part", "partn": 3}, {"name": "nvme0n1p4", "path": "/dev/nvme0n1p4", "type": "part", "partn": 4}, {"name": "nvme0n1p5", "path": "/dev/nvme0n1p5", "type": "part", "partn": 5}]}]}`, nil),
+				).Return(`{"blockdevices": [{"name": "nvme0n1", "path": "/dev/nvme0n1", "type": "disk", "partn": null, "children": [{"name": "nvme0n1p1", "path": "/dev/nvme0n1p1", "type": "part", "partn": 1}, {"name": "nvme0n1p2", "path": "/dev/nvme0n1p2", "type": "part", "partn": 2}, {"name": "nvme0n1p3", "path": "/dev/nvme0n1p3", "type": "part", "partn": 3}, {"name": "nvme0n1p4", "path": "/dev/nvme0n1p4", "type": "part", "partn": 4}, {"name": "nvme0n1p64", "path": "/dev/nvme0n1p64", "type": "part", "partn": 64}]}]}`, nil),
 
 				// Step 5: mkfs.xfs (no partx needed, auto-discovered)
 				mockExec.EXPECT().ExecCommandWithOptions(
 					gomock.Any(),
 					"mkfs.xfs",
-					[]string{"-f", "-L", "iri-registry", "/dev/nvme0n1p5"},
+					[]string{"-f", "-L", "iri-registry", "/dev/nvme0n1p64"},
 					gomock.Any(),
 				).Return("", nil),
 			)
@@ -1126,7 +1128,7 @@ last-lba: 629145566`
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sfdisk", []string{"--no-reread", "--no-tell-kernel", "--relocate", "gpt-bak-std", "/dev/sda"}, gomock.Any()).Return("", nil),
 				// Step 3.1: sfdisk -d
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sfdisk", []string{"-d", "/dev/sda"}, gomock.Any()).Return(sfdiskDump, nil),
-				// Step 3.2: sfdisk -N 5 (create partition)
+				// Step 3.2: sfdisk -N 64 (create partition)
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sh", gomock.Any(), gomock.Any()).Return("", nil),
 				// Step 3.3: udevadm settle (after sfdisk)
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "udevadm", gomock.Any(), gomock.Any()).Return("", nil),
@@ -1139,11 +1141,11 @@ last-lba: 629145566`
 				// Step 3.7: udevadm settle (after partx)
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "udevadm", gomock.Any(), gomock.Any()).Return("", nil),
 				// Step 3.8: lsblk to verify partition exists
-				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda5", "path": "/dev/sda5", "type": "part", "partn": 5}]}]}`, nil),
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda64", "path": "/dev/sda64", "type": "part", "partn": 64}]}]}`, nil),
 				// Step 3.9: mkfs.xfs
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mkfs.xfs", gomock.Any(), gomock.Any()).Return("", nil),
 				// Step 4: copyRegistryDataToPartition
-				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda5", "path": "/dev/sda5", "type": "part", "partn": 5}]}]}`, nil),
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda64", "path": "/dev/sda64", "type": "part", "partn": 64}]}]}`, nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mkdir", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mount", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sh", gomock.Any(), gomock.Any()).Return("", nil),
@@ -1175,7 +1177,7 @@ last-lba: 629145566`
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sfdisk", []string{"--no-reread", "--no-tell-kernel", "--relocate", "gpt-bak-std", "/dev/sda"}, gomock.Any()).Return("", nil),
 				// Step 3.1: sfdisk -d
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sfdisk", []string{"-d", "/dev/sda"}, gomock.Any()).Return(sfdiskDump, nil),
-				// Step 3.2: sfdisk -N 5 (create partition)
+				// Step 3.2: sfdisk -N 64 (create partition)
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sh", gomock.Any(), gomock.Any()).Return("", nil),
 				// Step 3.3: udevadm settle (after sfdisk)
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "udevadm", gomock.Any(), gomock.Any()).Return("", nil),
@@ -1188,11 +1190,11 @@ last-lba: 629145566`
 				// Step 3.7: udevadm settle (after partx)
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "udevadm", gomock.Any(), gomock.Any()).Return("", nil),
 				// Step 3.8: lsblk to verify partition exists
-				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda5", "path": "/dev/sda5", "type": "part", "partn": 5}]}]}`, nil),
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda64", "path": "/dev/sda64", "type": "part", "partn": 64}]}]}`, nil),
 				// Step 3.9: mkfs.xfs
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mkfs.xfs", gomock.Any(), gomock.Any()).Return("", nil),
 				// Step 4: copyRegistryDataToPartition
-				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda5", "path": "/dev/sda5", "type": "part", "partn": 5}]}]}`, nil),
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda64", "path": "/dev/sda64", "type": "part", "partn": 64}]}]}`, nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mkdir", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mount", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sh", gomock.Any(), gomock.Any()).Return("", nil),
@@ -1220,7 +1222,7 @@ last-lba: 629145566`
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sfdisk", []string{"--no-reread", "--no-tell-kernel", "--relocate", "gpt-bak-std", "/dev/sda"}, gomock.Any()).Return("", nil),
 				// Step 3.1: sfdisk -d
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sfdisk", []string{"-d", "/dev/sda"}, gomock.Any()).Return(sfdiskDump, nil),
-				// Step 3.2: sfdisk -N 5 (create partition)
+				// Step 3.2: sfdisk -N 64 (create partition)
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sh", gomock.Any(), gomock.Any()).Return("", nil),
 				// Step 3.3: udevadm settle (after sfdisk)
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "udevadm", gomock.Any(), gomock.Any()).Return("", nil),
@@ -1233,12 +1235,12 @@ last-lba: 629145566`
 				// Step 3.7: udevadm settle (after partx)
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "udevadm", gomock.Any(), gomock.Any()).Return("", nil),
 				// Step 3.8: lsblk to verify partition exists
-				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda5", "path": "/dev/sda5", "type": "part", "partn": 5}]}]}`, nil),
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda64", "path": "/dev/sda64", "type": "part", "partn": 64}]}]}`, nil),
 				// Step 3.9: mkfs.xfs
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mkfs.xfs", gomock.Any(), gomock.Any()).Return("", nil),
 
 				// Step 4: copyRegistryDataToPartition
-				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda5", "path": "/dev/sda5", "type": "part", "partn": 5}]}]}`, nil),
+				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "lsblk", gomock.Any(), gomock.Any()).Return(`{"blockdevices": [{"name": "sda", "path": "/dev/sda", "type": "disk", "partn": null, "children": [{"name": "sda1", "path": "/dev/sda1", "type": "part", "partn": 1}, {"name": "sda2", "path": "/dev/sda2", "type": "part", "partn": 2}, {"name": "sda3", "path": "/dev/sda3", "type": "part", "partn": 3}, {"name": "sda4", "path": "/dev/sda4", "type": "part", "partn": 4}, {"name": "sda64", "path": "/dev/sda64", "type": "part", "partn": 64}]}]}`, nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mkdir", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "mount", gomock.Any(), gomock.Any()).Return("", nil),
 				mockExec.EXPECT().ExecCommandWithOptions(gomock.Any(), "sh", gomock.Any(), gomock.Any()).Return("", nil), // rsync
