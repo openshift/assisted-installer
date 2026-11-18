@@ -21,6 +21,7 @@ import (
 type MockRebootsNotifier struct {
 	ctrl     *gomock.Controller
 	recorder *MockRebootsNotifierMockRecorder
+	isgomock struct{}
 }
 
 // MockRebootsNotifierMockRecorder is the mock recorder for MockRebootsNotifier.
