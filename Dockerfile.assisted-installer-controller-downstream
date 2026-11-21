@@ -14,7 +14,7 @@ COPY --chown=${USER_UID} . /app
 WORKDIR /app
 RUN CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o assisted-installer-controller src/main/assisted-installer-controller/assisted_installer_main.go
 
-FROM registry.redhat.io/ubi9/ubi-minimal-pqc:latest@sha256:d2ed9d31c3e22e76ef5613223c867553921915372e3cc7f4b27efe68a0300109
+FROM registry.redhat.io/ubi9/ubi-minimal-pqc:latest@sha256:5e9a0970f73f4800445c3ce0ca0d6b7ea1a8c620b81e735d16432db09d6787bc
 ARG release=main
 ARG version=latest
 
