@@ -186,6 +186,54 @@ func (handler ClusterServiceVersionHandler) IsInitialized() bool {
 	return true
 }
 
+// IsInstalled reports whether OLM has finished installing the operator, i.e. whether
+// its CSV has reached the Succeeded phase and its CRDs are therefore registered with
+// the API server.
+//
+// It is the agent-based installer's alternative to IsInitialized, and differs from it
+// in two ways:
+//
+//  1. It does not run handleOLMEarlySetupBug. Deleting a failed InstallPlan after OLM
+//     has recorded it in the subscription's status.installPlanRef is unrecoverable:
+//     the subscription is left reporting InstallPlanMissing/ReferencedInstallPlanNotFound
+//     with state AtLatestKnown, and OLM never generates a replacement plan. The CSV that
+//     the plan had already created is then stranded in Pending/RequirementsNotMet forever,
+//     because the CRD steps of the plan never ran. Recovering requires recreating the
+//     subscription by hand. The agent-based installer runs this check from controller
+//     startup, while the control plane is still pivoting and transiently failed
+//     InstallPlans are expected, so it must not delete them.
+//
+//  2. It requires the Succeeded phase rather than mere existence of the CSV. A CSV is
+//     created by the first step of the InstallPlan, well before the steps that register
+//     the operator's CRDs, so "the CSV exists" does not imply the operator's custom
+//     resources can be applied. Gating on Succeeded means the CRDs are present by the
+//     time we apply the CRs from the olm-operator-manifests ConfigMap.
+func (handler ClusterServiceVersionHandler) IsInstalled() bool {
+	csvName, err := handler.kc.GetCSVFromSubscription(handler.operator.Namespace, handler.operator.SubscriptionName)
+	if err != nil {
+		return false
+	}
+	handler.log.Infof("Operator %s csv name is %s", handler.GetName(), csvName)
+	csv, err := handler.kc.GetCSV(handler.operator.Namespace, csvName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			handler.log.WithError(err).Warnf("CSV %s does not exist for %s. ", csvName, handler.GetName())
+		} else {
+			handler.log.WithError(err).Warnf("Failed to get csv %s not for %s. ", csvName, handler.GetName())
+		}
+
+		return false
+	}
+
+	if csv.Status.Phase != olmv1alpha1.CSVPhaseSucceeded {
+		handler.log.Infof("Operator %s csv %s is in phase %s, waiting for %s",
+			handler.GetName(), csvName, csv.Status.Phase, olmv1alpha1.CSVPhaseSucceeded)
+		return false
+	}
+
+	return true
+}
+
 // handleOLMEarlySetupBug cleans failed olm jobs as they will rerun by olm and
 // deletes install plans to force olm re-conciliation and job recreation.
 // Assisted controller does this because subscriptions created too early in the installation

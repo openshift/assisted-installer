@@ -587,7 +587,8 @@ func (c *controller) PostInstallConfigsK8sClient(ctx context.Context, wg *sync.W
 			}
 		}
 		// Apply manifests from configMap if ready
-		if !c.applyOperatorManifests(olmOperators, manifests, kubeconfigPath) {
+		// true: this is the agent-based installer path, see getReadyOperators.
+		if !c.applyOperatorManifests(olmOperators, manifests, kubeconfigPath, true) {
 			c.log.Infof("Failed to apply manifests")
 		} else {
 			c.log.Infof("Successfully applied manifests")
@@ -715,12 +716,25 @@ func (c *controller) waitForOLMOperators(ctx context.Context) error {
 	return stderrors.Join(errs...)
 }
 
-func (c *controller) getReadyOperators(operators []models.MonitoredOperator) ([]string, []models.MonitoredOperator, error) {
+// getReadyOperators returns the operators that are ready to have their custom resources
+// applied.
+//
+// agentBasedInstaller selects the readiness check. The agent-based installer uses
+// IsInstalled, which waits for the CSV to reach Succeeded and never deletes InstallPlans;
+// see IsInstalled for why that matters. Every other flow keeps the existing IsInitialized
+// behaviour unchanged.
+func (c *controller) getReadyOperators(operators []models.MonitoredOperator, agentBasedInstaller bool) ([]string, []models.MonitoredOperator, error) {
 	var readyOperators []string
 	for index := range operators {
 		handler := NewClusterServiceVersionHandler(c.log, c.kc, &operators[index], c.status)
 		c.log.Infof("Checking if %s operator is initialized", operators[index].Name)
-		if handler.IsInitialized() {
+		var ready bool
+		if agentBasedInstaller {
+			ready = handler.IsInstalled()
+		} else {
+			ready = handler.IsInitialized()
+		}
+		if ready {
 			c.log.Infof("%s operator is initialized", operators[index].Name)
 			readyOperators = append(readyOperators, handler.GetName())
 		}
@@ -730,7 +744,7 @@ func (c *controller) getReadyOperators(operators []models.MonitoredOperator) ([]
 
 func (c *controller) waitForCSVBeCreated(operators []models.MonitoredOperator) bool {
 	c.log.Infof("Waiting for csv to be created")
-	readyOperators, operators, err := c.getReadyOperators(operators)
+	readyOperators, operators, err := c.getReadyOperators(operators, false)
 	if err != nil {
 		c.log.WithError(err).Warn("Error while fetch the operators state.")
 		return false
@@ -774,7 +788,7 @@ func (c *controller) applyPostInstallManifests(operators []models.MonitoredOpera
 		return false
 	}
 
-	if !c.applyOperatorManifests(operators, manifests, kubeconfigName) {
+	if !c.applyOperatorManifests(operators, manifests, kubeconfigName, false) {
 		c.log.WithError(err).Errorf("Failed to apply operators to cluster")
 		return false
 	}
@@ -783,9 +797,9 @@ func (c *controller) applyPostInstallManifests(operators []models.MonitoredOpera
 }
 
 // Apply the operator manifests to the cluster.
-func (c *controller) applyOperatorManifests(operators []models.MonitoredOperator, manifests []Manifest, kubeconfigName string) bool {
+func (c *controller) applyOperatorManifests(operators []models.MonitoredOperator, manifests []Manifest, kubeconfigName string, agentBasedInstaller bool) bool {
 
-	readyOperators, _, err := c.getReadyOperators(operators)
+	readyOperators, _, err := c.getReadyOperators(operators, agentBasedInstaller)
 	if err != nil {
 		c.log.WithError(err).Errorf("Failed to fetch operators from cluster")
 		return false
