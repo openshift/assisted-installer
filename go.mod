@@ -34,7 +34,7 @@ require (
 	github.com/tidwall/gjson v1.17.1
 	github.com/vincent-petithory/dataurl v1.0.0
 	go.uber.org/mock v0.6.0
-	golang.org/x/net v0.62.0
+	golang.org/x/net v0.60.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.34.3

@@ -51,9 +51,6 @@ type parser struct {
 	// context is the context element when parsing an HTML fragment
 	// (section 12.4).
 	context *Node
-	// textNodes holds buffers for TextNodes that have had multiple text
-	// tokens coalesced into them.
-	textNodes map[*Node][]byte
 }
 
 func (p *parser) top() *Node {
@@ -295,7 +292,7 @@ func (p *parser) fosterParent(n *Node) {
 		prev = parent.LastChild
 	}
 	if prev != nil && prev.Type == TextNode && n.Type == TextNode {
-		p.appendText(prev, n.Data)
+		prev.Data += n.Data
 		return
 	}
 
@@ -319,25 +316,13 @@ func (p *parser) addText(text string) {
 
 	t := p.top()
 	if n := t.LastChild; n != nil && n.Type == TextNode {
-		p.appendText(n, text)
+		n.Data += text
 		return
 	}
 	p.addChild(&Node{
 		Type: TextNode,
 		Data: text,
 	})
-}
-
-func (p *parser) appendText(n *Node, text string) {
-	if p.textNodes == nil {
-		p.textNodes = make(map[*Node][]byte)
-	}
-	b, ok := p.textNodes[n]
-	if !ok {
-		b = []byte(n.Data)
-		n.Data = ""
-	}
-	p.textNodes[n] = append(b, text...)
 }
 
 func attrCompare(a, b Attribute) int {
@@ -2257,10 +2242,6 @@ func (p *parser) parse() (err error) {
 		}
 		p.parseCurrentToken()
 	}
-	for n, b := range p.textNodes {
-		n.Data = string(b)
-	}
-	p.textNodes = nil
 	return nil
 }
 
