@@ -1139,7 +1139,7 @@ func (o *ops) getPartitionPathFromLsblk(device, partitionNumber string) (string,
 	return devicePath, nil
 }
 
-func (o *ops) calculateFreePercent(device string, requiredSize *int64) (int64, error) {
+func (o *ops) calculateFreePercent(device string, requiredSize *int64) (freePercent int64, diskSize int64, err error) {
 	type node struct {
 		Name     string
 		Size     int64
@@ -1153,18 +1153,18 @@ func (o *ops) calculateFreePercent(device string, requiredSize *int64) (int64, e
 	)
 	ret, err := o.ExecPrivilegeCommand(nil, "lsblk", "--bytes", "--json", device)
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to run lsblk command")
+		return 0, 0, errors.Wrap(err, "failed to run lsblk command")
 	}
 	if err = json.Unmarshal([]byte(ret), &disks); err != nil {
-		return 0, errors.Wrap(err, "failed to unmarshal lsblk output")
+		return 0, 0, errors.Wrap(err, "failed to unmarshal lsblk output")
 	}
 	if len(disks.Blockdevices) == 0 {
-		return 0, errors.Errorf("no block device information returned for %s", device)
+		return 0, 0, errors.Errorf("no block device information returned for %s", device)
 	}
 	diskNode = disks.Blockdevices[0] // lsblk with device filter returns only that device
 	// Find partition 4 (1-based indexing, so array index 3)
 	if len(diskNode.Children) < 4 {
-		return 0, errors.Errorf("device %s does not have 4 partitions", device)
+		return 0, 0, errors.Errorf("device %s does not have 4 partitions", device)
 	}
 	var usedSize int64
 	funk.ForEach(diskNode.Children, func(n *node) { usedSize += n.Size })
@@ -1178,9 +1178,9 @@ func (o *ops) calculateFreePercent(device string, requiredSize *int64) (int64, e
 	// the partition size will be doubled, and the rest will remain as free space.
 	totalRequiredSize := usedSize + *requiredSize
 	if totalRequiredSize < diskNode.Size {
-		return ((diskNode.Size - totalRequiredSize) * 100) / diskNode.Size, nil
+		return ((diskNode.Size - totalRequiredSize) * 100) / diskNode.Size, diskNode.Size, nil
 	}
-	return 0, nil
+	return 0, diskNode.Size, nil
 }
 
 // copyNetworkRequested reports whether the installation was asked to propagate the live
@@ -1229,7 +1229,7 @@ func (o *ops) OverwriteOsImage(osImage, device string, extraArgs []string) error
 	makecmd := func(commad string, args ...string) *cmd {
 		return &cmd{command: commad, args: args}
 	}
-	freePercent, err := o.calculateFreePercent(device, nil)
+	freePercent, _, err := o.calculateFreePercent(device, nil)
 	if err != nil {
 		return err
 	}
@@ -1370,11 +1370,26 @@ func (o *ops) CopyRegistryData(liveLogger io.Writer, device string) error {
 	// Calculate the target free percent of the device. Reserve at least 2.5 times
 	// the current data registry size.
 	requestedSize := registryDataSize * 5 / 2
-	freePercent, err := o.calculateFreePercent(device, &requestedSize)
+	freePercent, diskSize, err := o.calculateFreePercent(device, &requestedSize)
 	if err != nil {
 		return err
 	}
-	o.log.Infof("Requesting at least %d bytes for the root partition on device %s (current registry size: %d bytes)", requestedSize, device, registryDataSize)
+
+	// Cap free space at 90% to ensure the partition uses at least 10% of the disk.
+	// This prevents XFS from creating too many allocation groups (AG) when the disk
+	// is expanded to full size at first reboot. Without this limit, large disks would
+	// have a small agsize, leading to agcount > 400 and triggering autosave-xfs failure.
+	// See https://github.com/coreos/fedora-coreos-tracker/issues/1183
+	maxAllowedFreePercent := int64(90)
+	if freePercent > maxAllowedFreePercent {
+		freePercent = maxAllowedFreePercent
+	}
+
+	targetPartitionSize := diskSize * (100 - freePercent) / 100
+	o.log.Infof("Registry data copy: disk=%s size=%d GB, registry_data=%d GB, target_partition=%d GB, free_percent=%d%%",
+		device, diskSize/(1024*1024*1024), registryDataSize/(1024*1024*1024),
+		targetPartitionSize/(1024*1024*1024), freePercent)
+
 	// Ensure to have at least some minimum free space available otherwise coreos-gpt-setup.service may fail on the next reboot,
 	// since it requires at least some free blocks at the end of the disk.
 	minAllowedFreePercent := int64(1)
