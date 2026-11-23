@@ -93,6 +93,34 @@ func (mr *MockK8SClientMockRecorder) CreateOrPatchConfigMapData(namespace, name,
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOrPatchConfigMapData", reflect.TypeOf((*MockK8SClient)(nil).CreateOrPatchConfigMapData), namespace, name, data)
 }
 
+// CreateSubscription mocks base method.
+func (m *MockK8SClient) CreateSubscription(subscription *v1alpha10.Subscription) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateSubscription", subscription)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateSubscription indicates an expected call of CreateSubscription.
+func (mr *MockK8SClientMockRecorder) CreateSubscription(subscription any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSubscription", reflect.TypeOf((*MockK8SClient)(nil).CreateSubscription), subscription)
+}
+
+// DeleteCSV mocks base method.
+func (m *MockK8SClient) DeleteCSV(namespace, name string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteCSV", namespace, name)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteCSV indicates an expected call of DeleteCSV.
+func (mr *MockK8SClientMockRecorder) DeleteCSV(namespace, name any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCSV", reflect.TypeOf((*MockK8SClient)(nil).DeleteCSV), namespace, name)
+}
+
 // DeleteInstallPlan mocks base method.
 func (m *MockK8SClient) DeleteInstallPlan(installPlan types.NamespacedName) error {
 	m.ctrl.T.Helper()
@@ -147,6 +175,20 @@ func (m *MockK8SClient) DeleteService(namespace, name string) error {
 func (mr *MockK8SClientMockRecorder) DeleteService(namespace, name any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteService", reflect.TypeOf((*MockK8SClient)(nil).DeleteService), namespace, name)
+}
+
+// DeleteSubscription mocks base method.
+func (m *MockK8SClient) DeleteSubscription(subscription types.NamespacedName) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteSubscription", subscription)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteSubscription indicates an expected call of DeleteSubscription.
+func (mr *MockK8SClientMockRecorder) DeleteSubscription(subscription any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSubscription", reflect.TypeOf((*MockK8SClient)(nil).DeleteSubscription), subscription)
 }
 
 // EnableRouterAccessLogs mocks base method.

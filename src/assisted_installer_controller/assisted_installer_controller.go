@@ -38,6 +38,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -130,6 +131,9 @@ type controller struct {
 	rebootsNotifier RebootsNotifier
 	csrStore        csrApprovalStore
 	csrState        *csrApprovalState
+	// subscriptionRecovery tracks recreation of wedged OLM subscriptions in the
+	// agent-based installer, see recoverWedgedSubscription.
+	subscriptionRecovery map[types.NamespacedName]*subscriptionRecoveryState
 }
 
 // Manifest stores the operator manifest used by assisted-installer to create CRs of the OLM:
@@ -157,6 +161,8 @@ func newController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inv
 		status:           NewControllerStatus(),
 		rebootsNotifier:  rebootsNotifier,
 		csrState:         &csrApprovalState{},
+
+		subscriptionRecovery: map[types.NamespacedName]*subscriptionRecoveryState{},
 	}
 }
 
@@ -731,6 +737,9 @@ func (c *controller) getReadyOperators(operators []models.MonitoredOperator, age
 		var ready bool
 		if agentBasedInstaller {
 			ready = handler.IsInstalled()
+			if !ready {
+				c.recoverWedgedSubscription(operators[index])
+			}
 		} else {
 			ready = handler.IsInitialized()
 		}

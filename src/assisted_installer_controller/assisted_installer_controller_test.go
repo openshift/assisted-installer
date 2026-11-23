@@ -1484,6 +1484,8 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockRebootsNotifier.EXPECT().GetKubeconfigPath(gomock.Any()).Return("", nil).AnyTimes()
 				mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-kube-descheduler-operator", "cluster-kube-descheduler-operator").Return("", fmt.Errorf("dummy")).AnyTimes()
 				mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-nmstate", "kubernetes-nmstate-operator").Return("", fmt.Errorf("dummy")).AnyTimes()
+				// Not ready, so the recovery check runs; the subscriptions are healthy.
+				mockk8sclient.EXPECT().GetSubscription(gomock.Any()).Return(&olmv1alpha1.Subscription{}, nil).AnyTimes()
 
 				wg.Add(1)
 				go func() {
@@ -1517,6 +1519,12 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockk8sclient.EXPECT().ListJobs(gomock.Any()).Times(0)
 				mockk8sclient.EXPECT().GetAllInstallPlansOfSubscription(gomock.Any()).Times(0)
 				mockk8sclient.EXPECT().DeleteInstallPlan(gomock.Any()).Times(0)
+
+				// The subscriptions are healthy, just not finished, so nothing is recreated.
+				mockk8sclient.EXPECT().GetSubscription(gomock.Any()).Return(&olmv1alpha1.Subscription{}, nil).AnyTimes()
+				mockk8sclient.EXPECT().DeleteSubscription(gomock.Any()).Times(0)
+				mockk8sclient.EXPECT().CreateSubscription(gomock.Any()).Times(0)
+				mockk8sclient.EXPECT().DeleteCSV(gomock.Any(), gomock.Any()).Times(0)
 
 				wg.Add(1)
 				go func() {
