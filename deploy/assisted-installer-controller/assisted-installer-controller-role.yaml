@@ -157,6 +157,8 @@ rules:
     verbs:
       - get
       - list
+      # Remove a CSV stranded by a wedged subscription, see recoverWedgedSubscription.
+      - delete
   - apiGroups:
       - operators.coreos.com
     resources:
@@ -167,6 +169,13 @@ rules:
       - list
       - update
       - delete
+  - apiGroups:
+      - operators.coreos.com
+    resources:
+      - subscriptions
+    verbs:
+      # Recreate a wedged subscription, see recoverWedgedSubscription.
+      - create
   - apiGroups:
       - ""
     resources:
