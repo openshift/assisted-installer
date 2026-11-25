@@ -20,6 +20,7 @@ import (
 type MockIgnition struct {
 	ctrl     *gomock.Controller
 	recorder *MockIgnitionMockRecorder
+	isgomock struct{}
 }
 
 // MockIgnitionMockRecorder is the mock recorder for MockIgnition.

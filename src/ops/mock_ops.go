@@ -22,6 +22,7 @@ import (
 type MockOps struct {
 	ctrl     *gomock.Controller
 	recorder *MockOpsMockRecorder
+	isgomock struct{}
 }
 
 // MockOpsMockRecorder is the mock recorder for MockOps.
@@ -39,20 +40,6 @@ func NewMockOps(ctrl *gomock.Controller) *MockOps {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockOps) EXPECT() *MockOpsMockRecorder {
 	return m.recorder
-}
-
-// CopyRegistryData mocks base method.
-func (m *MockOps) CopyRegistryData(liveLogger io.Writer, device string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CopyRegistryData", liveLogger, device)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// CopyRegistryData indicates an expected call of CopyRegistryData.
-func (mr *MockOpsMockRecorder) CopyRegistryData(liveLogger, device any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CopyRegistryData", reflect.TypeOf((*MockOps)(nil).CopyRegistryData), liveLogger, device)
 }
 
 // CreateManifests mocks base method.
@@ -309,6 +296,20 @@ func (mr *MockOpsMockRecorder) PrepareController() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrepareController", reflect.TypeOf((*MockOps)(nil).PrepareController))
 }
 
+// PrepareIRIRegistryIgnition mocks base method.
+func (m *MockOps) PrepareIRIRegistryIgnition(ignitionPath string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PrepareIRIRegistryIgnition", ignitionPath)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PrepareIRIRegistryIgnition indicates an expected call of PrepareIRIRegistryIgnition.
+func (mr *MockOpsMockRecorder) PrepareIRIRegistryIgnition(ignitionPath any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrepareIRIRegistryIgnition", reflect.TypeOf((*MockOps)(nil).PrepareIRIRegistryIgnition), ignitionPath)
+}
+
 // ReadFile mocks base method.
 func (m *MockOps) ReadFile(filePath string) ([]byte, error) {
 	m.ctrl.T.Helper()
@@ -364,6 +365,20 @@ func (m *MockOps) SetBootOrder(device string) error {
 func (mr *MockOpsMockRecorder) SetBootOrder(device any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBootOrder", reflect.TypeOf((*MockOps)(nil).SetBootOrder), device)
+}
+
+// SetupIRIRegistryPartition mocks base method.
+func (m *MockOps) SetupIRIRegistryPartition(device string, liveLogger io.Writer) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetupIRIRegistryPartition", device, liveLogger)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetupIRIRegistryPartition indicates an expected call of SetupIRIRegistryPartition.
+func (mr *MockOpsMockRecorder) SetupIRIRegistryPartition(device, liveLogger any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetupIRIRegistryPartition", reflect.TypeOf((*MockOps)(nil).SetupIRIRegistryPartition), device, liveLogger)
 }
 
 // SystemctlAction mocks base method.

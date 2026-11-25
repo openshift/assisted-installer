@@ -23,6 +23,7 @@ import (
 type MockInventoryClient struct {
 	ctrl     *gomock.Controller
 	recorder *MockInventoryClientMockRecorder
+	isgomock struct{}
 }
 
 // MockInventoryClientMockRecorder is the mock recorder for MockInventoryClient.
