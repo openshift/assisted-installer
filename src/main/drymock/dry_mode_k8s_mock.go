@@ -85,6 +85,7 @@ func PrepareControllerDryMock(mockk8sclient *k8s_client.MockK8SClient, logger *l
 	// Called by GetReadyState to make sure we're online
 	csrs := certificatesv1.CertificateSigningRequestList{}
 	mockk8sclient.EXPECT().ListCsrs().Return(&csrs, nil).AnyTimes()
+	mockk8sclient.EXPECT().CreateOrPatchConfigMapData(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 	bmhs := metal3v1alpha1.BareMetalHostList{}
 	mockk8sclient.EXPECT().ListBMHs().Return(bmhs, nil).AnyTimes()
