@@ -132,7 +132,7 @@ type controller struct {
 	csrStore        csrApprovalStore
 	csrState        *csrApprovalState
 	// subscriptionRecovery tracks recreation of wedged OLM subscriptions in the
-	// agent-based installer, see recoverWedgedSubscription.
+	// agent-based installer, see recoverWedgedSubscriptions.
 	subscriptionRecovery map[types.NamespacedName]*subscriptionRecoveryState
 }
 
@@ -534,7 +534,17 @@ func (c *controller) PostInstallConfigsK8sClient(ctx context.Context, wg *sync.W
 		c.log.Infof("Finished PostInstallConfigsK8sClient")
 		wg.Done()
 	}()
+	// The loop ends once the manifests are applied and no subscription recovery is
+	// outstanding, or when ctx is cancelled. Recovery keeps running after the manifests
+	// are applied because it also covers Day-1 operators the controller does not
+	// monitor, which may still be wedged.
+	manifestsApplied := false
 	err := utils.WaitForeverForPredicate(ctx, GeneralWaitInterval, func() bool {
+		recoveryOutstanding := c.recoverWedgedSubscriptions()
+		if manifestsApplied {
+			return !recoveryOutstanding
+		}
+
 		// Get operator info from ConfigMap created by assisted-service
 		cm, err := c.kc.GetConfigMap(c.Namespace, "olm-operator-manifests")
 		if err != nil {
@@ -598,7 +608,11 @@ func (c *controller) PostInstallConfigsK8sClient(ctx context.Context, wg *sync.W
 			c.log.Infof("Failed to apply manifests")
 		} else {
 			c.log.Infof("Successfully applied manifests")
-			return true
+			manifestsApplied = true
+			if recoveryOutstanding {
+				c.log.Infof("Waiting for subscription recovery to finish")
+			}
+			return !recoveryOutstanding
 		}
 		return false
 	})
@@ -737,9 +751,6 @@ func (c *controller) getReadyOperators(operators []models.MonitoredOperator, age
 		var ready bool
 		if agentBasedInstaller {
 			ready = handler.IsInstalled()
-			if !ready {
-				c.recoverWedgedSubscription(operators[index])
-			}
 		} else {
 			ready = handler.IsInitialized()
 		}

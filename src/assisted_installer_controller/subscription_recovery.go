@@ -3,10 +3,10 @@ package assisted_installer_controller
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
-	"github.com/openshift/assisted-service/models"
 	olmv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,14 +36,18 @@ const (
 )
 
 // subscriptionRecoveryState tracks recovery of one subscription across polls. The
-// ClusterServiceVersionHandler is rebuilt on every poll, so this lives on the controller.
+// controller is the only long-lived object in the poll loop, so this lives on it.
 type subscriptionRecoveryState struct {
 	attempts    int
 	lastAttempt time.Time
 	// pending holds a subscription that has been deleted but not yet successfully
-	// recreated. While it is set, the next poll retries the create before doing
-	// anything else, so a failed create never loses the subscription.
+	// recreated. While it is set, every poll retries the create first, so a failed
+	// create never loses the subscription.
 	pending *olmv1alpha1.Subscription
+	// installed is set once a recreated subscription's CSV has reached Succeeded.
+	installed bool
+	// gaveUp is set once the subscription is still wedged after maxSubscriptionRecoveries.
+	gaveUp bool
 }
 
 // subscriptionWedged reports whether OLM will never finish installing the
@@ -67,80 +71,257 @@ func subscriptionWedged(sub *olmv1alpha1.Subscription) (string, bool) {
 	return "", false
 }
 
-// recoverWedgedSubscription recreates an operator's subscription, and removes the CSV
-// stranded by its failed InstallPlan, when OLM will not finish the install on its own.
-// See subscriptionWedged.
-//
-// This is the documented manual recovery for a failed OLM install, done automatically.
-// It is used by the agent-based installer only, where InstallPlans routinely fail
-// during the first minutes after the control plane comes up. Recreations of a given
-// subscription are spaced by subscriptionRecoveryBackoff and capped at
-// maxSubscriptionRecoveries.
-//
-// Only called from the PostInstallConfigsK8sClient goroutine, so subscriptionRecovery
-// needs no locking.
-func (c *controller) recoverWedgedSubscription(operator models.MonitoredOperator) {
-	key := types.NamespacedName{Namespace: operator.Namespace, Name: operator.SubscriptionName}
-	state, ok := c.subscriptionRecovery[key]
-	if !ok {
-		state = &subscriptionRecoveryState{}
-		c.subscriptionRecovery[key] = state
-	}
+// wedgedGroup is a set of subscriptions that must be recovered together because they
+// reference the same InstallPlan.
+type wedgedGroup struct {
+	// plan is the InstallPlan the subscriptions reference, nil if they reference none.
+	plan *types.NamespacedName
+	subs []*olmv1alpha1.Subscription
+}
 
-	// Finish a recreation that an earlier poll started.
-	if state.pending != nil {
+// recoverWedgedSubscriptions recreates every wedged subscription in the cluster, and
+// removes the CSVs stranded by their failed InstallPlans, when OLM will not finish the
+// install on its own. See subscriptionWedged. It returns true while any recovery is
+// still outstanding: a recreate that has not been created yet, a subscription that is
+// wedged and has attempts left, or a recreated subscription whose CSV has not reached
+// Succeeded yet.
+//
+// This is the documented manual recovery for a failed OLM install, done automatically,
+// for the agent-based installer only, where InstallPlans routinely fail during the first
+// minutes after the control plane comes up. It covers every subscription, not only the
+// operators the controller monitors, because the agent-based installer creates other
+// Day-1 operators too (for example fence-agents-remediation and node-maintenance) and
+// they wedge the same way.
+//
+// OLM resolves all subscriptions of a namespace together and gives them one InstallPlan,
+// so a failed plan is shared by every subscription that references it. Those
+// subscriptions are recovered as one group: all of them are deleted, then the failed
+// plan, then all of them are recreated. Recreating only some of them lets OLM resolve the
+// same set of CSVs again and reuse the failed plan, so the recreated subscription fails
+// again at once. Deleting the plan is safe only because no subscription references it
+// any more; deleting a plan that a subscription still references is exactly what wedges
+// it (see IsInstalled).
+//
+// Recreations of a given subscription are spaced by subscriptionRecoveryBackoff and capped
+// at maxSubscriptionRecoveries. Only called from the PostInstallConfigsK8sClient
+// goroutine, so subscriptionRecovery needs no locking.
+func (c *controller) recoverWedgedSubscriptions() bool {
+	outstanding := false
+
+	// Finish recreations that an earlier poll started.
+	for _, key := range c.sortedRecoveryKeys() {
+		state := c.subscriptionRecovery[key]
+		if state.pending == nil {
+			continue
+		}
 		c.createRecoveredSubscription(key, state)
-		return
+		if state.pending != nil {
+			outstanding = true
+		}
 	}
 
-	sub, err := c.kc.GetSubscription(key)
+	subs, err := c.kc.ListSubscriptions(metav1.NamespaceAll)
 	if err != nil {
-		c.log.WithError(err).Warnf("Failed to get subscription %s to check whether it needs recovery", key)
-		return
+		c.log.WithError(err).Warnf("Failed to list subscriptions to check whether any needs recovery")
+		return true
 	}
 
-	reason, wedged := subscriptionWedged(sub)
-	if !wedged {
-		return
+	if c.checkRecoveredSubscriptions(subs) {
+		outstanding = true
 	}
 
-	if state.attempts >= maxSubscriptionRecoveries {
-		c.log.Warnf("Subscription %s for operator %s is still wedged (%s) after %d recreations, giving up",
-			key, operator.Name, reason, state.attempts)
-		return
+	for _, group := range c.wedgedGroups(subs) {
+		if c.recoverWedgedGroup(group) {
+			outstanding = true
+		}
 	}
-	if since := time.Since(state.lastAttempt); since < subscriptionRecoveryBackoff {
-		c.log.Infof("Subscription %s for operator %s is wedged (%s), next recreation in %s",
-			key, operator.Name, reason, (subscriptionRecoveryBackoff - since).Round(time.Second))
-		return
+	return outstanding
+}
+
+// wedgedGroups groups the wedged subscriptions by the InstallPlan they reference. A group
+// is left out while any subscription referencing its plan is not wedged yet, since the
+// plan cannot be deleted while it is still referenced; OLM sets the condition on the
+// others shortly.
+func (c *controller) wedgedGroups(subs []olmv1alpha1.Subscription) []wedgedGroup {
+	byPlan := map[types.NamespacedName][]*olmv1alpha1.Subscription{}
+	var planOrder []types.NamespacedName
+	var groups []wedgedGroup
+
+	for i := range subs {
+		sub := &subs[i]
+		key := types.NamespacedName{Namespace: sub.Namespace, Name: sub.Name}
+		if sub.DeletionTimestamp != nil {
+			continue
+		}
+		if state, ok := c.subscriptionRecovery[key]; ok && state.pending != nil {
+			continue
+		}
+		ref := sub.Status.InstallPlanRef
+		if ref == nil {
+			if _, wedged := subscriptionWedged(sub); wedged {
+				groups = append(groups, wedgedGroup{subs: []*olmv1alpha1.Subscription{sub}})
+			}
+			continue
+		}
+		plan := types.NamespacedName{Namespace: ref.Namespace, Name: ref.Name}
+		if plan.Namespace == "" {
+			plan.Namespace = sub.Namespace
+		}
+		if _, seen := byPlan[plan]; !seen {
+			planOrder = append(planOrder, plan)
+		}
+		byPlan[plan] = append(byPlan[plan], sub)
 	}
 
-	state.attempts++
-	state.lastAttempt = time.Now()
-	c.log.Warnf("Subscription %s for operator %s is wedged (%s), recreating it (attempt %d/%d)",
-		key, operator.Name, reason, state.attempts, maxSubscriptionRecoveries)
+	for _, plan := range planOrder {
+		members := byPlan[plan]
+		var wedged, notWedged []string
+		for _, sub := range members {
+			if _, ok := subscriptionWedged(sub); ok {
+				wedged = append(wedged, sub.Namespace+"/"+sub.Name)
+			} else {
+				notWedged = append(notWedged, sub.Namespace+"/"+sub.Name)
+			}
+		}
+		if len(wedged) == 0 {
+			continue
+		}
+		if len(notWedged) > 0 {
+			c.log.Infof("Subscriptions %v are wedged on InstallPlan %s, waiting for %v, which share it, before recovering them together",
+				wedged, plan, notWedged)
+			continue
+		}
+		p := plan
+		groups = append(groups, wedgedGroup{plan: &p, subs: members})
+	}
+	return groups
+}
 
-	recreated := subscriptionForRecreate(sub)
-	// Log the full object first, so it can be recreated by hand if the controller
-	// dies between the delete and the create below.
-	if raw, err := json.Marshal(recreated); err == nil {
-		c.log.Infof("Subscription %s to be recreated: %s", key, string(raw))
+// recoverWedgedGroup recreates one group of wedged subscriptions. It returns true while
+// the group's recovery is outstanding.
+func (c *controller) recoverWedgedGroup(group wedgedGroup) bool {
+	states := make([]*subscriptionRecoveryState, len(group.subs))
+	for i, sub := range group.subs {
+		key := types.NamespacedName{Namespace: sub.Namespace, Name: sub.Name}
+		state, ok := c.subscriptionRecovery[key]
+		if !ok {
+			state = &subscriptionRecoveryState{}
+			c.subscriptionRecovery[key] = state
+		}
+		states[i] = state
 	}
 
-	if err := c.kc.DeleteSubscription(key); err != nil && !apierrors.IsNotFound(err) {
-		c.log.WithError(err).Warnf("Failed to delete subscription %s", key)
-		return
+	for i, sub := range group.subs {
+		reason, _ := subscriptionWedged(sub)
+		if states[i].attempts >= maxSubscriptionRecoveries {
+			if !states[i].gaveUp {
+				c.log.Warnf("Subscription %s/%s is still wedged (%s) after %d recreations, giving up",
+					sub.Namespace, sub.Name, reason, states[i].attempts)
+				states[i].gaveUp = true
+			}
+			return false
+		}
+		if since := time.Since(states[i].lastAttempt); since < subscriptionRecoveryBackoff {
+			c.log.Infof("Subscription %s/%s is wedged (%s), next recreation in %s",
+				sub.Namespace, sub.Name, reason, (subscriptionRecoveryBackoff - since).Round(time.Second))
+			return true
+		}
 	}
-	state.pending = recreated
 
-	// Without its subscription nothing will ever move the stranded CSV out of Pending,
+	allDeleted := true
+	var deleted []int
+	for i, sub := range group.subs {
+		key := types.NamespacedName{Namespace: sub.Namespace, Name: sub.Name}
+		reason, _ := subscriptionWedged(sub)
+		state := states[i]
+		state.attempts++
+		state.lastAttempt = time.Now()
+		state.installed = false
+		c.log.Warnf("Subscription %s is wedged (%s), recreating it (attempt %d/%d)",
+			key, reason, state.attempts, maxSubscriptionRecoveries)
+
+		recreated := subscriptionForRecreate(sub)
+		// Log the full object first, so it can be recreated by hand if the controller
+		// dies between the delete and the create below.
+		if raw, err := json.Marshal(recreated); err == nil {
+			c.log.Infof("Subscription %s to be recreated: %s", key, string(raw))
+		}
+
+		if err := c.kc.DeleteSubscription(key); err != nil && !apierrors.IsNotFound(err) {
+			c.log.WithError(err).Warnf("Failed to delete subscription %s", key)
+			allDeleted = false
+			continue
+		}
+		state.pending = recreated
+		deleted = append(deleted, i)
+	}
+
+	// Without its subscription nothing will ever move a stranded CSV out of Pending,
 	// and leaving it in place lets the recreated subscription adopt it instead of
 	// running a fresh InstallPlan.
-	for _, csvName := range c.strandedCSVs(sub) {
-		c.deleteStrandedCSV(key.Namespace, csvName)
+	for _, i := range deleted {
+		for _, csvName := range c.strandedCSVs(group.subs[i]) {
+			c.deleteStrandedCSV(group.subs[i].Namespace, csvName)
+		}
 	}
 
-	c.createRecoveredSubscription(key, state)
+	// Only once nothing references it, so OLM cannot reuse the failed plan.
+	if group.plan != nil && allDeleted {
+		if err := c.kc.DeleteInstallPlan(*group.plan); err != nil && !apierrors.IsNotFound(err) {
+			c.log.WithError(err).Warnf("Failed to delete InstallPlan %s, recreating its subscriptions anyway", *group.plan)
+		} else {
+			c.log.Infof("Deleted InstallPlan %s, which no subscription references any more", *group.plan)
+		}
+	}
+
+	outstanding := !allDeleted
+	for _, i := range deleted {
+		sub := group.subs[i]
+		c.createRecoveredSubscription(types.NamespacedName{Namespace: sub.Namespace, Name: sub.Name}, states[i])
+		outstanding = true // installing, or the create is pending
+	}
+	return outstanding
+}
+
+// checkRecoveredSubscriptions reports whether any subscription that was recreated is
+// still on its way to a Succeeded CSV, and marks the ones that got there.
+func (c *controller) checkRecoveredSubscriptions(subs []olmv1alpha1.Subscription) bool {
+	outstanding := false
+	for i := range subs {
+		sub := &subs[i]
+		key := types.NamespacedName{Namespace: sub.Namespace, Name: sub.Name}
+		state, ok := c.subscriptionRecovery[key]
+		if !ok || state.attempts == 0 || state.installed || state.gaveUp || state.pending != nil {
+			continue
+		}
+		if c.csvSucceeded(sub) {
+			c.log.Infof("Recreated subscription %s installed %s", key, sub.Status.CurrentCSV)
+			state.installed = true
+			continue
+		}
+		outstanding = true
+	}
+	return outstanding
+}
+
+func (c *controller) csvSucceeded(sub *olmv1alpha1.Subscription) bool {
+	if sub.Status.CurrentCSV == "" {
+		return false
+	}
+	csv, err := c.kc.GetCSV(sub.Namespace, sub.Status.CurrentCSV)
+	if err != nil {
+		return false
+	}
+	return csv.Status.Phase == olmv1alpha1.CSVPhaseSucceeded
+}
+
+func (c *controller) sortedRecoveryKeys() []types.NamespacedName {
+	keys := make([]types.NamespacedName, 0, len(c.subscriptionRecovery))
+	for key := range c.subscriptionRecovery {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i].String() < keys[j].String() })
+	return keys
 }
 
 // createRecoveredSubscription creates state.pending and clears it on success. On
