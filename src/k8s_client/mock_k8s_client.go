@@ -121,6 +121,21 @@ func (mr *MockK8SClientMockRecorder) DeleteCSV(namespace, name any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCSV", reflect.TypeOf((*MockK8SClient)(nil).DeleteCSV), namespace, name)
 }
 
+// ListCSVs mocks base method.
+func (m *MockK8SClient) ListCSVs(namespace, labelSelector string) ([]v1alpha10.ClusterServiceVersion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListCSVs", namespace, labelSelector)
+	ret0, _ := ret[0].([]v1alpha10.ClusterServiceVersion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListCSVs indicates an expected call of ListCSVs.
+func (mr *MockK8SClientMockRecorder) ListCSVs(namespace, labelSelector any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCSVs", reflect.TypeOf((*MockK8SClient)(nil).ListCSVs), namespace, labelSelector)
+}
+
 // DeleteInstallPlan mocks base method.
 func (m *MockK8SClient) DeleteInstallPlan(installPlan types.NamespacedName) error {
 	m.ctrl.T.Helper()

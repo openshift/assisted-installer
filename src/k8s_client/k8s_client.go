@@ -67,6 +67,7 @@ type K8SClient interface {
 	CreateSubscription(subscription *olmv1alpha1.Subscription) error
 	DeleteSubscription(subscription types.NamespacedName) error
 	DeleteCSV(namespace string, name string) error
+	ListCSVs(namespace string, labelSelector string) ([]olmv1alpha1.ClusterServiceVersion, error)
 	IsMetalProvisioningExists() (bool, error)
 	ListBMHs() (metal3v1alpha1.BareMetalHostList, error)
 	GetBMH(name string) (*metal3v1alpha1.BareMetalHost, error)
@@ -675,6 +676,14 @@ func (c *k8sClient) DeleteSubscription(subscription types.NamespacedName) error 
 
 func (c *k8sClient) DeleteCSV(namespace string, name string) error {
 	return c.olmClient.ClusterServiceVersions(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+}
+
+func (c *k8sClient) ListCSVs(namespace string, labelSelector string) ([]olmv1alpha1.ClusterServiceVersion, error) {
+	list, err := c.olmClient.ClusterServiceVersions(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+	if err != nil {
+		return nil, err
+	}
+	return list.Items, nil
 }
 
 func (c *k8sClient) GetNode(name string) (*v1.Node, error) {

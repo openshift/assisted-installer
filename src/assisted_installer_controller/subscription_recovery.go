@@ -3,6 +3,7 @@ package assisted_installer_controller
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/openshift/assisted-service/models"
@@ -24,6 +25,14 @@ const (
 	// new InstallPlan and run it, and whatever failed the previous plan (for example a CRD
 	// validating webhook whose backend is not serving yet) needs time to clear.
 	subscriptionRecoveryBackoff = 5 * time.Minute
+
+	// operatorLabelPrefix prefixes the label OLM puts on an operator's subscription and on
+	// the CSVs it creates for it: operators.coreos.com/<package>.<namespace>.
+	operatorLabelPrefix = "operators.coreos.com/"
+
+	// copiedCSVLabel marks a CSV that OLM copied into this namespace from an operator
+	// installed for all namespaces. It belongs to that other operator and is never ours to delete.
+	copiedCSVLabel = "olm.copiedFrom"
 )
 
 // subscriptionRecoveryState tracks recovery of one subscription across polls. The
@@ -127,7 +136,7 @@ func (c *controller) recoverWedgedSubscription(operator models.MonitoredOperator
 	// Without its subscription nothing will ever move the stranded CSV out of Pending,
 	// and leaving it in place lets the recreated subscription adopt it instead of
 	// running a fresh InstallPlan.
-	for _, csvName := range strandedCSVs(sub) {
+	for _, csvName := range c.strandedCSVs(sub) {
 		c.deleteStrandedCSV(key.Namespace, csvName)
 	}
 
@@ -135,20 +144,43 @@ func (c *controller) recoverWedgedSubscription(operator models.MonitoredOperator
 }
 
 // createRecoveredSubscription creates state.pending and clears it on success. On
-// failure it is left set and retried on the next poll; AlreadyExists is expected
-// while the deleted subscription is still being removed.
+// failure it is left set and retried on the next poll.
 func (c *controller) createRecoveredSubscription(key types.NamespacedName, state *subscriptionRecoveryState) {
 	err := c.kc.CreateSubscription(state.pending.DeepCopy())
-	if err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			c.log.Infof("Subscription %s is still being deleted, will recreate it on the next check", key)
-		} else {
-			c.log.WithError(err).Warnf("Failed to recreate subscription %s, will retry", key)
-		}
+	if err == nil {
+		c.log.Infof("Recreated subscription %s", key)
+		c.finishRecovery(state)
 		return
 	}
-	c.log.Infof("Recreated subscription %s", key)
+	if !apierrors.IsAlreadyExists(err) {
+		c.log.WithError(err).Warnf("Failed to recreate subscription %s, will retry", key)
+		return
+	}
+
+	// The delete of the original already succeeded, so an existing subscription is
+	// either the original still terminating or a replacement: ours, from an earlier
+	// create whose response was lost, or one created by someone else. Only keep
+	// retrying for the former; a replacement must go through the normal wedge check,
+	// otherwise a replacement that wedges again would never be noticed.
+	existing, getErr := c.kc.GetSubscription(key)
+	if getErr != nil {
+		c.log.WithError(getErr).Infof("Subscription %s already exists but could not be read, will retry", key)
+		return
+	}
+	if existing.DeletionTimestamp != nil {
+		c.log.Infof("Subscription %s is still being deleted, will recreate it on the next check", key)
+		return
+	}
+	c.log.Infof("Subscription %s has already been recreated", key)
+	c.finishRecovery(state)
+}
+
+// finishRecovery records that the subscription exists again. The backoff restarts
+// here rather than from the delete, so a recreation whose create was delayed still
+// gets the full subscriptionRecoveryBackoff for OLM to run its new InstallPlan.
+func (c *controller) finishRecovery(state *subscriptionRecoveryState) {
 	state.pending = nil
+	state.lastAttempt = time.Now()
 }
 
 // deleteStrandedCSV deletes a CSV left behind by a failed InstallPlan. A CSV that
@@ -170,15 +202,62 @@ func (c *controller) deleteStrandedCSV(namespace, name string) {
 	}
 }
 
-// strandedCSVs returns the distinct CSV names a subscription points at.
-func strandedCSVs(sub *olmv1alpha1.Subscription) []string {
+// strandedCSVs returns the distinct names of the CSVs that may have been left behind
+// for a subscription: the ones its status points at, and every CSV OLM created for
+// the same operator in its namespace.
+//
+// The status alone is not enough. When OLM moves currentCSV on to a newer version
+// before the first CSV installs (for example v2.12.10, then v5.0.0 from the default
+// channel), the older CSV is no longer referenced but is still there. After the
+// subscription is recreated OLM then refuses to resolve it, with ResolutionFailed
+// "clusterserviceversion ... exists and is not referenced by a subscription", and the
+// operator never installs.
+//
+// deleteStrandedCSV still checks each one and never deletes a Succeeded CSV.
+func (c *controller) strandedCSVs(sub *olmv1alpha1.Subscription) []string {
 	var names []string
-	for _, name := range []string{sub.Status.CurrentCSV, sub.Status.InstalledCSV} {
-		if name != "" && (len(names) == 0 || names[0] != name) {
+	seen := map[string]bool{}
+	add := func(name string) {
+		if name != "" && !seen[name] {
+			seen[name] = true
 			names = append(names, name)
 		}
 	}
+	add(sub.Status.CurrentCSV)
+	add(sub.Status.InstalledCSV)
+
+	label := operatorLabel(sub)
+	if label == "" {
+		return names
+	}
+	csvs, err := c.kc.ListCSVs(sub.Namespace, label)
+	if err != nil {
+		c.log.WithError(err).Warnf("Failed to list CSVs of subscription %s/%s, only checking the ones it references",
+			sub.Namespace, sub.Name)
+		return names
+	}
+	for _, csv := range csvs {
+		if _, copied := csv.Labels[copiedCSVLabel]; copied {
+			continue
+		}
+		add(csv.Name)
+	}
 	return names
+}
+
+// operatorLabel returns the operators.coreos.com/<package>.<namespace> label key OLM
+// uses for the subscription's operator. OLM sets it on the subscription itself, so
+// that copy is used when present; otherwise it is built from the package name.
+func operatorLabel(sub *olmv1alpha1.Subscription) string {
+	for k := range sub.Labels {
+		if strings.HasPrefix(k, operatorLabelPrefix) {
+			return k
+		}
+	}
+	if sub.Spec == nil || sub.Spec.Package == "" {
+		return ""
+	}
+	return operatorLabelPrefix + sub.Spec.Package + "." + sub.Namespace
 }
 
 // subscriptionForRecreate returns a copy of sub that can be passed to Create: the same
