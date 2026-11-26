@@ -24,6 +24,7 @@ import (
 	mapiv1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/assisted-installer/src/common"
 	"github.com/openshift/assisted-installer/src/config"
+	"github.com/openshift/assisted-installer/src/csr_approver"
 	"github.com/openshift/assisted-installer/src/inventory_client"
 	"github.com/openshift/assisted-installer/src/k8s_client"
 	"github.com/openshift/assisted-installer/src/ops"
@@ -127,6 +128,8 @@ type controller struct {
 	ic              inventory_client.InventoryClient
 	kc              k8s_client.K8SClient
 	rebootsNotifier RebootsNotifier
+	csrStore        csrApprovalStore
+	csrState        *csrApprovalState
 }
 
 // Manifest stores the operator manifest used by assisted-installer to create CRs of the OLM:
@@ -153,11 +156,14 @@ func newController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inv
 		kc:               kc,
 		status:           NewControllerStatus(),
 		rebootsNotifier:  rebootsNotifier,
+		csrState:         &csrApprovalState{},
 	}
 }
 
 func NewController(log *logrus.Logger, cfg ControllerConfig, ops ops.Ops, ic inventory_client.InventoryClient, kc k8s_client.K8SClient, rebootsNotifier RebootsNotifier) Controller {
-	return newController(log, cfg, ops, ic, kc, rebootsNotifier)
+	controller := newController(log, cfg, ops, ic, kc, rebootsNotifier)
+	controller.csrStore = &k8sCSRApprovalStore{kc: kc, namespace: cfg.Namespace, clusterID: cfg.ClusterID}
+	return controller
 }
 
 func NewControllerStatus() *ControllerStatus {
@@ -220,6 +226,7 @@ func (c *controller) WaitAndUpdateNodesStatus(ctx context.Context, wg *sync.Wait
 		c.log.Infof("WaitAndUpdateNodesStatus finished")
 		wg.Done()
 	}()
+	c.loadCSRApprovalSnapshot()
 	// starting approve csrs
 	go c.ApproveCsrs(approveCtx)
 
@@ -237,6 +244,10 @@ func (c *controller) waitAndUpdateNodesStatus(removeUninitializedTaint bool) boo
 	knownIpAddresses := common.BuildHostsMapIPAddressBased(assistedNodesMap)
 	if err != nil {
 		log.WithError(err).Error("Failed to get node map from the assisted service")
+		return KeepWaiting
+	}
+	if snapshotErr := c.refreshCSRApprovalSnapshot(assistedNodesMap); snapshotErr != nil {
+		log.WithError(snapshotErr).Error("Failed to prepare CSR approval snapshot")
 		return KeepWaiting
 	}
 
@@ -414,6 +425,7 @@ func (c *controller) updateConfiguringStatusIfNeeded(hosts map[string]inventory_
 func (c *controller) ApproveCsrs(ctx context.Context) {
 	c.log.Infof("Start approving CSRs")
 	ticker := time.NewTicker(GeneralWaitInterval)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
@@ -424,18 +436,35 @@ func (c *controller) ApproveCsrs(ctx context.Context) {
 			if err != nil {
 				continue
 			}
-			c.approveCsrs(csrs)
+			snapshot, ok := c.csrState.get()
+			if !ok {
+				c.log.Warn("CSR approval snapshot is not available; leaving CSRs pending")
+				continue
+			}
+			nodes, err := c.kc.ListNodes()
+			if err != nil {
+				c.log.WithError(err).Warn("Failed to list Nodes for CSR approval")
+				continue
+			}
+			c.approveCsrs(csrs, nodes, snapshot)
 		}
 	}
 }
 
-func (c *controller) approveCsrs(csrs *certificatesv1.CertificateSigningRequestList) {
+func (c *controller) approveCsrs(csrs *certificatesv1.CertificateSigningRequestList, nodes *v1.NodeList, snapshot csr_approver.Snapshot) {
 	for i := range csrs.Items {
 		csr := csrs.Items[i]
-		if !isCsrApproved(&csr) {
-			c.log.Infof("Approving CSR %s", csr.Name)
-			// We can fail and it is ok, we will retry on the next time
-			_ = c.kc.ApproveCsr(&csr)
+		decision := csr_approver.Evaluate(&csr, nodes, snapshot)
+		if !decision.Approve {
+			if !isCsrApproved(&csr) {
+				c.log.WithField("reason", decision.Reason).Debugf("Leaving CSR %s pending", csr.Name)
+			}
+			continue
+		}
+		c.log.Infof("Approving CSR %s", csr.Name)
+		// We can fail and it is ok, we will retry on the next time.
+		if err := c.kc.ApproveCsr(&csr); err != nil {
+			c.log.WithError(err).Warnf("Failed to approve CSR %s", csr.Name)
 		}
 	}
 }
