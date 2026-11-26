@@ -1290,6 +1290,65 @@ var _ = Describe("Copy registry data", func() {
 	It("Copy registry data - device mapper", func() {
 		runTest("/dev/dm-0", "/dev/dm-4")
 	})
+	It("Copy registry data - large disk with 90% cap", func() {
+		device := "/dev/sda"
+		part4 := "/dev/sda4"
+		dataDir := "/mnt/agentdata"
+		registryDataSize := 20 * 1024 * 1024 * 1024 // 20GB
+		registryDataDirOnRoot := filepath.Join("/mnt/root/ostree/deploy/rhcos", registryDataDirOnDevice)
+
+		// Mock du calls for getting registry data size
+		execMock.EXPECT().ExecCommandWithOptions(nil, "du",
+			[]string{"-sb", dataDir},
+			gomock.Any()).Return(strconv.FormatInt(int64(registryDataSize), 10), nil).Times(1)
+
+		// Mock lsblk for a 3TB disk
+		largeDiskFormat := `{
+   "blockdevices": [
+		{
+         "name": "sda",
+         "size": 3000000000000,
+         "ro": false,
+         "type": "disk",
+         "mountpoints": [null],
+         "children": [
+            {"name": "sda1", "maj:min": "8:1", "rm": false, "size": 1048576, "ro": false, "type": "part", "mountpoints": [null]},
+            {"name": "sda2", "maj:min": "8:2", "rm": false, "size": 133169152, "ro": false, "type": "part", "mountpoints": [null]},
+            {"name": "sda3", "maj:min": "8:3", "rm": false, "size": 402653184, "ro": false, "type": "part", "mountpoints": [null]},
+            {"name": "sda4", "maj:min": "8:4", "rm": false, "size": 3272588800, "ro": false, "type": "part", "mountpoints": [null]}
+         ]
+      }
+   ]
+}`
+		execMock.EXPECT().ExecCommandWithOptions(nil, "lsblk",
+			[]string{"--bytes", "--json", device},
+			gomock.Any()).Return(largeDiskFormat, nil).Times(2)
+
+		mockPrivileged("mkdir", "-p", "/mnt/root")
+		mockPrivileged("mount", part4, "/mnt/root")
+		mockPrivileged("sh", "-c", "fsfreeze --unfreeze /mnt/root || true")
+		mockPrivileged("umount", "/mnt/root")
+
+		// Expect freePercent to be capped at 90% (not the calculated ~98%)
+		mockPrivileged("growpart", "--free-percent=90", device, "4")
+		mockPrivileged("bash", "-c", "sed 's/threshold=[0-9]*/threshold=0/' /usr/lib/dracut/modules.d/40ignition-ostree/ignition-ostree-transposefs.sh | bash -s autosave-xfs")
+		mockPrivileged("bash", "-c", "/usr/lib/dracut/modules.d/40ignition-ostree/ignition-ostree-transposefs.sh restore")
+		mockPrivileged("bash", "-c", "/usr/lib/dracut/modules.d/40ignition-ostree/ignition-ostree-transposefs.sh cleanup")
+
+		mockPrivileged("mount", part4, "/mnt/root")
+		mockPrivileged("xfs_growfs", "/mnt/root")
+		mockPrivileged("mkdir", "-p", registryDataDirOnRoot)
+
+		execMock.EXPECT().ExecCommandWithOptions(io.Discard, "sh",
+			[]string{"-c", fmt.Sprintf("rsync -ah --info=progress2 %s/ %s/", dataDir, registryDataDirOnRoot)},
+			gomock.Any()).Return("", nil).Times(1)
+
+		mockPrivileged("fsfreeze", "--freeze", "/mnt/root")
+		mockPrivileged("umount", "/mnt/root")
+
+		err := o.CopyRegistryData(io.Discard, device)
+		Expect(err).ToNot(HaveOccurred())
+	})
 })
 
 var _ = Describe("Security: validateImageReference", func() {
