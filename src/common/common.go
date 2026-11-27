@@ -27,7 +27,6 @@ const (
 	ControllerLogsSecondsAgo       = 60 * 60
 	AssistedControllerIsReadyEvent = "AssistedControllerIsReady"
 	AssistedControllerPrefix       = "assisted-installer-controller"
-	ControllerLogFile              = "/tmp/controller_logs.log"
 	ControllerLogFileName          = "assisted-installer-controller.logs"
 	KubeconfigFileName             = "kubeconfig-noingress"
 	installConfigMapName           = "openshift-install-manifests"
@@ -36,6 +35,10 @@ const (
 	clusterConfigCMName            = "cluster-config-v1"
 	clusterConfigCMNamespace       = "kube-system"
 	clusterConfigCMAttribute       = "install-config"
+)
+
+var (
+	ControllerLogFile = path.Join(os.TempDir(), "controller_logs.log")
 )
 
 func GetHostsInStatus(hosts map[string]inventory_client.HostData, status []string, isMatch bool) map[string]inventory_client.HostData {
