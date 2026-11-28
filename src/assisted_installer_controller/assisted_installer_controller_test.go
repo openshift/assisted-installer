@@ -1447,7 +1447,53 @@ var _ = Describe("installer HostRoleMaster role", func() {
 		})
 	})
 
+	Context("PostInstallConfigsK8sClient with subscription recovery outstanding", func() {
+		BeforeEach(func() {
+			GeneralWaitInterval = 1 * time.Millisecond
+		})
+
+		It("applies the manifests once and keeps polling until a recreated subscription is installed", func() {
+			mockAllCapabilitiesEnabled()
+
+			// fence-agents-remediation is not monitored, and was recreated by an earlier poll.
+			farKey := types.NamespacedName{Namespace: "openshift-workload-availability", Name: "fence-agents-remediation"}
+			assistedController.subscriptionRecovery[farKey] = &subscriptionRecoveryState{attempts: 1, lastAttempt: time.Now()}
+			far := olmv1alpha1.Subscription{
+				ObjectMeta: metav1.ObjectMeta{Namespace: farKey.Namespace, Name: farKey.Name},
+				Status:     olmv1alpha1.SubscriptionStatus{CurrentCSV: "fence-agents-remediation.v0.8.1"},
+			}
+			mockk8sclient.EXPECT().ListSubscriptions(metav1.NamespaceAll).Return([]olmv1alpha1.Subscription{far}, nil).Times(2)
+			gomock.InOrder(
+				mockk8sclient.EXPECT().GetCSV(farKey.Namespace, far.Status.CurrentCSV).
+					Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseInstalling}}, nil),
+				mockk8sclient.EXPECT().GetCSV(farKey.Namespace, far.Status.CurrentCSV).
+					Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseSucceeded}}, nil),
+			)
+
+			// The manifests are applied on the first poll only.
+			mockk8sclient.EXPECT().GetConfigMap(assistedController.Namespace, "olm-operator-manifests").Return(createConfigMap(), nil).Times(1)
+			mockRebootsNotifier.EXPECT().GetKubeconfigPath(gomock.Any()).Return("", nil).Times(1)
+			randomCSV := uuid.New().String()
+			mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-kube-descheduler-operator", "cluster-kube-descheduler-operator").Return(randomCSV, nil).Times(1)
+			mockk8sclient.EXPECT().GetCSV("openshift-kube-descheduler-operator", gomock.Any()).Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseSucceeded}}, nil).Times(1)
+			mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-nmstate", "kubernetes-nmstate-operator").Return(randomCSV, nil).Times(1)
+			mockk8sclient.EXPECT().GetCSV("openshift-nmstate", gomock.Any()).Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseSucceeded}}, nil).Times(1)
+			mockops.EXPECT().CreateManifests(gomock.Any(), gomock.Any()).Times(2)
+
+			wg.Add(1)
+			assistedController.PostInstallConfigsK8sClient(context.TODO(), &wg, "")
+			wg.Wait()
+
+			Expect(assistedController.subscriptionRecovery[farKey].installed).To(BeTrue())
+		})
+	})
+
 	Context("PostInstallConfigsK8sClient", func() {
+		BeforeEach(func() {
+			// Every poll also checks for wedged subscriptions; none here.
+			mockk8sclient.EXPECT().ListSubscriptions(metav1.NamespaceAll).Return(nil, nil).AnyTimes()
+		})
+
 		Context("operator manifests", func() {
 			BeforeEach(func() {
 				GeneralWaitInterval = 1 * time.Millisecond
@@ -1459,14 +1505,12 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				operatorConfigMap := createConfigMap()
 
 				mockk8sclient.EXPECT().GetConfigMap(assistedController.Namespace, "olm-operator-manifests").Return(operatorConfigMap, nil).Times(1)
-				mockk8sclient.EXPECT().ListJobs(gomock.Any()).Return(&batchV1.JobList{}, nil).AnyTimes()
-				mockk8sclient.EXPECT().GetAllInstallPlansOfSubscription(gomock.Any()).Return([]olmv1alpha1.InstallPlan{}, nil).Times(2)
 				mockRebootsNotifier.EXPECT().GetKubeconfigPath(gomock.Any()).Return("", nil).Times(1)
 				randomCSV := uuid.New().String()
 				mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-kube-descheduler-operator", "cluster-kube-descheduler-operator").Return(randomCSV, nil).Times(1)
-				mockk8sclient.EXPECT().GetCSV("openshift-kube-descheduler-operator", gomock.Any()).Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseNone}}, nil).Times(1)
+				mockk8sclient.EXPECT().GetCSV("openshift-kube-descheduler-operator", gomock.Any()).Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseSucceeded}}, nil).Times(1)
 				mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-nmstate", "kubernetes-nmstate-operator").Return(randomCSV, nil).Times(1)
-				mockk8sclient.EXPECT().GetCSV("openshift-nmstate", gomock.Any()).Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseNone}}, nil).Times(1)
+				mockk8sclient.EXPECT().GetCSV("openshift-nmstate", gomock.Any()).Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseSucceeded}}, nil).Times(1)
 				mockops.EXPECT().CreateManifests(gomock.Any(), gomock.Any()).Times(2)
 
 				wg.Add(1)
@@ -1486,6 +1530,47 @@ var _ = Describe("installer HostRoleMaster role", func() {
 				mockRebootsNotifier.EXPECT().GetKubeconfigPath(gomock.Any()).Return("", nil).AnyTimes()
 				mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-kube-descheduler-operator", "cluster-kube-descheduler-operator").Return("", fmt.Errorf("dummy")).AnyTimes()
 				mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-nmstate", "kubernetes-nmstate-operator").Return("", fmt.Errorf("dummy")).AnyTimes()
+				// Not ready, so the recovery check runs; the subscriptions are healthy.
+				mockk8sclient.EXPECT().GetSubscription(gomock.Any()).Return(&olmv1alpha1.Subscription{}, nil).AnyTimes()
+
+				wg.Add(1)
+				go func() {
+					defer GinkgoRecover()
+					ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Millisecond)
+					defer cancel()
+					assistedController.PostInstallConfigsK8sClient(ctx, &wg, "")
+				}()
+				wg.Wait()
+			})
+
+			It("waits for the CSV to succeed and never deletes install plans", func() {
+				mockAllCapabilitiesEnabled()
+
+				operatorConfigMap := createConfigMap()
+
+				mockk8sclient.EXPECT().GetConfigMap(assistedController.Namespace, "olm-operator-manifests").Return(operatorConfigMap, nil).AnyTimes()
+				mockRebootsNotifier.EXPECT().GetKubeconfigPath(gomock.Any()).Return("", nil).AnyTimes()
+
+				// A CSV exists but OLM has not finished installing the operator, so its CRDs
+				// are not registered yet and its CRs must not be applied.
+				randomCSV := uuid.New().String()
+				mockk8sclient.EXPECT().GetCSVFromSubscription(gomock.Any(), gomock.Any()).Return(randomCSV, nil).AnyTimes()
+				mockk8sclient.EXPECT().GetCSV(gomock.Any(), gomock.Any()).
+					Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhasePending}}, nil).AnyTimes()
+				mockops.EXPECT().CreateManifests(gomock.Any(), gomock.Any()).Times(0)
+
+				// The agent-based installer must not run handleOLMEarlySetupBug: deleting an
+				// install plan that OLM has already referenced from the subscription wedges
+				// the operator permanently.
+				mockk8sclient.EXPECT().ListJobs(gomock.Any()).Times(0)
+				mockk8sclient.EXPECT().GetAllInstallPlansOfSubscription(gomock.Any()).Times(0)
+				mockk8sclient.EXPECT().DeleteInstallPlan(gomock.Any()).Times(0)
+
+				// The subscriptions are healthy, just not finished, so nothing is recreated.
+				mockk8sclient.EXPECT().GetSubscription(gomock.Any()).Return(&olmv1alpha1.Subscription{}, nil).AnyTimes()
+				mockk8sclient.EXPECT().DeleteSubscription(gomock.Any()).Times(0)
+				mockk8sclient.EXPECT().CreateSubscription(gomock.Any()).Times(0)
+				mockk8sclient.EXPECT().DeleteCSV(gomock.Any(), gomock.Any()).Times(0)
 
 				wg.Add(1)
 				go func() {
@@ -1592,8 +1677,6 @@ manifests:
 
 				mockk8sclient.EXPECT().GetConfigMap(assistedController.Namespace, "olm-operator-manifests").
 					Return(operatorConfigMap, nil).Times(2)
-				mockk8sclient.EXPECT().ListJobs(gomock.Any()).Return(&batchV1.JobList{}, nil).AnyTimes()
-				mockk8sclient.EXPECT().GetAllInstallPlansOfSubscription(gomock.Any()).Return([]olmv1alpha1.InstallPlan{}, nil).Times(2)
 
 				// First attempt - kubeconfig path fails
 				mockRebootsNotifier.EXPECT().GetKubeconfigPath(gomock.Any()).
@@ -1607,11 +1690,11 @@ manifests:
 				mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-kube-descheduler-operator", "cluster-kube-descheduler-operator").
 					Return(randomCSV, nil).Times(1)
 				mockk8sclient.EXPECT().GetCSV("openshift-kube-descheduler-operator", gomock.Any()).
-					Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseNone}}, nil).Times(1)
+					Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseSucceeded}}, nil).Times(1)
 				mockk8sclient.EXPECT().GetCSVFromSubscription("openshift-nmstate", "kubernetes-nmstate-operator").
 					Return(randomCSV, nil).Times(1)
 				mockk8sclient.EXPECT().GetCSV("openshift-nmstate", gomock.Any()).
-					Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseNone}}, nil).Times(1)
+					Return(&olmv1alpha1.ClusterServiceVersion{Status: olmv1alpha1.ClusterServiceVersionStatus{Phase: olmv1alpha1.CSVPhaseSucceeded}}, nil).Times(1)
 				mockops.EXPECT().CreateManifests(gomock.Any(), gomock.Any()).Times(2)
 
 				wg.Add(1)

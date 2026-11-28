@@ -62,8 +62,14 @@ type K8SClient interface {
 	GetCSV(namespace string, name string) (*olmv1alpha1.ClusterServiceVersion, error)
 	GetCSVFromSubscription(namespace string, name string) (string, error)
 	GetSubscription(subscription types.NamespacedName) (*olmv1alpha1.Subscription, error)
+	ListSubscriptions(namespace string) ([]olmv1alpha1.Subscription, error)
 	GetAllInstallPlansOfSubscription(subscription types.NamespacedName) ([]olmv1alpha1.InstallPlan, error)
 	DeleteInstallPlan(installPlan types.NamespacedName) error
+	GetInstallPlan(installPlan types.NamespacedName) (*olmv1alpha1.InstallPlan, error)
+	CreateSubscription(subscription *olmv1alpha1.Subscription) error
+	DeleteSubscription(subscription types.NamespacedName) error
+	DeleteCSV(namespace string, name string) error
+	ListCSVs(namespace string, labelSelector string) ([]olmv1alpha1.ClusterServiceVersion, error)
 	IsMetalProvisioningExists() (bool, error)
 	ListBMHs() (metal3v1alpha1.BareMetalHostList, error)
 	GetBMH(name string) (*metal3v1alpha1.BareMetalHost, error)
@@ -655,9 +661,43 @@ func (c *k8sClient) GetAllInstallPlansOfSubscription(subscription types.Namespac
 	return installPlansOwnedBySubscription, nil
 }
 
+func (c *k8sClient) GetInstallPlan(installPlan types.NamespacedName) (*olmv1alpha1.InstallPlan, error) {
+	return c.olmClient.InstallPlans(installPlan.Namespace).Get(context.TODO(), installPlan.Name, metav1.GetOptions{})
+}
+
 func (c *k8sClient) DeleteInstallPlan(installPlan types.NamespacedName) error {
 	return c.olmClient.InstallPlans(installPlan.Namespace).Delete(context.TODO(),
 		installPlan.Name, metav1.DeleteOptions{})
+}
+
+func (c *k8sClient) ListSubscriptions(namespace string) ([]olmv1alpha1.Subscription, error) {
+	list, err := c.olmClient.Subscriptions(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return list.Items, nil
+}
+
+func (c *k8sClient) CreateSubscription(subscription *olmv1alpha1.Subscription) error {
+	_, err := c.olmClient.Subscriptions(subscription.Namespace).Create(context.TODO(), subscription, metav1.CreateOptions{})
+	return err
+}
+
+func (c *k8sClient) DeleteSubscription(subscription types.NamespacedName) error {
+	return c.olmClient.Subscriptions(subscription.Namespace).Delete(context.TODO(),
+		subscription.Name, metav1.DeleteOptions{})
+}
+
+func (c *k8sClient) DeleteCSV(namespace string, name string) error {
+	return c.olmClient.ClusterServiceVersions(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+}
+
+func (c *k8sClient) ListCSVs(namespace string, labelSelector string) ([]olmv1alpha1.ClusterServiceVersion, error) {
+	list, err := c.olmClient.ClusterServiceVersions(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+	if err != nil {
+		return nil, err
+	}
+	return list.Items, nil
 }
 
 func (c *k8sClient) GetNode(name string) (*v1.Node, error) {
