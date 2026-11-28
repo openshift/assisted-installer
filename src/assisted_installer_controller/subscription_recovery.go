@@ -26,6 +26,11 @@ const (
 	// validating webhook whose backend is not serving yet) needs time to clear.
 	subscriptionRecoveryBackoff = 5 * time.Minute
 
+	// deletedPlanWait bounds how long a recreation waits for the deleted InstallPlan to
+	// disappear. A plan that is still there after this is not going away on its own (for
+	// example a finalizer), and the subscription must not stay deleted because of it.
+	deletedPlanWait = 2 * time.Minute
+
 	// operatorLabelPrefix prefixes the label OLM puts on an operator's subscription and on
 	// the CSVs it creates for it: operators.coreos.com/<package>.<namespace>.
 	operatorLabelPrefix = "operators.coreos.com/"
@@ -44,6 +49,9 @@ type subscriptionRecoveryState struct {
 	// recreated. While it is set, every poll retries the create first, so a failed
 	// create never loses the subscription.
 	pending *olmv1alpha1.Subscription
+	// deletedPlan is the InstallPlan deleted together with pending. pending is only
+	// created once that plan is gone; see recoverWedgedGroup.
+	deletedPlan *types.NamespacedName
 	// installed is set once a recreated subscription's CSV has reached Succeeded.
 	installed bool
 	// gaveUp is set once the subscription is still wedged after maxSubscriptionRecoveries.
@@ -112,6 +120,10 @@ func (c *controller) recoverWedgedSubscriptions() bool {
 	for _, key := range c.sortedRecoveryKeys() {
 		state := c.subscriptionRecovery[key]
 		if state.pending == nil {
+			continue
+		}
+		if !c.deletedPlanGone(key, state) {
+			outstanding = true
 			continue
 		}
 		c.createRecoveredSubscription(key, state)
@@ -266,21 +278,59 @@ func (c *controller) recoverWedgedGroup(group wedgedGroup) bool {
 	}
 
 	// Only once nothing references it, so OLM cannot reuse the failed plan.
+	var deletedPlan *types.NamespacedName
 	if group.plan != nil && allDeleted {
-		if err := c.kc.DeleteInstallPlan(*group.plan); err != nil && !apierrors.IsNotFound(err) {
-			c.log.WithError(err).Warnf("Failed to delete InstallPlan %s, recreating its subscriptions anyway", *group.plan)
-		} else {
+		err := c.kc.DeleteInstallPlan(*group.plan)
+		switch {
+		case err == nil:
 			c.log.Infof("Deleted InstallPlan %s, which no subscription references any more", *group.plan)
+			deletedPlan = group.plan
+		case apierrors.IsNotFound(err):
+			c.log.Infof("InstallPlan %s is already gone", *group.plan)
+		default:
+			c.log.WithError(err).Warnf("Failed to delete InstallPlan %s, recreating its subscriptions anyway", *group.plan)
 		}
 	}
 
-	outstanding := !allDeleted
+	// The subscriptions are recreated on a later poll, not straight away. OLM resolves a
+	// new subscription against its own cached view of the namespace; if that view still
+	// has the plan deleted a moment ago, OLM reuses it, and the recreated subscription
+	// reports InstallPlanMissing at once (seen with mtv, which then needed a whole
+	// backoff round). Waiting until the plan is confirmed gone, and at least one poll,
+	// gives OLM time to see the delete.
 	for _, i := range deleted {
 		sub := group.subs[i]
-		c.createRecoveredSubscription(types.NamespacedName{Namespace: sub.Namespace, Name: sub.Name}, states[i])
-		outstanding = true // installing, or the create is pending
+		states[i].deletedPlan = deletedPlan
+		c.log.Infof("Subscription %s/%s will be recreated on the next check", sub.Namespace, sub.Name)
 	}
-	return outstanding
+	return true
+}
+
+// deletedPlanGone reports whether the InstallPlan deleted together with state.pending
+// is gone, so the subscription can be recreated. It gives up waiting after
+// deletedPlanWait, so a plan that never disappears cannot leave the subscription deleted.
+func (c *controller) deletedPlanGone(key types.NamespacedName, state *subscriptionRecoveryState) bool {
+	if state.deletedPlan == nil {
+		return true
+	}
+	plan := *state.deletedPlan
+	_, err := c.kc.GetInstallPlan(plan)
+	switch {
+	case apierrors.IsNotFound(err):
+		state.deletedPlan = nil
+		return true
+	case time.Since(state.lastAttempt) >= deletedPlanWait:
+		c.log.Warnf("InstallPlan %s is still present %s after it was deleted, recreating subscription %s anyway",
+			plan, deletedPlanWait, key)
+		state.deletedPlan = nil
+		return true
+	case err != nil:
+		c.log.WithError(err).Infof("Failed to check whether InstallPlan %s is gone, will recreate subscription %s on a later check", plan, key)
+		return false
+	default:
+		c.log.Infof("InstallPlan %s is still being deleted, will recreate subscription %s on a later check", plan, key)
+		return false
+	}
 }
 
 // checkRecoveredSubscriptions reports whether any subscription that was recreated is

@@ -100,13 +100,24 @@ var _ = Describe("recoverWedgedSubscriptions", func() {
 		return kc.EXPECT().DeleteCSV(namespace, csvOf(name)).Return(nil).Times(1)
 	}
 
-	// expectRecreate expects one full recovery of a single subscription on planName.
-	expectRecreate := func(name string) {
+	// expectTeardown expects the first half of the recovery of one subscription on
+	// planName: it, its stranded CSV and the plan are deleted. It is recreated on the next poll.
+	expectTeardown := func(name string) {
 		key := types.NamespacedName{Namespace: namespace, Name: name}
 		kc.EXPECT().DeleteSubscription(key).Return(nil).Times(1)
 		expectCSVCleanup(name)
 		kc.EXPECT().DeleteInstallPlan(planKey).Return(nil).Times(1)
-		kc.EXPECT().CreateSubscription(gomock.Any()).Return(nil).Times(1)
+	}
+
+	// nextPoll runs the poll after a teardown: each of the n deleted subscriptions finds
+	// the deleted plan gone (when there is one to check) and is recreated.
+	nextPoll := func(n int, plan *types.NamespacedName) {
+		if plan != nil {
+			kc.EXPECT().GetInstallPlan(*plan).Return(nil, notFound("installplans", plan.Name)).Times(n)
+		}
+		kc.EXPECT().CreateSubscription(gomock.Any()).Return(nil).Times(n)
+		kc.EXPECT().ListSubscriptions(metav1.NamespaceAll).Return(subs(), nil).Times(1)
+		c.recoverWedgedSubscriptions()
 	}
 
 	BeforeEach(func() {
@@ -145,7 +156,18 @@ var _ = Describe("recoverWedgedSubscriptions", func() {
 		kc.EXPECT().ListSubscriptions(metav1.NamespaceAll).Return(subs(sub), nil).Times(1)
 		deleteSub := kc.EXPECT().DeleteSubscription(nhcKey).Return(nil).Times(1)
 		deleteCSV := expectCSVCleanup(nhc).After(deleteSub)
-		deletePlan := kc.EXPECT().DeleteInstallPlan(planKey).Return(nil).Times(1).After(deleteCSV)
+		kc.EXPECT().DeleteInstallPlan(planKey).Return(nil).Times(1).After(deleteCSV)
+
+		Expect(c.recoverWedgedSubscriptions()).To(BeTrue())
+
+		// Not recreated in the same poll: OLM may still see the plan just deleted.
+		state := c.subscriptionRecovery[nhcKey]
+		Expect(state.attempts).To(Equal(1))
+		Expect(state.pending).NotTo(BeNil())
+		Expect(*state.deletedPlan).To(Equal(planKey))
+
+		// Next poll: the plan is confirmed gone, then the subscription is recreated.
+		planGone := kc.EXPECT().GetInstallPlan(planKey).Return(nil, notFound("installplans", planName)).Times(1)
 		kc.EXPECT().CreateSubscription(gomock.Any()).DoAndReturn(func(created *olmv1alpha1.Subscription) error {
 			Expect(created.Name).To(Equal(nhc))
 			Expect(created.Namespace).To(Equal(namespace))
@@ -158,13 +180,14 @@ var _ = Describe("recoverWedgedSubscriptions", func() {
 			Expect(created.Generation).To(BeZero())
 			Expect(created.Status).To(Equal(olmv1alpha1.SubscriptionStatus{}))
 			return nil
-		}).Times(1).After(deletePlan)
+		}).Times(1).After(planGone)
+		kc.EXPECT().ListSubscriptions(metav1.NamespaceAll).Return(subs(), nil).Times(1)
 
-		Expect(c.recoverWedgedSubscriptions()).To(BeTrue())
+		c.recoverWedgedSubscriptions()
 
-		state := c.subscriptionRecovery[nhcKey]
 		Expect(state.attempts).To(Equal(1))
 		Expect(state.pending).To(BeNil())
+		Expect(state.deletedPlan).To(BeNil())
 	})
 
 	It("recovers every subscription that shares a failed plan together, including ones it does not monitor", func() {
@@ -177,14 +200,18 @@ var _ = Describe("recoverWedgedSubscriptions", func() {
 		deleteNhc := kc.EXPECT().DeleteSubscription(nhcKey).Return(nil).Times(1)
 		expectCSVCleanup(far)
 		expectCSVCleanup(nhc)
-		deletePlan := kc.EXPECT().DeleteInstallPlan(planKey).Return(nil).Times(1).After(deleteFar).After(deleteNhc)
+		kc.EXPECT().DeleteInstallPlan(planKey).Return(nil).Times(1).After(deleteFar).After(deleteNhc)
+
+		Expect(c.recoverWedgedSubscriptions()).To(BeTrue())
+
 		var created []string
+		kc.EXPECT().GetInstallPlan(planKey).Return(nil, notFound("installplans", planName)).Times(2)
 		kc.EXPECT().CreateSubscription(gomock.Any()).DoAndReturn(func(s *olmv1alpha1.Subscription) error {
 			created = append(created, s.Name)
 			return nil
-		}).Times(2).After(deletePlan)
-
-		Expect(c.recoverWedgedSubscriptions()).To(BeTrue())
+		}).Times(2)
+		kc.EXPECT().ListSubscriptions(metav1.NamespaceAll).Return(subs(), nil).Times(1)
+		c.recoverWedgedSubscriptions()
 
 		Expect(created).To(ConsistOf(far, nhc))
 		Expect(c.subscriptionRecovery[farKey].attempts).To(Equal(1))
@@ -208,16 +235,22 @@ var _ = Describe("recoverWedgedSubscriptions", func() {
 		other.Status.InstallPlanRef = &corev1.ObjectReference{Namespace: other.Namespace, Name: "install-jprqh"}
 		kc.EXPECT().ListSubscriptions(metav1.NamespaceAll).Return(subs(subscription(nhc, installPlanFailed), other), nil).Times(1)
 
-		expectRecreate(nhc)
+		expectTeardown(nhc)
 		otherKey := types.NamespacedName{Namespace: other.Namespace, Name: far}
 		kc.EXPECT().DeleteSubscription(otherKey).Return(nil).Times(1)
 		kc.EXPECT().ListCSVs(other.Namespace, "operators.coreos.com/"+far+"."+other.Namespace).Return(nil, nil).Times(1)
 		kc.EXPECT().GetCSV(other.Namespace, csvOf(far)).Return(csvInPhase(olmv1alpha1.CSVPhasePending), nil).Times(1)
 		kc.EXPECT().DeleteCSV(other.Namespace, csvOf(far)).Return(nil).Times(1)
-		kc.EXPECT().DeleteInstallPlan(types.NamespacedName{Namespace: other.Namespace, Name: "install-jprqh"}).Return(nil).Times(1)
-		kc.EXPECT().CreateSubscription(gomock.Any()).Return(nil).Times(1)
+		otherPlan := types.NamespacedName{Namespace: other.Namespace, Name: "install-jprqh"}
+		kc.EXPECT().DeleteInstallPlan(otherPlan).Return(nil).Times(1)
 
 		Expect(c.recoverWedgedSubscriptions()).To(BeTrue())
+
+		kc.EXPECT().GetInstallPlan(planKey).Return(nil, notFound("installplans", planName)).Times(1)
+		kc.EXPECT().GetInstallPlan(otherPlan).Return(nil, notFound("installplans", otherPlan.Name)).Times(1)
+		kc.EXPECT().CreateSubscription(gomock.Any()).Return(nil).Times(2)
+		kc.EXPECT().ListSubscriptions(metav1.NamespaceAll).Return(subs(), nil).Times(1)
+		c.recoverWedgedSubscriptions()
 	})
 
 	It("recreates a subscription whose plan is already gone", func() {
@@ -225,9 +258,11 @@ var _ = Describe("recoverWedgedSubscriptions", func() {
 		kc.EXPECT().DeleteSubscription(nhcKey).Return(nil).Times(1)
 		expectCSVCleanup(nhc)
 		kc.EXPECT().DeleteInstallPlan(planKey).Return(notFound("installplans", planName)).Times(1)
-		kc.EXPECT().CreateSubscription(gomock.Any()).Return(nil).Times(1)
 
 		c.recoverWedgedSubscriptions()
+		// Nothing to wait for: the next poll recreates it without checking the plan.
+		Expect(c.subscriptionRecovery[nhcKey].deletedPlan).To(BeNil())
+		nextPoll(1, nil)
 
 		Expect(c.subscriptionRecovery[nhcKey].attempts).To(Equal(1))
 	})
@@ -239,9 +274,9 @@ var _ = Describe("recoverWedgedSubscriptions", func() {
 		kc.EXPECT().DeleteSubscription(nhcKey).Return(nil).Times(1)
 		expectCSVCleanup(nhc)
 		kc.EXPECT().DeleteInstallPlan(gomock.Any()).Times(0)
-		kc.EXPECT().CreateSubscription(gomock.Any()).Return(nil).Times(1)
 
 		c.recoverWedgedSubscriptions()
+		nextPoll(1, nil)
 	})
 
 	It("skips subscriptions that are being deleted", func() {
@@ -260,9 +295,9 @@ var _ = Describe("recoverWedgedSubscriptions", func() {
 		kc.EXPECT().GetCSV(namespace, csvOf(nhc)).Return(csvInPhase(olmv1alpha1.CSVPhaseSucceeded), nil).Times(1)
 		kc.EXPECT().DeleteCSV(gomock.Any(), gomock.Any()).Times(0)
 		kc.EXPECT().DeleteInstallPlan(planKey).Return(nil).Times(1)
-		kc.EXPECT().CreateSubscription(gomock.Any()).Return(nil).Times(1)
 
 		c.recoverWedgedSubscriptions()
+		nextPoll(1, &planKey)
 	})
 
 	It("still recreates the subscription when its CSV is already gone", func() {
@@ -272,9 +307,9 @@ var _ = Describe("recoverWedgedSubscriptions", func() {
 		kc.EXPECT().GetCSV(namespace, csvOf(nhc)).Return(nil, notFound("clusterserviceversions", csvOf(nhc))).Times(1)
 		kc.EXPECT().DeleteCSV(gomock.Any(), gomock.Any()).Times(0)
 		kc.EXPECT().DeleteInstallPlan(planKey).Return(nil).Times(1)
-		kc.EXPECT().CreateSubscription(gomock.Any()).Return(nil).Times(1)
 
 		c.recoverWedgedSubscriptions()
+		nextPoll(1, &planKey)
 
 		Expect(c.subscriptionRecovery[nhcKey].pending).To(BeNil())
 	})
@@ -293,11 +328,11 @@ var _ = Describe("recoverWedgedSubscriptions", func() {
 		kc.EXPECT().GetCSV(namespace, csvOf(nhc)).Return(csvInPhase(olmv1alpha1.CSVPhasePending), nil).Times(1)
 		kc.EXPECT().DeleteCSV(namespace, csvOf(nhc)).Return(nil).Times(1)
 		kc.EXPECT().GetCSV(namespace, orphan).Return(csvInPhase(olmv1alpha1.CSVPhasePending), nil).Times(1)
-		deleteOrphan := kc.EXPECT().DeleteCSV(namespace, orphan).Return(nil).Times(1)
+		kc.EXPECT().DeleteCSV(namespace, orphan).Return(nil).Times(1)
 		kc.EXPECT().DeleteInstallPlan(planKey).Return(nil).Times(1)
-		kc.EXPECT().CreateSubscription(gomock.Any()).Return(nil).Times(1).After(deleteOrphan)
 
 		c.recoverWedgedSubscriptions()
+		nextPoll(1, &planKey)
 	})
 
 	It("never deletes a CSV copied in from an operator installed for all namespaces", func() {
@@ -311,9 +346,9 @@ var _ = Describe("recoverWedgedSubscriptions", func() {
 		kc.EXPECT().DeleteCSV(namespace, csvOf(nhc)).Return(nil).Times(1)
 		kc.EXPECT().GetCSV(namespace, copied).Times(0)
 		kc.EXPECT().DeleteInstallPlan(planKey).Return(nil).Times(1)
-		kc.EXPECT().CreateSubscription(gomock.Any()).Return(nil).Times(1)
 
 		c.recoverWedgedSubscriptions()
+		nextPoll(1, &planKey)
 	})
 
 	It("looks up the operator's CSVs by the OLM label on the subscription when it has one", func() {
@@ -326,9 +361,9 @@ var _ = Describe("recoverWedgedSubscriptions", func() {
 		kc.EXPECT().GetCSV(namespace, csvOf(nhc)).Return(csvInPhase(olmv1alpha1.CSVPhasePending), nil).Times(1)
 		kc.EXPECT().DeleteCSV(namespace, csvOf(nhc)).Return(nil).Times(1)
 		kc.EXPECT().DeleteInstallPlan(planKey).Return(nil).Times(1)
-		kc.EXPECT().CreateSubscription(gomock.Any()).Return(nil).Times(1)
 
 		c.recoverWedgedSubscriptions()
+		nextPoll(1, &planKey)
 	})
 
 	It("still cleans up the referenced CSV and recreates when the CSVs cannot be listed", func() {
@@ -338,9 +373,9 @@ var _ = Describe("recoverWedgedSubscriptions", func() {
 		kc.EXPECT().GetCSV(namespace, csvOf(nhc)).Return(csvInPhase(olmv1alpha1.CSVPhasePending), nil).Times(1)
 		kc.EXPECT().DeleteCSV(namespace, csvOf(nhc)).Return(nil).Times(1)
 		kc.EXPECT().DeleteInstallPlan(planKey).Return(nil).Times(1)
-		kc.EXPECT().CreateSubscription(gomock.Any()).Return(nil).Times(1)
 
 		c.recoverWedgedSubscriptions()
+		nextPoll(1, &planKey)
 
 		Expect(c.subscriptionRecovery[nhcKey].pending).To(BeNil())
 	})
@@ -348,8 +383,9 @@ var _ = Describe("recoverWedgedSubscriptions", func() {
 	It("waits out the backoff before recreating the same subscription again", func() {
 		sub := subscription(nhc, installPlanFailed)
 		kc.EXPECT().ListSubscriptions(metav1.NamespaceAll).Return(subs(sub), nil).Times(1)
-		expectRecreate(nhc)
+		expectTeardown(nhc)
 		c.recoverWedgedSubscriptions()
+		nextPoll(1, &planKey)
 
 		// Still wedged straight away: only checked, not recreated.
 		kc.EXPECT().ListSubscriptions(metav1.NamespaceAll).Return(subs(sub), nil).Times(1)
@@ -361,7 +397,7 @@ var _ = Describe("recoverWedgedSubscriptions", func() {
 		c.subscriptionRecovery[nhcKey].lastAttempt = time.Now().Add(-subscriptionRecoveryBackoff)
 		kc.EXPECT().ListSubscriptions(metav1.NamespaceAll).Return(subs(sub), nil).Times(1)
 		kc.EXPECT().GetCSV(namespace, csvOf(nhc)).Return(csvInPhase(olmv1alpha1.CSVPhasePending), nil).Times(1)
-		expectRecreate(nhc)
+		expectTeardown(nhc)
 		c.recoverWedgedSubscriptions()
 		Expect(c.subscriptionRecovery[nhcKey].attempts).To(Equal(2))
 	})
@@ -396,6 +432,55 @@ var _ = Describe("recoverWedgedSubscriptions", func() {
 		Expect(c.recoverWedgedSubscriptions()).To(BeFalse())
 	})
 
+	It("waits until the deleted plan is gone before recreating the subscriptions", func() {
+		// The mtv case: recreated a second after its plan was deleted, the subscription was
+		// attached to that same plan and reported InstallPlanMissing at once.
+		kc.EXPECT().ListSubscriptions(metav1.NamespaceAll).Return(subs(subscription(nhc, installPlanFailed)), nil).Times(1)
+		expectTeardown(nhc)
+		c.recoverWedgedSubscriptions()
+
+		// Still there: not recreated yet.
+		kc.EXPECT().GetInstallPlan(planKey).Return(&olmv1alpha1.InstallPlan{}, nil).Times(1)
+		kc.EXPECT().ListSubscriptions(metav1.NamespaceAll).Return(subs(), nil).Times(1)
+		Expect(c.recoverWedgedSubscriptions()).To(BeTrue())
+		Expect(c.subscriptionRecovery[nhcKey].pending).NotTo(BeNil())
+
+		// Gone: recreated.
+		nextPoll(1, &planKey)
+		Expect(c.subscriptionRecovery[nhcKey].pending).To(BeNil())
+	})
+
+	It("keeps waiting when it cannot tell whether the deleted plan is gone", func() {
+		c.subscriptionRecovery[nhcKey] = &subscriptionRecoveryState{
+			attempts:    1,
+			lastAttempt: time.Now(),
+			pending:     subscriptionForRecreate(ptr(subscription(nhc))),
+			deletedPlan: &planKey,
+		}
+		kc.EXPECT().GetInstallPlan(planKey).Return(nil, fmt.Errorf("connection refused")).Times(1)
+		kc.EXPECT().CreateSubscription(gomock.Any()).Times(0)
+		kc.EXPECT().ListSubscriptions(metav1.NamespaceAll).Return(subs(), nil).Times(1)
+
+		Expect(c.recoverWedgedSubscriptions()).To(BeTrue())
+		Expect(c.subscriptionRecovery[nhcKey].pending).NotTo(BeNil())
+	})
+
+	It("recreates the subscriptions anyway when the deleted plan does not go away", func() {
+		c.subscriptionRecovery[nhcKey] = &subscriptionRecoveryState{
+			attempts:    1,
+			lastAttempt: time.Now().Add(-deletedPlanWait),
+			pending:     subscriptionForRecreate(ptr(subscription(nhc))),
+			deletedPlan: &planKey,
+		}
+		kc.EXPECT().GetInstallPlan(planKey).Return(&olmv1alpha1.InstallPlan{}, nil).Times(1)
+		kc.EXPECT().CreateSubscription(gomock.Any()).Return(nil).Times(1)
+		kc.EXPECT().ListSubscriptions(metav1.NamespaceAll).Return(subs(), nil).Times(1)
+
+		c.recoverWedgedSubscriptions()
+
+		Expect(c.subscriptionRecovery[nhcKey].pending).To(BeNil())
+	})
+
 	It("does not delete the plan, the CSV or create anything for a subscription that could not be deleted", func() {
 		kc.EXPECT().ListSubscriptions(metav1.NamespaceAll).Return(subs(subscription(nhc, installPlanFailed)), nil).Times(1)
 		kc.EXPECT().DeleteSubscription(nhcKey).Return(fmt.Errorf("forbidden")).Times(1)
@@ -418,9 +503,10 @@ var _ = Describe("recoverWedgedSubscriptions", func() {
 		kc.EXPECT().DeleteSubscription(nhcKey).Return(nil).Times(1)
 		expectCSVCleanup(nhc)
 		kc.EXPECT().DeleteInstallPlan(gomock.Any()).Times(0)
-		kc.EXPECT().CreateSubscription(gomock.Any()).Return(nil).Times(1)
 
 		Expect(c.recoverWedgedSubscriptions()).To(BeTrue())
+		// The plan was not deleted, so there is nothing to wait for.
+		nextPoll(1, nil)
 	})
 
 	It("still recreates the subscriptions when the plan cannot be deleted", func() {
@@ -428,9 +514,9 @@ var _ = Describe("recoverWedgedSubscriptions", func() {
 		kc.EXPECT().DeleteSubscription(nhcKey).Return(nil).Times(1)
 		expectCSVCleanup(nhc)
 		kc.EXPECT().DeleteInstallPlan(planKey).Return(fmt.Errorf("timeout")).Times(1)
-		kc.EXPECT().CreateSubscription(gomock.Any()).Return(nil).Times(1)
 
 		c.recoverWedgedSubscriptions()
+		nextPoll(1, nil)
 
 		Expect(c.subscriptionRecovery[nhcKey].pending).To(BeNil())
 	})
@@ -441,8 +527,12 @@ var _ = Describe("recoverWedgedSubscriptions", func() {
 		kc.EXPECT().DeleteSubscription(nhcKey).Return(nil).Times(1)
 		expectCSVCleanup(nhc)
 		kc.EXPECT().DeleteInstallPlan(planKey).Return(nil).Times(1)
-		kc.EXPECT().CreateSubscription(gomock.Any()).Return(fmt.Errorf("connection refused")).Times(1)
+		Expect(c.recoverWedgedSubscriptions()).To(BeTrue())
 
+		// The first create fails.
+		kc.EXPECT().GetInstallPlan(planKey).Return(nil, notFound("installplans", planName)).Times(1)
+		kc.EXPECT().CreateSubscription(gomock.Any()).Return(fmt.Errorf("connection refused")).Times(1)
+		kc.EXPECT().ListSubscriptions(metav1.NamespaceAll).Return(subs(), nil).Times(1)
 		Expect(c.recoverWedgedSubscriptions()).To(BeTrue())
 		Expect(c.subscriptionRecovery[nhcKey].pending).NotTo(BeNil())
 

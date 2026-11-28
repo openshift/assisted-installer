@@ -151,6 +151,21 @@ func (mr *MockK8SClientMockRecorder) ListSubscriptions(namespace any) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSubscriptions", reflect.TypeOf((*MockK8SClient)(nil).ListSubscriptions), namespace)
 }
 
+// GetInstallPlan mocks base method.
+func (m *MockK8SClient) GetInstallPlan(installPlan types.NamespacedName) (*v1alpha10.InstallPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetInstallPlan", installPlan)
+	ret0, _ := ret[0].(*v1alpha10.InstallPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetInstallPlan indicates an expected call of GetInstallPlan.
+func (mr *MockK8SClientMockRecorder) GetInstallPlan(installPlan any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInstallPlan", reflect.TypeOf((*MockK8SClient)(nil).GetInstallPlan), installPlan)
+}
+
 // DeleteInstallPlan mocks base method.
 func (m *MockK8SClient) DeleteInstallPlan(installPlan types.NamespacedName) error {
 	m.ctrl.T.Helper()

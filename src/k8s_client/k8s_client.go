@@ -65,6 +65,7 @@ type K8SClient interface {
 	ListSubscriptions(namespace string) ([]olmv1alpha1.Subscription, error)
 	GetAllInstallPlansOfSubscription(subscription types.NamespacedName) ([]olmv1alpha1.InstallPlan, error)
 	DeleteInstallPlan(installPlan types.NamespacedName) error
+	GetInstallPlan(installPlan types.NamespacedName) (*olmv1alpha1.InstallPlan, error)
 	CreateSubscription(subscription *olmv1alpha1.Subscription) error
 	DeleteSubscription(subscription types.NamespacedName) error
 	DeleteCSV(namespace string, name string) error
@@ -658,6 +659,10 @@ func (c *k8sClient) GetAllInstallPlansOfSubscription(subscription types.Namespac
 	}
 
 	return installPlansOwnedBySubscription, nil
+}
+
+func (c *k8sClient) GetInstallPlan(installPlan types.NamespacedName) (*olmv1alpha1.InstallPlan, error) {
+	return c.olmClient.InstallPlans(installPlan.Namespace).Get(context.TODO(), installPlan.Name, metav1.GetOptions{})
 }
 
 func (c *k8sClient) DeleteInstallPlan(installPlan types.NamespacedName) error {
